@@ -1,0 +1,75 @@
+{
+  "Metadata": {
+    "title": "HACCP Система",
+    "description": "Управление на анализ на опасностите и критичните контролни точки"
+  },
+  "HomePage": {
+    "badge": "HACCP Система",
+    "title": "Скелет на монорепото",
+    "description": "Next.js уеб приложение, свързано със самостоятелното Hono API.",
+    "apiHealth": "Състояние на API",
+    "status": "Статус",
+    "service": "Услуга",
+    "timestamp": "Време",
+    "apiUnreachable": "API е недостъпно. Стартирайте монорепото с",
+    "openDashboard": "Отвори таблото"
+  },
+  "DashboardPage": {
+    "breadcrumbApp": "HACCP Система",
+    "breadcrumbDashboard": "Табло",
+    "placeholder": "Примерно съдържание на таблото"
+  },
+  "Sidebar": {
+    "brandName": "HACCP Система",
+    "brandPlan": "Предприятие",
+    "platform": "Платформа",
+    "projectsLabel": "Проекти",
+    "more": "Още",
+    "viewProject": "Преглед на проект",
+    "shareProject": "Споделяне на проект",
+    "deleteProject": "Изтриване на проект",
+    "toggle": "Превключване",
+    "navMain": {
+      "playground": "Работна среда",
+      "history": "История",
+      "starred": "С отметка",
+      "settings": "Настройки",
+      "models": "Модели",
+      "genesis": "Genesis",
+      "explorer": "Explorer",
+      "quantum": "Quantum",
+      "documentation": "Документация",
+      "introduction": "Въведение",
+      "getStarted": "Започнете",
+      "tutorials": "Уроци",
+      "changelog": "Промени",
+      "general": "Общи",
+      "team": "Екип",
+      "billing": "Плащания",
+      "limits": "Лимити"
+    },
+    "navSecondary": {
+      "support": "Поддръжка",
+      "feedback": "Обратна връзка"
+    },
+    "projects": {
+      "designEngineering": "Инженерен дизайн",
+      "salesMarketing": "Продажби и маркетинг",
+      "travel": "Пътувания"
+    },
+    "userMenu": {
+      "account": "Акаунт",
+      "preferences": "Предпочитания",
+      "theme": "Тема",
+      "themeLight": "Светла",
+      "themeDark": "Тъмна",
+      "themeSystem": "Системна",
+      "logOut": "Изход"
+    }
+  },
+  "LocaleSwitcher": {
+    "label": "Език",
+    "bg": "Български",
+    "en": "English"
+  }
+}
