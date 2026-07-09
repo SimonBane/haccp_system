@@ -1,6 +1,7 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { apiErrorSchema, healthResponseSchema } from "@haccp/shared";
+import { healthResponseSchema as sharedHealthResponseSchema } from "@haccp/shared";
 import { db } from "../db/index.js";
+import { apiErrorSchema, healthResponseSchema } from "../openapi/schemas.js";
 import { healthService } from "../services/health.service.js";
 import type { AppEnv } from "../types.js";
 
@@ -34,5 +35,5 @@ const healthRoute = createRoute({
 
 healthRoutes.openapi(healthRoute, async (c) => {
   const payload = await healthService.getHealth(db);
-  return c.json(healthResponseSchema.parse(payload), 200);
+  return c.json(sharedHealthResponseSchema.parse(payload), 200);
 });
