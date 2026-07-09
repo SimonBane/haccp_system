@@ -5,7 +5,7 @@ import * as schema from "./schema/index.js";
 
 const queryClient = postgres(env.DATABASE_URL, {
   prepare: false,
-  max: env.NODE_ENV === "production" ? 10 : 5,
+  max: process.env.VERCEL ? 1 : env.NODE_ENV === "production" ? 10 : 5,
 });
 
 export const db = drizzle(queryClient, { schema });

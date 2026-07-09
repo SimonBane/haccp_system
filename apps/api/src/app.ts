@@ -15,3 +15,5 @@ app.get("/", (c) => c.json({ message: "HACCP API" }));
 
 app.notFound(notFoundHandler);
 app.onError(errorHandler);
+
+export default app;

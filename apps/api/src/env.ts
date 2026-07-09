@@ -4,7 +4,7 @@ const envSchema = z.object({
   API_PORT: z.coerce.number().default(3001),
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
   DATABASE_URL: z.string().url(),
-  DIRECT_DATABASE_URL: z.string().url(),
+  DIRECT_DATABASE_URL: z.string().url().optional(),
   NODE_ENV: z
     .enum(["development", "production", "test"])
     .default("development"),
