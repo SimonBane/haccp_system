@@ -1,0 +1,27 @@
+{
+  "name": "@haccp/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.25.56"
+  },
+  "devDependencies": {
+    "@haccp/eslint-config": "workspace:*",
+    "@haccp/typescript-config": "workspace:*",
+    "eslint": "^9.28.0",
+    "typescript": "^5.8.3"
+  }
+}
