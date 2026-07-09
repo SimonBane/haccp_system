@@ -12,7 +12,19 @@
     "service": "Service",
     "timestamp": "Timestamp",
     "apiUnreachable": "API unreachable. Start the monorepo with",
-    "openDashboard": "Open dashboard"
+    "openDashboard": "Open dashboard",
+    "signIn": "Sign in",
+    "signUp": "Sign up"
+  },
+  "NoOrganizationPage": {
+    "title": "No organization access",
+    "description": "Your account is not linked to an organization. Contact your administrator to receive an invitation.",
+    "backHome": "Back to home"
+  },
+  "AcceptInvitationPage": {
+    "noToken": "No invitation token found. Use the link from your invitation email.",
+    "processing": "Processing your invitation…",
+    "completing": "Signing you in…"
   },
   "DashboardPage": {
     "breadcrumbApp": "HACCP System",

@@ -1,8 +1,7 @@
 import { type Locale } from "@/i18n/routing";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { getHealth } from "@/lib/api-client";
-import { Link } from "@/i18n/navigation";
-import { buttonVariants } from "@/components/ui/button";
+import { HomeAuthControls } from "@/components/home-auth-controls";
 import {
   Card,
   CardContent,
@@ -65,9 +64,7 @@ export default async function HomePage({
         </CardContent>
 
         <CardFooter>
-          <Link href="/dashboard" className={buttonVariants()}>
-            {t("openDashboard")}
-          </Link>
+          <HomeAuthControls />
         </CardFooter>
       </Card>
     </div>

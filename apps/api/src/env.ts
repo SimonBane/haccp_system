@@ -5,6 +5,8 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
   DATABASE_URL: z.string().url(),
   DIRECT_DATABASE_URL: z.string().url().optional(),
+  CLERK_SECRET_KEY: z.string().min(1),
+  CLERK_PUBLISHABLE_KEY: z.string().min(1),
   NODE_ENV: z
     .enum(["development", "production", "test"])
     .default("development"),
@@ -15,5 +17,7 @@ export const env = envSchema.parse({
   CORS_ORIGIN: process.env.CORS_ORIGIN,
   DATABASE_URL: process.env.DATABASE_URL,
   DIRECT_DATABASE_URL: process.env.DIRECT_DATABASE_URL,
+  CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
+  CLERK_PUBLISHABLE_KEY: process.env.CLERK_PUBLISHABLE_KEY,
   NODE_ENV: process.env.NODE_ENV,
 });

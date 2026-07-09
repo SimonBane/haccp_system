@@ -1,11 +1,17 @@
+import { ClerkProvider } from "@clerk/nextjs";
+import { shadcn } from "@clerk/ui/themes";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, getTranslations, setRequestLocale } from "next-intl/server";
 import { hasLocale } from "next-intl";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { LocaleHtmlLang } from "@/components/locale-html-lang";
-import { routing, type Locale } from "@/i18n/routing";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { routing, type Locale } from "@/i18n/routing";
+import {
+  getClerkLocalization,
+  getClerkLocalePath,
+} from "@/lib/clerk-localization";
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -44,11 +50,22 @@ export default async function LocaleLayout({
   setRequestLocale(locale as Locale);
 
   const messages = await getMessages();
+  const resolvedLocale = locale as Locale;
 
   return (
-    <NextIntlClientProvider messages={messages}>
-      <LocaleHtmlLang />
-      <TooltipProvider>{children}</TooltipProvider>
-    </NextIntlClientProvider>
+    <ClerkProvider
+      appearance={{ theme: shadcn }}
+      localization={getClerkLocalization(resolvedLocale)}
+      signInUrl={getClerkLocalePath(resolvedLocale, "/sign-in")}
+      signUpUrl={getClerkLocalePath(resolvedLocale, "/sign-up")}
+      signInFallbackRedirectUrl={getClerkLocalePath(resolvedLocale, "/dashboard")}
+      signUpFallbackRedirectUrl={getClerkLocalePath(resolvedLocale, "/dashboard")}
+      afterSignOutUrl={getClerkLocalePath(resolvedLocale, "/")}
+    >
+      <NextIntlClientProvider messages={messages}>
+        <LocaleHtmlLang />
+        <TooltipProvider>{children}</TooltipProvider>
+      </NextIntlClientProvider>
+    </ClerkProvider>
   );
 }

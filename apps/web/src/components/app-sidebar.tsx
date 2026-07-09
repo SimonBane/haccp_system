@@ -93,12 +93,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     },
   ];
 
-  const user = {
-    name: "Demo User",
-    email: "demo@haccp.local",
-    avatar: "",
-  };
-
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>
@@ -121,7 +115,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavProjects projects={projects} groupLabel={t("projectsLabel")} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={user} />
+        <NavUser />
       </SidebarFooter>
     </Sidebar>
   );
