@@ -6,17 +6,14 @@ import {
   BookOpenIcon,
   BotIcon,
   FrameIcon,
-  LifeBuoyIcon,
   MapIcon,
   PieChartIcon,
-  SendIcon,
   Settings2Icon,
   ShieldCheckIcon,
   TerminalSquareIcon,
 } from "lucide-react";
 import { NavMain } from "@/components/nav-main";
 import { NavProjects } from "@/components/nav-projects";
-import { NavSecondary } from "@/components/nav-secondary";
 import { NavUser } from "@/components/nav-user";
 import { Link } from "@/i18n/navigation";
 import {
@@ -78,19 +75,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     },
   ];
 
-  const navSecondary = [
-    {
-      title: t("navSecondary.support"),
-      url: "#",
-      icon: <LifeBuoyIcon />,
-    },
-    {
-      title: t("navSecondary.feedback"),
-      url: "#",
-      icon: <SendIcon />,
-    },
-  ];
-
   const projects = [
     {
       name: t("projects.designEngineering"),
@@ -135,7 +119,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         <NavMain items={navMain} groupLabel={t("platform")} />
         <NavProjects projects={projects} groupLabel={t("projectsLabel")} />
-        <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={user} />
