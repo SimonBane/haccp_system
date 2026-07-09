@@ -1,39 +1,12 @@
-import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { healthResponseSchema as sharedHealthResponseSchema } from "@haccp/shared";
+import { OpenAPIHono } from "@hono/zod-openapi";
+import { healthResponseSchema } from "@haccp/shared";
 import { db } from "../db/index.js";
-import { apiErrorSchema, healthResponseSchema } from "../openapi/schemas.js";
 import { healthService } from "../services/health.service.js";
 import type { AppEnv } from "../types.js";
 
 export const healthRoutes = new OpenAPIHono<AppEnv>();
 
-const healthRoute = createRoute({
-  method: "get",
-  path: "/",
-  tags: ["Health"],
-  summary: "Health check",
-  description: "Returns API status and verifies database connectivity.",
-  responses: {
-    200: {
-      content: {
-        "application/json": {
-          schema: healthResponseSchema,
-        },
-      },
-      description: "API and database are healthy",
-    },
-    500: {
-      content: {
-        "application/json": {
-          schema: apiErrorSchema,
-        },
-      },
-      description: "Internal server error",
-    },
-  },
-});
-
-healthRoutes.openapi(healthRoute, async (c) => {
+healthRoutes.get("/", async (c) => {
   const payload = await healthService.getHealth(db);
-  return c.json(sharedHealthResponseSchema.parse(payload), 200);
+  return c.json(healthResponseSchema.parse(payload), 200);
 });
