@@ -12,7 +12,19 @@
     "service": "Услуга",
     "timestamp": "Време",
     "apiUnreachable": "API е недостъпно. Стартирайте монорепото с",
-    "openDashboard": "Отвори таблото"
+    "openDashboard": "Отвори таблото",
+    "signIn": "Вход",
+    "signUp": "Регистрация"
+  },
+  "NoOrganizationPage": {
+    "title": "Няма достъп до организация",
+    "description": "Вашият акаунт не е свързан с организация. Свържете се с администратора, за да получите покана.",
+    "backHome": "Към началната страница"
+  },
+  "AcceptInvitationPage": {
+    "noToken": "Не е намерен токен за покана. Използвайте връзката от имейла с поканата.",
+    "processing": "Обработване на поканата…",
+    "completing": "Влизане в системата…"
   },
   "DashboardPage": {
     "breadcrumbApp": "HACCP Система",
