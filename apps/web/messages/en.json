@@ -1,0 +1,75 @@
+{
+  "Metadata": {
+    "title": "HACCP System",
+    "description": "Hazard Analysis and Critical Control Points management"
+  },
+  "HomePage": {
+    "badge": "HACCP System",
+    "title": "Monorepo skeleton",
+    "description": "Next.js web app connected to the standalone Hono API.",
+    "apiHealth": "API health",
+    "status": "Status",
+    "service": "Service",
+    "timestamp": "Timestamp",
+    "apiUnreachable": "API unreachable. Start the monorepo with",
+    "openDashboard": "Open dashboard"
+  },
+  "DashboardPage": {
+    "breadcrumbApp": "HACCP System",
+    "breadcrumbDashboard": "Dashboard",
+    "placeholder": "Sample dashboard content"
+  },
+  "Sidebar": {
+    "brandName": "HACCP System",
+    "brandPlan": "Enterprise",
+    "platform": "Platform",
+    "projectsLabel": "Projects",
+    "more": "More",
+    "viewProject": "View Project",
+    "shareProject": "Share Project",
+    "deleteProject": "Delete Project",
+    "toggle": "Toggle",
+    "navMain": {
+      "playground": "Playground",
+      "history": "History",
+      "starred": "Starred",
+      "settings": "Settings",
+      "models": "Models",
+      "genesis": "Genesis",
+      "explorer": "Explorer",
+      "quantum": "Quantum",
+      "documentation": "Documentation",
+      "introduction": "Introduction",
+      "getStarted": "Get Started",
+      "tutorials": "Tutorials",
+      "changelog": "Changelog",
+      "general": "General",
+      "team": "Team",
+      "billing": "Billing",
+      "limits": "Limits"
+    },
+    "navSecondary": {
+      "support": "Support",
+      "feedback": "Feedback"
+    },
+    "projects": {
+      "designEngineering": "Design Engineering",
+      "salesMarketing": "Sales & Marketing",
+      "travel": "Travel"
+    },
+    "userMenu": {
+      "account": "Account",
+      "preferences": "Preferences",
+      "theme": "Theme",
+      "themeLight": "Light",
+      "themeDark": "Dark",
+      "themeSystem": "System",
+      "logOut": "Log out"
+    }
+  },
+  "LocaleSwitcher": {
+    "label": "Language",
+    "bg": "Български",
+    "en": "English"
+  }
+}
