@@ -1,0 +1,27 @@
+# Supabase project: haccp-api (eu-central-1)
+# Project ref: ottlklibvmkdhjhrabjf
+# Dashboard: https://supabase.com/dashboard/project/ottlklibvmkdhjhrabjf
+
+project_id = "ottlklibvmkdhjhrabjf"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.migrations]
+enabled = true
+
+[db.pooler]
+enabled = false
+
+[studio]
+enabled = true
+port = 54323
