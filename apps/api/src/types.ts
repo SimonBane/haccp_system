@@ -1,4 +1,4 @@
-import type { Hono } from "hono";
+import type { OpenAPIHono } from "@hono/zod-openapi";
 
 export type AppEnv = {
   Variables: {
@@ -6,4 +6,4 @@ export type AppEnv = {
   };
 };
 
-export type AppHono = Hono<AppEnv>;
+export type AppHono = OpenAPIHono<AppEnv>;
