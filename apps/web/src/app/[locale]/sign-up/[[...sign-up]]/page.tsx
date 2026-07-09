@@ -1,6 +1,7 @@
 import { SignUp } from "@clerk/nextjs";
 import { type Locale } from "@/i18n/routing";
 import { setRequestLocale } from "next-intl/server";
+import { getClerkLocalePath } from "@/lib/clerk-localization";
 
 export default async function SignUpPage({
   params,
@@ -8,11 +9,15 @@ export default async function SignUpPage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  setRequestLocale(locale as Locale);
+  const resolvedLocale = locale as Locale;
+  setRequestLocale(resolvedLocale);
+
+  const dashboardPath = getClerkLocalePath(resolvedLocale, "/dashboard");
 
   return (
-    <div className="flex min-h-full flex-1 items-center justify-center px-6 py-16">
-      <SignUp forceRedirectUrl="/dashboard" fallbackRedirectUrl="/dashboard" />
-    </div>
+    <SignUp
+      forceRedirectUrl={dashboardPath}
+      fallbackRedirectUrl={dashboardPath}
+    />
   );
 }
