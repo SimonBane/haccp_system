@@ -28,6 +28,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { usePathname, useRouter } from "@/i18n/navigation";
+import { setLocaleCookie } from "@/i18n/locale-cookie";
 import { routing, type Locale } from "@/i18n/routing";
 import {
   UserIcon,
@@ -107,6 +108,7 @@ export function NavUser({
                     value={locale}
                     onValueChange={(value) => {
                       if (value !== locale) {
+                        setLocaleCookie(value as Locale);
                         router.replace(pathname, { locale: value as Locale });
                       }
                     }}
