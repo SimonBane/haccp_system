@@ -1,4 +1,5 @@
-import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
+import { OpenAPIHono } from "@hono/zod-openapi";
+import { z } from "zod";
 import type { AppEnv } from "../types.js";
 
 const meResponseSchema = z.object({
@@ -9,26 +10,13 @@ const meResponseSchema = z.object({
 
 export const meRoutes = new OpenAPIHono<AppEnv>();
 
-const meRoute = createRoute({
-  method: "get",
-  path: "/",
-  responses: {
-    200: {
-      content: {
-        "application/json": {
-          schema: meResponseSchema,
-        },
-      },
-      description: "Authenticated user context from Clerk session",
-    },
-  },
-  tags: ["Auth"],
-});
-
-meRoutes.openapi(meRoute, (c) => {
-  return c.json({
+meRoutes.get("/", (c) => {
+  return c.json(
+    meResponseSchema.parse({
     userId: c.get("userId"),
     orgId: c.get("orgId"),
     orgRole: c.get("orgRole"),
-  });
+    }),
+    200,
+  );
 });
