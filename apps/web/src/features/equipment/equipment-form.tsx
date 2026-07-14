@@ -209,7 +209,7 @@ export function EquipmentForm({
     }
   }
 
-  const { isSubmitting, isDirty } = form.formState;
+  const { isSubmitting } = form.formState;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -368,7 +368,6 @@ export function EquipmentForm({
                   <Button
                     type="submit"
                     isLoading={isSubmitting}
-                    disabled={!isDirty}
                   >
                     <SaveIcon data-icon="inline-start" />
                     {t("save")}
