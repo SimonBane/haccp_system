@@ -2,18 +2,14 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
+import { usePathname } from "@/i18n/navigation";
+import { useAuth } from "@clerk/nextjs";
 import {
-  BookOpenIcon,
-  BotIcon,
-  FrameIcon,
-  MapIcon,
-  PieChartIcon,
-  Settings2Icon,
+  CalendarDaysIcon,
+  RefrigeratorIcon,
   ShieldCheckIcon,
-  TerminalSquareIcon,
 } from "lucide-react";
 import { NavMain } from "@/components/nav-main";
-import { NavProjects } from "@/components/nav-projects";
 import { NavUser } from "@/components/nav-user";
 import {
   Sidebar,
@@ -27,68 +23,26 @@ import {
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const t = useTranslations("Sidebar");
+  const pathname = usePathname();
+  const { orgRole } = useAuth();
 
-  const navMain = [
+  const isAdmin = orgRole === "org:admin";
+
+  const platformNav = [
     {
-      title: t("navMain.playground"),
-      url: "#",
-      icon: <TerminalSquareIcon />,
-      isActive: true,
-      items: [
-        { title: t("navMain.history"), url: "#" },
-        { title: t("navMain.starred"), url: "#" },
-        { title: t("navMain.settings"), url: "#" },
-      ],
-    },
-    {
-      title: t("navMain.models"),
-      url: "#",
-      icon: <BotIcon />,
-      items: [
-        { title: t("navMain.genesis"), url: "#" },
-        { title: t("navMain.explorer"), url: "#" },
-        { title: t("navMain.quantum"), url: "#" },
-      ],
-    },
-    {
-      title: t("navMain.documentation"),
-      url: "#",
-      icon: <BookOpenIcon />,
-      items: [
-        { title: t("navMain.introduction"), url: "#" },
-        { title: t("navMain.getStarted"), url: "#" },
-        { title: t("navMain.tutorials"), url: "#" },
-        { title: t("navMain.changelog"), url: "#" },
-      ],
-    },
-    {
-      title: t("navMain.settings"),
-      url: "#",
-      icon: <Settings2Icon />,
-      items: [
-        { title: t("navMain.general"), url: "#" },
-        { title: t("navMain.team"), url: "#" },
-        { title: t("navMain.billing"), url: "#" },
-        { title: t("navMain.limits"), url: "#" },
-      ],
+      title: t("nav.today"),
+      url: "/dashboard",
+      icon: <CalendarDaysIcon />,
+      isActive: pathname === "/dashboard",
     },
   ];
 
-  const projects = [
+  const adminNav = [
     {
-      name: t("projects.designEngineering"),
-      url: "#",
-      icon: <FrameIcon />,
-    },
-    {
-      name: t("projects.salesMarketing"),
-      url: "#",
-      icon: <PieChartIcon />,
-    },
-    {
-      name: t("projects.travel"),
-      url: "#",
-      icon: <MapIcon />,
+      title: t("nav.equipment"),
+      url: "/dashboard/equipment",
+      icon: <RefrigeratorIcon />,
+      isActive: pathname.startsWith("/dashboard/equipment"),
     },
   ];
 
@@ -99,7 +53,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"
-              render={<div />}
               className="pointer-events-none cursor-default hover:bg-transparent active:bg-transparent"
             >
               <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
@@ -114,8 +67,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={navMain} groupLabel={t("platform")} />
-        <NavProjects projects={projects} groupLabel={t("projectsLabel")} />
+        <NavMain items={platformNav} groupLabel={t("platform")} />
+        {isAdmin ? <NavMain items={adminNav} groupLabel={t("nav.settings")} /> : null}
       </SidebarContent>
       <SidebarFooter>
         <NavUser />

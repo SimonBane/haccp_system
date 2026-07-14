@@ -67,9 +67,10 @@ export function NavUser() {
         sideOffset={4}
       >
         <DropdownMenuGroup>
+          <DropdownMenuLabel>{t("account")}</DropdownMenuLabel>
           <DropdownMenuItem onClick={() => openUserProfile()}>
             <UserIcon />
-            {t("account")}
+            {t("myProfile")}
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />

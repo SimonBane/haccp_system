@@ -1,6 +1,10 @@
 import { verifyToken } from "@clerk/backend";
 import { createMiddleware } from "hono/factory";
 import { env } from "../env.js";
+import {
+  extractOrgIdFromPayload,
+  extractOrgRoleFromPayload,
+} from "../lib/clerk-token.js";
 import { ForbiddenError, UnauthorizedError } from "../lib/errors.js";
 import type { AppEnv } from "../types.js";
 
@@ -16,9 +20,11 @@ export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
       secretKey: env.CLERK_SECRET_KEY,
     });
 
+    const claims = payload as Record<string, unknown>;
+
     c.set("userId", payload.sub);
-    c.set("orgId", (payload.org_id as string | undefined) ?? null);
-    c.set("orgRole", (payload.org_role as string | undefined) ?? null);
+    c.set("orgId", extractOrgIdFromPayload(claims));
+    c.set("orgRole", extractOrgRoleFromPayload(claims));
   } catch {
     throw new UnauthorizedError("Invalid or expired token");
   }
@@ -29,6 +35,14 @@ export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
 export const requireOrg = createMiddleware<AppEnv>(async (c, next) => {
   if (!c.get("orgId")) {
     throw new ForbiddenError("Organization membership required");
+  }
+
+  await next();
+});
+
+export const requireOrgAdmin = createMiddleware<AppEnv>(async (c, next) => {
+  if (c.get("orgRole") !== "org:admin") {
+    throw new ForbiddenError("Admin access required");
   }
 
   await next();

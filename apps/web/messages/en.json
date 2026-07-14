@@ -31,42 +31,65 @@
     "breadcrumbDashboard": "Dashboard",
     "placeholder": "Sample dashboard content"
   },
+  "EquipmentPage": {
+    "breadcrumb": "Equipment",
+    "title": "Equipment",
+    "description": "Register fridges, freezers, and display cases with allowed temperature ranges.",
+    "emptyTitle": "No equipment yet",
+    "emptyDescription": "Add your first fridge or freezer to start temperature monitoring.",
+    "add": "Add",
+    "addTitle": "Add equipment",
+    "addDescription": "Enter a name, type, and allowed temperature range.",
+    "editTitle": "Edit equipment",
+    "editDescription": "Update the equipment details.",
+    "nameLabel": "Name",
+    "namePlaceholder": "Walk-in freezer",
+    "typeLabel": "Type",
+    "typePlaceholder": "Select a type",
+    "minTempLabel": "Min °C",
+    "maxTempLabel": "Max °C",
+    "save": "Save",
+    "saving": "Saving…",
+    "edit": "Edit",
+    "duplicate": "Duplicate",
+    "duplicateTitle": "Duplicate equipment",
+    "duplicateDescription": "Create a copy with a new name.",
+    "delete": "Delete",
+    "openMenu": "Open menu",
+    "deleteConfirm": "Delete \"{name}\"? This cannot be undone.",
+    "deleteDialog": {
+      "title": "Delete equipment",
+      "fallback": "This will permanently delete the equipment.",
+      "cancel": "Cancel",
+      "confirm": "Delete"
+    },
+    "submitError": "Something went wrong. Please try again.",
+    "nameTaken": "Equipment with this name already exists.",
+    "columns": {
+      "name": "Name",
+      "type": "Type",
+      "range": "Allowed range",
+      "actions": "Actions"
+    },
+    "types": {
+      "fridge": "Fridge",
+      "freezer": "Freezer",
+      "displayCase": "Display case"
+    }
+  },
   "Sidebar": {
     "brandName": "HACCP System",
     "brandPlan": "Enterprise",
     "platform": "Platform",
-    "projectsLabel": "Projects",
-    "more": "More",
-    "viewProject": "View Project",
-    "shareProject": "Share Project",
-    "deleteProject": "Delete Project",
     "toggle": "Toggle",
-    "navMain": {
-      "playground": "Playground",
-      "history": "History",
-      "starred": "Starred",
-      "settings": "Settings",
-      "models": "Models",
-      "genesis": "Genesis",
-      "explorer": "Explorer",
-      "quantum": "Quantum",
-      "documentation": "Documentation",
-      "introduction": "Introduction",
-      "getStarted": "Get Started",
-      "tutorials": "Tutorials",
-      "changelog": "Changelog",
-      "general": "General",
-      "team": "Team",
-      "billing": "Billing",
-      "limits": "Limits"
-    },
-    "projects": {
-      "designEngineering": "Design Engineering",
-      "salesMarketing": "Sales & Marketing",
-      "travel": "Travel"
+    "nav": {
+      "today": "Today",
+      "equipment": "Equipment",
+      "settings": "Settings"
     },
     "userMenu": {
       "account": "Account",
+      "myProfile": "My Profile",
       "preferences": "Preferences",
       "theme": "Theme",
       "themeLight": "Light",
