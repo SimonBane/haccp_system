@@ -1,5 +1,14 @@
 import { z } from "zod";
 
+export function parseCorsOrigins(value: string | undefined): string[] {
+  const origins = (value ?? "http://localhost:3000")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  return origins.length > 0 ? origins : ["http://localhost:3000"];
+}
+
 const envSchema = z.object({
   API_PORT: z.coerce.number().default(3001),
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
@@ -12,7 +21,7 @@ const envSchema = z.object({
     .default("development"),
 });
 
-export const env = envSchema.parse({
+const parsedEnv = envSchema.parse({
   API_PORT: process.env.API_PORT,
   CORS_ORIGIN: process.env.CORS_ORIGIN,
   DATABASE_URL: process.env.DATABASE_URL,
@@ -21,3 +30,8 @@ export const env = envSchema.parse({
   CLERK_PUBLISHABLE_KEY: process.env.CLERK_PUBLISHABLE_KEY,
   NODE_ENV: process.env.NODE_ENV,
 });
+
+export const env = {
+  ...parsedEnv,
+  corsOrigins: parseCorsOrigins(parsedEnv.CORS_ORIGIN),
+};
