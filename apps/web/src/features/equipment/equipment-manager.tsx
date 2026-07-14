@@ -4,7 +4,6 @@ import type { EquipmentResponse } from "@haccp/shared";
 import { Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
-import { LoadingButtonLabel } from "@/components/loading-button-label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -129,14 +128,11 @@ export function EquipmentManager({ initialItems }: EquipmentManagerProps) {
             </AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
-              className="relative"
-              disabled={isDeleting}
+              isLoading={isDeleting}
               onClick={confirmDelete}
             >
-              <LoadingButtonLabel loading={isDeleting}>
-                <Trash2Icon data-icon="inline-start" />
-                {t("deleteDialog.confirm")}
-              </LoadingButtonLabel>
+              <Trash2Icon data-icon="inline-start" />
+              {t("deleteDialog.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -76,6 +76,13 @@
     },
     "submitError": "Something went wrong. Please try again.",
     "nameTaken": "Equipment with this name already exists.",
+    "validation": {
+      "nameRequired": "Name is required.",
+      "nameMaxLength": "Name must be at most 100 characters.",
+      "minTemp": "Temperature must be at least -40°C.",
+      "maxTemp": "Temperature must be at most 15°C.",
+      "tempRange": "Minimum temperature must be less than maximum temperature."
+    },
     "columns": {
       "name": "Name",
       "type": "Type",
