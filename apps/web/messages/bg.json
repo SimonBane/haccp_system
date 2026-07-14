@@ -75,6 +75,13 @@
       "confirm": "Изтрий"
     },
     "submitError": "Възникна грешка. Опитайте отново.",
+    "toast": {
+      "createSuccess": "\"{name}\" беше добавено.",
+      "updateSuccess": "\"{name}\" беше актуализирано.",
+      "duplicateSuccess": "\"{name}\" беше създадено като копие.",
+      "deleteSuccess": "\"{name}\" беше изтрито.",
+      "deleteError": "Неуспешно изтриване. Опитайте отново."
+    },
     "nameTaken": "Оборудване с това име вече съществува.",
     "validation": {
       "nameRequired": "Името е задължително.",
