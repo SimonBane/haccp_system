@@ -31,42 +31,65 @@
     "breadcrumbDashboard": "Табло",
     "placeholder": "Примерно съдържание на таблото"
   },
+  "EquipmentPage": {
+    "breadcrumb": "Оборудване",
+    "title": "Оборудване",
+    "description": "Регистрирайте хладилници, фризери и витрини с допустими температурни граници.",
+    "emptyTitle": "Няма оборудване",
+    "emptyDescription": "Добавете първия си хладилник или фризер, за да започнете температурния контрол.",
+    "add": "Добави",
+    "addTitle": "Добавяне на оборудване",
+    "addDescription": "Въведете име, тип и допустим температурен диапазон.",
+    "editTitle": "Редактиране на оборудване",
+    "editDescription": "Актуализирайте данните за оборудването.",
+    "nameLabel": "Име",
+    "namePlaceholder": "Складов фризер",
+    "typeLabel": "Тип",
+    "typePlaceholder": "Изберете тип",
+    "minTempLabel": "Мин. °C",
+    "maxTempLabel": "Макс. °C",
+    "save": "Запази",
+    "saving": "Запазване…",
+    "edit": "Редактирай",
+    "duplicate": "Дублирай",
+    "duplicateTitle": "Дублиране на оборудване",
+    "duplicateDescription": "Създайте копие с ново име.",
+    "delete": "Изтрий",
+    "openMenu": "Отвори меню",
+    "deleteConfirm": "Изтриване на \"{name}\"? Това действие е необратимо.",
+    "deleteDialog": {
+      "title": "Изтриване на оборудване",
+      "fallback": "Това ще изтрие оборудването завинаги.",
+      "cancel": "Отказ",
+      "confirm": "Изтрий"
+    },
+    "submitError": "Възникна грешка. Опитайте отново.",
+    "nameTaken": "Оборудване с това име вече съществува.",
+    "columns": {
+      "name": "Име",
+      "type": "Тип",
+      "range": "Допустим диапазон",
+      "actions": "Действия"
+    },
+    "types": {
+      "fridge": "Хладилник",
+      "freezer": "Фризер",
+      "displayCase": "Витрина"
+    }
+  },
   "Sidebar": {
     "brandName": "HACCP Система",
     "brandPlan": "Предприятие",
     "platform": "Платформа",
-    "projectsLabel": "Проекти",
-    "more": "Още",
-    "viewProject": "Преглед на проект",
-    "shareProject": "Споделяне на проект",
-    "deleteProject": "Изтриване на проект",
     "toggle": "Превключване",
-    "navMain": {
-      "playground": "Работна среда",
-      "history": "История",
-      "starred": "С отметка",
-      "settings": "Настройки",
-      "models": "Модели",
-      "genesis": "Genesis",
-      "explorer": "Explorer",
-      "quantum": "Quantum",
-      "documentation": "Документация",
-      "introduction": "Въведение",
-      "getStarted": "Започнете",
-      "tutorials": "Уроци",
-      "changelog": "Промени",
-      "general": "Общи",
-      "team": "Екип",
-      "billing": "Плащания",
-      "limits": "Лимити"
-    },
-    "projects": {
-      "designEngineering": "Инженерен дизайн",
-      "salesMarketing": "Продажби и маркетинг",
-      "travel": "Пътувания"
+    "nav": {
+      "today": "Днес",
+      "equipment": "Оборудване",
+      "settings": "Настройки"
     },
     "userMenu": {
       "account": "Акаунт",
+      "myProfile": "Моят профил",
       "preferences": "Предпочитания",
       "theme": "Тема",
       "themeLight": "Светла",

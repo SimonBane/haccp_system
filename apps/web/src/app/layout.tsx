@@ -4,16 +4,13 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
 import "./globals.css";
 
-const inter = Inter({
-  subsets: ["latin", "cyrillic"],
-  variable: "--font-sans",
-});
+const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="bg"
-      className={cn("h-full antialiased", inter.variable)}
+      className={cn("h-full antialiased", "font-sans", inter.variable)}
       suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col font-sans">

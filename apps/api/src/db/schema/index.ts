@@ -1,1 +1,2 @@
-// Domain table schemas will be added here as features are built.
+export * from "./locations.js";
+export * from "./equipment.js";
