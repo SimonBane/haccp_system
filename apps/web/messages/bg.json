@@ -31,12 +31,23 @@
     "breadcrumbDashboard": "Табло",
     "placeholder": "Примерно съдържание на таблото"
   },
+  "DataTable": {
+    "search": "Търсене",
+    "searchClear": "Изчисти търсенето",
+    "noResults": "Няма намерени резултати.",
+    "pagination": {
+      "rowsCount": "{current} от {total} ред(а)",
+      "rowsPerPage": "Редове на страница",
+      "pageCount": "Страница {current} от {total}"
+    }
+  },
   "EquipmentPage": {
     "breadcrumb": "Оборудване",
     "title": "Оборудване",
     "description": "Регистрирайте хладилници, фризери и витрини с допустими температурни граници.",
     "emptyTitle": "Няма оборудване",
     "emptyDescription": "Добавете първия си хладилник или фризер, за да започнете температурния контрол.",
+    "searchPlaceholder": "Търсене на оборудване",
     "add": "Добави",
     "addTitle": "Добавяне на оборудване",
     "addDescription": "Въведете име, тип и допустим температурен диапазон.",

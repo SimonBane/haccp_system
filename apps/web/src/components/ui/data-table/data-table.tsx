@@ -4,13 +4,19 @@ import "./types";
 import {
   flexRender,
   getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
+  type ColumnFiltersState,
   type Row,
   type SortingState,
+  type Table as ReactTable,
 } from "@tanstack/react-table";
 import * as React from "react";
+import { DataTablePagination } from "@/components/ui/data-table/data-table-pagination";
+import { DataTableSearch } from "@/components/ui/data-table/data-table-search";
 import {
   Table,
   TableBody,
@@ -26,9 +32,16 @@ interface DataTableProps<TData, TValue> {
   data: TData[];
   onRowClick?: (row: Row<TData>) => void;
   emptyMessage?: string;
+  noResultsMessage?: string;
   className?: string;
   classNameWrapper?: string;
   truncateCellValue?: boolean;
+  Toolbar?: ({ table }: { table: ReactTable<TData> }) => React.ReactNode;
+  enableSearch?: boolean;
+  searchColumn?: string;
+  searchPlaceholder?: string;
+  enablePagination?: boolean;
+  pageSize?: number;
 }
 
 export function DataTable<TData, TValue>({
@@ -36,22 +49,68 @@ export function DataTable<TData, TValue>({
   data,
   onRowClick,
   emptyMessage = "No results.",
+  noResultsMessage = "No results found.",
   className,
   classNameWrapper,
   truncateCellValue = true,
+  Toolbar,
+  enableSearch = false,
+  searchColumn,
+  searchPlaceholder,
+  enablePagination = true,
+  pageSize = 50,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    [],
+  );
+
+  React.useEffect(() => {
+    if (!enableSearch) {
+      setColumnFilters([]);
+    }
+  }, [enableSearch]);
 
   const table = useReactTable({
     data,
     columns,
-    state: { sorting },
+    initialState: {
+      pagination: {
+        pageSize: enablePagination ? pageSize : data.length,
+      },
+    },
+    state: {
+      ...(enablePagination
+        ? {}
+        : { pagination: { pageIndex: 0, pageSize: data.length } }),
+      sorting,
+      columnFilters,
+    },
     onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    filterFns: {
+      includesString: (row, id, value) => {
+        const cellValue = row.getValue(id);
+        if (Array.isArray(value)) {
+          return value.includes(cellValue);
+        }
+        return String(cellValue)
+          .toLowerCase()
+          .includes(String(value).toLowerCase());
+      },
+    },
+    defaultColumn: {
+      filterFn: "includesString",
+    },
   });
 
   const visibleRows = table.getRowModel().rows;
+  const isFiltered = columnFilters.length > 0;
+  const displayEmptyMessage = isFiltered ? noResultsMessage : emptyMessage;
 
   return (
     <div
@@ -60,6 +119,21 @@ export function DataTable<TData, TValue>({
         classNameWrapper,
       )}
     >
+      {enableSearch || Toolbar ? (
+        <div className="shrink-0">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            {enableSearch && searchColumn ? (
+              <DataTableSearch
+                table={table}
+                column={searchColumn}
+                placeholder={searchPlaceholder ?? ""}
+              />
+            ) : null}
+            {Toolbar ? <Toolbar table={table} /> : null}
+          </div>
+        </div>
+      ) : null}
+
       <div
         className={cn(
           "min-h-0 overflow-auto rounded-md border bg-card px-1 pb-1 shadow-xs md:px-0 md:pb-2",
@@ -74,7 +148,11 @@ export function DataTable<TData, TValue>({
                   <TableHead
                     key={header.id}
                     className={cn(
-                      header.column.id === "select" || header.column.id === "expand" || header.column.id === "actions" ? "w-10" : "",
+                      header.column.id === "select" ||
+                        header.column.id === "expand" ||
+                        header.column.id === "actions"
+                        ? "w-10"
+                        : "",
                       header.column.columnDef.meta?.className,
                       "group sticky top-0 z-40 bg-card",
                       header.column.columnDef.meta?.sticky && "left-0 z-50",
@@ -137,13 +215,19 @@ export function DataTable<TData, TValue>({
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  {emptyMessage}
+                  {displayEmptyMessage}
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
+
+      {enablePagination ? (
+        <div className="shrink-0">
+          <DataTablePagination table={table} />
+        </div>
+      ) : null}
     </div>
   );
 }

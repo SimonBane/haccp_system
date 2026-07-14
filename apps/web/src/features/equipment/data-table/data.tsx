@@ -20,6 +20,7 @@ export function EquipmentData({
   onDelete,
 }: EquipmentDataProps) {
   const t = useTranslations("EquipmentPage");
+  const tTable = useTranslations("DataTable");
 
   const typeLabels: Record<EquipmentType, string> = {
     fridge: t("types.fridge"),
@@ -43,7 +44,13 @@ export function EquipmentData({
     <DataTable
       columns={columns}
       data={items}
+      enableSearch
+      searchColumn="name"
+      searchPlaceholder={t("searchPlaceholder")}
       emptyMessage={t("emptyTitle")}
+      noResultsMessage={tTable("noResults")}
+      enablePagination
+      pageSize={10}
       classNameWrapper="bg-sidebar ring-1 ring-sidebar-border"
       onRowClick={(row) => onEdit(row.original)}
     />
