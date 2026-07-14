@@ -3,7 +3,7 @@
 import {
   EQUIPMENT_DEFAULT_TEMPS,
   equipmentTypeSchema,
-  type CreateEquipmentInput,
+  type EquipmentFieldsInput,
   type EquipmentResponse,
   type EquipmentType,
   type UpdateEquipmentInput,
@@ -51,7 +51,7 @@ type EquipmentFormProps = {
   existingItems?: Pick<EquipmentResponse, "id" | "name">[];
   onDuplicate?: () => void;
   onSubmit: (
-    values: CreateEquipmentInput | UpdateEquipmentInput,
+    values: EquipmentFieldsInput | UpdateEquipmentInput,
   ) => Promise<void>;
 };
 

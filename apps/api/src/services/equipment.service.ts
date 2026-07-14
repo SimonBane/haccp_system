@@ -4,11 +4,10 @@ import type {
   EquipmentResponse,
   UpdateEquipmentInput,
 } from "@haccp/shared";
-import { and, asc, eq, ne } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import type { Db } from "../db/index.js";
 import { equipment } from "../db/schema/equipment.js";
 import { ConflictError, NotFoundError } from "../lib/errors.js";
-import { locationService } from "./location.service.js";
 
 function toEquipmentResponse(
   row: typeof equipment.$inferSelect,
@@ -26,12 +25,12 @@ function toEquipmentResponse(
   };
 }
 
-function isUniqueViolation(error: unknown): boolean {
+function isPostgresError(error: unknown, code: string): boolean {
   if (
     typeof error === "object" &&
     error !== null &&
     "code" in error &&
-    error.code === "23505"
+    error.code === code
   ) {
     return true;
   }
@@ -40,7 +39,7 @@ function isUniqueViolation(error: unknown): boolean {
     typeof error === "object" &&
     error !== null &&
     "cause" in error &&
-    isUniqueViolation((error as { cause: unknown }).cause)
+    isPostgresError((error as { cause: unknown }).cause, code)
   ) {
     return true;
   }
@@ -48,27 +47,26 @@ function isUniqueViolation(error: unknown): boolean {
   return false;
 }
 
-async function assertNameAvailable(
-  db: Db,
-  locationId: string,
-  name: string,
-  excludeEquipmentId?: string,
-): Promise<void> {
-  const existing = await db.query.equipment.findFirst({
-    where: and(
-      eq(equipment.locationId, locationId),
-      eq(equipment.name, name),
-      excludeEquipmentId
-        ? ne(equipment.id, excludeEquipmentId)
-        : undefined,
-    ),
-  });
+function isUniqueViolation(error: unknown): boolean {
+  return isPostgresError(error, "23505");
+}
 
-  if (existing) {
+function isForeignKeyViolation(error: unknown): boolean {
+  return isPostgresError(error, "23503");
+}
+
+function mapEquipmentMutationError(error: unknown): never {
+  if (isUniqueViolation(error)) {
     throw new ConflictError(
       "Equipment with this name already exists at this site",
     );
   }
+
+  if (isForeignKeyViolation(error)) {
+    throw new NotFoundError("Location not found");
+  }
+
+  throw error;
 }
 
 export const equipmentService = {
@@ -88,16 +86,12 @@ export const equipmentService = {
     orgId: string,
     input: CreateEquipmentInput,
   ): Promise<EquipmentResponse> {
-    const location = await locationService.getOrCreateCurrentLocation(db, orgId);
-
-    await assertNameAvailable(db, location.id, input.name);
-
     try {
       const [created] = await db
         .insert(equipment)
         .values({
           orgId,
-          locationId: location.id,
+          locationId: input.locationId,
           name: input.name,
           type: input.type,
           minTempC: String(input.minTempC),
@@ -111,13 +105,7 @@ export const equipmentService = {
 
       return toEquipmentResponse(created);
     } catch (error) {
-      if (isUniqueViolation(error)) {
-        throw new ConflictError(
-          "Equipment with this name already exists at this site",
-        );
-      }
-
-      throw error;
+      mapEquipmentMutationError(error);
     }
   },
 
@@ -127,14 +115,6 @@ export const equipmentService = {
     equipmentId: string,
     input: UpdateEquipmentInput,
   ): Promise<EquipmentResponse> {
-    const existing = await db.query.equipment.findFirst({
-      where: and(eq(equipment.id, equipmentId), eq(equipment.orgId, orgId)),
-    });
-
-    if (!existing) {
-      throw new NotFoundError("Equipment not found");
-    }
-
     const updates: Partial<typeof equipment.$inferInsert> = {
       updatedAt: new Date(),
     };
@@ -143,15 +123,6 @@ export const equipmentService = {
     if (input.type !== undefined) updates.type = input.type;
     if (input.minTempC !== undefined) updates.minTempC = String(input.minTempC);
     if (input.maxTempC !== undefined) updates.maxTempC = String(input.maxTempC);
-
-    if (input.name !== undefined && input.name !== existing.name) {
-      await assertNameAvailable(
-        db,
-        existing.locationId,
-        input.name,
-        equipmentId,
-      );
-    }
 
     try {
       const [updated] = await db
@@ -166,27 +137,22 @@ export const equipmentService = {
 
       return toEquipmentResponse(updated);
     } catch (error) {
-      if (isUniqueViolation(error)) {
-        throw new ConflictError(
-          "Equipment with this name already exists at this site",
-        );
+      if (error instanceof NotFoundError) {
+        throw error;
       }
 
-      throw error;
+      mapEquipmentMutationError(error);
     }
   },
 
   async delete(db: Db, orgId: string, equipmentId: string): Promise<void> {
-    const existing = await db.query.equipment.findFirst({
-      where: and(eq(equipment.id, equipmentId), eq(equipment.orgId, orgId)),
-    });
+    const [deleted] = await db
+      .delete(equipment)
+      .where(and(eq(equipment.id, equipmentId), eq(equipment.orgId, orgId)))
+      .returning({ id: equipment.id });
 
-    if (!existing) {
+    if (!deleted) {
       throw new NotFoundError("Equipment not found");
     }
-
-    await db
-      .delete(equipment)
-      .where(and(eq(equipment.id, equipmentId), eq(equipment.orgId, orgId)));
   },
 };

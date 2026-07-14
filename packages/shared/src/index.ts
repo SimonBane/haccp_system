@@ -13,6 +13,7 @@ export {
   equipmentTypeSchema,
   updateEquipmentSchema,
   type CreateEquipmentInput,
+  type EquipmentFieldsInput,
   type EquipmentListResponse,
   type EquipmentResponse,
   type EquipmentType,

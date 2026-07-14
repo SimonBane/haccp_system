@@ -7,7 +7,7 @@ import {
   healthResponseSchema,
   locationResponseSchema,
   updateEquipmentSchema,
-  type CreateEquipmentInput,
+  type EquipmentFieldsInput,
   type EquipmentListResponse,
   type EquipmentResponse,
   type HealthResponse,
@@ -90,14 +90,15 @@ export async function listEquipment(): Promise<EquipmentListResponse> {
 }
 
 export async function createEquipment(
-  input: CreateEquipmentInput,
+  locationId: string,
+  input: EquipmentFieldsInput,
 ): Promise<EquipmentResponse> {
-  createEquipmentSchema.parse(input);
+  const payload = createEquipmentSchema.parse({ ...input, locationId });
 
   return fetchJson("/equipment", equipmentResponseSchema, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
+    body: JSON.stringify(payload),
   });
 }
 

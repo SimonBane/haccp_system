@@ -1,5 +1,5 @@
 import type { LocationResponse } from "@haccp/shared";
-import { eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import type { Db } from "../db/index.js";
 import { locations } from "../db/schema/locations.js";
 
@@ -20,26 +20,22 @@ export const locationService = {
     db: Db,
     orgId: string,
   ): Promise<LocationResponse> {
-    const existing = await db.query.locations.findFirst({
-      where: eq(locations.orgId, orgId),
-    });
-
-    if (existing) {
-      return toLocationResponse(existing);
-    }
-
-    const [created] = await db
+    const [location] = await db
       .insert(locations)
       .values({
         orgId,
         name: DEFAULT_LOCATION_NAME,
       })
+      .onConflictDoUpdate({
+        target: locations.orgId,
+        set: { orgId: sql`excluded.org_id` },
+      })
       .returning();
 
-    if (!created) {
-      throw new Error("Failed to create location");
+    if (!location) {
+      throw new Error("Failed to resolve location");
     }
 
-    return toLocationResponse(created);
+    return toLocationResponse(location);
   },
 };
