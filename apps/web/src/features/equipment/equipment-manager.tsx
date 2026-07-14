@@ -4,6 +4,7 @@ import type { EquipmentResponse } from "@haccp/shared";
 import { Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -80,15 +81,18 @@ export function EquipmentManager({ initialItems }: EquipmentManagerProps) {
   async function confirmDelete() {
     if (!deleteTarget || isDeleting) return;
     setIsDeleting(true);
+    const target = deleteTarget;
     try {
-      await remove(deleteTarget.id);
+      await remove(target.id);
       setItems((current) =>
-        current.filter((item) => item.id !== deleteTarget.id),
+        current.filter((item) => item.id !== target.id),
       );
-    } catch (error) {
-      console.error(error);
-    } finally {
+      toast.success(t("toast.deleteSuccess", { name: target.name }));
       setDeleteTarget(null);
+    } catch {
+      toast.error(t("toast.deleteError"));
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -183,6 +187,11 @@ export function EquipmentManager({ initialItems }: EquipmentManagerProps) {
 
             const created = await create(values);
             setItems((current) => [...current, created]);
+            toast.success(
+              duplicateSource
+                ? t("toast.duplicateSuccess", { name: created.name })
+                : t("toast.createSuccess", { name: created.name }),
+            );
           }}
         />
       ) : null}

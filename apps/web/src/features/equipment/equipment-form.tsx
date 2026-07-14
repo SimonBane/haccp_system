@@ -11,7 +11,8 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
 import { CopyPlusIcon, PlusIcon, SaveIcon } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
+import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -125,7 +126,6 @@ export function EquipmentForm({
   const t = useTranslations("EquipmentPage");
   const isEditing = Boolean(equipment);
   const isDuplicating = Boolean(duplicateSource) && !isEditing;
-  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const equipmentFormSchema = useMemo(() => {
     const tempSchema = z.coerce
@@ -213,7 +213,7 @@ export function EquipmentForm({
         return;
       }
 
-      setSubmitError(
+      toast.error(
         error instanceof Error ? error.message : t("submitError"),
       );
     }
@@ -364,12 +364,6 @@ export function EquipmentForm({
                 )}
               />
             </div>
-
-            {submitError ? (
-              <p className="text-sm text-destructive" role="alert">
-                {submitError}
-              </p>
-            ) : null}
 
             <DialogFooter>
               {isEditing ? (
