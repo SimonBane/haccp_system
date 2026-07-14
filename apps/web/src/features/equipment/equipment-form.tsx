@@ -64,6 +64,23 @@ const EQUIPMENT_TYPES: EquipmentType[] = [
 const numberInputNoSpinClass =
   "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
+function hasEquipmentChanges(
+  values: {
+    name: string;
+    type: EquipmentType;
+    minTempC: number;
+    maxTempC: number;
+  },
+  equipment: EquipmentResponse,
+): boolean {
+  return (
+    values.name !== equipment.name ||
+    values.type !== equipment.type ||
+    values.minTempC !== equipment.minTempC ||
+    values.maxTempC !== equipment.maxTempC
+  );
+}
+
 function buildDefaultValues(
   equipment?: EquipmentResponse | null,
   duplicateSource?: EquipmentResponse | null,
@@ -140,23 +157,16 @@ export function EquipmentForm({
 
   type EquipmentFormValues = z.infer<typeof equipmentFormSchema>;
 
+  const defaultValues = useMemo(
+    () =>
+      buildDefaultValues(equipment, duplicateSource, suggestedDuplicateName),
+    [equipment, duplicateSource, suggestedDuplicateName],
+  );
+
   const form = useForm<EquipmentFormValues>({
     resolver: zodResolver(equipmentFormSchema),
-    defaultValues: buildDefaultValues(
-      equipment,
-      duplicateSource,
-      suggestedDuplicateName,
-    ),
+    defaultValues,
   });
-
-  useEffect(() => {
-    if (!open) return;
-
-    form.reset(
-      buildDefaultValues(equipment, duplicateSource, suggestedDuplicateName),
-    );
-    setSubmitError(null);
-  }, [open, equipment, duplicateSource, suggestedDuplicateName, form]);
 
   useEffect(() => {
     if (!open || !duplicateSource || equipment) return;
@@ -180,7 +190,7 @@ export function EquipmentForm({
   }));
 
   async function handleValidSubmit(values: EquipmentFormValues) {
-    if (isEditing && !form.formState.isDirty) {
+    if (isEditing && equipment && !hasEquipmentChanges(values, equipment)) {
       onOpenChange(false);
       return;
     }
@@ -315,8 +325,12 @@ export function EquipmentForm({
                         step="0.1"
                         className={numberInputNoSpinClass}
                         {...field}
-                        value={field.value}
-                        onChange={(event) => field.onChange(event.target.value)}
+                        onChange={(event) => {
+                          const next = event.target.value;
+                          field.onChange(
+                            next === "" ? "" : Number(next),
+                          );
+                        }}
                       />
                     </FormControl>
                     <FormMessage />
@@ -337,8 +351,12 @@ export function EquipmentForm({
                         step="0.1"
                         className={numberInputNoSpinClass}
                         {...field}
-                        value={field.value}
-                        onChange={(event) => field.onChange(event.target.value)}
+                        onChange={(event) => {
+                          const next = event.target.value;
+                          field.onChange(
+                            next === "" ? "" : Number(next),
+                          );
+                        }}
                       />
                     </FormControl>
                     <FormMessage />
