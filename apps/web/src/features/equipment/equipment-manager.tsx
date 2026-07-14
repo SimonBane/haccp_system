@@ -138,41 +138,54 @@ export function EquipmentManager({ initialItems }: EquipmentManagerProps) {
         </AlertDialogContent>
       </AlertDialog>
 
-      <EquipmentForm
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        equipment={editingEquipment}
-        duplicateSource={duplicateSource}
-        suggestedDuplicateName={
-          duplicateSource
-            ? suggestDuplicateName(
-                duplicateSource.name,
-                items.map((item) => item.name),
-              )
-            : undefined
-        }
-        existingItems={items.map((item) => ({
-          id: item.id,
-          name: item.name,
-        }))}
-        onDuplicate={() => {
-          if (editingEquipment) openDuplicateForm(editingEquipment);
-        }}
-        onSubmit={async (values) => {
-          if (editingEquipment) {
-            const updated = await update(editingEquipment.id, values);
-            setItems((current) =>
-              current.map((item) =>
-                item.id === updated.id ? updated : item,
-              ),
-            );
-            return;
+      {formOpen ? (
+        <EquipmentForm
+          key={
+            duplicateSource
+              ? `duplicate-${duplicateSource.id}`
+              : (editingEquipment?.id ?? "create")
           }
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setFormOpen(false);
+              setEditingEquipment(null);
+              setDuplicateSource(null);
+            }
+          }}
+          equipment={editingEquipment}
+          duplicateSource={duplicateSource}
+          suggestedDuplicateName={
+            duplicateSource
+              ? suggestDuplicateName(
+                  duplicateSource.name,
+                  items.map((item) => item.name),
+                )
+              : undefined
+          }
+          existingItems={items.map((item) => ({
+            id: item.id,
+            name: item.name,
+          }))}
+          onDuplicate={() => {
+            if (editingEquipment) openDuplicateForm(editingEquipment);
+          }}
+          onSubmit={async (values) => {
+            if (editingEquipment) {
+              const updated = await update(editingEquipment.id, values);
+              setItems((current) =>
+                current.map((item) =>
+                  item.id === updated.id ? updated : item,
+                ),
+              );
+              return;
+            }
 
-          const created = await create(values);
-          setItems((current) => [...current, created]);
-        }}
-      />
+            const created = await create(values);
+            setItems((current) => [...current, created]);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
