@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { LoadingButtonLabel } from "@/components/loading-button-label";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
 import { ApiRequestError } from "@/lib/api-utils";
 import {
   Dialog,
@@ -182,8 +181,6 @@ export function EquipmentForm({
   const numberInputNoSpinClass =
     "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
-  const fieldClassName = "h-12 text-base";
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-full sm:max-w-xl">
@@ -215,7 +212,6 @@ export function EquipmentForm({
               placeholder={t("namePlaceholder")}
               required
               aria-invalid={Boolean(nameError)}
-              className={fieldClassName}
             />
             {nameError ? (
               <p className="text-sm text-destructive" role="alert">
@@ -258,7 +254,7 @@ export function EquipmentForm({
                 value={minTempC}
                 onChange={(event) => setMinTempC(event.target.value)}
                 required
-                className={cn(fieldClassName, numberInputNoSpinClass)}
+                className={numberInputNoSpinClass}
               />
             </div>
             <div className="space-y-2">
@@ -271,7 +267,7 @@ export function EquipmentForm({
                 value={maxTempC}
                 onChange={(event) => setMaxTempC(event.target.value)}
                 required
-                className={cn(fieldClassName, numberInputNoSpinClass)}
+                className={numberInputNoSpinClass}
               />
             </div>
           </div>
@@ -288,8 +284,6 @@ export function EquipmentForm({
                 <Button
                   type="button"
                   variant="outline"
-                  size="lg"
-                  className="h-12 w-full text-base sm:w-auto"
                   disabled={isSubmitting}
                   onClick={onDuplicate}
                 >
@@ -298,8 +292,7 @@ export function EquipmentForm({
                 </Button>
                 <Button
                   type="submit"
-                  size="lg"
-                  className="relative h-12 w-full text-base sm:w-auto"
+                  className="relative"
                   disabled={isSubmitting}
                 >
                   <LoadingButtonLabel loading={isSubmitting}>
@@ -311,8 +304,7 @@ export function EquipmentForm({
             ) : (
               <Button
                 type="submit"
-                size="lg"
-                className="relative h-12 w-full text-base sm:w-auto"
+                className="relative"
                 disabled={isSubmitting}
               >
                 <LoadingButtonLabel loading={isSubmitting}>
