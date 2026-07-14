@@ -1,13 +1,16 @@
 "use client";
 
 import type { EquipmentResponse, EquipmentType } from "@haccp/shared";
+import { PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useMemo } from "react";
+import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { getColumns } from "@/features/equipment/data-table/columns";
 
 type EquipmentDataProps = {
   items: EquipmentResponse[];
+  onAdd: () => void;
   onEdit: (equipment: EquipmentResponse) => void;
   onDuplicate: (equipment: EquipmentResponse) => void;
   onDelete: (equipment: EquipmentResponse) => void;
@@ -15,6 +18,7 @@ type EquipmentDataProps = {
 
 export function EquipmentData({
   items,
+  onAdd,
   onEdit,
   onDuplicate,
   onDelete,
@@ -53,6 +57,12 @@ export function EquipmentData({
       pageSize={10}
       classNameWrapper="bg-sidebar ring-1 ring-sidebar-border"
       onRowClick={(row) => onEdit(row.original)}
+      Toolbar={() => (
+        <Button type="button" onClick={onAdd}>
+          <PlusIcon />
+          {t("add")}
+        </Button>
+      )}
     />
   );
 }
