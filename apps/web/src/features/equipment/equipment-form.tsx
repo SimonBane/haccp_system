@@ -2,18 +2,28 @@
 
 import {
   EQUIPMENT_DEFAULT_TEMPS,
+  equipmentTypeSchema,
   type CreateEquipmentInput,
   type EquipmentResponse,
   type EquipmentType,
   type UpdateEquipmentInput,
 } from "@haccp/shared";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
 import { CopyPlusIcon, PlusIcon, SaveIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { LoadingButtonLabel } from "@/components/loading-button-label";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ApiRequestError } from "@/lib/api-utils";
 import {
   Dialog,
@@ -26,6 +36,7 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -50,6 +61,40 @@ const EQUIPMENT_TYPES: EquipmentType[] = [
   "display_case",
 ];
 
+const numberInputNoSpinClass =
+  "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+
+function buildDefaultValues(
+  equipment?: EquipmentResponse | null,
+  duplicateSource?: EquipmentResponse | null,
+  suggestedDuplicateName?: string,
+) {
+  if (equipment) {
+    return {
+      name: equipment.name,
+      type: equipment.type,
+      minTempC: equipment.minTempC,
+      maxTempC: equipment.maxTempC,
+    };
+  }
+
+  if (duplicateSource) {
+    return {
+      name: suggestedDuplicateName ?? `${duplicateSource.name} (Copy)`,
+      type: duplicateSource.type,
+      minTempC: duplicateSource.minTempC,
+      maxTempC: duplicateSource.maxTempC,
+    };
+  }
+
+  return {
+    name: "",
+    type: "fridge" as EquipmentType,
+    minTempC: EQUIPMENT_DEFAULT_TEMPS.fridge.minTempC,
+    maxTempC: EQUIPMENT_DEFAULT_TEMPS.fridge.maxTempC,
+  };
+}
+
 export function EquipmentForm({
   open,
   onOpenChange,
@@ -63,67 +108,65 @@ export function EquipmentForm({
   const t = useTranslations("EquipmentPage");
   const isEditing = Boolean(equipment);
   const isDuplicating = Boolean(duplicateSource) && !isEditing;
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const [name, setName] = useState("");
-  const [type, setType] = useState<EquipmentType>("fridge");
-  const [minTempC, setMinTempC] = useState("0");
-  const [maxTempC, setMaxTempC] = useState("4");
-  const [error, setError] = useState<string | null>(null);
-  const [nameError, setNameError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const nameInputRef = useRef<HTMLInputElement>(null);
+  const equipmentFormSchema = useMemo(() => {
+    const tempSchema = z.coerce
+      .number()
+      .min(-40, t("validation.minTemp"))
+      .max(15, t("validation.maxTemp"));
+
+    return z
+      .object({
+        name: z
+          .string()
+          .trim()
+          .min(1, t("validation.nameRequired"))
+          .max(100, t("validation.nameMaxLength")),
+        type: equipmentTypeSchema,
+        minTempC: tempSchema,
+        maxTempC: tempSchema,
+      })
+      .superRefine((data, ctx) => {
+        if (data.minTempC >= data.maxTempC) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: t("validation.tempRange"),
+            path: ["minTempC"],
+          });
+        }
+      });
+  }, [t]);
+
+  type EquipmentFormValues = z.infer<typeof equipmentFormSchema>;
+
+  const form = useForm<EquipmentFormValues>({
+    resolver: zodResolver(equipmentFormSchema),
+    defaultValues: buildDefaultValues(
+      equipment,
+      duplicateSource,
+      suggestedDuplicateName,
+    ),
+  });
 
   useEffect(() => {
     if (!open) return;
 
-    if (equipment) {
-      setName(equipment.name);
-      setType(equipment.type);
-      setMinTempC(String(equipment.minTempC));
-      setMaxTempC(String(equipment.maxTempC));
-    } else if (duplicateSource) {
-      setName(suggestedDuplicateName ?? `${duplicateSource.name} (Copy)`);
-      setType(duplicateSource.type);
-      setMinTempC(String(duplicateSource.minTempC));
-      setMaxTempC(String(duplicateSource.maxTempC));
-    } else {
-      setName("");
-      setType("fridge");
-      setMinTempC(String(EQUIPMENT_DEFAULT_TEMPS.fridge.minTempC));
-      setMaxTempC(String(EQUIPMENT_DEFAULT_TEMPS.fridge.maxTempC));
-    }
-
-    setError(null);
-    setNameError(null);
-    setIsSubmitting(false);
-  }, [open, equipment, duplicateSource, suggestedDuplicateName]);
+    form.reset(
+      buildDefaultValues(equipment, duplicateSource, suggestedDuplicateName),
+    );
+    setSubmitError(null);
+  }, [open, equipment, duplicateSource, suggestedDuplicateName, form]);
 
   useEffect(() => {
     if (!open || !duplicateSource || equipment) return;
 
     const timeoutId = window.setTimeout(() => {
-      const input = nameInputRef.current;
-      input?.focus();
-      input?.select();
+      form.setFocus("name", { shouldSelect: true });
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, [open, equipment, duplicateSource, suggestedDuplicateName]);
-
-  function validateName(value: string): string | null {
-    const trimmedName = value.trim();
-    const isTaken = existingItems.some(
-      (item) => item.name === trimmedName && item.id !== equipment?.id,
-    );
-
-    return isTaken ? t("nameTaken") : null;
-  }
-
-  function handleNameChange(value: string) {
-    setName(value);
-    if (nameError) setNameError(null);
-    if (error) setError(null);
-  }
+  }, [open, equipment, duplicateSource, suggestedDuplicateName, form]);
 
   const typeLabels: Record<EquipmentType, string> = {
     fridge: t("types.fridge"),
@@ -131,55 +174,42 @@ export function EquipmentForm({
     display_case: t("types.displayCase"),
   };
 
-  function handleTypeChange(nextType: EquipmentType) {
-    setType(nextType);
-    if (!isEditing) {
-      setMinTempC(String(EQUIPMENT_DEFAULT_TEMPS[nextType].minTempC));
-      setMaxTempC(String(EQUIPMENT_DEFAULT_TEMPS[nextType].maxTempC));
-    }
-  }
+  const typeItems = EQUIPMENT_TYPES.map((equipmentType) => ({
+    label: typeLabels[equipmentType],
+    value: equipmentType,
+  }));
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    setNameError(null);
-
-    const nextNameError = validateName(name);
-    if (nextNameError) {
-      setNameError(nextNameError);
+  async function handleValidSubmit(values: EquipmentFormValues) {
+    if (isEditing && !form.formState.isDirty) {
+      onOpenChange(false);
       return;
     }
 
-    setIsSubmitting(true);
+    const isNameTaken = existingItems.some(
+      (item) => item.name === values.name && item.id !== equipment?.id,
+    );
+
+    if (isNameTaken) {
+      form.setError("name", { message: t("nameTaken") });
+      return;
+    }
 
     try {
-      const values = {
-        name: name.trim(),
-        type,
-        minTempC: Number(minTempC),
-        maxTempC: Number(maxTempC),
-      };
-
       await onSubmit(values);
       onOpenChange(false);
-    } catch (submitError) {
-      if (
-        submitError instanceof ApiRequestError &&
-        submitError.code === "CONFLICT"
-      ) {
-        setNameError(t("nameTaken"));
-      } else {
-        setError(
-          submitError instanceof Error
-            ? submitError.message
-            : t("submitError"),
-        );
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.code === "CONFLICT") {
+        form.setError("name", { message: t("nameTaken") });
+        return;
       }
+
+      setSubmitError(
+        error instanceof Error ? error.message : t("submitError"),
+      );
     }
   }
 
-  const numberInputNoSpinClass =
-    "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+  const { isSubmitting, isDirty } = form.formState;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -201,120 +231,158 @@ export function EquipmentForm({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="grid gap-6">
-          <div className="space-y-2">
-            <Label htmlFor="equipment-name">{t("nameLabel")}</Label>
-            <Input
-              ref={nameInputRef}
-              id="equipment-name"
-              value={name}
-              onChange={(event) => handleNameChange(event.target.value)}
-              placeholder={t("namePlaceholder")}
-              required
-              aria-invalid={Boolean(nameError)}
+        <Form {...form}>
+          <form
+            onSubmit={form.handleSubmit(handleValidSubmit)}
+            className="grid gap-6"
+          >
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t("nameLabel")}</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder={t("namePlaceholder")}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-            {nameError ? (
+
+            <FormField
+              control={form.control}
+              name="type"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t("typeLabel")}</FormLabel>
+                  <Select
+                    items={typeItems}
+                    value={field.value}
+                    onValueChange={(value: unknown) => {
+                      const nextType = value as EquipmentType;
+                      field.onChange(nextType);
+
+                      if (!isEditing) {
+                        form.setValue(
+                          "minTempC",
+                          EQUIPMENT_DEFAULT_TEMPS[nextType].minTempC,
+                        );
+                        form.setValue(
+                          "maxTempC",
+                          EQUIPMENT_DEFAULT_TEMPS[nextType].maxTempC,
+                        );
+                      }
+                    }}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder={t("typePlaceholder")} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent alignItemWithTrigger={false}>
+                      <SelectGroup>
+                        {EQUIPMENT_TYPES.map((equipmentType) => (
+                          <SelectItem
+                            key={equipmentType}
+                            value={equipmentType}
+                          >
+                            {typeLabels[equipmentType]}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="minTempC"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("minTempLabel")}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.1"
+                        className={numberInputNoSpinClass}
+                        {...field}
+                        value={field.value}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="maxTempC"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("maxTempLabel")}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.1"
+                        className={numberInputNoSpinClass}
+                        {...field}
+                        value={field.value}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {submitError ? (
               <p className="text-sm text-destructive" role="alert">
-                {nameError}
+                {submitError}
               </p>
             ) : null}
-          </div>
 
-          <div className="space-y-2">
-            <Label>{t("typeLabel")}</Label>
-            <Select
-              value={type}
-              onValueChange={(value: unknown) =>
-                handleTypeChange(value as EquipmentType)
-              }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder={t("typePlaceholder")}>
-                  {typeLabels[type]}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {EQUIPMENT_TYPES.map((equipmentType) => (
-                  <SelectItem key={equipmentType} value={equipmentType}>
-                    {typeLabels[equipmentType]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="equipment-min-temp">{t("minTempLabel")}</Label>
-              <Input
-                id="equipment-min-temp"
-                type="number"
-                inputMode="decimal"
-                step="0.1"
-                value={minTempC}
-                onChange={(event) => setMinTempC(event.target.value)}
-                required
-                className={numberInputNoSpinClass}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="equipment-max-temp">{t("maxTempLabel")}</Label>
-              <Input
-                id="equipment-max-temp"
-                type="number"
-                inputMode="decimal"
-                step="0.1"
-                value={maxTempC}
-                onChange={(event) => setMaxTempC(event.target.value)}
-                required
-                className={numberInputNoSpinClass}
-              />
-            </div>
-          </div>
-
-          {error ? (
-            <p className="text-sm text-destructive" role="alert">
-              {error}
-            </p>
-          ) : null}
-
-          <DialogFooter>
-            {isEditing ? (
-              <>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={isSubmitting}
-                  onClick={onDuplicate}
-                >
-                  <CopyPlusIcon data-icon="inline-start" />
-                  {t("duplicate")}
-                </Button>
-                <Button
-                  type="submit"
-                  className="relative"
-                  disabled={isSubmitting}
-                >
-                  <LoadingButtonLabel loading={isSubmitting}>
+            <DialogFooter>
+              {isEditing ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isSubmitting}
+                    onClick={onDuplicate}
+                  >
+                    <CopyPlusIcon data-icon="inline-start" />
+                    {t("duplicate")}
+                  </Button>
+                  <Button
+                    type="submit"
+                    isLoading={isSubmitting}
+                    disabled={!isDirty}
+                  >
                     <SaveIcon data-icon="inline-start" />
                     {t("save")}
-                  </LoadingButtonLabel>
-                </Button>
-              </>
-            ) : (
-              <Button
-                type="submit"
-                className="relative"
-                disabled={isSubmitting}
-              >
-                <LoadingButtonLabel loading={isSubmitting}>
+                  </Button>
+                </>
+              ) : (
+                <Button type="submit" isLoading={isSubmitting}>
                   <PlusIcon data-icon="inline-start" />
                   {t("add")}
-                </LoadingButtonLabel>
-              </Button>
-            )}
-          </DialogFooter>
-        </form>
+                </Button>
+              )}
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );
