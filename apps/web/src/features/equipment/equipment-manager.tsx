@@ -1,10 +1,9 @@
 "use client";
 
 import type { EquipmentResponse } from "@haccp/shared";
-import { PlusIcon, Trash2Icon } from "lucide-react";
+import { Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { LoadingButtonLabel } from "@/components/loading-button-label";
 import {
   AlertDialog,
@@ -96,24 +95,14 @@ export function EquipmentManager({ initialItems }: EquipmentManagerProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("title")}</h1>
-          <p className="text-sm text-muted-foreground">{t("description")}</p>
-        </div>
-        <Button
-          type="button"
-          size="lg"
-          className="h-12 px-6 text-base"
-          onClick={openCreateForm}
-        >
-          <PlusIcon />
-          {t("add")}
-        </Button>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">{t("title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("description")}</p>
       </div>
 
       <EquipmentData
         items={items}
+        onAdd={openCreateForm}
         onEdit={openEditForm}
         onDuplicate={openDuplicateForm}
         onDelete={handleDelete}
