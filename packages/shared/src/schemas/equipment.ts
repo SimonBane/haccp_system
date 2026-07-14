@@ -22,7 +22,7 @@ const tempSchema = z.coerce
   .min(-40, "Temperature must be at least -40°C")
   .max(15, "Temperature must be at most 15°C");
 
-const equipmentBaseSchema = z.object({
+const equipmentFieldsSchema = z.object({
   name: z.string().trim().min(1).max(100),
   type: equipmentTypeSchema,
   minTempC: tempSchema,
@@ -42,12 +42,18 @@ function withTempRangeValidation<T extends z.ZodTypeAny>(schema: T) {
   });
 }
 
-export const createEquipmentSchema = withTempRangeValidation(equipmentBaseSchema);
+export const createEquipmentSchema = withTempRangeValidation(
+  equipmentFieldsSchema.extend({
+    locationId: z.string().uuid(),
+  }),
+);
 
 export type CreateEquipmentInput = z.infer<typeof createEquipmentSchema>;
 
+export type EquipmentFieldsInput = z.infer<typeof equipmentFieldsSchema>;
+
 export const updateEquipmentSchema = withTempRangeValidation(
-  equipmentBaseSchema.partial().refine(
+  equipmentFieldsSchema.partial().refine(
     (data) =>
       Object.keys(data).length > 0 &&
       Object.values(data).some((value) => value !== undefined),

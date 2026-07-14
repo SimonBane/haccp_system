@@ -5,12 +5,13 @@ import {
   equipmentListResponseSchema,
   equipmentResponseSchema,
   updateEquipmentSchema,
-  type CreateEquipmentInput,
+  type EquipmentFieldsInput,
   type UpdateEquipmentInput,
 } from "@haccp/shared";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useCallback } from "react";
+import { useLocation } from "@/features/location/location-provider";
 import { parseApiError, API_BASE_URL, ApiRequestError } from "@/lib/api-utils";
 
 async function fetchWithToken(
@@ -51,6 +52,7 @@ async function fetchJsonWithToken<T>(
 
 export function useEquipmentApi() {
   const { getToken } = useAuth();
+  const { locationId } = useLocation();
   const router = useRouter();
 
   const refresh = useCallback(() => {
@@ -58,8 +60,8 @@ export function useEquipmentApi() {
   }, [router]);
 
   const create = useCallback(
-    async (input: CreateEquipmentInput) => {
-      createEquipmentSchema.parse(input);
+    async (input: EquipmentFieldsInput) => {
+      const payload = createEquipmentSchema.parse({ ...input, locationId });
       const result = await fetchJsonWithToken(
         getToken,
         "/equipment",
@@ -67,13 +69,13 @@ export function useEquipmentApi() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(input),
+          body: JSON.stringify(payload),
         },
       );
       refresh();
       return result;
     },
-    [getToken, refresh],
+    [getToken, locationId, refresh],
   );
 
   const update = useCallback(
