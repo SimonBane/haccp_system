@@ -31,12 +31,23 @@
     "breadcrumbDashboard": "Dashboard",
     "placeholder": "Sample dashboard content"
   },
+  "DataTable": {
+    "search": "Search",
+    "searchClear": "Clear search",
+    "noResults": "No results found.",
+    "pagination": {
+      "rowsCount": "{current} of {total} row(s)",
+      "rowsPerPage": "Rows per page",
+      "pageCount": "Page {current} of {total}"
+    }
+  },
   "EquipmentPage": {
     "breadcrumb": "Equipment",
     "title": "Equipment",
     "description": "Register fridges, freezers, and display cases with allowed temperature ranges.",
     "emptyTitle": "No equipment yet",
     "emptyDescription": "Add your first fridge or freezer to start temperature monitoring.",
+    "searchPlaceholder": "Search equipment",
     "add": "Add",
     "addTitle": "Add equipment",
     "addDescription": "Enter a name, type, and allowed temperature range.",
