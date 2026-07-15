@@ -14,7 +14,6 @@ CREATE TABLE "equipment" (
 	"type" text NOT NULL,
 	"min_temp_c" numeric(4, 1) NOT NULL,
 	"max_temp_c" numeric(4, 1) NOT NULL,
-	"is_active" boolean DEFAULT true NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "equipment_min_temp_less_than_max_temp" CHECK ("equipment"."min_temp_c" < "equipment"."max_temp_c")

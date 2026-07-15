@@ -1,1 +1,0 @@
-ALTER TABLE "equipment" DROP COLUMN "is_active";
