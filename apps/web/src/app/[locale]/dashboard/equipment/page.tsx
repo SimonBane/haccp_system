@@ -4,14 +4,12 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import {
   Breadcrumb,
   BreadcrumbItem,
-  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Link } from "@/i18n/navigation";
 import { EquipmentManager } from "@/features/equipment/equipment-manager";
 
 export default async function EquipmentPage({
@@ -23,7 +21,6 @@ export default async function EquipmentPage({
   setRequestLocale(locale as Locale);
 
   const t = await getTranslations("EquipmentPage");
-  const tDashboard = await getTranslations("DashboardPage");
 
   const equipment = await listEquipment();
 
@@ -39,9 +36,7 @@ export default async function EquipmentPage({
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink render={<Link href="/dashboard" />}>
-                  {tDashboard("breadcrumbApp")}
-                </BreadcrumbLink>
+                <span>{t("breadcrumbSettings")}</span>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>

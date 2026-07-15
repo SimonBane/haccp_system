@@ -6,8 +6,8 @@ import { usePathname } from "@/i18n/navigation";
 import { useAuth } from "@clerk/nextjs";
 import {
   CalendarDaysIcon,
-  RefrigeratorIcon,
   ShieldCheckIcon,
+  ThermometerSnowflakeIcon,
 } from "lucide-react";
 import { NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
@@ -41,7 +41,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     {
       title: t("nav.equipment"),
       url: "/dashboard/equipment",
-      icon: <RefrigeratorIcon />,
+      icon: <ThermometerSnowflakeIcon />,
       isActive: pathname.startsWith("/dashboard/equipment"),
     },
   ];
