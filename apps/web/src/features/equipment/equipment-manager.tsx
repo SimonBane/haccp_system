@@ -87,7 +87,7 @@ export function EquipmentManager({ initialItems }: EquipmentManagerProps) {
       setItems((current) =>
         current.filter((item) => item.id !== target.id),
       );
-      toast.success(t("toast.deleteSuccess", { name: target.name }));
+      toast.success(t("toast.deleteSuccess"));
       setDeleteTarget(null);
     } catch {
       toast.error(t("toast.deleteError"));
@@ -182,6 +182,7 @@ export function EquipmentManager({ initialItems }: EquipmentManagerProps) {
                   item.id === updated.id ? updated : item,
                 ),
               );
+              toast.success(t("toast.updateSuccess"));
               return;
             }
 
@@ -189,8 +190,8 @@ export function EquipmentManager({ initialItems }: EquipmentManagerProps) {
             setItems((current) => [...current, created]);
             toast.success(
               duplicateSource
-                ? t("toast.duplicateSuccess", { name: created.name })
-                : t("toast.createSuccess", { name: created.name }),
+                ? t("toast.duplicateSuccess")
+                : t("toast.createSuccess"),
             );
           }}
         />

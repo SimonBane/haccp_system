@@ -43,6 +43,7 @@
   },
   "EquipmentPage": {
     "breadcrumb": "Equipment",
+    "breadcrumbSettings": "Settings",
     "title": "Equipment",
     "description": "Register fridges, freezers, and display cases with allowed temperature ranges.",
     "emptyTitle": "No equipment yet",
@@ -76,10 +77,10 @@
     },
     "submitError": "Something went wrong. Please try again.",
     "toast": {
-      "createSuccess": "\"{name}\" was added.",
-      "updateSuccess": "\"{name}\" was updated.",
-      "duplicateSuccess": "\"{name}\" was created as a copy.",
-      "deleteSuccess": "\"{name}\" was deleted.",
+      "createSuccess": "Equipment was added.",
+      "updateSuccess": "Equipment was updated.",
+      "duplicateSuccess": "Equipment was copied.",
+      "deleteSuccess": "Equipment was deleted.",
       "deleteError": "Could not delete equipment. Please try again."
     },
     "nameTaken": "Equipment with this name already exists.",
