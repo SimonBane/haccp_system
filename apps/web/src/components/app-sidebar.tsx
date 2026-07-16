@@ -6,6 +6,7 @@ import { usePathname } from "@/i18n/navigation";
 import { useAuth } from "@clerk/nextjs";
 import {
   CalendarDaysIcon,
+  ListChecksIcon,
   ShieldCheckIcon,
   ThermometerSnowflakeIcon,
 } from "lucide-react";
@@ -38,6 +39,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   ];
 
   const adminNav = [
+    {
+      title: t("nav.tasks"),
+      url: "/dashboard/tasks",
+      icon: <ListChecksIcon />,
+      isActive: pathname.startsWith("/dashboard/tasks"),
+    },
     {
       title: t("nav.equipment"),
       url: "/dashboard/equipment",

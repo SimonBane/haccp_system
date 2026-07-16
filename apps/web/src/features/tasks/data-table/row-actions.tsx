@@ -1,6 +1,6 @@
 "use client";
 
-import type { EquipmentResponse } from "@haccp/shared";
+import type { TaskTemplateResponse } from "@haccp/shared";
 import type { Row } from "@tanstack/react-table";
 import {
   CopyPlusIcon,
@@ -19,26 +19,24 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-type EquipmentTranslations = ReturnType<
-  typeof useTranslations<"EquipmentPage">
->;
+type TasksTranslations = ReturnType<typeof useTranslations<"TasksPage">>;
 
-type EquipmentTableRowActionsProps = {
-  row: Row<EquipmentResponse>;
-  t: EquipmentTranslations;
-  onEdit: (equipment: EquipmentResponse) => void;
-  onDuplicate: (equipment: EquipmentResponse) => void;
-  onDelete: (equipment: EquipmentResponse) => void;
+type TasksTableRowActionsProps = {
+  row: Row<TaskTemplateResponse>;
+  t: TasksTranslations;
+  onEdit: (task: TaskTemplateResponse) => void;
+  onDuplicate: (task: TaskTemplateResponse) => void;
+  onDelete: (task: TaskTemplateResponse) => void;
 };
 
-export function EquipmentTableRowActions({
+export function TasksTableRowActions({
   row,
   t,
   onEdit,
   onDuplicate,
   onDelete,
-}: EquipmentTableRowActionsProps) {
-  const equipment = row.original;
+}: TasksTableRowActionsProps) {
+  const task = row.original;
 
   return (
     <div className="flex justify-end" onClick={(event) => event.stopPropagation()}>
@@ -62,21 +60,18 @@ export function EquipmentTableRowActions({
           onClick={(event) => event.stopPropagation()}
         >
           <DropdownMenuGroup>
-            <DropdownMenuItem onClick={() => onEdit(equipment)}>
+            <DropdownMenuItem onClick={() => onEdit(task)}>
               <PencilIcon />
               {t("edit")}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onDuplicate(equipment)}>
+            <DropdownMenuItem onClick={() => onDuplicate(task)}>
               <CopyPlusIcon />
               {t("duplicate")}
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
-            <DropdownMenuItem
-              variant="destructive"
-              onClick={() => onDelete(equipment)}
-            >
+            <DropdownMenuItem variant="destructive" onClick={() => onDelete(task)}>
               <Trash2Icon />
               {t("delete")}
             </DropdownMenuItem>

@@ -17,10 +17,13 @@ export const EQUIPMENT_DEFAULT_TEMPS: Record<
   display_case: { minTempC: 0, maxTempC: 4 },
 };
 
+export const EQUIPMENT_TEMP_MIN_C = -40;
+export const EQUIPMENT_TEMP_MAX_C = 15;
+
 const tempSchema = z.coerce
   .number()
-  .min(-40, "Temperature must be at least -40°C")
-  .max(15, "Temperature must be at most 15°C");
+  .min(EQUIPMENT_TEMP_MIN_C, `Temperature must be at least ${EQUIPMENT_TEMP_MIN_C}°C`)
+  .max(EQUIPMENT_TEMP_MAX_C, `Temperature must be at most ${EQUIPMENT_TEMP_MAX_C}°C`);
 
 const equipmentFieldsSchema = z.object({
   name: z.string().trim().min(1).max(100),

@@ -1,6 +1,10 @@
 "use client";
 
-import type { EquipmentResponse } from "@haccp/shared";
+import type {
+  EquipmentResponse,
+  TaskTemplateFieldsInput,
+  TaskTemplateResponse,
+} from "@haccp/shared";
 import { Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
@@ -15,56 +19,58 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { EquipmentForm } from "@/features/equipment/equipment-form";
-import { EquipmentData } from "@/features/equipment/data-table/data";
-import { useEquipmentApi } from "@/features/equipment/use-equipment-api";
+import { TasksData } from "@/features/tasks/data-table/data";
+import { TasksForm } from "@/features/tasks/tasks-form";
+import { useTasksApi } from "@/features/tasks/use-tasks-api";
 
-type EquipmentManagerProps = {
-  initialItems: EquipmentResponse[];
+type TasksManagerProps = {
+  initialItems: TaskTemplateResponse[];
+  equipment: Pick<EquipmentResponse, "id" | "name">[];
 };
 
-export function EquipmentManager({ initialItems }: EquipmentManagerProps) {
-  const t = useTranslations("EquipmentPage");
-  const { create, update, remove } = useEquipmentApi();
+export function TasksManager({ initialItems, equipment }: TasksManagerProps) {
+  const t = useTranslations("TasksPage");
+  const { create, update, remove } = useTasksApi();
 
   const [items, setItems] = useState(initialItems);
   const [formOpen, setFormOpen] = useState(false);
-  const [editingEquipment, setEditingEquipment] =
-    useState<EquipmentResponse | null>(null);
+  const [editingTask, setEditingTask] = useState<TaskTemplateResponse | null>(
+    null,
+  );
   const [duplicateSource, setDuplicateSource] =
-    useState<EquipmentResponse | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<EquipmentResponse | null>(
+    useState<TaskTemplateResponse | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<TaskTemplateResponse | null>(
     null,
   );
   const [isDeleting, setIsDeleting] = useState(false);
 
   function openCreateForm() {
-    setEditingEquipment(null);
+    setEditingTask(null);
     setDuplicateSource(null);
     setFormOpen(true);
     setIsDeleting(false);
     setDeleteTarget(null);
   }
 
-  function openEditForm(equipment: EquipmentResponse) {
-    setEditingEquipment(equipment);
+  function openEditForm(task: TaskTemplateResponse) {
+    setEditingTask(task);
     setDuplicateSource(null);
     setFormOpen(true);
     setIsDeleting(false);
     setDeleteTarget(null);
   }
 
-  function openDuplicateForm(equipment: EquipmentResponse) {
-    setEditingEquipment(null);
-    setDuplicateSource(equipment);
+  function openDuplicateForm(task: TaskTemplateResponse) {
+    setEditingTask(null);
+    setDuplicateSource(task);
     setFormOpen(true);
     setIsDeleting(false);
     setDeleteTarget(null);
   }
 
-  function handleDelete(equipment: EquipmentResponse) {
+  function handleDelete(task: TaskTemplateResponse) {
     setIsDeleting(false);
-    setDeleteTarget(equipment);
+    setDeleteTarget(task);
   }
 
   async function confirmDelete() {
@@ -73,9 +79,7 @@ export function EquipmentManager({ initialItems }: EquipmentManagerProps) {
     const target = deleteTarget;
     try {
       await remove(target.id);
-      setItems((current) =>
-        current.filter((item) => item.id !== target.id),
-      );
+      setItems((current) => current.filter((item) => item.id !== target.id));
       toast.success(t("toast.deleteSuccess"));
       setDeleteTarget(null);
     } catch {
@@ -92,7 +96,7 @@ export function EquipmentManager({ initialItems }: EquipmentManagerProps) {
         <p className="text-sm text-muted-foreground">{t("description")}</p>
       </div>
 
-      <EquipmentData
+      <TasksData
         items={items}
         onAdd={openCreateForm}
         onEdit={openEditForm}
@@ -111,7 +115,7 @@ export function EquipmentManager({ initialItems }: EquipmentManagerProps) {
             <AlertDialogTitle>{t("deleteDialog.title")}</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteTarget
-                ? t("deleteConfirm", { name: deleteTarget.name })
+                ? t("deleteConfirm", { title: deleteTarget.title })
                 : t("deleteDialog.fallback")}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -132,47 +136,42 @@ export function EquipmentManager({ initialItems }: EquipmentManagerProps) {
       </AlertDialog>
 
       {formOpen ? (
-        <EquipmentForm
+        <TasksForm
           key={
             duplicateSource
               ? `duplicate-${duplicateSource.id}`
-              : (editingEquipment?.id ?? "create")
+              : (editingTask?.id ?? "create")
           }
           open
           onOpenChange={(open) => {
             if (!open) {
               setFormOpen(false);
-              setEditingEquipment(null);
+              setEditingTask(null);
               setDuplicateSource(null);
             }
           }}
-          equipment={editingEquipment}
+          task={editingTask}
           duplicateSource={duplicateSource}
-          suggestedDuplicateName={
+          suggestedDuplicateTitle={
             duplicateSource
-              ? t("duplicateSuggestedName", { name: duplicateSource.name })
+              ? t("duplicateSuggestedTitle", { title: duplicateSource.title })
               : undefined
           }
-          existingItems={items.map((item) => ({
-            id: item.id,
-            name: item.name,
-          }))}
+          equipment={equipment}
           onDuplicate={() => {
-            if (editingEquipment) openDuplicateForm(editingEquipment);
+            if (editingTask) openDuplicateForm(editingTask);
           }}
           onSubmit={async (values) => {
-            if (editingEquipment) {
-              const updated = await update(editingEquipment.id, values);
+            if (editingTask) {
+              const updated = await update(editingTask.id, values);
               setItems((current) =>
-                current.map((item) =>
-                  item.id === updated.id ? updated : item,
-                ),
+                current.map((item) => (item.id === updated.id ? updated : item)),
               );
               toast.success(t("toast.updateSuccess"));
               return;
             }
 
-            const created = await create(values);
+            const created = await create(values as TaskTemplateFieldsInput);
             setItems((current) => [...current, created]);
             toast.success(
               duplicateSource

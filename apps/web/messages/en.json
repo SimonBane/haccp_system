@@ -42,51 +42,54 @@
     }
   },
   "EquipmentPage": {
-    "breadcrumb": "Equipment",
+    "breadcrumb": "Cold storage",
     "breadcrumbSettings": "Settings",
-    "title": "Equipment",
+    "title": "Cold storage",
     "description": "Register fridges, freezers, and display cases with allowed temperature ranges.",
-    "emptyTitle": "No equipment yet",
+    "emptyTitle": "No cold storage yet",
     "emptyDescription": "Add your first fridge or freezer to start temperature monitoring.",
-    "searchPlaceholder": "Search equipment",
+    "searchPlaceholder": "Search cold storage",
     "add": "Add",
-    "addTitle": "Add equipment",
+    "addTitle": "Add cold storage",
     "addDescription": "Enter a name, type, and allowed temperature range.",
-    "editTitle": "Edit equipment",
-    "editDescription": "Update the equipment details.",
+    "editTitle": "Edit cold storage",
+    "editDescription": "Update the cold storage details.",
     "nameLabel": "Name",
     "namePlaceholder": "Walk-in freezer",
     "typeLabel": "Type",
     "typePlaceholder": "Select a type",
-    "minTempLabel": "Min °C",
-    "maxTempLabel": "Max °C",
+    "allowedTempLabel": "Allowed temperature",
+    "tempTo": "to",
     "save": "Save",
     "saving": "Saving…",
     "edit": "Edit",
     "duplicate": "Duplicate",
-    "duplicateTitle": "Duplicate equipment",
+    "duplicateTitle": "Duplicate cold storage",
     "duplicateDescription": "Create a copy with a new name.",
+    "duplicateSuggestedName": "{name} (Copy)",
     "delete": "Delete",
     "openMenu": "Open menu",
     "deleteConfirm": "Delete \"{name}\"? This cannot be undone.",
     "deleteDialog": {
-      "title": "Delete equipment",
-      "fallback": "This will permanently delete the equipment.",
+      "title": "Delete cold storage",
+      "fallback": "This will permanently delete the cold storage.",
       "cancel": "Cancel",
       "confirm": "Delete"
     },
     "submitError": "Something went wrong. Please try again.",
     "toast": {
-      "createSuccess": "Equipment was added.",
-      "updateSuccess": "Equipment was updated.",
-      "duplicateSuccess": "Equipment was copied.",
-      "deleteSuccess": "Equipment was deleted.",
-      "deleteError": "Could not delete equipment. Please try again."
+      "createSuccess": "Cold storage was added.",
+      "updateSuccess": "Cold storage was updated.",
+      "duplicateSuccess": "Cold storage was copied.",
+      "deleteSuccess": "Cold storage was deleted.",
+      "deleteError": "Could not delete cold storage. Please try again."
     },
-    "nameTaken": "Equipment with this name already exists.",
+    "nameTaken": "Cold storage with this name already exists.",
     "validation": {
       "nameRequired": "Name is required.",
       "nameMaxLength": "Name must be at most 100 characters.",
+      "typeRequired": "Type is required.",
+      "tempRequired": "Temperature is required.",
       "minTemp": "Temperature must be at least -40°C.",
       "maxTemp": "Temperature must be at most 15°C.",
       "tempRange": "Minimum temperature must be less than maximum temperature."
@@ -103,6 +106,93 @@
       "displayCase": "Display case"
     }
   },
+  "TasksPage": {
+    "breadcrumb": "Tasks",
+    "breadcrumbSettings": "Settings",
+    "title": "Tasks",
+    "description": "Define recurring HACCP tasks with weekdays and scheduled times from your plan.",
+    "emptyTitle": "No tasks yet",
+    "emptyDescription": "Add your first task template to build the daily checklist.",
+    "searchPlaceholder": "Search tasks",
+    "add": "Add",
+    "addTitle": "Add task",
+    "addDescription": "Enter the task details, weekdays, and scheduled times.",
+    "editTitle": "Edit task",
+    "editDescription": "Update the task template.",
+    "duplicateTitle": "Duplicate task",
+    "duplicateDescription": "Create a copy with a new title.",
+    "duplicateSuggestedTitle": "{title} (Copy)",
+    "titleLabel": "Title",
+    "titlePlaceholder": "Check walk-in chiller",
+    "typeLabel": "Type",
+    "typePlaceholder": "Select a type",
+    "equipmentLabel": "Cold storage",
+    "equipmentPlaceholder": "Select cold storage",
+    "weekdaysLabel": "Schedule",
+    "timesLabel": "Scheduled times",
+    "addTime": "Add time",
+    "removeTime": "Remove time",
+    "timePicker": {
+      "hours": "Hours",
+      "minutes": "Minutes"
+    },
+    "save": "Save",
+    "edit": "Edit",
+    "duplicate": "Duplicate",
+    "delete": "Delete",
+    "openMenu": "Open menu",
+    "deleteConfirm": "Delete \"{title}\"? This cannot be undone.",
+    "deleteDialog": {
+      "title": "Delete task",
+      "fallback": "This will permanently delete the task template.",
+      "cancel": "Cancel",
+      "confirm": "Delete"
+    },
+    "submitError": "Something went wrong. Please try again.",
+    "toast": {
+      "createSuccess": "Task was added.",
+      "updateSuccess": "Task was updated.",
+      "duplicateSuccess": "Task was copied.",
+      "deleteSuccess": "Task was deleted.",
+      "deleteError": "Could not delete task. Please try again."
+    },
+    "presets": {
+      "everyDay": "Every day",
+      "monFri": "Monday–Friday",
+      "custom": "Custom"
+    },
+    "weekdaysShort": {
+      "monday": "Mon",
+      "tuesday": "Tue",
+      "wednesday": "Wed",
+      "thursday": "Thu",
+      "friday": "Fri",
+      "saturday": "Sat",
+      "sunday": "Sun"
+    },
+    "validation": {
+      "titleRequired": "Title is required.",
+      "titleMaxLength": "Title must be at most 200 characters.",
+      "typeRequired": "Type is required.",
+      "weekdaysRequired": "Select at least one weekday.",
+      "timesRequired": "Add at least one scheduled time.",
+      "timesMax": "At most 3 times per task.",
+      "timesUnique": "Scheduled times must be unique.",
+      "equipmentRequired": "Cold storage is required for temperature tasks."
+    },
+    "columns": {
+      "title": "Title",
+      "type": "Type",
+      "schedule": "Schedule",
+      "equipment": "Cold storage",
+      "actions": "Actions"
+    },
+    "types": {
+      "temperature": "Temperature",
+      "cleaning": "Cleaning",
+      "other": "Other"
+    }
+  },
   "Sidebar": {
     "brandName": "HACCP System",
     "brandPlan": "Enterprise",
@@ -110,7 +200,8 @@
     "toggle": "Toggle",
     "nav": {
       "today": "Today",
-      "equipment": "Equipment",
+      "tasks": "Tasks",
+      "equipment": "Cold storage",
       "settings": "Settings"
     },
     "userMenu": {
