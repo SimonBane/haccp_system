@@ -19,17 +19,6 @@ import { EquipmentForm } from "@/features/equipment/equipment-form";
 import { EquipmentData } from "@/features/equipment/data-table/data";
 import { useEquipmentApi } from "@/features/equipment/use-equipment-api";
 
-function suggestDuplicateName(
-  sourceName: string,
-  existingNames: string[],
-): string {
-  const base = `${sourceName} (Copy)`;
-  if (!existingNames.includes(base)) return base;
-  let i = 2;
-  while (existingNames.includes(`${sourceName} (Copy ${i})`)) i++;
-  return `${sourceName} (Copy ${i})`;
-}
-
 type EquipmentManagerProps = {
   initialItems: EquipmentResponse[];
 };
@@ -161,10 +150,7 @@ export function EquipmentManager({ initialItems }: EquipmentManagerProps) {
           duplicateSource={duplicateSource}
           suggestedDuplicateName={
             duplicateSource
-              ? suggestDuplicateName(
-                  duplicateSource.name,
-                  items.map((item) => item.name),
-                )
+              ? t("duplicateSuggestedName", { name: duplicateSource.name })
               : undefined
           }
           existingItems={items.map((item) => ({

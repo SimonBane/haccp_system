@@ -42,51 +42,54 @@
     }
   },
   "EquipmentPage": {
-    "breadcrumb": "Оборудване",
+    "breadcrumb": "Хладилна техника",
     "breadcrumbSettings": "Настройки",
-    "title": "Оборудване",
+    "title": "Хладилна техника",
     "description": "Регистрирайте хладилници, фризери и витрини с допустими температурни граници.",
-    "emptyTitle": "Няма оборудване",
+    "emptyTitle": "Няма хладилна техника",
     "emptyDescription": "Добавете първия си хладилник или фризер, за да започнете температурния контрол.",
-    "searchPlaceholder": "Търсене на оборудване",
+    "searchPlaceholder": "Търсене на хладилна техника",
     "add": "Добави",
-    "addTitle": "Добавяне на оборудване",
+    "addTitle": "Добавяне на хладилна техника",
     "addDescription": "Въведете име, тип и допустим температурен диапазон.",
-    "editTitle": "Редактиране на оборудване",
-    "editDescription": "Актуализирайте данните за оборудването.",
+    "editTitle": "Редактиране на хладилна техника",
+    "editDescription": "Актуализирайте данните за хладилната техника.",
     "nameLabel": "Име",
     "namePlaceholder": "Складов фризер",
     "typeLabel": "Тип",
     "typePlaceholder": "Изберете тип",
-    "minTempLabel": "Мин. °C",
-    "maxTempLabel": "Макс. °C",
+    "allowedTempLabel": "Допустима температура",
+    "tempTo": "до",
     "save": "Запази",
     "saving": "Запазване…",
     "edit": "Редактирай",
     "duplicate": "Дублирай",
-    "duplicateTitle": "Дублиране на оборудване",
+    "duplicateTitle": "Дублиране на хладилна техника",
     "duplicateDescription": "Създайте копие с ново име.",
+    "duplicateSuggestedName": "{name} (Копие)",
     "delete": "Изтрий",
     "openMenu": "Отвори меню",
     "deleteConfirm": "Изтриване на \"{name}\"? Това действие е необратимо.",
     "deleteDialog": {
-      "title": "Изтриване на оборудване",
-      "fallback": "Това ще изтрие оборудването завинаги.",
+      "title": "Изтриване на хладилна техника",
+      "fallback": "Това ще изтрие хладилната техника завинаги.",
       "cancel": "Отказ",
       "confirm": "Изтрий"
     },
     "submitError": "Възникна грешка. Опитайте отново.",
     "toast": {
-      "createSuccess": "Оборудването беше добавено.",
-      "updateSuccess": "Оборудването беше актуализирано.",
-      "duplicateSuccess": "Оборудването беше копирано.",
-      "deleteSuccess": "Оборудването беше изтрито.",
+      "createSuccess": "Хладилната техника беше добавена.",
+      "updateSuccess": "Хладилната техника беше актуализирана.",
+      "duplicateSuccess": "Хладилната техника беше копирана.",
+      "deleteSuccess": "Хладилната техника беше изтрита.",
       "deleteError": "Неуспешно изтриване. Опитайте отново."
     },
-    "nameTaken": "Оборудване с това име вече съществува.",
+    "nameTaken": "Хладилна техника с това име вече съществува.",
     "validation": {
       "nameRequired": "Името е задължително.",
       "nameMaxLength": "Името трябва да е най-много 100 символа.",
+      "typeRequired": "Типът е задължителен.",
+      "tempRequired": "Температурата е задължителна.",
       "minTemp": "Температурата трябва да е поне -40°C.",
       "maxTemp": "Температурата трябва да е най-много 15°C.",
       "tempRange": "Минималната температура трябва да е по-ниска от максималната."
@@ -103,6 +106,93 @@
       "displayCase": "Витрина"
     }
   },
+  "TasksPage": {
+    "breadcrumb": "Задачи",
+    "breadcrumbSettings": "Настройки",
+    "title": "Задачи",
+    "description": "Дефинирайте повтарящи се HACCP задачи с дни от седмицата и часове от вашия план.",
+    "emptyTitle": "Няма задачи",
+    "emptyDescription": "Добавете първия шаблон на задача, за да изградите дневния списък.",
+    "searchPlaceholder": "Търсене на задачи",
+    "add": "Добави",
+    "addTitle": "Добавяне на задача",
+    "addDescription": "Въведете данни за задачата, дни от седмицата и часове.",
+    "editTitle": "Редактиране на задача",
+    "editDescription": "Актуализирайте шаблона на задачата.",
+    "duplicateTitle": "Дублиране на задача",
+    "duplicateDescription": "Създайте копие с ново заглавие.",
+    "duplicateSuggestedTitle": "{title} (Копие)",
+    "titleLabel": "Заглавие",
+    "titlePlaceholder": "Проверка на складов хладилник",
+    "typeLabel": "Тип",
+    "typePlaceholder": "Изберете тип",
+    "equipmentLabel": "Хладилна техника",
+    "equipmentPlaceholder": "Изберете хладилна техника",
+    "weekdaysLabel": "График",
+    "timesLabel": "Часове",
+    "addTime": "Добави час",
+    "removeTime": "Премахни час",
+    "timePicker": {
+      "hours": "Часове",
+      "minutes": "Минути"
+    },
+    "save": "Запази",
+    "edit": "Редактирай",
+    "duplicate": "Дублирай",
+    "delete": "Изтрий",
+    "openMenu": "Отвори меню",
+    "deleteConfirm": "Изтриване на \"{title}\"? Това действие е необратимо.",
+    "deleteDialog": {
+      "title": "Изтриване на задача",
+      "fallback": "Това ще изтрие шаблона на задачата завинаги.",
+      "cancel": "Отказ",
+      "confirm": "Изтрий"
+    },
+    "submitError": "Възникна грешка. Опитайте отново.",
+    "toast": {
+      "createSuccess": "Задачата беше добавена.",
+      "updateSuccess": "Задачата беше актуализирана.",
+      "duplicateSuccess": "Задачата беше копирана.",
+      "deleteSuccess": "Задачата беше изтрита.",
+      "deleteError": "Неуспешно изтриване. Опитайте отново."
+    },
+    "presets": {
+      "everyDay": "Всеки ден",
+      "monFri": "Понеделник–Петък",
+      "custom": "По избор"
+    },
+    "weekdaysShort": {
+      "monday": "Пон",
+      "tuesday": "Вт",
+      "wednesday": "Ср",
+      "thursday": "Чет",
+      "friday": "Пет",
+      "saturday": "Съб",
+      "sunday": "Нед"
+    },
+    "validation": {
+      "titleRequired": "Заглавието е задължително.",
+      "titleMaxLength": "Заглавието трябва да е най-много 200 символа.",
+      "typeRequired": "Типът е задължителен.",
+      "weekdaysRequired": "Изберете поне един ден от седмицата.",
+      "timesRequired": "Добавете поне един час.",
+      "timesMax": "Най-много 3 часа на задача.",
+      "timesUnique": "Часовете трябва да са уникални.",
+      "equipmentRequired": "Хладилната техника е задължителна за температурни задачи."
+    },
+    "columns": {
+      "title": "Заглавие",
+      "type": "Тип",
+      "schedule": "График",
+      "equipment": "Хладилна техника",
+      "actions": "Действия"
+    },
+    "types": {
+      "temperature": "Температура",
+      "cleaning": "Почистване",
+      "other": "Друго"
+    }
+  },
   "Sidebar": {
     "brandName": "HACCP Система",
     "brandPlan": "Предприятие",
@@ -110,7 +200,8 @@
     "toggle": "Превключване",
     "nav": {
       "today": "Днес",
-      "equipment": "Оборудване",
+      "tasks": "Задачи",
+      "equipment": "Хладилна техника",
       "settings": "Настройки"
     },
     "userMenu": {

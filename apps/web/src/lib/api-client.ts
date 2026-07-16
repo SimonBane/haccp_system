@@ -6,12 +6,14 @@ import {
   equipmentResponseSchema,
   healthResponseSchema,
   locationResponseSchema,
+  taskTemplateListResponseSchema,
   updateEquipmentSchema,
   type EquipmentFieldsInput,
   type EquipmentListResponse,
   type EquipmentResponse,
   type HealthResponse,
   type LocationResponse,
+  type TaskTemplateListResponse,
   type UpdateEquipmentInput,
 } from "@haccp/shared";
 import { auth } from "@clerk/nextjs/server";
@@ -87,6 +89,10 @@ export async function getCurrentLocation(): Promise<LocationResponse> {
 
 export async function listEquipment(): Promise<EquipmentListResponse> {
   return fetchJson("/equipment", equipmentListResponseSchema);
+}
+
+export async function listTaskTemplates(): Promise<TaskTemplateListResponse> {
+  return fetchJson("/task-templates", taskTemplateListResponseSchema);
 }
 
 export async function createEquipment(

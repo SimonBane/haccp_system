@@ -15,6 +15,7 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -69,6 +70,9 @@ export function EquipmentTableRowActions({
               <CopyPlusIcon />
               {t("duplicate")}
             </DropdownMenuItem>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
             <DropdownMenuItem
               variant="destructive"
               onClick={() => onDelete(equipment)}
