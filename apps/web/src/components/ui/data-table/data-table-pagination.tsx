@@ -20,25 +20,33 @@ import {
 interface DataTablePaginationProps<TData> {
   table: Table<TData>;
   pageSizeOptions?: number[];
+  showSelectionCount?: boolean;
 }
 
 export function DataTablePagination<TData>({
   table,
-  pageSizeOptions = [10, 25, 50, 100],
+  pageSizeOptions = [10, 20, 25, 30, 40, 50],
+  showSelectionCount = false,
 }: DataTablePaginationProps<TData>) {
   const t = useTranslations("DataTable.pagination");
   const totalRowsCount = table.getFilteredRowModel().rows.length;
   const currentPageRowsCount = table.getRowModel().rows.length;
   const pageSize = table.getState().pagination.pageSize;
+  const selectedRowsCount = table.getFilteredSelectedRowModel().rows.length;
 
   return (
     <div className="flex flex-col justify-between gap-2 px-2 md:flex-row md:items-center">
       <div className="flex-1 text-sm text-muted-foreground">
         <span>
-          {t("rowsCount", {
-            current: currentPageRowsCount,
-            total: totalRowsCount,
-          })}
+          {showSelectionCount
+            ? t("rowsSelected", {
+                selected: selectedRowsCount,
+                total: totalRowsCount,
+              })
+            : t("rowsCount", {
+                current: currentPageRowsCount,
+                total: totalRowsCount,
+              })}
         </span>
       </div>
 

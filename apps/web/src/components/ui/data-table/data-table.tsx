@@ -10,13 +10,20 @@ import {
   useReactTable,
   type ColumnDef,
   type ColumnFiltersState,
+  type OnChangeFn,
   type Row,
+  type RowSelectionState,
   type SortingState,
   type Table as ReactTable,
+  type VisibilityState,
 } from "@tanstack/react-table";
+import { useTranslations } from "next-intl";
 import * as React from "react";
+import { DataTableColumnHideButton } from "@/components/ui/data-table/data-table-column-hide-button";
 import { DataTablePagination } from "@/components/ui/data-table/data-table-pagination";
 import { DataTableSearch } from "@/components/ui/data-table/data-table-search";
+import { createSelectColumn } from "@/components/ui/data-table/data-table-select-column";
+import { DataTableViewOptions } from "@/components/ui/data-table/data-table-view-options";
 import {
   Table,
   TableBody,
@@ -42,7 +49,18 @@ interface DataTableProps<TData, TValue> {
   searchPlaceholder?: string;
   enablePagination?: boolean;
   pageSize?: number;
+  pageSizeOptions?: number[];
+  enableColumnVisibility?: boolean;
+  enableRowSelection?: boolean;
+  showSelectionCount?: boolean;
+  getRowId?: (originalRow: TData, index: number) => string;
+  columnVisibility?: VisibilityState;
+  onColumnVisibilityChange?: OnChangeFn<VisibilityState>;
+  rowSelection?: RowSelectionState;
+  onRowSelectionChange?: OnChangeFn<RowSelectionState>;
 }
+
+const NON_CLICKABLE_COLUMN_IDS = new Set(["select", "actions", "expand"]);
 
 export function DataTable<TData, TValue>({
   columns,
@@ -59,11 +77,46 @@ export function DataTable<TData, TValue>({
   searchPlaceholder,
   enablePagination = true,
   pageSize = 50,
+  pageSizeOptions,
+  enableColumnVisibility = false,
+  enableRowSelection = false,
+  showSelectionCount,
+  getRowId,
+  columnVisibility: columnVisibilityProp,
+  onColumnVisibilityChange,
+  rowSelection: rowSelectionProp,
+  onRowSelectionChange,
 }: DataTableProps<TData, TValue>) {
+  const t = useTranslations("DataTable.selection");
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     [],
   );
+  const [internalColumnVisibility, setInternalColumnVisibility] =
+    React.useState<VisibilityState>({});
+  const [internalRowSelection, setInternalRowSelection] =
+    React.useState<RowSelectionState>({});
+
+  const columnVisibility = columnVisibilityProp ?? internalColumnVisibility;
+  const setColumnVisibility =
+    onColumnVisibilityChange ?? setInternalColumnVisibility;
+  const rowSelection = rowSelectionProp ?? internalRowSelection;
+  const setRowSelection = onRowSelectionChange ?? setInternalRowSelection;
+
+  const hasSelectColumn = columns.some((column) => column.id === "select");
+  const tableColumns = React.useMemo(() => {
+    if (!enableRowSelection || hasSelectColumn) {
+      return columns;
+    }
+
+    return [
+      createSelectColumn<TData>({
+        selectAll: t("selectAll"),
+        selectRow: t("selectRow"),
+      }),
+      ...columns,
+    ];
+  }, [columns, enableRowSelection, hasSelectColumn, t]);
 
   React.useEffect(() => {
     if (!enableSearch) {
@@ -73,7 +126,8 @@ export function DataTable<TData, TValue>({
 
   const table = useReactTable({
     data,
-    columns,
+    columns: tableColumns,
+    getRowId,
     initialState: {
       pagination: {
         pageSize: enablePagination ? pageSize : data.length,
@@ -85,9 +139,14 @@ export function DataTable<TData, TValue>({
         : { pagination: { pageIndex: 0, pageSize: data.length } }),
       sorting,
       columnFilters,
+      columnVisibility,
+      rowSelection,
     },
+    enableRowSelection,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -111,6 +170,9 @@ export function DataTable<TData, TValue>({
   const visibleRows = table.getRowModel().rows;
   const isFiltered = columnFilters.length > 0;
   const displayEmptyMessage = isFiltered ? noResultsMessage : emptyMessage;
+  const showToolbar =
+    enableSearch || Boolean(Toolbar) || enableColumnVisibility;
+  const shouldShowSelectionCount = showSelectionCount ?? enableRowSelection;
 
   return (
     <div
@@ -119,16 +181,21 @@ export function DataTable<TData, TValue>({
         classNameWrapper,
       )}
     >
-      {enableSearch || Toolbar ? (
+      {showToolbar ? (
         <div className="shrink-0">
           <div className="flex flex-wrap items-end justify-between gap-2">
-            {enableSearch && searchColumn ? (
-              <DataTableSearch
-                table={table}
-                column={searchColumn}
-                placeholder={searchPlaceholder ?? ""}
-              />
-            ) : null}
+            <div className="flex flex-wrap items-end gap-2">
+              {enableSearch && searchColumn ? (
+                <DataTableSearch
+                  table={table}
+                  column={searchColumn}
+                  placeholder={searchPlaceholder ?? ""}
+                />
+              ) : null}
+              {enableColumnVisibility ? (
+                <DataTableViewOptions table={table} />
+              ) : null}
+            </div>
             {Toolbar ? <Toolbar table={table} /> : null}
           </div>
         </div>
@@ -160,13 +227,14 @@ export function DataTable<TData, TValue>({
                     )}
                   >
                     {header.isPlaceholder ? null : (
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex-1">
-                          {flexRender(
-                            header.column.columnDef.header,
-                            header.getContext(),
-                          )}
-                        </div>
+                      <div className="inline-flex w-fit max-w-full items-center gap-0.5">
+                        {flexRender(
+                          header.column.columnDef.header,
+                          header.getContext(),
+                        )}
+                        {enableColumnVisibility ? (
+                          <DataTableColumnHideButton column={header.column} />
+                        ) : null}
                       </div>
                     )}
                   </TableHead>
@@ -191,7 +259,9 @@ export function DataTable<TData, TValue>({
                           : "whitespace-pre-wrap",
                         cell.column.columnDef.meta?.sticky && "left-0 z-20",
                         cell.column.columnDef.meta?.className,
-                        onRowClick && "cursor-pointer",
+                        onRowClick &&
+                          !NON_CLICKABLE_COLUMN_IDS.has(cell.column.id) &&
+                          "cursor-pointer",
                         cell.column.columnDef.meta?.hidden && "hidden",
                       )}
                       title={
@@ -199,7 +269,15 @@ export function DataTable<TData, TValue>({
                           ? (cell.getContext().getValue() as string)
                           : ""
                       }
-                      onClick={() => onRowClick?.(row)}
+                      onClick={() => {
+                        if (
+                          !onRowClick ||
+                          NON_CLICKABLE_COLUMN_IDS.has(cell.column.id)
+                        ) {
+                          return;
+                        }
+                        onRowClick(row);
+                      }}
                     >
                       {flexRender(
                         cell.column.columnDef.cell,
@@ -212,7 +290,7 @@ export function DataTable<TData, TValue>({
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length}
+                  colSpan={tableColumns.length}
                   className="h-24 text-center"
                 >
                   {displayEmptyMessage}
@@ -225,7 +303,11 @@ export function DataTable<TData, TValue>({
 
       {enablePagination ? (
         <div className="shrink-0">
-          <DataTablePagination table={table} />
+          <DataTablePagination
+            table={table}
+            pageSizeOptions={pageSizeOptions}
+            showSelectionCount={shouldShowSelectionCount}
+          />
         </div>
       ) : null}
     </div>

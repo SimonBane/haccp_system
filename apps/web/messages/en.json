@@ -31,12 +31,173 @@
     "breadcrumbDashboard": "Dashboard",
     "placeholder": "Sample dashboard content"
   },
+  "TodayPage": {
+    "breadcrumb": "Today",
+    "title": "Today",
+    "selectedDayTitle": "Daily plan",
+    "sections": {
+      "attention": "Needs attention",
+      "overdue": "Overdue",
+      "now": "Now",
+      "next": "Next",
+      "completed": "Completed",
+      "morning": "Morning",
+      "afternoon": "Afternoon",
+      "evening": "Evening"
+    },
+    "filters": {
+      "todo": "To do",
+      "attention": "Attention",
+      "completed": "Completed",
+      "all": "All",
+      "ariaLabel": "Filter tasks"
+    },
+    "filtersShort": {
+      "todo": "To do",
+      "attention": "Attention",
+      "completed": "Done",
+      "all": "All"
+    },
+    "status": {
+      "pending": "Pending",
+      "completed": "Completed",
+      "overdue": "Overdue",
+      "now": "Now",
+      "attention": "Needs attention"
+    },
+    "actions": {
+      "complete": "Complete",
+      "completeNow": "Complete now",
+      "completeLate": "Complete",
+      "record": "Record",
+      "recordNow": "Record now",
+      "recordLate": "Record",
+      "undo": "Undo"
+    },
+    "taskTypes": {
+      "cleaning": "Cleaning",
+      "temperature": "Temperature",
+      "other": "Other"
+    },
+    "progress": {
+      "summary": "{completed} of {total} completed",
+      "label": "Daily progress",
+      "allCompletedTitle": "All tasks are completed",
+      "allCompletedSummary": "{completed} of {total} tasks completed"
+    },
+    "metrics": {
+      "attention": "Attention",
+      "remaining": "Remaining",
+      "completed": "Completed"
+    },
+    "summary": {
+      "ariaLabel": "Daily task summary",
+      "requiresAction": "Requires action",
+      "tasksLeft": "Tasks left today",
+      "nextDeadline": "Next deadline",
+      "noDeadline": "No tasks remaining"
+    },
+    "workspace": {
+      "title": "Today's work",
+      "description": "Complete required checks and review exceptions for the selected day."
+    },
+    "dateNavigation": {
+      "ariaLabel": "Choose a day",
+      "previous": "Previous day",
+      "today": "Today",
+      "next": "Next day"
+    },
+    "relative": {
+      "inMinutes": "In {count}m",
+      "inHours": "In {count}h",
+      "inHoursMinutes": "In {hours}h {minutes}m",
+      "lateByMinutes": "+{count}m",
+      "lateByHours": "+{count}h",
+      "lateByHoursMinutes": "+{hours}h {minutes}m"
+    },
+    "allowedRange": "Allowed range: {min}°C to {max}°C",
+    "allowedRangeCompact": "{min}…{max}°C",
+    "audit": {
+      "completed": "Completed at {time} · {user}",
+      "you": "You",
+      "employee": "employee ···{id}",
+      "correctiveAction": "Corrective action"
+    },
+    "overview": {
+      "ariaLabel": "Day overview",
+      "title": "Day overview",
+      "description": "Compliance context for the selected day",
+      "needsAttention": "Attention",
+      "onTrack": "On track",
+      "nextPriority": "Priority now",
+      "exceptions": "Needs attention",
+      "noExceptions": "No open exceptions.",
+      "temperatureChecks": "Temperature checks",
+      "temperatureDue": "Due",
+      "temperatureRecorded": "Recorded",
+      "temperatureIssues": "Issues",
+      "latestActivity": "Recent activity",
+      "noRecentActivity": "No tasks have been completed yet."
+    },
+    "temperatureDialog": {
+      "title": "Temperature check",
+      "allowedRange": "Allowed range",
+      "recordedCLabel": "Measured temperature",
+      "celsius": "°C",
+      "recordedCPlaceholder": "Enter temperature in °C",
+      "ok": "OK",
+      "outOfRange": "Out of range",
+      "okHint": "Within the allowed range",
+      "outOfRangeHint": "Outside the allowed range",
+      "correctiveActionLabel": "Corrective action taken",
+      "correctiveActionPlaceholder": "For example, moved the products and notified the manager…",
+      "correctiveActionHint": "Describe exactly what you did after the deviation.",
+      "cancel": "Cancel",
+      "confirm": "Confirm",
+      "validation": {
+        "required": "Enter a temperature reading",
+        "invalid": "Enter a valid number",
+        "correctiveActionRequired": "Describe the corrective action taken",
+        "correctiveActionMax": "Corrective action can be up to 1000 characters"
+      }
+    },
+    "empty": {
+      "title": "No tasks for today",
+      "description": "There is nothing scheduled for this location on the selected day."
+    },
+    "error": {
+      "title": "Could not load today's tasks",
+      "description": "Check your connection and try again.",
+      "retry": "Retry"
+    },
+    "toasts": {
+      "loadError": "Failed to load Today",
+      "missingEquipment": "Unable to find the equipment temperature range",
+      "undoError": "Could not undo task",
+      "doneError": "Could not complete task"
+    }
+  },
   "DataTable": {
     "search": "Search",
     "searchClear": "Clear search",
     "noResults": "No results found.",
+    "columnHeader": {
+      "asc": "Asc",
+      "desc": "Desc",
+      "hide": "Hide",
+      "hideColumn": "Hide column"
+    },
+    "viewOptions": {
+      "label": "Columns",
+      "toggleColumns": "Toggle columns"
+    },
+    "selection": {
+      "selectAll": "Select all",
+      "selectRow": "Select row"
+    },
     "pagination": {
       "rowsCount": "{current} of {total} row(s)",
+      "rowsSelected": "{selected} of {total} row(s) selected.",
       "rowsPerPage": "Rows per page",
       "pageCount": "Page {current} of {total}"
     }
@@ -130,12 +291,7 @@
     "equipmentPlaceholder": "Select cold storage",
     "weekdaysLabel": "Schedule",
     "timesLabel": "Scheduled times",
-    "addTime": "Add time",
     "removeTime": "Remove time",
-    "timePicker": {
-      "hours": "Hours",
-      "minutes": "Minutes"
-    },
     "save": "Save",
     "edit": "Edit",
     "duplicate": "Duplicate",
@@ -176,8 +332,10 @@
       "typeRequired": "Type is required.",
       "weekdaysRequired": "Select at least one weekday.",
       "timesRequired": "Add at least one scheduled time.",
-      "timesMax": "At most 3 times per task.",
+      "timesMax": "At most 4 times per task.",
       "timesUnique": "Scheduled times must be unique.",
+      "timeRequired": "Scheduled time is required.",
+      "timeInvalid": "Enter a valid time in HH:MM format.",
       "equipmentRequired": "Cold storage is required for temperature tasks."
     },
     "columns": {

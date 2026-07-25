@@ -33,6 +33,7 @@ export function getColumns({
   return [
     {
       accessorKey: "title",
+      enableHiding: false,
       meta: { view_label: t("columns.title") },
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title={t("columns.title")} />

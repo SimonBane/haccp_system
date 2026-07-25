@@ -31,12 +31,173 @@
     "breadcrumbDashboard": "Табло",
     "placeholder": "Примерно съдържание на таблото"
   },
+  "TodayPage": {
+    "breadcrumb": "Днес",
+    "title": "Днес",
+    "selectedDayTitle": "Дневен план",
+    "sections": {
+      "attention": "Изискват внимание",
+      "overdue": "Просрочени",
+      "now": "Сега",
+      "next": "Следващи",
+      "completed": "Изпълнени",
+      "morning": "Сутрин",
+      "afternoon": "Следобед",
+      "evening": "Вечер"
+    },
+    "filters": {
+      "todo": "За изпълнение",
+      "attention": "Внимание",
+      "completed": "Изпълнени",
+      "all": "Всички",
+      "ariaLabel": "Филтриране на задачи"
+    },
+    "filtersShort": {
+      "todo": "Задачи",
+      "attention": "Внимание",
+      "completed": "Готови",
+      "all": "Всички"
+    },
+    "status": {
+      "pending": "Предстоящо",
+      "completed": "Изпълнена",
+      "overdue": "Просрочена",
+      "now": "Сега",
+      "attention": "Изисква внимание"
+    },
+    "actions": {
+      "complete": "Изпълни",
+      "completeNow": "Изпълни сега",
+      "completeLate": "Изпълни",
+      "record": "Запиши",
+      "recordNow": "Запиши сега",
+      "recordLate": "Запиши",
+      "undo": "Отмени"
+    },
+    "taskTypes": {
+      "cleaning": "Почистване",
+      "temperature": "Температура",
+      "other": "Друго"
+    },
+    "progress": {
+      "summary": "{completed} от {total} изпълнени",
+      "label": "Дневен напредък",
+      "allCompletedTitle": "Всички задачи са изпълнени",
+      "allCompletedSummary": "{completed} от {total} задачи изпълнени"
+    },
+    "metrics": {
+      "attention": "Внимание",
+      "remaining": "Остават",
+      "completed": "Изпълнени"
+    },
+    "summary": {
+      "ariaLabel": "Обобщение на задачите за деня",
+      "requiresAction": "Изисква действие",
+      "tasksLeft": "Задачи за деня",
+      "nextDeadline": "Следващ срок",
+      "noDeadline": "Няма оставащи задачи"
+    },
+    "workspace": {
+      "title": "Работа за деня",
+      "description": "Изпълнете необходимите проверки и прегледайте отклоненията за избрания ден."
+    },
+    "dateNavigation": {
+      "ariaLabel": "Избор на ден",
+      "previous": "Предишен ден",
+      "today": "Днес",
+      "next": "Следващ ден"
+    },
+    "relative": {
+      "inMinutes": "След {count} мин",
+      "inHours": "След {count} ч",
+      "inHoursMinutes": "След {hours} ч {minutes} мин",
+      "lateByMinutes": "+{count} мин",
+      "lateByHours": "+{count} ч",
+      "lateByHoursMinutes": "+{hours} ч {minutes} мин"
+    },
+    "allowedRange": "Допустим диапазон: {min}°C до {max}°C",
+    "allowedRangeCompact": "{min}…{max}°C",
+    "audit": {
+      "completed": "Изпълнено в {time} · {user}",
+      "you": "Вие",
+      "employee": "служител ···{id}",
+      "correctiveAction": "Коригиращо действие"
+    },
+    "overview": {
+      "ariaLabel": "Преглед на деня",
+      "title": "Преглед на деня",
+      "description": "Контекст за съответствието през избрания ден",
+      "needsAttention": "Внимание",
+      "onTrack": "По план",
+      "nextPriority": "Текущ приоритет",
+      "exceptions": "Изискват внимание",
+      "noExceptions": "Няма отворени отклонения.",
+      "temperatureChecks": "Температурни проверки",
+      "temperatureDue": "Предстоят",
+      "temperatureRecorded": "Записани",
+      "temperatureIssues": "Проблеми",
+      "latestActivity": "Последна активност",
+      "noRecentActivity": "Все още няма изпълнени задачи."
+    },
+    "temperatureDialog": {
+      "title": "Температурна проверка",
+      "allowedRange": "Допустим диапазон",
+      "recordedCLabel": "Отчетена температура",
+      "celsius": "°C",
+      "recordedCPlaceholder": "Въведете температура (°C)",
+      "ok": "ОК",
+      "outOfRange": "Извън диапазона",
+      "okHint": "В допустимите граници",
+      "outOfRangeHint": "Извън допустимите граници",
+      "correctiveActionLabel": "Предприето коригиращо действие",
+      "correctiveActionPlaceholder": "Напр. преместих продуктите и уведомих отговорника…",
+      "correctiveActionHint": "Опишете конкретно какво направихте след отклонението.",
+      "cancel": "Отказ",
+      "confirm": "Потвърди",
+      "validation": {
+        "required": "Въведете измерена температура",
+        "invalid": "Въведете валидно число",
+        "correctiveActionRequired": "Опишете предприетото коригиращо действие",
+        "correctiveActionMax": "Коригиращото действие може да е до 1000 знака"
+      }
+    },
+    "empty": {
+      "title": "Няма задачи за днес",
+      "description": "За тази локация няма насрочени задачи за избрания ден."
+    },
+    "error": {
+      "title": "Задачите за днес не можаха да се заредят",
+      "description": "Проверете връзката и опитайте отново.",
+      "retry": "Опитай отново"
+    },
+    "toasts": {
+      "loadError": "Неуспешно зареждане на Днес",
+      "missingEquipment": "Липсва диапазон за оборудването",
+      "undoError": "Неуспешно връщане назад",
+      "doneError": "Неуспешно приключване"
+    }
+  },
   "DataTable": {
     "search": "Търсене",
     "searchClear": "Изчисти търсенето",
     "noResults": "Няма намерени резултати.",
+    "columnHeader": {
+      "asc": "Възходящо",
+      "desc": "Низходящо",
+      "hide": "Скрий",
+      "hideColumn": "Скрий колона"
+    },
+    "viewOptions": {
+      "label": "Колони",
+      "toggleColumns": "Превключване на колони"
+    },
+    "selection": {
+      "selectAll": "Избери всички",
+      "selectRow": "Избери ред"
+    },
     "pagination": {
       "rowsCount": "{current} от {total} ред(а)",
+      "rowsSelected": "{selected} от {total} ред(а) избрани.",
       "rowsPerPage": "Редове на страница",
       "pageCount": "Страница {current} от {total}"
     }
@@ -130,12 +291,7 @@
     "equipmentPlaceholder": "Изберете хладилна техника",
     "weekdaysLabel": "График",
     "timesLabel": "Часове",
-    "addTime": "Добави час",
     "removeTime": "Премахни час",
-    "timePicker": {
-      "hours": "Часове",
-      "minutes": "Минути"
-    },
     "save": "Запази",
     "edit": "Редактирай",
     "duplicate": "Дублирай",
@@ -176,8 +332,10 @@
       "typeRequired": "Типът е задължителен.",
       "weekdaysRequired": "Изберете поне един ден от седмицата.",
       "timesRequired": "Добавете поне един час.",
-      "timesMax": "Най-много 3 часа на задача.",
+      "timesMax": "Най-много 4 часа на задача.",
       "timesUnique": "Часовете трябва да са уникални.",
+      "timeRequired": "Часът е задължителен.",
+      "timeInvalid": "Въведете валиден час във формат ЧЧ:ММ.",
       "equipmentRequired": "Хладилната техника е задължителна за температурни задачи."
     },
     "columns": {

@@ -3,14 +3,13 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import {
   Breadcrumb,
   BreadcrumbItem,
-  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Link } from "@/i18n/navigation";
+import { TodayView } from "@/features/today/today-view";
 
 export default async function DashboardPage({
   params,
@@ -20,7 +19,8 @@ export default async function DashboardPage({
   const { locale } = await params;
   setRequestLocale(locale as Locale);
 
-  const t = await getTranslations("DashboardPage");
+  const tDashboard = await getTranslations("DashboardPage");
+  const tToday = await getTranslations("TodayPage");
 
   return (
     <>
@@ -34,27 +34,18 @@ export default async function DashboardPage({
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink render={<Link href="/" />}>
-                  {t("breadcrumbApp")}
-                </BreadcrumbLink>
+                <span>{tDashboard("breadcrumbDashboard")}</span>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>
-                <BreadcrumbPage>{t("breadcrumbDashboard")}</BreadcrumbPage>
+                <BreadcrumbPage>{tToday("breadcrumb")}</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
         </div>
       </header>
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-        <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-          <div className="aspect-video rounded-xl bg-muted/50" />
-          <div className="aspect-video rounded-xl bg-muted/50" />
-          <div className="aspect-video rounded-xl bg-muted/50" />
-        </div>
-        <div className="flex min-h-[50vh] flex-1 items-center justify-center rounded-xl bg-muted/50 md:min-h-min">
-          <p className="text-sm text-muted-foreground">{t("placeholder")}</p>
-        </div>
+      <div className="flex flex-1 flex-col">
+        <TodayView />
       </div>
     </>
   );

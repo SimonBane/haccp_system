@@ -54,7 +54,7 @@ export const TASK_TEMPLATE_HOURS = Array.from({ length: 24 }, (_, hour) =>
   String(hour).padStart(2, "0"),
 );
 
-export const TASK_TEMPLATE_MAX_SCHEDULED_TIMES = 3;
+export const TASK_TEMPLATE_MAX_SCHEDULED_TIMES = 4;
 
 export const TASK_TEMPLATE_SLOT_THRESHOLDS = {
   morningStart: 5 * 60,
@@ -67,16 +67,7 @@ const scheduledTimePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 export const scheduledTimeSchema = z
   .string()
-  .regex(scheduledTimePattern, "Time must be in HH:MM format")
-  .superRefine((value, ctx) => {
-    const minute = value.split(":")[1];
-    if (!TASK_TEMPLATE_MINUTES.includes(minute as TaskTemplateMinute)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Minutes must be 00, 15, 30, or 45",
-      });
-    }
-  });
+  .regex(scheduledTimePattern, "Time must be in HH:MM format");
 
 export function parseScheduledTimeToMinutes(time: string): number {
   const [hourPart, minutePart] = time.split(":");
@@ -85,6 +76,25 @@ export function parseScheduledTimeToMinutes(time: string): number {
 
 export function composeScheduledTime(hour: string, minute: string): string {
   return `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
+}
+
+export const TASK_TEMPLATE_TIME_OPTIONS: string[] = TASK_TEMPLATE_HOURS.flatMap(
+  (hour) =>
+    TASK_TEMPLATE_MINUTES.map((minute) => composeScheduledTime(hour, minute)),
+);
+
+export function normalizeScheduledTimeInput(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  const parts = trimmed.split(":");
+  if (parts.length !== 2) return null;
+
+  const hour = parts[0].padStart(2, "0");
+  const minute = parts[1].padStart(2, "0");
+  const candidate = `${hour}:${minute}`;
+
+  return scheduledTimePattern.test(candidate) ? candidate : null;
 }
 
 export function splitScheduledTime(
