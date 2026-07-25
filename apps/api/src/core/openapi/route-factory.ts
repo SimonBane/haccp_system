@@ -3,40 +3,18 @@ import {
   createRoute,
   type OpenAPIHono,
 } from "@hono/zod-openapi";
-import { apiErrorSchema, uuidParamSchema } from "@haccp/shared";
+import { uuidParamSchema } from "@haccp/shared";
 import type { Context } from "hono";
 import type { z } from "zod";
 import type { Db } from "../db/client.js";
 import { ForbiddenError } from "../errors/app-errors.js";
 import { getDb, getCurrentLocation, requireOrgContext } from "../../lib/context.js";
 import type { AppEnv } from "../../types.js";
+import { errorResponse, jsonResponse } from "./responses.js";
+
+export { errorResponse, jsonResponse } from "./responses.js";
 
 const bearerSecurity = [{ Bearer: [] }];
-
-export function errorResponse(description: string) {
-  return {
-    description,
-    content: {
-      "application/json": {
-        schema: apiErrorSchema,
-      },
-    },
-  };
-}
-
-export function jsonResponse<T extends z.ZodType>(
-  schema: T,
-  description = "Success",
-) {
-  return {
-    description,
-    content: {
-      "application/json": {
-        schema,
-      },
-    },
-  };
-}
 
 function assertOrgAdmin(c: Context<AppEnv>): void {
   if (c.get("orgRole") !== "org:admin") {
