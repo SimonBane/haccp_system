@@ -1,8 +1,7 @@
-import type { LocationResponse } from "@haccp/shared";
 import type { Context } from "hono";
 import type { Db } from "../core/db/client.js";
 import { InternalError } from "../core/errors/app-errors.js";
-import type { AppEnv } from "../types.js";
+import type { AppEnv, AppLocationContext } from "../types.js";
 
 export function requireOrgContext(c: Context<AppEnv>) {
   return {
@@ -15,7 +14,7 @@ export function getDb(c: Context<AppEnv>): Db {
   return c.get("db");
 }
 
-export function getCurrentLocation(c: Context<AppEnv>): LocationResponse {
+export function getCurrentLocation(c: Context<AppEnv>): AppLocationContext {
   const location = c.get("currentLocation");
 
   if (!location) {

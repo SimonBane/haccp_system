@@ -9,7 +9,7 @@ export function errorResponse(description: string) {
         schema: apiErrorSchema,
       },
     },
-  } as const;
+  };
 }
 
 export function jsonResponse<T extends z.ZodType>(
@@ -23,5 +23,5 @@ export function jsonResponse<T extends z.ZodType>(
         schema,
       },
     },
-  } as const;
+  };
 }
