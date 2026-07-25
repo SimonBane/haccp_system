@@ -5,7 +5,6 @@ import {
   sortScheduledTimes,
 } from "@haccp/shared";
 import type { Db } from "../../core/db/client.js";
-import { locationService } from "../locations/location.service.js";
 import { taskTemplateRepository } from "../task-templates/task-template.repository.js";
 import {
   buildCompletionKey,
@@ -15,33 +14,31 @@ import {
 import { todayRepository } from "./today.repository.js";
 
 export const todayService = {
-  async getToday(db: Db, orgId: string, date: string): Promise<TodayResponse> {
-    const location = await locationService.getOrCreateCurrentLocation(
-      db,
-      orgId,
-    );
-
+  async getToday(
+    db: Db,
+    orgId: string,
+    locationId: string,
+    date: string,
+  ): Promise<TodayResponse> {
     const weekday = getWeekdayFromDate(date);
     const now = new Date();
 
-    const templateRows =
-      await taskTemplateRepository.findManyWithEquipmentByOrgAndLocation(
+    const [templateRows, completionRows] = await Promise.all([
+      taskTemplateRepository.findManyWithEquipmentByOrgLocationAndWeekday(
         db,
         orgId,
-        location.id,
-      );
+        locationId,
+        weekday,
+      ),
+      todayRepository.findCompletionsWithTemperatureLogs(
+        db,
+        orgId,
+        locationId,
+        date,
+      ),
+    ]);
 
-    const matchingTemplates = templateRows
-      .map(toTemplateRow)
-      .filter((template) => template.weekdays.includes(weekday));
-
-    const completionRows = await todayRepository.findCompletionsWithTemperatureLogs(
-      db,
-      orgId,
-      location.id,
-      date,
-    );
-
+    const matchingTemplates = templateRows.map(toTemplateRow);
     const completionByKey = todayRepository.buildCompletionMap(completionRows);
 
     const sections: TodayResponse["sections"] = {
@@ -95,7 +92,7 @@ export const todayService = {
 
     return {
       date,
-      locationId: location.id,
+      locationId,
       sections: {
         morning: sortItemsByScheduledTime(sections.morning),
         afternoon: sortItemsByScheduledTime(sections.afternoon),

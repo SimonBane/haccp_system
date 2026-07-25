@@ -1,8 +1,20 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { Db, DbClient } from "../../core/db/client.js";
 import { taskCompletions } from "../../core/db/schema/task-completions.js";
 import { temperatureLogs } from "../../core/db/schema/temperature-logs.js";
 import type { CompletionRecord } from "./today.mapper.js";
+
+export type CompletionWithTemperatureRow = {
+  taskTemplateId: string;
+  scheduledTime: string;
+  completedAt: Date;
+  completedBy: string;
+  recordedC: string | null;
+  minTempC: string | null;
+  maxTempC: string | null;
+  result: string | null;
+  correctiveAction: string | null;
+};
 
 export const todayRepository = {
   async findCompletionsWithTemperatureLogs(
@@ -10,11 +22,18 @@ export const todayRepository = {
     orgId: string,
     locationId: string,
     date: string,
-  ) {
+  ): Promise<CompletionWithTemperatureRow[]> {
     return db
       .select({
-        completion: taskCompletions,
-        temperatureLog: temperatureLogs,
+        taskTemplateId: taskCompletions.taskTemplateId,
+        scheduledTime: taskCompletions.scheduledTime,
+        completedAt: taskCompletions.completedAt,
+        completedBy: taskCompletions.completedBy,
+        recordedC: temperatureLogs.recordedC,
+        minTempC: temperatureLogs.minTempC,
+        maxTempC: temperatureLogs.maxTempC,
+        result: temperatureLogs.result,
+        correctiveAction: temperatureLogs.correctiveAction,
       })
       .from(taskCompletions)
       .leftJoin(
@@ -30,12 +49,26 @@ export const todayRepository = {
       );
   },
 
-  async insertCompletion(
+  async upsertCompletion(
     db: DbClient,
     data: typeof taskCompletions.$inferInsert,
   ) {
-    const [created] = await db.insert(taskCompletions).values(data).returning();
-    return created ?? null;
+    const [row] = await db
+      .insert(taskCompletions)
+      .values(data)
+      .onConflictDoUpdate({
+        target: [
+          taskCompletions.taskTemplateId,
+          taskCompletions.occurrenceDate,
+          taskCompletions.scheduledTime,
+        ],
+        set: {
+          completedAt: sql`${taskCompletions.completedAt}`,
+        },
+      })
+      .returning();
+
+    return row ?? null;
   },
 
   async findCompletion(
@@ -121,27 +154,28 @@ export const todayRepository = {
   },
 
   buildCompletionMap(
-    rows: Array<{
-      completion: typeof taskCompletions.$inferSelect;
-      temperatureLog: typeof temperatureLogs.$inferSelect | null;
-    }>,
+    rows: CompletionWithTemperatureRow[],
   ): Map<string, CompletionRecord> {
     const completionByKey = new Map<string, CompletionRecord>();
 
     for (const row of rows) {
-      const key = `${row.completion.taskTemplateId}|${row.completion.scheduledTime}`;
+      const key = `${row.taskTemplateId}|${row.scheduledTime}`;
       completionByKey.set(key, {
-        completedAt: row.completion.completedAt,
-        completedBy: row.completion.completedBy,
-        temperatureLog: row.temperatureLog
-          ? {
-              recordedC: row.temperatureLog.recordedC,
-              minTempC: row.temperatureLog.minTempC,
-              maxTempC: row.temperatureLog.maxTempC,
-              result: row.temperatureLog.result,
-              correctiveAction: row.temperatureLog.correctiveAction,
-            }
-          : null,
+        completedAt: row.completedAt,
+        completedBy: row.completedBy,
+        temperatureLog:
+          row.recordedC !== null &&
+          row.minTempC !== null &&
+          row.maxTempC !== null &&
+          row.result !== null
+            ? {
+                recordedC: row.recordedC,
+                minTempC: row.minTempC,
+                maxTempC: row.maxTempC,
+                result: row.result,
+                correctiveAction: row.correctiveAction,
+              }
+            : null,
       });
     }
 

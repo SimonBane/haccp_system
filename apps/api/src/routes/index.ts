@@ -4,6 +4,7 @@ import {
   requireAuth,
   requireOrg,
 } from "../core/middleware/auth.js";
+import { currentLocationMiddleware } from "../core/middleware/current-location.js";
 import { dbMiddleware } from "../core/middleware/db.js";
 import { equipmentRoutes } from "../modules/equipment/equipment.routes.js";
 import { healthRoutes } from "../modules/health/health.routes.js";
@@ -31,6 +32,7 @@ function mountProtected(
   const protectedRouter = new OpenAPIHono<AppEnv>();
   protectedRouter.use("*", requireAuth);
   protectedRouter.use("*", requireOrg);
+  protectedRouter.use("*", currentLocationMiddleware);
   protectedRouter.route("/", moduleRoutes);
   routes.route(path, protectedRouter);
 }

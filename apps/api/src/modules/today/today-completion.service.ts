@@ -15,11 +15,21 @@ import {
   NotFoundError,
   ValidationError,
 } from "../../core/errors/app-errors.js";
-import { isUniqueViolation } from "../../lib/db-errors.js";
-import { locationService } from "../locations/location.service.js";
 import { taskTemplateRepository } from "../task-templates/task-template.repository.js";
 import { toTemplateRow, type TemplateRow } from "./today.mapper.js";
 import { todayRepository } from "./today.repository.js";
+
+type CompletionContextInput = Pick<
+  CompleteTodayTaskInput,
+  "templateId" | "date" | "scheduledTime"
+>;
+
+type CompletionContext = {
+  locationId: string;
+  template: TemplateRow;
+  weekday: string;
+  now: Date;
+};
 
 function assertTemplateScheduled(
   template: TemplateRow,
@@ -80,6 +90,28 @@ async function resolveTemplateForCompletion(
   return toTemplateRow(templateRow);
 }
 
+async function withCompletionContext<T>(
+  db: Db,
+  orgId: string,
+  locationId: string,
+  input: CompletionContextInput,
+  handler: (context: CompletionContext) => Promise<T>,
+): Promise<T> {
+  const weekday = getWeekdayFromDate(input.date);
+  const now = new Date();
+
+  const template = await resolveTemplateForCompletion(
+    db,
+    orgId,
+    locationId,
+    input.templateId,
+  );
+
+  assertTemplateScheduled(template, weekday, input.scheduledTime);
+
+  return handler({ locationId, template, weekday, now });
+}
+
 async function createOrFetchCompletion(
   db: DbClient,
   orgId: string,
@@ -88,238 +120,199 @@ async function createOrFetchCompletion(
   input: CompleteTodayTaskInput,
   now: Date,
 ): Promise<typeof taskCompletions.$inferSelect> {
-  try {
-    const created = await todayRepository.insertCompletion(db, {
-      orgId,
-      locationId,
-      taskTemplateId: input.templateId,
-      occurrenceDate: input.date,
-      scheduledTime: input.scheduledTime,
-      completedAt: now,
-      completedBy: userId,
-    });
+  const completion = await todayRepository.upsertCompletion(db, {
+    orgId,
+    locationId,
+    taskTemplateId: input.templateId,
+    occurrenceDate: input.date,
+    scheduledTime: input.scheduledTime,
+    completedAt: now,
+    completedBy: userId,
+  });
 
-    if (!created) {
-      throw new InternalError("Failed to create completion");
-    }
-
-    return created;
-  } catch (error) {
-    if (!isUniqueViolation(error)) {
-      throw error;
-    }
-
-    const existing = await todayRepository.findCompletion(
-      db,
-      orgId,
-      locationId,
-      input.templateId,
-      input.date,
-      input.scheduledTime,
-    );
-
-    if (!existing) {
-      throw new InternalError("Failed to fetch existing completion");
-    }
-
-    return existing;
+  if (!completion) {
+    throw new InternalError("Failed to create completion");
   }
+
+  return completion;
 }
 
 export const todayCompletionService = {
   async completeTask(
     db: Db,
     orgId: string,
+    locationId: string,
     userId: string,
     input: CompleteTodayTaskInput,
   ): Promise<TodayTaskItem> {
-    const location = await locationService.getOrCreateCurrentLocation(
+    return withCompletionContext(
       db,
       orgId,
-    );
-    const weekday = getWeekdayFromDate(input.date);
-    const now = new Date();
-
-    const template = await resolveTemplateForCompletion(
-      db,
-      orgId,
-      location.id,
-      input.templateId,
-    );
-
-    if (template.type === "temperature") {
-      throw new ValidationError("This task requires a temperature reading");
-    }
-
-    assertTemplateScheduled(template, weekday, input.scheduledTime);
-
-    const completionRow = await createOrFetchCompletion(
-      db,
-      orgId,
-      location.id,
-      userId,
+      locationId,
       input,
-      now,
-    );
+      async ({ locationId: resolvedLocationId, template, now }) => {
+        if (template.type === "temperature") {
+          throw new ValidationError("This task requires a temperature reading");
+        }
 
-    return buildTaskItemFromTemplate(
-      template,
-      input,
-      completionRow.completedAt.toISOString(),
-      completionRow.completedBy,
-      null,
-      now,
+        const completionRow = await createOrFetchCompletion(
+          db,
+          orgId,
+          resolvedLocationId,
+          userId,
+          input,
+          now,
+        );
+
+        return buildTaskItemFromTemplate(
+          template,
+          input,
+          completionRow.completedAt.toISOString(),
+          completionRow.completedBy,
+          null,
+          now,
+        );
+      },
     );
   },
 
   async uncompleteTask(
     db: Db,
     orgId: string,
+    locationId: string,
     input: CompleteTodayTaskInput,
   ): Promise<TodayTaskItem> {
-    const location = await locationService.getOrCreateCurrentLocation(
+    return withCompletionContext(
       db,
       orgId,
-    );
-    const weekday = getWeekdayFromDate(input.date);
-    const now = new Date();
-
-    const template = await resolveTemplateForCompletion(
-      db,
-      orgId,
-      location.id,
-      input.templateId,
-    );
-
-    assertTemplateScheduled(template, weekday, input.scheduledTime);
-
-    const deleted = await todayRepository.deleteCompletion(
-      db,
-      orgId,
-      location.id,
-      input.templateId,
-      input.date,
-      input.scheduledTime,
-    );
-
-    if (!deleted) {
-      throw new NotFoundError("Completion not found");
-    }
-
-    return buildTaskItemFromTemplate(
-      template,
+      locationId,
       input,
-      null,
-      null,
-      null,
-      now,
+      async ({ locationId: resolvedLocationId, template, now }) => {
+        const deleted = await todayRepository.deleteCompletion(
+          db,
+          orgId,
+          resolvedLocationId,
+          input.templateId,
+          input.date,
+          input.scheduledTime,
+        );
+
+        if (!deleted) {
+          throw new NotFoundError("Completion not found");
+        }
+
+        return buildTaskItemFromTemplate(
+          template,
+          input,
+          null,
+          null,
+          null,
+          now,
+        );
+      },
     );
   },
 
   async completeTemperatureTask(
     db: Db,
     orgId: string,
+    locationId: string,
     userId: string,
     input: CompleteTodayTemperatureTaskInput,
   ): Promise<TodayTaskItem> {
-    const location = await locationService.getOrCreateCurrentLocation(
+    return withCompletionContext(
       db,
       orgId,
-    );
-    const weekday = getWeekdayFromDate(input.date);
-    const now = new Date();
-    const recordedC = Number(input.recordedC);
+      locationId,
+      input,
+      async ({ locationId: resolvedLocationId, template, now }) => {
+        const recordedC = Number(input.recordedC);
 
-    const template = await resolveTemplateForCompletion(
-      db,
-      orgId,
-      location.id,
-      input.templateId,
-    );
+        if (template.type !== "temperature") {
+          throw new ValidationError("This endpoint is for temperature tasks");
+        }
 
-    if (template.type !== "temperature") {
-      throw new ValidationError("This endpoint is for temperature tasks");
-    }
+        if (
+          !template.equipmentId ||
+          template.minTempC === null ||
+          template.maxTempC === null
+        ) {
+          throw new ValidationError("Temperature task is missing equipment range");
+        }
 
-    if (
-      !template.equipmentId ||
-      template.minTempC === null ||
-      template.maxTempC === null
-    ) {
-      throw new ValidationError("Temperature task is missing equipment range");
-    }
-
-    assertTemplateScheduled(template, weekday, input.scheduledTime);
-
-    const minTempC = template.minTempC;
-    const maxTempC = template.maxTempC;
-    const result = classifyTemperatureResult({
-      recordedC,
-      minTempC,
-      maxTempC,
-    });
-    const correctiveAction = input.correctiveAction?.trim() || null;
-
-    if (result === "out_of_range" && !correctiveAction) {
-      throw new ValidationError(
-        "A corrective action is required for an out-of-range reading",
-      );
-    }
-
-    return db.transaction(async (tx) => {
-      const completionRow = await createOrFetchCompletion(
-        tx,
-        orgId,
-        location.id,
-        userId,
-        input,
-        now,
-      );
-
-      const tempLog = await todayRepository.upsertTemperatureLog(
-        tx,
-        {
-          orgId,
-          locationId: location.id,
-          taskCompletionId: completionRow.id,
-          equipmentId: template.equipmentId!,
-          recordedC: String(recordedC),
-          minTempC: String(minTempC),
-          maxTempC: String(maxTempC),
-          result,
-          correctiveAction: result === "out_of_range" ? correctiveAction : null,
-          recordedBy: userId,
-        },
-        {
-          recordedC: String(recordedC),
-          minTempC: String(minTempC),
-          maxTempC: String(maxTempC),
-          result,
-          correctiveAction:
-            result === "out_of_range" ? correctiveAction : null,
-          recordedBy: userId,
-          recordedAt: now,
-        },
-      );
-
-      if (!tempLog) {
-        throw new InternalError("Failed to create/update temperature log");
-      }
-
-      return buildTaskItemFromTemplate(
-        template,
-        input,
-        completionRow.completedAt.toISOString(),
-        completionRow.completedBy,
-        {
+        const minTempC = template.minTempC;
+        const maxTempC = template.maxTempC;
+        const result = classifyTemperatureResult({
           recordedC,
-          result,
           minTempC,
           maxTempC,
+        });
+        const correctiveAction = input.correctiveAction?.trim() || null;
+
+        if (result === "out_of_range" && !correctiveAction) {
+          throw new ValidationError(
+            "A corrective action is required for an out-of-range reading",
+          );
+        }
+
+        const temperatureValues = {
+          recordedC: String(recordedC),
+          minTempC: String(minTempC),
+          maxTempC: String(maxTempC),
+          result,
           correctiveAction: result === "out_of_range" ? correctiveAction : null,
-        },
-        now,
-      );
-    });
+          recordedBy: userId,
+          recordedAt: now,
+        };
+
+        return db.transaction(async (tx) => {
+          const completionRow = await createOrFetchCompletion(
+            tx,
+            orgId,
+            resolvedLocationId,
+            userId,
+            input,
+            now,
+          );
+
+          const tempLog = await todayRepository.upsertTemperatureLog(
+            tx,
+            {
+              orgId,
+              locationId: resolvedLocationId,
+              taskCompletionId: completionRow.id,
+              equipmentId: template.equipmentId!,
+              recordedC: temperatureValues.recordedC,
+              minTempC: temperatureValues.minTempC,
+              maxTempC: temperatureValues.maxTempC,
+              result: temperatureValues.result,
+              correctiveAction: temperatureValues.correctiveAction,
+              recordedBy: temperatureValues.recordedBy,
+            },
+            temperatureValues,
+          );
+
+          if (!tempLog) {
+            throw new InternalError("Failed to create/update temperature log");
+          }
+
+          return buildTaskItemFromTemplate(
+            template,
+            input,
+            completionRow.completedAt.toISOString(),
+            completionRow.completedBy,
+            {
+              recordedC,
+              result,
+              minTempC,
+              maxTempC,
+              correctiveAction:
+                result === "out_of_range" ? correctiveAction : null,
+            },
+            now,
+          );
+        });
+      },
+    );
   },
 };

@@ -9,7 +9,17 @@ export const equipmentRepository = {
     locationId: string,
   ) {
     return db
-      .select()
+      .select({
+        id: equipment.id,
+        orgId: equipment.orgId,
+        locationId: equipment.locationId,
+        name: equipment.name,
+        type: equipment.type,
+        minTempC: equipment.minTempC,
+        maxTempC: equipment.maxTempC,
+        createdAt: equipment.createdAt,
+        updatedAt: equipment.updatedAt,
+      })
       .from(equipment)
       .where(
         and(eq(equipment.orgId, orgId), eq(equipment.locationId, locationId)),
@@ -55,7 +65,7 @@ export const equipmentRepository = {
     equipmentId: string,
   ) {
     const [row] = await db
-      .select({ id: equipment.id })
+      .select({ id: equipment.id, name: equipment.name })
       .from(equipment)
       .where(
         and(

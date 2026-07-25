@@ -4,9 +4,8 @@ import {
   errorResponse,
   jsonResponse,
 } from "../../core/openapi/route-factory.js";
-import { getDb, requireOrgContext } from "../../lib/context.js";
+import { getCurrentLocation } from "../../lib/context.js";
 import type { AppEnv } from "../../types.js";
-import { locationService } from "./location.service.js";
 
 const bearerSecurity = [{ Bearer: [] }];
 
@@ -25,10 +24,5 @@ const getCurrentRoute = createRoute({
 });
 
 locationRoutes.openapi(getCurrentRoute, async (c) => {
-  const { orgId } = requireOrgContext(c);
-  const location = await locationService.getOrCreateCurrentLocation(
-    getDb(c),
-    orgId,
-  );
-  return c.json(location, 200);
+  return c.json(getCurrentLocation(c), 200);
 });

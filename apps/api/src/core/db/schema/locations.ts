@@ -1,5 +1,4 @@
 import {
-  index,
   pgTable,
   text,
   timestamp,
@@ -20,10 +19,7 @@ export const locations = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [
-    uniqueIndex("locations_org_id_unique").on(table.orgId),
-    index("locations_org_id_idx").on(table.orgId),
-  ],
+  (table) => [uniqueIndex("locations_org_id_unique").on(table.orgId)],
 );
 
 export type Location = typeof locations.$inferSelect;

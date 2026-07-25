@@ -18,12 +18,12 @@ import { locationService } from "../locations/location.service.js";
 import { toTaskTemplateResponse } from "./task-template.mapper.js";
 import { taskTemplateRepository } from "./task-template.repository.js";
 
-async function assertEquipmentForTemplate(
+async function resolveEquipmentForTemplate(
   db: Db,
   orgId: string,
   locationId: string,
   equipmentId: string,
-): Promise<void> {
+): Promise<{ id: string; name: string }> {
   const matched = await equipmentRepository.findByIdAndOrgAndLocation(
     db,
     orgId,
@@ -34,16 +34,21 @@ async function assertEquipmentForTemplate(
   if (!matched) {
     throw new NotFoundError("Equipment not found");
   }
+
+  return matched;
 }
 
 export const taskTemplateService = {
-  async list(db: Db, orgId: string): Promise<TaskTemplateListResponse> {
-    const location = await locationService.getOrCreateCurrentLocation(db, orgId);
+  async list(
+    db: Db,
+    orgId: string,
+    locationId: string,
+  ): Promise<TaskTemplateListResponse> {
     const rows =
       await taskTemplateRepository.findManyWithEquipmentByOrgAndLocation(
         db,
         orgId,
-        location.id,
+        locationId,
       );
 
     return {
@@ -58,20 +63,21 @@ export const taskTemplateService = {
     orgId: string,
     input: CreateTaskTemplateInput,
   ): Promise<TaskTemplateResponse> {
-    await locationService.assertLocationBelongsToOrg(
-      db,
-      orgId,
-      input.locationId,
-    );
-
-    if (input.equipmentId) {
-      await assertEquipmentForTemplate(
+    const [, resolvedEquipment] = await Promise.all([
+      locationService.assertLocationBelongsToOrg(
         db,
         orgId,
         input.locationId,
-        input.equipmentId,
-      );
-    }
+      ),
+      input.equipmentId
+        ? resolveEquipmentForTemplate(
+            db,
+            orgId,
+            input.locationId,
+            input.equipmentId,
+          )
+        : Promise.resolve(null),
+    ]);
 
     try {
       const created = await taskTemplateRepository.insert(db, {
@@ -88,15 +94,10 @@ export const taskTemplateService = {
         throw new InternalError("Failed to create task template");
       }
 
-      let equipmentName: string | null = null;
-      if (created.equipmentId) {
-        equipmentName = await taskTemplateRepository.findEquipmentNameById(
-          db,
-          created.equipmentId,
-        );
-      }
-
-      return toTaskTemplateResponse(created, equipmentName);
+      return toTaskTemplateResponse(
+        created,
+        resolvedEquipment?.name ?? null,
+      );
     } catch (error) {
       if (error instanceof NotFoundError) {
         throw error;
@@ -135,8 +136,10 @@ export const taskTemplateService = {
       throw new ValidationError("Equipment is required for temperature tasks");
     }
 
+    let resolvedEquipment: { id: string; name: string } | null = null;
+
     if (nextEquipmentId) {
-      await assertEquipmentForTemplate(
+      resolvedEquipment = await resolveEquipmentForTemplate(
         db,
         orgId,
         existing.locationId,
@@ -174,15 +177,10 @@ export const taskTemplateService = {
         throw new NotFoundError("Task template not found");
       }
 
-      let equipmentName: string | null = null;
-      if (updated.equipmentId) {
-        equipmentName = await taskTemplateRepository.findEquipmentNameById(
-          db,
-          updated.equipmentId,
-        );
-      }
-
-      return toTaskTemplateResponse(updated, equipmentName);
+      return toTaskTemplateResponse(
+        updated,
+        resolvedEquipment?.name ?? null,
+      );
     } catch (error) {
       if (error instanceof NotFoundError) {
         throw error;

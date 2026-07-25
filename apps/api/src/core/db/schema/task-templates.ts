@@ -25,8 +25,11 @@ export const taskTemplates = pgTable(
       .notNull(),
   },
   (table) => [
-    index("task_templates_org_id_idx").on(table.orgId),
-    index("task_templates_location_id_idx").on(table.locationId),
+    index("task_templates_org_id_location_id_idx").on(
+      table.orgId,
+      table.locationId,
+    ),
+    index("task_templates_equipment_id_idx").on(table.equipmentId),
   ],
 );
 

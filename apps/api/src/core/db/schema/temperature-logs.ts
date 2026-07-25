@@ -47,6 +47,7 @@ export const temperatureLogs = pgTable(
       table.locationId,
       table.recordedAt,
     ),
+    index("temperature_logs_equipment_id_idx").on(table.equipmentId),
   ],
 );
 
