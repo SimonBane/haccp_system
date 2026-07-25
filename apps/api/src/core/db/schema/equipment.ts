@@ -35,7 +35,10 @@ export const equipment = pgTable(
       table.locationId,
       table.name,
     ),
-    index("equipment_org_id_idx").on(table.orgId),
+    index("equipment_org_id_location_id_idx").on(
+      table.orgId,
+      table.locationId,
+    ),
     check(
       "equipment_min_temp_less_than_max_temp",
       sql`${table.minTempC} < ${table.maxTempC}`,

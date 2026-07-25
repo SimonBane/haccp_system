@@ -1,3 +1,4 @@
+import type { LocationResponse } from "@haccp/shared";
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "./core/db/client.js";
 
@@ -8,6 +9,7 @@ export type AppEnv = {
     orgId: string | null;
     orgRole: string | null;
     db: Db;
+    currentLocation?: LocationResponse;
   };
 };
 

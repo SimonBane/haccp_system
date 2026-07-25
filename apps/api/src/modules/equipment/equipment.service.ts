@@ -17,12 +17,15 @@ import { toEquipmentResponse } from "./equipment.mapper.js";
 import { equipmentRepository } from "./equipment.repository.js";
 
 export const equipmentService = {
-  async list(db: Db, orgId: string): Promise<EquipmentListResponse> {
-    const location = await locationService.getOrCreateCurrentLocation(db, orgId);
+  async list(
+    db: Db,
+    orgId: string,
+    locationId: string,
+  ): Promise<EquipmentListResponse> {
     const rows = await equipmentRepository.findManyByOrgAndLocation(
       db,
       orgId,
-      location.id,
+      locationId,
     );
 
     return {

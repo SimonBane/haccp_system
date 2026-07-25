@@ -8,7 +8,7 @@ import type { Context } from "hono";
 import type { z } from "zod";
 import type { Db } from "../db/client.js";
 import { ForbiddenError } from "../errors/app-errors.js";
-import { getDb, requireOrgContext } from "../../lib/context.js";
+import { getDb, getCurrentLocation, requireOrgContext } from "../../lib/context.js";
 import type { AppEnv } from "../../types.js";
 
 const bearerSecurity = [{ Bearer: [] }];
@@ -50,7 +50,7 @@ type AdminCrudService<
   TList extends z.ZodType,
   TItem extends z.ZodType,
 > = {
-  list: (db: Db, orgId: string) => Promise<z.infer<TList>>;
+  list: (db: Db, orgId: string, locationId: string) => Promise<z.infer<TList>>;
   create: (
     db: Db,
     orgId: string,
@@ -161,7 +161,8 @@ export function registerAdminCrudRoutes<
     listRoute,
     async (c) => {
       const { orgId } = requireOrgContext(c);
-      const result = await options.service.list(getDb(c), orgId);
+      const { id: locationId } = getCurrentLocation(c);
+      const result = await options.service.list(getDb(c), orgId, locationId);
       return c.json(result, 200);
     },
   );

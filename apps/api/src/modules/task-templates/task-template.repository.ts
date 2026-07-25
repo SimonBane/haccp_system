@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import type { Db } from "../../core/db/client.js";
 import { equipment } from "../../core/db/schema/equipment.js";
 import { taskTemplates } from "../../core/db/schema/task-templates.js";
@@ -11,6 +11,31 @@ export type TaskTemplateWithEquipmentRow = {
 };
 
 export const taskTemplateRepository = {
+  async findManyWithEquipmentByOrgLocationAndWeekday(
+    db: Db,
+    orgId: string,
+    locationId: string,
+    weekday: string,
+  ) {
+    return db
+      .select({
+        template: taskTemplates,
+        equipmentName: equipment.name,
+        minTempC: equipment.minTempC,
+        maxTempC: equipment.maxTempC,
+      })
+      .from(taskTemplates)
+      .leftJoin(equipment, eq(taskTemplates.equipmentId, equipment.id))
+      .where(
+        and(
+          eq(taskTemplates.orgId, orgId),
+          eq(taskTemplates.locationId, locationId),
+          sql`${weekday} = ANY(${taskTemplates.weekdays})`,
+        ),
+      )
+      .orderBy(asc(taskTemplates.title));
+  },
+
   async findManyWithEquipmentByOrgAndLocation(
     db: Db,
     orgId: string,
@@ -113,15 +138,5 @@ export const taskTemplateRepository = {
       .returning({ id: taskTemplates.id });
 
     return deleted ?? null;
-  },
-
-  async findEquipmentNameById(db: Db, equipmentId: string) {
-    const [row] = await db
-      .select({ name: equipment.name })
-      .from(equipment)
-      .where(eq(equipment.id, equipmentId))
-      .limit(1);
-
-    return row?.name ?? null;
   },
 };

@@ -5,6 +5,16 @@ import { locations } from "../../core/db/schema/locations.js";
 const DEFAULT_LOCATION_NAME = "Main site";
 
 export const locationRepository = {
+  async findDefaultByOrg(db: Db, orgId: string) {
+    const [row] = await db
+      .select()
+      .from(locations)
+      .where(eq(locations.orgId, orgId))
+      .limit(1);
+
+    return row ?? null;
+  },
+
   async findByIdAndOrg(db: Db, orgId: string, locationId: string) {
     const [row] = await db
       .select()
