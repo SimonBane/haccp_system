@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 import { app } from "./app.js";
 import { closeDb } from "./core/db/client.js";
+import { closeRedis } from "./core/redis/client.js";
 import { env } from "./env.js";
 import { logger } from "./lib/logger.js";
 
@@ -17,7 +18,7 @@ const server = serve(
 async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, "Shutting down");
 
-  await closeDb();
+  await Promise.all([closeDb(), closeRedis()]);
 
   server.close(() => {
     logger.info("Server closed");
