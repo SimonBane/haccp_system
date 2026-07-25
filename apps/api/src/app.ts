@@ -1,9 +1,12 @@
 // Required for Vercel Hono entrypoint detection (must import the "hono" package directly).
 import "hono";
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { corsMiddleware } from "./middleware/cors.js";
-import { errorHandler, notFoundHandler } from "./middleware/error-handler.js";
-import { requestIdMiddleware } from "./middleware/request-id.js";
+import { corsMiddleware } from "./core/middleware/cors.js";
+import {
+  errorHandler,
+  notFoundHandler,
+} from "./core/middleware/error-handler.js";
+import { requestIdMiddleware } from "./core/middleware/request-id.js";
 import { env } from "./env.js";
 import { routes } from "./routes/index.js";
 import type { AppEnv } from "./types.js";
@@ -14,10 +17,7 @@ app.use("*", requestIdMiddleware);
 app.use("*", corsMiddleware);
 app.route("/", routes);
 
-if (env.NODE_ENV === "development") {
-  const { registerDevDocs } = await import("./openapi/dev-docs.js");
-  await registerDevDocs(app);
-} else {
+if (env.NODE_ENV !== "development") {
   app.get("/", (c) => c.json({ message: "HACCP API" }));
 }
 
