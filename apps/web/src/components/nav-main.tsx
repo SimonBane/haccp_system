@@ -18,6 +18,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { ChevronRightIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -35,7 +36,14 @@ type NavItem = {
 
 function NavMainItem({ item }: { item: NavItem }) {
   const t = useTranslations("Sidebar");
+  const { isMobile, setOpenMobile } = useSidebar();
   const [open, setOpen] = useState(item.isActive ?? false);
+
+  const closeMobileSidebar = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
 
   useEffect(() => {
     if (item.isActive) {
@@ -50,6 +58,7 @@ function NavMainItem({ item }: { item: NavItem }) {
           tooltip={item.title}
           isActive={item.isActive}
           render={<Link href={item.url} />}
+          onClick={closeMobileSidebar}
         >
           {item.icon}
           <span>{item.title}</span>
@@ -68,6 +77,7 @@ function NavMainItem({ item }: { item: NavItem }) {
           tooltip={item.title}
           isActive={item.isActive}
           render={<Link href={item.url} />}
+          onClick={closeMobileSidebar}
         >
           {item.icon}
           <span>{item.title}</span>
@@ -82,7 +92,10 @@ function NavMainItem({ item }: { item: NavItem }) {
           <SidebarMenuSub>
             {item.items.map((subItem) => (
               <SidebarMenuSubItem key={subItem.title}>
-                <SidebarMenuSubButton render={<Link href={subItem.url} />}>
+                <SidebarMenuSubButton
+                  render={<Link href={subItem.url} />}
+                  onClick={closeMobileSidebar}
+                >
                   <span>{subItem.title}</span>
                 </SidebarMenuSubButton>
               </SidebarMenuSubItem>
