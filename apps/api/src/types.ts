@@ -9,7 +9,7 @@ export type AppEnv = {
     orgId: string | null;
     orgRole: string | null;
     db: Db;
-    currentLocation?: LocationResponse;
+    currentLocation: LocationResponse | undefined;
   };
 };
 

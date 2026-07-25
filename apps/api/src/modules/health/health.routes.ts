@@ -1,6 +1,6 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { healthResponseSchema } from "@haccp/shared";
-import { jsonResponse } from "../../core/openapi/route-factory.js";
+import { jsonResponse } from "../../core/openapi/responses.js";
 import { getDb } from "../../lib/context.js";
 import type { AppEnv } from "../../types.js";
 import { healthService } from "./health.service.js";
