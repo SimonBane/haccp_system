@@ -10,7 +10,7 @@ export const locationService = {
     db: Db,
     orgId: string,
   ): Promise<LocationResponse> {
-    const cached = locationCache.get(orgId);
+    const cached = await locationCache.get(orgId);
 
     if (cached) {
       return cached;
@@ -20,7 +20,7 @@ export const locationService = {
 
     if (existing) {
       const location = toLocationResponse(existing);
-      locationCache.set(orgId, location);
+      await locationCache.set(orgId, location);
       return location;
     }
 
@@ -38,12 +38,12 @@ export const locationService = {
     }
 
     const response = toLocationResponse(location);
-    locationCache.set(orgId, response);
+    await locationCache.set(orgId, response);
     return response;
   },
 
-  invalidateCachedLocation(orgId: string): void {
-    locationCache.invalidate(orgId);
+  async invalidateCachedLocation(orgId: string): Promise<void> {
+    await locationCache.invalidate(orgId);
   },
 
   async assertLocationBelongsToOrg(

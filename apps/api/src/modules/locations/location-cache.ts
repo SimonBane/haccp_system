@@ -1,38 +1,52 @@
-import type { LocationResponse } from "@haccp/shared";
+import { locationResponseSchema, type LocationResponse } from "@haccp/shared";
+import { getRedis } from "../../core/redis/client.js";
+import { logger } from "../../lib/logger.js";
 
-const DEFAULT_TTL_MS = 2 * 24 * 60 * 60 * 1000;
+const KEY_PREFIX = "location:org:";
+const DEFAULT_TTL_SECONDS = 2 * 24 * 60 * 60;
 
-type CacheEntry = {
-  location: LocationResponse;
-  expiresAt: number;
-};
-
-const cache = new Map<string, CacheEntry>();
+function cacheKey(orgId: string): string {
+  return `${KEY_PREFIX}${orgId}`;
+}
 
 export const locationCache = {
-  get(orgId: string): LocationResponse | null {
-    const entry = cache.get(orgId);
+  async get(orgId: string): Promise<LocationResponse | null> {
+    try {
+      const redis = await getRedis();
+      const raw = await redis.get(cacheKey(orgId));
 
-    if (!entry) {
+      if (!raw) {
+        return null;
+      }
+
+      return locationResponseSchema.parse(JSON.parse(raw));
+    } catch (err) {
+      logger.warn({ err, orgId }, "Redis cache get failed");
       return null;
     }
+  },
 
-    if (entry.expiresAt <= Date.now()) {
-      cache.delete(orgId);
-      return null;
+  async set(
+    orgId: string,
+    location: LocationResponse,
+    ttlSeconds = DEFAULT_TTL_SECONDS,
+  ): Promise<void> {
+    try {
+      const redis = await getRedis();
+      await redis.set(cacheKey(orgId), JSON.stringify(location), {
+        EX: ttlSeconds,
+      });
+    } catch (err) {
+      logger.warn({ err, orgId }, "Redis cache set failed");
     }
-
-    return entry.location;
   },
 
-  set(orgId: string, location: LocationResponse, ttlMs = DEFAULT_TTL_MS): void {
-    cache.set(orgId, {
-      location,
-      expiresAt: Date.now() + ttlMs,
-    });
-  },
-
-  invalidate(orgId: string): void {
-    cache.delete(orgId);
+  async invalidate(orgId: string): Promise<void> {
+    try {
+      const redis = await getRedis();
+      await redis.del(cacheKey(orgId));
+    } catch (err) {
+      logger.warn({ err, orgId }, "Redis cache invalidate failed");
+    }
   },
 };
