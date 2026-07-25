@@ -97,10 +97,10 @@ export function useTodayApi() {
       const payload = completeTodayTaskSchema.parse(input);
       return fetchJsonWithToken(
         getToken,
-        "/today/complete",
+        "/today/uncomplete",
         todayTaskItemSchema,
         {
-          method: "DELETE",
+          method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         },

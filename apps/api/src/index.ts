@@ -1,6 +1,6 @@
 import { serve } from "@hono/node-server";
 import { app } from "./app.js";
-import { closeDb } from "./db/index.js";
+import { closeDb } from "./core/db/client.js";
 import { env } from "./env.js";
 import { logger } from "./lib/logger.js";
 

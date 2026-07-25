@@ -1,5 +1,7 @@
 export type { ApiError, HealthResponse } from "./types/api.js";
 export { apiErrorSchema } from "./schemas/error.js";
+export { uuidParamSchema, type UuidParam } from "./schemas/common.js";
+export { meResponseSchema, type MeResponse } from "./schemas/me.js";
 export { healthResponseSchema, type HealthResponseSchema } from "./schemas/health.js";
 export {
   locationResponseSchema,
@@ -34,6 +36,7 @@ export {
   deriveTimeSlotFromTime,
   formatScheduledTimes,
   normalizeScheduledTimeInput,
+  parseScheduledTimeToMinutes,
   scheduledTimeSchema,
   sortScheduledTimes,
   sortWeekdays,
