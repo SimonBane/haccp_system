@@ -15,7 +15,7 @@ export const locationCache = {
       const redis = await getRedis();
       const raw = await redis.get(cacheKey(orgId));
 
-      if (!raw) {
+      if (typeof raw !== "string") {
         return null;
       }
 
