@@ -55,6 +55,7 @@ export function EquipmentData({
       noResultsMessage={tTable("noResults")}
       enablePagination
       pageSize={10}
+      enableColumnVisibility
       classNameWrapper="bg-sidebar ring-1 ring-sidebar-border"
       onRowClick={(row) => onEdit(row.original)}
       Toolbar={() => (

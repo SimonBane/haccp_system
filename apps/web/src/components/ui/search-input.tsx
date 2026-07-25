@@ -3,11 +3,17 @@
 import { SearchIcon, XIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { Input } from "@/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+  InputGroupText,
+} from "@/components/ui/input-group";
 import { cn } from "@/lib/utils";
 
 export interface SearchInputProps
-  extends Omit<React.ComponentProps<typeof Input>, "size" | "defaultValue"> {
+  extends Omit<React.ComponentProps<typeof InputGroupInput>, "size" | "defaultValue"> {
   value: string;
   onSearch?: (value: string) => void;
   searchIconClassName?: string;
@@ -50,38 +56,37 @@ const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
     const showClear = value.trim().length > 0;
 
     return (
-      <div className="relative">
-        <SearchIcon
-          className={cn(
-            "absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground",
-            searchIconClassName,
-          )}
-        />
-        <Input
+      <InputGroup
+        className={cn(
+          "w-[250px]",
+          size === "sm" ? "h-8" : "h-10",
+          className,
+        )}
+      >
+        <InputGroupAddon align="inline-start">
+          <InputGroupText>
+            <SearchIcon className={searchIconClassName} />
+          </InputGroupText>
+        </InputGroupAddon>
+        <InputGroupInput
           ref={ref}
           value={value}
-          className={cn(
-            "w-[250px] pl-9",
-            showClear && "pr-9",
-            size === "sm" ? "h-8 text-sm" : "h-10",
-            className,
-          )}
           onKeyDown={handleKeyDown}
           onChange={handleChange}
           placeholder={placeholder ?? t("search")}
           {...props}
         />
         {showClear ? (
-          <button
-            type="button"
-            aria-label={t("searchClear")}
-            className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
-            onClick={() => handleSearch("")}
-          >
-            <XIcon aria-hidden="true" className="h-4 w-4" />
-          </button>
+          <InputGroupAddon align="inline-end">
+            <InputGroupButton
+              aria-label={t("searchClear")}
+              onClick={() => handleSearch("")}
+            >
+              <XIcon aria-hidden="true" />
+            </InputGroupButton>
+          </InputGroupAddon>
         ) : null}
-      </div>
+      </InputGroup>
     );
   },
 );

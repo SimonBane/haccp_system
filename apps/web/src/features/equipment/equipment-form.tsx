@@ -14,20 +14,19 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
 import { CopyPlusIcon, PlusIcon, SaveIcon } from "lucide-react";
 import { useEffect, useMemo } from "react";
+import { Controller, useForm, useFormState } from "react-hook-form";
 import { toast } from "sonner";
-import { useForm, useFormState } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   InputGroup,
   InputGroupAddon,
@@ -70,6 +69,11 @@ const EQUIPMENT_TYPES: EquipmentType[] = [
   "freezer",
   "display_case",
 ];
+
+const EQUIPMENT_FORM_ID = "equipment-form";
+
+const REQUIRED_LABEL_CLASS =
+  "gap-1 after:text-destructive after:content-['*']";
 
 const numberInputNoSpinClass =
   "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
@@ -236,6 +240,11 @@ export function EquipmentForm({
   });
 
   useEffect(() => {
+    if (!open) return;
+    form.reset(defaultValues);
+  }, [open, defaultValues, form]);
+
+  useEffect(() => {
     if (!open || !duplicateSource || equipment) return;
 
     const timeoutId = window.setTimeout(() => {
@@ -333,35 +342,49 @@ export function EquipmentForm({
           </DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(handleValidSubmit)}
-            className="grid gap-8"
-          >
-            <FormField
-              control={form.control}
+        <form
+          id={EQUIPMENT_FORM_ID}
+          onSubmit={form.handleSubmit(handleValidSubmit)}
+          className="grid gap-8"
+        >
+          <FieldGroup>
+            <Controller
               name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel required>{t("nameLabel")}</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder={t("namePlaceholder")}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel
+                    htmlFor={`${EQUIPMENT_FORM_ID}-name`}
+                    className={REQUIRED_LABEL_CLASS}
+                  >
+                    {t("nameLabel")}
+                  </FieldLabel>
+                  <Input
+                    {...field}
+                    id={`${EQUIPMENT_FORM_ID}-name`}
+                    aria-invalid={fieldState.invalid}
+                    placeholder={t("namePlaceholder")}
+                  />
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
+                </Field>
               )}
             />
 
-            <FormField
-              control={form.control}
+            <Controller
               name="type"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel required>{t("typeLabel")}</FormLabel>
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel
+                    htmlFor={`${EQUIPMENT_FORM_ID}-type`}
+                    className={REQUIRED_LABEL_CLASS}
+                  >
+                    {t("typeLabel")}
+                  </FieldLabel>
                   <Select
+                    name={field.name}
                     items={typeItems}
                     value={field.value || null}
                     onValueChange={(value: unknown) => {
@@ -385,11 +408,13 @@ export function EquipmentForm({
                       }
                     }}
                   >
-                    <FormControl>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder={t("typePlaceholder")} />
-                      </SelectTrigger>
-                    </FormControl>
+                    <SelectTrigger
+                      id={`${EQUIPMENT_FORM_ID}-type`}
+                      aria-invalid={fieldState.invalid}
+                      className="w-full"
+                    >
+                      <SelectValue placeholder={t("typePlaceholder")} />
+                    </SelectTrigger>
                     <SelectContent alignItemWithTrigger={false}>
                       <SelectGroup>
                         {EQUIPMENT_TYPES.map((equipmentType) => (
@@ -403,114 +428,114 @@ export function EquipmentForm({
                       </SelectGroup>
                     </SelectContent>
                   </Select>
-                  <FormMessage />
-                </FormItem>
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
+                </Field>
               )}
             />
+          </FieldGroup>
 
-            <div className="space-y-2">
-              <Label className="gap-1 after:text-destructive after:content-['*']">
-                {t("allowedTempLabel")}
-              </Label>
-              <div className="flex items-center gap-2">
-                <FormField
-                  control={form.control}
-                  name="minTempC"
-                  render={({ field, fieldState }) => (
-                    <FormItem className="flex-1">
-                      <FormControl>
-                        <InputGroup>
-                          <InputGroupInput
-                            type="text"
-                            inputMode="decimal"
-                            aria-invalid={fieldState.invalid}
-                            className={numberInputNoSpinClass}
-                            name={field.name}
-                            ref={field.ref}
-                            value={field.value}
-                            onChange={(event) => {
-                              const next = event.target.value;
-                              if (!isAllowedTempInput(next)) return;
+          <FieldSet
+            className="gap-2"
+            data-invalid={Boolean(errors.minTempC || errors.maxTempC)}
+          >
+            <FieldLegend variant="label" className={REQUIRED_LABEL_CLASS}>
+              {t("allowedTempLabel")}
+            </FieldLegend>
+            <div className="flex items-center gap-2">
+              <Controller
+                name="minTempC"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field className="flex-1" data-invalid={fieldState.invalid}>
+                    <InputGroup>
+                      <InputGroupInput
+                        id={`${EQUIPMENT_FORM_ID}-min-temp`}
+                        type="text"
+                        inputMode="decimal"
+                        aria-invalid={fieldState.invalid}
+                        className={numberInputNoSpinClass}
+                        name={field.name}
+                        ref={field.ref}
+                        value={field.value}
+                        onChange={(event) => {
+                          const next = event.target.value;
+                          if (!isAllowedTempInput(next)) return;
 
-                              field.onChange(next);
-                              if (
-                                form.formState.touchedFields.minTempC ||
-                                form.formState.touchedFields.maxTempC
-                              ) {
-                                void form.trigger(["minTempC", "maxTempC"]);
-                              }
-                            }}
-                            onBlur={() => {
-                              field.onBlur();
-                              void form.trigger(["minTempC", "maxTempC"]);
-                            }}
-                          />
-                          <InputGroupAddon align="inline-end">
-                            <InputGroupText>°C</InputGroupText>
-                          </InputGroupAddon>
-                        </InputGroup>
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                          field.onChange(next);
+                          if (
+                            form.formState.touchedFields.minTempC ||
+                            form.formState.touchedFields.maxTempC
+                          ) {
+                            void form.trigger(["minTempC", "maxTempC"]);
+                          }
+                        }}
+                        onBlur={() => {
+                          field.onBlur();
+                          void form.trigger(["minTempC", "maxTempC"]);
+                        }}
+                      />
+                      <InputGroupAddon align="inline-end">
+                        <InputGroupText>°C</InputGroupText>
+                      </InputGroupAddon>
+                    </InputGroup>
+                  </Field>
+                )}
+              />
 
-                <span className="shrink-0 text-sm text-muted-foreground">
-                  {t("tempTo")}
-                </span>
+              <span className="shrink-0 text-sm text-muted-foreground">
+                {t("tempTo")}
+              </span>
 
-                <FormField
-                  control={form.control}
-                  name="maxTempC"
-                  render={({ field, fieldState }) => (
-                    <FormItem className="flex-1">
-                      <FormControl>
-                        <InputGroup>
-                          <InputGroupInput
-                            type="text"
-                            inputMode="decimal"
-                            aria-invalid={fieldState.invalid}
-                            className={numberInputNoSpinClass}
-                            name={field.name}
-                            ref={field.ref}
-                            value={field.value}
-                            onChange={(event) => {
-                              const next = event.target.value;
-                              if (!isAllowedTempInput(next)) return;
+              <Controller
+                name="maxTempC"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field className="flex-1" data-invalid={fieldState.invalid}>
+                    <InputGroup>
+                      <InputGroupInput
+                        id={`${EQUIPMENT_FORM_ID}-max-temp`}
+                        type="text"
+                        inputMode="decimal"
+                        aria-invalid={fieldState.invalid}
+                        className={numberInputNoSpinClass}
+                        name={field.name}
+                        ref={field.ref}
+                        value={field.value}
+                        onChange={(event) => {
+                          const next = event.target.value;
+                          if (!isAllowedTempInput(next)) return;
 
-                              field.onChange(next);
-                              if (
-                                form.formState.touchedFields.minTempC ||
-                                form.formState.touchedFields.maxTempC
-                              ) {
-                                void form.trigger(["minTempC", "maxTempC"]);
-                              }
-                            }}
-                            onBlur={() => {
-                              field.onBlur();
-                              void form.trigger(["minTempC", "maxTempC"]);
-                            }}
-                          />
-                          <InputGroupAddon align="inline-end">
-                            <InputGroupText>°C</InputGroupText>
-                          </InputGroupAddon>
-                        </InputGroup>
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-              {errors.minTempC?.message ? (
-                <p className="text-sm text-destructive">
-                  {errors.minTempC.message}
-                </p>
-              ) : errors.maxTempC?.message ? (
-                <p className="text-sm text-destructive">
-                  {errors.maxTempC.message}
-                </p>
-              ) : null}
+                          field.onChange(next);
+                          if (
+                            form.formState.touchedFields.minTempC ||
+                            form.formState.touchedFields.maxTempC
+                          ) {
+                            void form.trigger(["minTempC", "maxTempC"]);
+                          }
+                        }}
+                        onBlur={() => {
+                          field.onBlur();
+                          void form.trigger(["minTempC", "maxTempC"]);
+                        }}
+                      />
+                      <InputGroupAddon align="inline-end">
+                        <InputGroupText>°C</InputGroupText>
+                      </InputGroupAddon>
+                    </InputGroup>
+                  </Field>
+                )}
+              />
             </div>
+            {errors.minTempC?.message ? (
+              <FieldError>{errors.minTempC.message}</FieldError>
+            ) : errors.maxTempC?.message ? (
+              <FieldError>{errors.maxTempC.message}</FieldError>
+            ) : null}
+          </FieldSet>
 
-            <DialogFooter>
+          <DialogFooter>
               {isEditing ? (
                 <>
                   <Button
@@ -538,8 +563,7 @@ export function EquipmentForm({
                 </Button>
               )}
             </DialogFooter>
-          </form>
-        </Form>
+        </form>
       </DialogContent>
     </Dialog>
   );
