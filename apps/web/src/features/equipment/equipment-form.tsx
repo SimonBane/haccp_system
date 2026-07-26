@@ -313,11 +313,11 @@ export function EquipmentForm({
     name: ["minTempC", "maxTempC"],
   });
 
-  const watchedValues = form.watch();
-  const hasChanges =
-    !isEditing ||
-    !equipment ||
-    hasEquipmentChanges(watchedValues, equipment);
+  const { isDirty } = useFormState({
+    control: form.control,
+  });
+
+  const hasChanges = !isEditing || !equipment || isDirty;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

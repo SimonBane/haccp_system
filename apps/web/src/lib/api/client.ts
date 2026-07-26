@@ -2,7 +2,6 @@
 
 import { useAuth } from "@clerk/nextjs";
 import { useCallback } from "react";
-import { useRouter } from "@/i18n/navigation";
 import { API_BASE_URL, ApiRequestError, parseApiError } from "./api-utils";
 
 export async function fetchWithToken(
@@ -41,14 +40,6 @@ export async function fetchJsonWithToken<T>(
   return schema.parse(body);
 }
 
-export function useApiRefresh() {
-  const router = useRouter();
-
-  return useCallback(() => {
-    router.refresh();
-  }, [router]);
-}
-
 export function useAuthenticatedFetch(): {
   fetchJson: <T>(
     path: string,
@@ -56,11 +47,9 @@ export function useAuthenticatedFetch(): {
     init?: RequestInit,
   ) => Promise<T>;
   fetchApi: (path: string, init?: RequestInit) => Promise<Response>;
-  refresh: () => void;
   getToken: () => Promise<string | null>;
 } {
   const { getToken } = useAuth();
-  const refresh = useApiRefresh();
 
   const fetchJson = useCallback(
     async <T>(
@@ -76,5 +65,5 @@ export function useAuthenticatedFetch(): {
     [getToken],
   );
 
-  return { fetchJson, fetchApi, refresh, getToken };
+  return { fetchJson, fetchApi, getToken };
 }

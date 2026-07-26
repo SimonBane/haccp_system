@@ -2,51 +2,60 @@
 
 import {
   createEquipmentSchema,
-  equipmentListResponseSchema,
   equipmentResponseSchema,
   updateEquipmentSchema,
   type EquipmentFieldsInput,
   type UpdateEquipmentInput,
 } from "@haccp/shared";
-import { useCallback } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "@/features/location/location-provider";
 import { ApiRequestError, parseApiError } from "@/lib/api-utils";
 import { useAuthenticatedFetch } from "@/lib/api/client";
+import { queryKeys } from "@/lib/api/query-keys";
 
-export function useEquipmentApi() {
+export function useEquipmentMutations() {
   const { locationId } = useLocation();
-  const { fetchJson, fetchApi, refresh } = useAuthenticatedFetch();
+  const { fetchJson, fetchApi } = useAuthenticatedFetch();
+  const queryClient = useQueryClient();
 
-  const create = useCallback(
-    async (input: EquipmentFieldsInput) => {
+  const invalidateEquipment = () => {
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.equipment(locationId),
+    });
+  };
+
+  const create = useMutation({
+    mutationFn: async (input: EquipmentFieldsInput) => {
       const payload = createEquipmentSchema.parse({ ...input, locationId });
-      const result = await fetchJson("/equipment", equipmentResponseSchema, {
+      return fetchJson("/equipment", equipmentResponseSchema, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      refresh();
-      return result;
     },
-    [fetchJson, locationId, refresh],
-  );
+    onSuccess: invalidateEquipment,
+  });
 
-  const update = useCallback(
-    async (id: string, input: UpdateEquipmentInput) => {
+  const update = useMutation({
+    mutationFn: async ({
+      id,
+      input,
+    }: {
+      id: string;
+      input: UpdateEquipmentInput;
+    }) => {
       updateEquipmentSchema.parse(input);
-      const result = await fetchJson(`/equipment/${id}`, equipmentResponseSchema, {
+      return fetchJson(`/equipment/${id}`, equipmentResponseSchema, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
       });
-      refresh();
-      return result;
     },
-    [fetchJson, refresh],
-  );
+    onSuccess: invalidateEquipment,
+  });
 
-  const remove = useCallback(
-    async (id: string) => {
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
       const response = await fetchApi(`/equipment/${id}`, {
         method: "DELETE",
       });
@@ -58,15 +67,9 @@ export function useEquipmentApi() {
           error?.error ?? "UNKNOWN",
         );
       }
-
-      refresh();
     },
-    [fetchApi, refresh],
-  );
+    onSuccess: invalidateEquipment,
+  });
 
-  const list = useCallback(async () => {
-    return fetchJson("/equipment", equipmentListResponseSchema);
-  }, [fetchJson]);
-
-  return { create, update, remove, list };
+  return { create, update, remove };
 }

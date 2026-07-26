@@ -34,6 +34,7 @@
   "TodayPage": {
     "breadcrumb": "Today",
     "title": "Today",
+    "loading": "Loading",
     "selectedDayTitle": "Daily plan",
     "sections": {
       "attention": "Needs attention",

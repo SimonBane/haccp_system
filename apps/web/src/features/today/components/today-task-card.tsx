@@ -1,6 +1,7 @@
 "use client";
 
 import type { TodayTaskItem } from "@haccp/shared";
+import { computeTodayTaskStatus } from "@haccp/shared";
 import {
   CheckIcon,
   CircleAlertIcon,
@@ -8,6 +9,7 @@ import {
   ThermometerIcon,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { memo } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -90,7 +92,7 @@ function localIsoDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function TodayTaskCard({
+export const TodayTaskCard = memo(function TodayTaskCard({
   task,
   bucket,
   now,
@@ -103,7 +105,13 @@ export function TodayTaskCard({
   const t = useTranslations("TodayPage");
   const locale = useLocale();
 
-  const isRecorded = task.status === "completed";
+  const status = computeTodayTaskStatus({
+    date: task.date,
+    scheduledTime: task.scheduledTime,
+    now,
+    completedAt: task.completedAt,
+  });
+  const isRecorded = status === "completed";
   const isCompleted = bucket === "completed";
   const isAttention = bucket === "attention";
   const isOverdue = bucket === "overdue";
@@ -359,5 +367,21 @@ export function TodayTaskCard({
         </Button>
       </div>
     </Card>
+  );
+}, areTodayTaskCardPropsEqual);
+
+function areTodayTaskCardPropsEqual(prev: Props, next: Props): boolean {
+  if (prev.task !== next.task) return false;
+  if (prev.bucket !== next.bucket) return false;
+  if (prev.isPending !== next.isPending) return false;
+  if (prev.currentUserId !== next.currentUserId) return false;
+  if (prev.task.completedAt) return true;
+
+  return (
+    prev.now.getFullYear() === next.now.getFullYear() &&
+    prev.now.getMonth() === next.now.getMonth() &&
+    prev.now.getDate() === next.now.getDate() &&
+    prev.now.getHours() === next.now.getHours() &&
+    prev.now.getMinutes() === next.now.getMinutes()
   );
 }

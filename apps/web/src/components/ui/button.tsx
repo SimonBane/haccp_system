@@ -59,21 +59,23 @@ function Button({
       disabled={disabled || isLoading}
       aria-busy={isLoading}
       className={cn(
-        buttonVariants({ variant, size, className }),
+        buttonVariants({ variant, size }),
         isLoading && "relative",
+        className,
       )}
       {...props}
     >
       {isLoading ? (
-        <>
-          <span className="inline-flex items-center gap-1.5 invisible">
-            {children}
-          </span>
-          <Spinner className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-        </>
-      ) : (
-        children
-      )}
+        <Spinner className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+      ) : null}
+      <span
+        className={cn(
+          "inline-flex items-center gap-1.5",
+          isLoading && "invisible",
+        )}
+      >
+        {children}
+      </span>
     </ButtonPrimitive>
   )
 }

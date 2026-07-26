@@ -3,7 +3,7 @@
 import type { EquipmentResponse } from "@haccp/shared";
 import { Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -17,7 +17,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { EquipmentForm } from "@/features/equipment/equipment-form";
 import { EquipmentData } from "@/features/equipment/data-table/data";
-import { useEquipmentApi } from "@/features/equipment/use-equipment-api";
+import { useEquipmentMutations } from "@/features/equipment/hooks/use-equipment-mutations";
+import { useEquipmentQuery } from "@/features/equipment/hooks/use-equipment-query";
+import { getErrorMessage } from "@/lib/api/get-error-message";
 
 type EquipmentManagerProps = {
   initialItems: EquipmentResponse[];
@@ -25,9 +27,9 @@ type EquipmentManagerProps = {
 
 export function EquipmentManager({ initialItems }: EquipmentManagerProps) {
   const t = useTranslations("EquipmentPage");
-  const { create, update, remove } = useEquipmentApi();
+  const { data: items = [], refetch } = useEquipmentQuery({ initialData: initialItems });
+  const { create, update, remove } = useEquipmentMutations();
 
-  const [items, setItems] = useState(initialItems);
   const [formOpen, setFormOpen] = useState(false);
   const [editingEquipment, setEditingEquipment] =
     useState<EquipmentResponse | null>(null);
@@ -38,52 +40,76 @@ export function EquipmentManager({ initialItems }: EquipmentManagerProps) {
   );
   const [isDeleting, setIsDeleting] = useState(false);
 
-  function openCreateForm() {
+  const openCreateForm = useCallback(() => {
     setEditingEquipment(null);
     setDuplicateSource(null);
     setFormOpen(true);
-    setIsDeleting(false);
     setDeleteTarget(null);
-  }
+  }, []);
 
-  function openEditForm(equipment: EquipmentResponse) {
+  const openEditForm = useCallback((equipment: EquipmentResponse) => {
     setEditingEquipment(equipment);
     setDuplicateSource(null);
     setFormOpen(true);
-    setIsDeleting(false);
     setDeleteTarget(null);
-  }
+  }, []);
 
-  function openDuplicateForm(equipment: EquipmentResponse) {
+  const openDuplicateForm = useCallback((equipment: EquipmentResponse) => {
     setEditingEquipment(null);
     setDuplicateSource(equipment);
     setFormOpen(true);
-    setIsDeleting(false);
     setDeleteTarget(null);
-  }
+  }, []);
 
-  function handleDelete(equipment: EquipmentResponse) {
+  const handleDelete = useCallback((equipment: EquipmentResponse) => {
     setIsDeleting(false);
     setDeleteTarget(equipment);
-  }
+  }, []);
 
-  async function confirmDelete() {
+  const confirmDelete = useCallback(async () => {
     if (!deleteTarget || isDeleting) return;
-    setIsDeleting(true);
     const target = deleteTarget;
+    setIsDeleting(true);
     try {
-      await remove(target.id);
-      setItems((current) =>
-        current.filter((item) => item.id !== target.id),
-      );
+      await remove.mutateAsync(target.id);
+      await refetch();
       toast.success(t("toast.deleteSuccess"));
       setDeleteTarget(null);
-    } catch {
-      toast.error(t("toast.deleteError"));
-    } finally {
+    } catch (error) {
       setIsDeleting(false);
+      toast.error(getErrorMessage(error, t("toast.deleteError")));
     }
-  }
+  }, [deleteTarget, isDeleting, refetch, remove, t]);
+
+  const handleFormOpenChange = useCallback((open: boolean) => {
+    if (!open) {
+      setFormOpen(false);
+      setEditingEquipment(null);
+      setDuplicateSource(null);
+    }
+  }, []);
+
+  const handleDuplicateFromForm = useCallback(() => {
+    if (editingEquipment) openDuplicateForm(editingEquipment);
+  }, [editingEquipment, openDuplicateForm]);
+
+  const handleSubmit = useCallback(
+    async (values: Parameters<typeof create.mutateAsync>[0]) => {
+      if (editingEquipment) {
+        await update.mutateAsync({ id: editingEquipment.id, input: values });
+        toast.success(t("toast.updateSuccess"));
+        return;
+      }
+
+      await create.mutateAsync(values);
+      toast.success(
+        duplicateSource
+          ? t("toast.duplicateSuccess")
+          : t("toast.createSuccess"),
+      );
+    },
+    [create, duplicateSource, editingEquipment, t, update],
+  );
 
   return (
     <div className="space-y-6">
@@ -139,13 +165,7 @@ export function EquipmentManager({ initialItems }: EquipmentManagerProps) {
               : (editingEquipment?.id ?? "create")
           }
           open
-          onOpenChange={(open) => {
-            if (!open) {
-              setFormOpen(false);
-              setEditingEquipment(null);
-              setDuplicateSource(null);
-            }
-          }}
+          onOpenChange={handleFormOpenChange}
           equipment={editingEquipment}
           duplicateSource={duplicateSource}
           suggestedDuplicateName={
@@ -157,29 +177,8 @@ export function EquipmentManager({ initialItems }: EquipmentManagerProps) {
             id: item.id,
             name: item.name,
           }))}
-          onDuplicate={() => {
-            if (editingEquipment) openDuplicateForm(editingEquipment);
-          }}
-          onSubmit={async (values) => {
-            if (editingEquipment) {
-              const updated = await update(editingEquipment.id, values);
-              setItems((current) =>
-                current.map((item) =>
-                  item.id === updated.id ? updated : item,
-                ),
-              );
-              toast.success(t("toast.updateSuccess"));
-              return;
-            }
-
-            const created = await create(values);
-            setItems((current) => [...current, created]);
-            toast.success(
-              duplicateSource
-                ? t("toast.duplicateSuccess")
-                : t("toast.createSuccess"),
-            );
-          }}
+          onDuplicate={handleDuplicateFromForm}
+          onSubmit={handleSubmit}
         />
       ) : null}
     </div>

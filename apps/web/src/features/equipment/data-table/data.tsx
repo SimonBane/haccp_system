@@ -3,7 +3,7 @@
 import type { EquipmentResponse, EquipmentType } from "@haccp/shared";
 import { PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { getColumns } from "@/features/equipment/data-table/columns";
@@ -16,6 +16,15 @@ type EquipmentDataProps = {
   onDelete: (equipment: EquipmentResponse) => void;
 };
 
+function EquipmentToolbar({ onAdd, label }: { onAdd: () => void; label: string }) {
+  return (
+    <Button type="button" onClick={onAdd}>
+      <PlusIcon />
+      {label}
+    </Button>
+  );
+}
+
 export function EquipmentData({
   items,
   onAdd,
@@ -26,11 +35,14 @@ export function EquipmentData({
   const t = useTranslations("EquipmentPage");
   const tTable = useTranslations("DataTable");
 
-  const typeLabels: Record<EquipmentType, string> = {
-    fridge: t("types.fridge"),
-    freezer: t("types.freezer"),
-    display_case: t("types.displayCase"),
-  };
+  const typeLabels = useMemo<Record<EquipmentType, string>>(
+    () => ({
+      fridge: t("types.fridge"),
+      freezer: t("types.freezer"),
+      display_case: t("types.displayCase"),
+    }),
+    [t],
+  );
 
   const columns = useMemo(
     () =>
@@ -42,6 +54,11 @@ export function EquipmentData({
         onDelete,
       }),
     [t, typeLabels, onEdit, onDuplicate, onDelete],
+  );
+
+  const toolbar = useMemo<ReactNode>(
+    () => <EquipmentToolbar onAdd={onAdd} label={t("add")} />,
+    [onAdd, t],
   );
 
   return (
@@ -58,12 +75,7 @@ export function EquipmentData({
       enableColumnVisibility
       classNameWrapper="bg-sidebar ring-1 ring-sidebar-border"
       onRowClick={(row) => onEdit(row.original)}
-      Toolbar={() => (
-        <Button type="button" onClick={onAdd}>
-          <PlusIcon />
-          {t("add")}
-        </Button>
-      )}
+      toolbar={toolbar}
     />
   );
 }

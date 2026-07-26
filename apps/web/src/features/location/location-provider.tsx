@@ -1,17 +1,12 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { LocationResponse } from "@haccp/shared";
-import {
-  createContext,
-  useContext,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useMemo } from "react";
 
 type LocationContextValue = {
   location: LocationResponse;
   locationId: string;
-  setLocation: (location: LocationResponse) => void;
 };
 
 const LocationContext = createContext<LocationContextValue | null>(null);
@@ -25,16 +20,16 @@ export function LocationProvider({
   initialLocation,
   children,
 }: LocationProviderProps) {
-  const [location, setLocation] = useState(initialLocation);
+  const value = useMemo(
+    () => ({
+      location: initialLocation,
+      locationId: initialLocation.id,
+    }),
+    [initialLocation],
+  );
 
   return (
-    <LocationContext.Provider
-      value={{
-        location,
-        locationId: location.id,
-        setLocation,
-      }}
-    >
+    <LocationContext.Provider value={value}>
       {children}
     </LocationContext.Provider>
   );

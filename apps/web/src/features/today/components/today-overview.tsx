@@ -72,7 +72,7 @@ export function TodayOverview({ grouped }: Props) {
                 "flex size-9 shrink-0 items-center justify-center rounded-lg",
                 needsAttention
                   ? "bg-destructive/10 text-destructive"
-                  : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+                  : "bg-primary/10 text-primary",
               )}
             >
               {needsAttention ? (
@@ -155,9 +155,9 @@ export function TodayOverview({ grouped }: Props) {
                 })}
               </div>
             ) : (
-              <div className="flex items-center gap-2 rounded-xl border bg-emerald-500/[0.04] p-3.5 text-sm">
+              <div className="flex items-center gap-2 rounded-xl border bg-primary/[0.04] p-3.5 text-sm">
                 <ShieldCheckIcon
-                  className="size-4 text-emerald-700 dark:text-emerald-400"
+                  className="size-4 text-primary"
                   aria-hidden
                 />
                 <span>{t("overview.noExceptions")}</span>

@@ -130,7 +130,7 @@ export function TodayHeader({
               </div>
             </div>
             <div className="flex min-w-0 items-center gap-2.5 p-3 sm:px-4">
-              <div className="hidden size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-700 sm:flex dark:text-emerald-400">
+              <div className="hidden size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary sm:flex">
                 <ShieldCheckIcon className="size-4" aria-hidden />
               </div>
               <div className="min-w-0">

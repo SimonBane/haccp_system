@@ -34,6 +34,7 @@
   "TodayPage": {
     "breadcrumb": "Днес",
     "title": "Днес",
+    "loading": "Зареждане",
     "selectedDayTitle": "Дневен план",
     "sections": {
       "attention": "Изискват внимание",

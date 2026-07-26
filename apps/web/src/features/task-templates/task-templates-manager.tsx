@@ -1,13 +1,9 @@
 "use client";
 
-import type {
-  EquipmentResponse,
-  TaskTemplateFieldsInput,
-  TaskTemplateResponse,
-} from "@haccp/shared";
+import type { TaskTemplateFieldsInput, TaskTemplateResponse } from "@haccp/shared";
 import { Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -19,23 +15,25 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useEquipmentOptions } from "@/features/equipment/hooks/use-equipment-query";
 import { TaskTemplatesData } from "@/features/task-templates/data-table/data";
+import { useTaskTemplatesMutations } from "@/features/task-templates/hooks/use-task-templates-mutations";
+import { useTaskTemplatesQuery } from "@/features/task-templates/hooks/use-task-templates-query";
 import { TaskTemplatesForm } from "@/features/task-templates/task-templates-form";
-import { useTaskTemplatesApi } from "@/features/task-templates/hooks/use-task-templates-api";
+import { getErrorMessage } from "@/lib/api/get-error-message";
 
 type TaskTemplatesManagerProps = {
   initialItems: TaskTemplateResponse[];
-  equipment: Pick<EquipmentResponse, "id" | "name">[];
 };
 
 export function TaskTemplatesManager({
   initialItems,
-  equipment,
 }: TaskTemplatesManagerProps) {
   const t = useTranslations("TasksPage");
-  const { create, update, remove } = useTaskTemplatesApi();
+  const { data: items = [], refetch } = useTaskTemplatesQuery({ initialData: initialItems });
+  const equipment = useEquipmentOptions();
+  const { create, update, remove } = useTaskTemplatesMutations();
 
-  const [items, setItems] = useState(initialItems);
   const [formOpen, setFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskTemplateResponse | null>(
     null,
@@ -47,50 +45,76 @@ export function TaskTemplatesManager({
   );
   const [isDeleting, setIsDeleting] = useState(false);
 
-  function openCreateForm() {
+  const openCreateForm = useCallback(() => {
     setEditingTask(null);
     setDuplicateSource(null);
     setFormOpen(true);
-    setIsDeleting(false);
     setDeleteTarget(null);
-  }
+  }, []);
 
-  function openEditForm(task: TaskTemplateResponse) {
+  const openEditForm = useCallback((task: TaskTemplateResponse) => {
     setEditingTask(task);
     setDuplicateSource(null);
     setFormOpen(true);
-    setIsDeleting(false);
     setDeleteTarget(null);
-  }
+  }, []);
 
-  function openDuplicateForm(task: TaskTemplateResponse) {
+  const openDuplicateForm = useCallback((task: TaskTemplateResponse) => {
     setEditingTask(null);
     setDuplicateSource(task);
     setFormOpen(true);
-    setIsDeleting(false);
     setDeleteTarget(null);
-  }
+  }, []);
 
-  function handleDelete(task: TaskTemplateResponse) {
+  const handleDelete = useCallback((task: TaskTemplateResponse) => {
     setIsDeleting(false);
     setDeleteTarget(task);
-  }
+  }, []);
 
-  async function confirmDelete() {
+  const confirmDelete = useCallback(async () => {
     if (!deleteTarget || isDeleting) return;
-    setIsDeleting(true);
     const target = deleteTarget;
+    setIsDeleting(true);
     try {
-      await remove(target.id);
-      setItems((current) => current.filter((item) => item.id !== target.id));
+      await remove.mutateAsync(target.id);
+      await refetch();
       toast.success(t("toast.deleteSuccess"));
       setDeleteTarget(null);
-    } catch {
-      toast.error(t("toast.deleteError"));
-    } finally {
+    } catch (error) {
       setIsDeleting(false);
+      toast.error(getErrorMessage(error, t("toast.deleteError")));
     }
-  }
+  }, [deleteTarget, isDeleting, refetch, remove, t]);
+
+  const handleFormOpenChange = useCallback((open: boolean) => {
+    if (!open) {
+      setFormOpen(false);
+      setEditingTask(null);
+      setDuplicateSource(null);
+    }
+  }, []);
+
+  const handleDuplicateFromForm = useCallback(() => {
+    if (editingTask) openDuplicateForm(editingTask);
+  }, [editingTask, openDuplicateForm]);
+
+  const handleSubmit = useCallback(
+    async (values: TaskTemplateFieldsInput) => {
+      if (editingTask) {
+        await update.mutateAsync({ id: editingTask.id, input: values });
+        toast.success(t("toast.updateSuccess"));
+        return;
+      }
+
+      await create.mutateAsync(values);
+      toast.success(
+        duplicateSource
+          ? t("toast.duplicateSuccess")
+          : t("toast.createSuccess"),
+      );
+    },
+    [create, duplicateSource, editingTask, t, update],
+  );
 
   return (
     <div className="space-y-6">
@@ -146,13 +170,7 @@ export function TaskTemplatesManager({
               : (editingTask?.id ?? "create")
           }
           open
-          onOpenChange={(open) => {
-            if (!open) {
-              setFormOpen(false);
-              setEditingTask(null);
-              setDuplicateSource(null);
-            }
-          }}
+          onOpenChange={handleFormOpenChange}
           task={editingTask}
           duplicateSource={duplicateSource}
           suggestedDuplicateTitle={
@@ -161,27 +179,8 @@ export function TaskTemplatesManager({
               : undefined
           }
           equipment={equipment}
-          onDuplicate={() => {
-            if (editingTask) openDuplicateForm(editingTask);
-          }}
-          onSubmit={async (values) => {
-            if (editingTask) {
-              const updated = await update(editingTask.id, values);
-              setItems((current) =>
-                current.map((item) => (item.id === updated.id ? updated : item)),
-              );
-              toast.success(t("toast.updateSuccess"));
-              return;
-            }
-
-            const created = await create(values as TaskTemplateFieldsInput);
-            setItems((current) => [...current, created]);
-            toast.success(
-              duplicateSource
-                ? t("toast.duplicateSuccess")
-                : t("toast.createSuccess"),
-            );
-          }}
+          onDuplicate={handleDuplicateFromForm}
+          onSubmit={handleSubmit}
         />
       ) : null}
     </div>

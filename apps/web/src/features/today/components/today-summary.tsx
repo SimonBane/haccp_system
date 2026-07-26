@@ -74,7 +74,7 @@ export function TodaySummary({
           onClick={() => onFilterChange("completed")}
         >
           <div className="flex w-full min-w-0 items-center gap-3">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <CheckCircle2Icon className="size-4" aria-hidden />
             </div>
             <div className="min-w-0 flex-1">
