@@ -10,7 +10,7 @@ features/<name>/
   <name>-view.tsx          # page-level orchestrator (optional)
   <name>-form.tsx          # create/edit form (optional)
   components/              # presentational UI
-  hooks/                   # client API hooks and feature hooks
+  hooks/                   # React Query hooks and feature hooks
   lib/                     # pure utils, formatters, grouping logic
   data-table/              # list views only
     columns.tsx
@@ -25,7 +25,23 @@ features/<name>/
 - No barrel `index.ts` exports — import directly, e.g. `@/features/today/components/today-header`
 - API types and Zod schemas live in `@haccp/shared`, not in the web app
 
-Smaller features (like `equipment/`) can stay flat until they grow past ~10 files.
+## Reference: `equipment`
+
+```
+features/equipment/
+  equipment-manager.tsx
+  equipment-form.tsx
+  equipment-page-skeleton.tsx
+  hooks/
+    use-equipment-query.ts
+    use-equipment-mutations.ts
+  data-table/
+    columns.tsx
+    data.tsx
+    row-actions.tsx
+```
+
+Route: `/dashboard/equipment`
 
 ## Reference: `task-templates`
 
@@ -39,7 +55,8 @@ features/task-templates/
     scheduled-time-row.tsx
     task-templates-page-skeleton.tsx
   hooks/
-    use-task-templates-api.ts
+    use-task-templates-query.ts
+    use-task-templates-mutations.ts
   lib/
     format-schedule.ts
   data-table/
@@ -72,7 +89,8 @@ features/today/
     today-page-skeleton.tsx
     temperature-check-dialog.tsx
   hooks/
-    use-today-api.ts
+    use-today-query.ts
+    use-today-mutations.ts
   lib/
     today-grouping.ts
 ```
@@ -81,9 +99,12 @@ Route: `/dashboard` (Today is the main dashboard view)
 
 ## Data Fetching
 
-- **Server:** `src/lib/api/server.ts` — authenticated fetch in Server Components
-- **Client:** `src/lib/api/client.ts` — `useAuthenticatedFetch()` for mutations in feature hooks
-- Pages fetch initial data on the server and pass it to client orchestrators as props
+- **Server:** `src/lib/api/server.ts` — authenticated fetch in Server Components (`cache: "no-store"`)
+- **Client queries:** TanStack Query via `use*Query` hooks in `features/*/hooks/`
+- **Client mutations:** `use*Mutations` hooks invalidate query keys after writes
+- **Query keys:** centralized in `src/lib/api/query-keys.ts`
+- **Provider:** `QueryClientProvider` in `src/components/providers/query-provider.tsx`
+- Pages fetch initial data on the server and pass as `initialData` to hydrate client queries
 
 ## Related Folders
 
@@ -93,4 +114,4 @@ Route: `/dashboard` (Today is the main dashboard view)
 | `src/components/ui/` | shadcn primitives — no business logic |
 | `src/components/layout/` | App shell — sidebar, nav, page headers |
 | `src/components/auth/` | Auth-specific UI |
-| `src/hooks/` | Shared UI hooks (e.g. `use-mobile`) |
+| `src/hooks/` | Shared UI hooks (e.g. `use-mobile`, `use-now`) |

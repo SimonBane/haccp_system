@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -125,6 +126,7 @@ export function TemperatureCheckDialog({
   }, [open, form]);
 
   function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen && isSubmitting) return;
     onOpenChange(nextOpen);
   }
 
@@ -143,15 +145,11 @@ export function TemperatureCheckDialog({
       <DialogContent className="max-h-[min(100dvh-2rem,40rem)] overflow-y-auto sm:max-w-md">
         <DialogHeader className="gap-1">
           <DialogTitle className="text-left text-lg">{task.title}</DialogTitle>
-          <div className="space-y-1 text-left text-sm text-muted-foreground">
-            {task.equipmentName && <p>{task.equipmentName}</p>}
-            <p>
-              <time dateTime={task.scheduledTime}>{task.scheduledTime}</time>
-              {" · "}
-              {t("temperatureDialog.allowedRange")}:{" "}
-              <span className="font-medium text-foreground">{rangeLabel}</span>
-            </p>
-          </div>
+          <DialogDescription className="text-left">
+            {task.equipmentName ? `${task.equipmentName} · ` : ""}
+            {task.scheduledTime} · {t("temperatureDialog.allowedRange")}:{" "}
+            {rangeLabel}
+          </DialogDescription>
         </DialogHeader>
 
         <form

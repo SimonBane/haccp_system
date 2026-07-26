@@ -10,6 +10,7 @@ import {
   ShieldCheckIcon,
   ThermometerSnowflakeIcon,
 } from "lucide-react";
+import { useMemo } from "react";
 import { NavMain } from "@/components/layout/nav-main";
 import { NavUser } from "@/components/layout/nav-user";
 import {
@@ -29,29 +30,35 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const isAdmin = orgRole === "org:admin";
 
-  const platformNav = [
-    {
-      title: t("nav.today"),
-      url: "/dashboard",
-      icon: <CalendarDaysIcon />,
-      isActive: pathname === "/dashboard",
-    },
-  ];
+  const platformNav = useMemo(
+    () => [
+      {
+        title: t("nav.today"),
+        url: "/dashboard",
+        icon: <CalendarDaysIcon />,
+        isActive: pathname === "/dashboard",
+      },
+    ],
+    [pathname, t],
+  );
 
-  const adminNav = [
-    {
-      title: t("nav.tasks"),
-      url: "/dashboard/task-templates",
-      icon: <ListChecksIcon />,
-      isActive: pathname.startsWith("/dashboard/task-templates"),
-    },
-    {
-      title: t("nav.equipment"),
-      url: "/dashboard/equipment",
-      icon: <ThermometerSnowflakeIcon />,
-      isActive: pathname.startsWith("/dashboard/equipment"),
-    },
-  ];
+  const adminNav = useMemo(
+    () => [
+      {
+        title: t("nav.tasks"),
+        url: "/dashboard/task-templates",
+        icon: <ListChecksIcon />,
+        isActive: pathname.startsWith("/dashboard/task-templates"),
+      },
+      {
+        title: t("nav.equipment"),
+        url: "/dashboard/equipment",
+        icon: <ThermometerSnowflakeIcon />,
+        isActive: pathname.startsWith("/dashboard/equipment"),
+      },
+    ],
+    [pathname, t],
+  );
 
   return (
     <Sidebar variant="inset" {...props}>

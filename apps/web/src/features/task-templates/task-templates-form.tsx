@@ -23,10 +23,12 @@ import {
   useFieldArray,
   useForm,
   useFormState,
+  useWatch,
 } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { ApiRequestError } from "@/lib/api-utils";
 import {
   Dialog,
   DialogContent,
@@ -338,10 +340,12 @@ export function TaskTemplatesForm({
     sunday: t("weekdaysShort.sunday"),
   };
 
-  const watchedValues = form.watch();
-  const selectedType = watchedValues.type;
-  const hasChanges =
-    !isEditing || !task || hasTaskChanges(watchedValues, task);
+  const selectedType = useWatch({ control: form.control, name: "type" });
+  const { isSubmitting, errors, isDirty } = useFormState({
+    control: form.control,
+  });
+
+  const hasChanges = !isEditing || !task || isDirty;
 
   function validateScheduledTimeUniqueness() {
     const times = form.getValues("scheduledTimeRows").map((row) => row.time);
@@ -379,15 +383,15 @@ export function TaskTemplatesForm({
       await onSubmit(payload);
       onOpenChange(false);
     } catch (error) {
+      if (error instanceof ApiRequestError && error.code === "CONFLICT") {
+        toast.error(error.message);
+        return;
+      }
       toast.error(
         error instanceof Error ? error.message : t("submitError"),
       );
     }
   }
-
-  const { isSubmitting, errors } = useFormState({
-    control: form.control,
-  });
 
   const scheduledTimeRowsError = errors.scheduledTimeRows;
   const scheduledTimeRowsErrorMessage =

@@ -44,6 +44,7 @@ interface DataTableProps<TData, TValue> {
   classNameWrapper?: string;
   truncateCellValue?: boolean;
   Toolbar?: ({ table }: { table: ReactTable<TData> }) => React.ReactNode;
+  toolbar?: React.ReactNode;
   enableSearch?: boolean;
   searchColumn?: string;
   searchPlaceholder?: string;
@@ -60,7 +61,25 @@ interface DataTableProps<TData, TValue> {
   onRowSelectionChange?: OnChangeFn<RowSelectionState>;
 }
 
-const NON_CLICKABLE_COLUMN_IDS = new Set(["select", "actions", "expand"]);
+const TABLE_FILTER_FNS = {
+  includesString: (
+    row: { getValue: (id: string) => unknown },
+    id: string,
+    value: unknown,
+  ) => {
+    const cellValue = row.getValue(id);
+    if (Array.isArray(value)) {
+      return value.includes(cellValue);
+    }
+    return String(cellValue)
+      .toLowerCase()
+      .includes(String(value).toLowerCase());
+  },
+};
+
+const TABLE_DEFAULT_COLUMN = {
+  filterFn: "includesString" as const,
+};
 
 export function DataTable<TData, TValue>({
   columns,
@@ -72,6 +91,7 @@ export function DataTable<TData, TValue>({
   classNameWrapper,
   truncateCellValue = true,
   Toolbar,
+  toolbar,
   enableSearch = false,
   searchColumn,
   searchPlaceholder,
@@ -151,27 +171,15 @@ export function DataTable<TData, TValue>({
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    filterFns: {
-      includesString: (row, id, value) => {
-        const cellValue = row.getValue(id);
-        if (Array.isArray(value)) {
-          return value.includes(cellValue);
-        }
-        return String(cellValue)
-          .toLowerCase()
-          .includes(String(value).toLowerCase());
-      },
-    },
-    defaultColumn: {
-      filterFn: "includesString",
-    },
+    filterFns: TABLE_FILTER_FNS,
+    defaultColumn: TABLE_DEFAULT_COLUMN,
   });
 
   const visibleRows = table.getRowModel().rows;
   const isFiltered = columnFilters.length > 0;
   const displayEmptyMessage = isFiltered ? noResultsMessage : emptyMessage;
   const showToolbar =
-    enableSearch || Boolean(Toolbar) || enableColumnVisibility;
+    enableSearch || Boolean(Toolbar) || Boolean(toolbar) || enableColumnVisibility;
   const shouldShowSelectionCount = showSelectionCount ?? enableRowSelection;
 
   return (
@@ -196,7 +204,7 @@ export function DataTable<TData, TValue>({
                 <DataTableViewOptions table={table} />
               ) : null}
             </div>
-            {Toolbar ? <Toolbar table={table} /> : null}
+            {Toolbar ? <Toolbar table={table} /> : toolbar}
           </div>
         </div>
       ) : null}
@@ -244,11 +252,37 @@ export function DataTable<TData, TValue>({
           </TableHeader>
           <TableBody>
             {visibleRows.length ? (
-              visibleRows.map((row) => (
+              visibleRows.map((row) => {
+                const isRowClickable = Boolean(onRowClick);
+
+                return (
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() ? "selected" : undefined}
-                  className="group h-8 md:h-auto"
+                  className={cn(
+                    "group h-8 md:h-auto",
+                    isRowClickable && "cursor-pointer",
+                  )}
+                  tabIndex={isRowClickable ? 0 : undefined}
+                  role={isRowClickable ? "button" : undefined}
+                  onKeyDown={(event) => {
+                    if (!onRowClick) return;
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      onRowClick(row);
+                    }
+                  }}
+                  onClick={(event) => {
+                    if (!onRowClick) return;
+                    const target = event.target as HTMLElement;
+                    if (
+                      target.closest("button") ||
+                      target.closest('[data-slot="dropdown-menu"]')
+                    ) {
+                      return;
+                    }
+                    onRowClick(row);
+                  }}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
@@ -259,9 +293,6 @@ export function DataTable<TData, TValue>({
                           : "whitespace-pre-wrap",
                         cell.column.columnDef.meta?.sticky && "left-0 z-20",
                         cell.column.columnDef.meta?.className,
-                        onRowClick &&
-                          !NON_CLICKABLE_COLUMN_IDS.has(cell.column.id) &&
-                          "cursor-pointer",
                         cell.column.columnDef.meta?.hidden && "hidden",
                       )}
                       title={
@@ -269,15 +300,6 @@ export function DataTable<TData, TValue>({
                           ? (cell.getContext().getValue() as string)
                           : ""
                       }
-                      onClick={() => {
-                        if (
-                          !onRowClick ||
-                          NON_CLICKABLE_COLUMN_IDS.has(cell.column.id)
-                        ) {
-                          return;
-                        }
-                        onRowClick(row);
-                      }}
                     >
                       {flexRender(
                         cell.column.columnDef.cell,
@@ -286,7 +308,8 @@ export function DataTable<TData, TValue>({
                     </TableCell>
                   ))}
                 </TableRow>
-              ))
+              );
+              })
             ) : (
               <TableRow>
                 <TableCell

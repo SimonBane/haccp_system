@@ -3,7 +3,7 @@
 import type { TaskTemplateResponse, TaskTemplateType } from "@haccp/shared";
 import { PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { getColumns } from "@/features/task-templates/data-table/columns";
@@ -16,6 +16,21 @@ type TaskTemplatesDataProps = {
   onDelete: (task: TaskTemplateResponse) => void;
 };
 
+function TaskTemplatesToolbar({
+  onAdd,
+  label,
+}: {
+  onAdd: () => void;
+  label: string;
+}) {
+  return (
+    <Button type="button" onClick={onAdd}>
+      <PlusIcon />
+      {label}
+    </Button>
+  );
+}
+
 export function TaskTemplatesData({
   items,
   onAdd,
@@ -26,11 +41,14 @@ export function TaskTemplatesData({
   const t = useTranslations("TasksPage");
   const tTable = useTranslations("DataTable");
 
-  const typeLabels: Record<TaskTemplateType, string> = {
-    temperature: t("types.temperature"),
-    cleaning: t("types.cleaning"),
-    other: t("types.other"),
-  };
+  const typeLabels = useMemo<Record<TaskTemplateType, string>>(
+    () => ({
+      temperature: t("types.temperature"),
+      cleaning: t("types.cleaning"),
+      other: t("types.other"),
+    }),
+    [t],
+  );
 
   const scheduleLabels = useMemo(
     () => ({
@@ -55,6 +73,11 @@ export function TaskTemplatesData({
     [t, typeLabels, scheduleLabels, onEdit, onDuplicate, onDelete],
   );
 
+  const toolbar = useMemo<ReactNode>(
+    () => <TaskTemplatesToolbar onAdd={onAdd} label={t("add")} />,
+    [onAdd, t],
+  );
+
   return (
     <DataTable
       columns={columns}
@@ -69,12 +92,7 @@ export function TaskTemplatesData({
       enableColumnVisibility
       classNameWrapper="bg-sidebar ring-1 ring-sidebar-border"
       onRowClick={(row) => onEdit(row.original)}
-      Toolbar={() => (
-        <Button type="button" onClick={onAdd}>
-          <PlusIcon />
-          {t("add")}
-        </Button>
-      )}
+      toolbar={toolbar}
     />
   );
 }

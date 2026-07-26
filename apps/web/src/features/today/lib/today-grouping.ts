@@ -1,4 +1,5 @@
 import type { TodayResponse, TodayTaskItem } from "@haccp/shared";
+import { computeTodayTaskStatus } from "@haccp/shared";
 
 /** Minutes before/after scheduled time that count as "due now". Easy to tune. */
 export const DUE_NOW_WINDOW_MINUTES = 30;
@@ -61,17 +62,24 @@ export function classifyTodayTask(
   task: TodayTaskItem,
   now: Date,
 ): TodayUiBucket {
+  const status = computeTodayTaskStatus({
+    date: task.date,
+    scheduledTime: task.scheduledTime,
+    now,
+    completedAt: task.completedAt,
+  });
+
   if (
-    task.status === "completed" &&
+    status === "completed" &&
     task.temperatureReading?.result === "out_of_range"
   ) {
     return "attention";
   }
-  if (task.status === "completed") return "completed";
+  if (status === "completed") return "completed";
   if (task.date === localIsoDate(now) && isDueNow(task.scheduledTime, now)) {
     return "dueNow";
   }
-  if (task.status === "overdue") return "overdue";
+  if (status === "overdue") return "overdue";
   return "upcoming";
 }
 

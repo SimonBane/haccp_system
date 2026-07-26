@@ -1,13 +1,16 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TodayWorkspace } from "./today-workspace";
 
 export function TodayPageSkeleton() {
+  const t = useTranslations("TodayPage");
+
   return (
     <TodayWorkspace>
       <div className="space-y-6" aria-busy="true">
-        <span className="sr-only">Loading</span>
+        <span className="sr-only">{t("loading")}</span>
 
         <div className="space-y-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

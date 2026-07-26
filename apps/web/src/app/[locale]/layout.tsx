@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { LocaleHtmlLang } from "@/components/locale-html-lang";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryProvider } from "@/components/providers/query-provider";
 import { routing, type Locale } from "@/i18n/routing";
 import {
   getClerkLocalization,
@@ -65,10 +66,12 @@ export default async function LocaleLayout({
     >
       <NextIntlClientProvider messages={messages}>
         <LocaleHtmlLang />
-        <TooltipProvider>
-          {children}
-          <Toaster position="top-right" />
-        </TooltipProvider>
+        <QueryProvider>
+          <TooltipProvider>
+            {children}
+            <Toaster position="top-right" />
+          </TooltipProvider>
+        </QueryProvider>
       </NextIntlClientProvider>
     </ClerkProvider>
   );

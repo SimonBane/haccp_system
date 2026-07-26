@@ -1,13 +1,16 @@
 "use client";
 
 import type { TodayResponse, TodayTaskItem } from "@haccp/shared";
-import { computeTodayTaskStatus } from "@haccp/shared";
 import { useAuth } from "@clerk/nextjs";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { getErrorMessage } from "@/lib/api/get-error-message";
+import { formatLocalDate, localTodayDate, shiftLocalDate } from "@/lib/date";
+import { useNow } from "@/hooks/use-now";
 import { TemperatureCheckDialog } from "./components/temperature-check-dialog";
 import { TodayEmptyState } from "./components/today-empty-state";
 import {
@@ -21,96 +24,12 @@ import {
 } from "./lib/today-grouping";
 import { TodayHeader } from "./components/today-header";
 import { TodayOverview } from "./components/today-overview";
-import { TodayPageSkeleton } from "./components/today-page-skeleton";
 import { TodayPriorityBanner } from "./components/today-priority-banner";
 import { TodaySummary } from "./components/today-summary";
 import { TodayTaskWorkspace } from "./components/today-task-workspace";
 import { TodayWorkspace } from "./components/today-workspace";
-import { useTodayApi } from "./hooks/use-today-api";
-
-function parseLocalDate(date: string): Date {
-  const [year, month, day] = date.split("-").map((value) => Number(value));
-  return new Date(year, month - 1, day);
-}
-
-function formatLocalIsoDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function shiftDate(date: string, days: number): string {
-  const shifted = parseLocalDate(date);
-  shifted.setDate(shifted.getDate() + days);
-  return formatLocalIsoDate(shifted);
-}
-
-function formatDate(dateStr: string, locale: string): string {
-  const date = parseLocalDate(dateStr);
-  return new Intl.DateTimeFormat(locale, {
-    weekday: "long",
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-  }).format(date);
-}
-
-function applyClientStatuses(
-  response: TodayResponse,
-  now: Date,
-): TodayResponse {
-  const mapItem = (item: TodayTaskItem): TodayTaskItem => {
-    const status = computeTodayTaskStatus({
-      date: item.date,
-      scheduledTime: item.scheduledTime,
-      now,
-      completedAt: item.completedAt,
-    });
-
-    return { ...item, status };
-  };
-
-  return {
-    ...response,
-    sections: {
-      morning: response.sections.morning.map(mapItem),
-      afternoon: response.sections.afternoon.map(mapItem),
-      evening: response.sections.evening.map(mapItem),
-    },
-  };
-}
-
-function withLiveStatuses(tasks: TodayTaskItem[], now: Date): TodayTaskItem[] {
-  return tasks.map((item) => ({
-    ...item,
-    status: computeTodayTaskStatus({
-      date: item.date,
-      scheduledTime: item.scheduledTime,
-      now,
-      completedAt: item.completedAt,
-    }),
-  }));
-}
-
-function replaceTaskItem(
-  response: TodayResponse,
-  next: TodayTaskItem,
-): TodayResponse {
-  const key = occurrenceKey(next);
-
-  const replaceIn = (items: TodayTaskItem[]) =>
-    items.map((item) => (occurrenceKey(item) === key ? next : item));
-
-  return {
-    ...response,
-    sections: {
-      morning: replaceIn(response.sections.morning),
-      afternoon: replaceIn(response.sections.afternoon),
-      evening: replaceIn(response.sections.evening),
-    },
-  };
-}
+import { useTodayMutations } from "./hooks/use-today-mutations";
+import { useTodayQuery } from "./hooks/use-today-query";
 
 export function TodayView({
   initialData,
@@ -122,98 +41,41 @@ export function TodayView({
   const t = useTranslations("TodayPage");
   const locale = useLocale();
   const { userId } = useAuth();
+  const now = useNow();
 
-  const { getToday, completeTask, uncompleteTask, completeTemperatureTask, localTodayDate } =
-    useTodayApi();
-
-  const initialNow = useMemo(() => new Date(), []);
-  const todayDate = useMemo(() => localTodayDate(), [localTodayDate]);
-
+  const todayDate = useMemo(() => localTodayDate(), []);
   const [selectedDate, setSelectedDate] = useState(initialDate);
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadError, setLoadError] = useState(false);
-  const [response, setResponse] = useState<TodayResponse | null>(() =>
-    applyClientStatuses(initialData, initialNow),
-  );
   const [filter, setFilter] = useState<TodayFilter>("todo");
-  const [now, setNow] = useState(() => new Date());
   const [pendingKey, setPendingKey] = useState<string | null>(null);
-
+  const pendingAwaitingResponseRef = useRef(false);
   const [tempDialogOpen, setTempDialogOpen] = useState(false);
   const [tempDialogTask, setTempDialogTask] = useState<TodayTaskItem | null>(
     null,
   );
 
-  const load = useCallback(
-    async (date: string) => {
-      try {
-        setIsLoading(true);
-        setLoadError(false);
-        const today = await getToday(date);
-        const currentNow = new Date();
-        setNow(currentNow);
-        setResponse(applyClientStatuses(today, currentNow));
-      } catch (error) {
-        setLoadError(true);
-        setResponse(null);
-        toast.error((error as Error).message || t("toasts.loadError"));
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [getToday, t],
-  );
+  const {
+    data: response,
+    isLoading,
+    isError,
+    isFetching,
+    refetch,
+  } = useTodayQuery(selectedDate, {
+    initialData: selectedDate === initialDate ? initialData : undefined,
+  });
 
-  const isFirstMount = useRef(true);
-
-  useEffect(() => {
-    if (isFirstMount.current && selectedDate === initialDate) {
-      isFirstMount.current = false;
-      return;
-    }
-
-    isFirstMount.current = false;
-
-    let mounted = true;
-
-    async function loadSelectedDate() {
-      try {
-        setIsLoading(true);
-        setLoadError(false);
-        const today = await getToday(selectedDate);
-        if (!mounted) return;
-        const currentNow = new Date();
-        setNow(currentNow);
-        setResponse(applyClientStatuses(today, currentNow));
-      } catch (error) {
-        if (!mounted) return;
-        setLoadError(true);
-        setResponse(null);
-        toast.error((error as Error).message || t("toasts.loadError"));
-      } finally {
-        if (mounted) setIsLoading(false);
-      }
-    }
-
-    void loadSelectedDate();
-
-    return () => {
-      mounted = false;
-    };
-  }, [getToday, initialDate, selectedDate, t]);
-
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      setNow(new Date());
-    }, 60_000);
-
-    return () => window.clearInterval(intervalId);
-  }, []);
+  const { completeTask, uncompleteTask, completeTemperatureTask } =
+    useTodayMutations();
 
   const allTasks = useMemo(
-    () => (response ? withLiveStatuses(flatTodayTasks(response), now) : []),
-    [response, now],
+    () => (response ? flatTodayTasks(response) : []),
+    [response],
   );
+
+  useEffect(() => {
+    if (!pendingKey || !pendingAwaitingResponseRef.current) return;
+    pendingAwaitingResponseRef.current = false;
+    setPendingKey(null);
+  }, [pendingKey, response]);
 
   const groupedAll = useMemo(
     () => groupTodayTasks(allTasks, now),
@@ -232,6 +94,7 @@ export function TodayView({
       }),
     [groupedAll, filter],
   );
+
   const nextTask = useMemo(
     () =>
       groupedAll.dueNow[0] ??
@@ -248,6 +111,18 @@ export function TodayView({
     groupedAll.dueNow.length +
     groupedAll.upcoming.length;
   const totalCount = allTasks.length;
+
+  const handlePreviousDay = useCallback(() => {
+    setSelectedDate((date) => shiftLocalDate(date, -1));
+  }, []);
+
+  const handleToday = useCallback(() => {
+    setSelectedDate(todayDate);
+  }, [todayDate]);
+
+  const handleNextDay = useCallback(() => {
+    setSelectedDate((date) => shiftLocalDate(date, 1));
+  }, []);
 
   const openTemperatureDialog = useCallback(
     (task: TodayTaskItem) => {
@@ -266,34 +141,24 @@ export function TodayView({
     [t],
   );
 
-  const updateFromReturnedItem = useCallback((next: TodayTaskItem) => {
-    const currentNow = new Date();
-    setNow(currentNow);
-    setResponse((current) => {
-      if (!current) return current;
-      const updated = replaceTaskItem(current, next);
-      return applyClientStatuses(updated, currentNow);
-    });
-  }, []);
-
   const handleUndo = useCallback(
     async (task: TodayTaskItem) => {
       const key = occurrenceKey(task);
       setPendingKey(key);
       try {
-        const result = await uncompleteTask({
+        await uncompleteTask.mutateAsync({
           templateId: task.templateId,
           date: task.date,
           scheduledTime: task.scheduledTime,
         });
-        updateFromReturnedItem(result);
+        pendingAwaitingResponseRef.current = true;
+        await refetch();
       } catch (error) {
-        toast.error((error as Error).message || t("toasts.undoError"));
-      } finally {
         setPendingKey(null);
+        toast.error(getErrorMessage(error, t("toasts.undoError")));
       }
     },
-    [t, uncompleteTask, updateFromReturnedItem],
+    [refetch, t, uncompleteTask],
   );
 
   const handleComplete = useCallback(
@@ -301,19 +166,19 @@ export function TodayView({
       const key = occurrenceKey(task);
       setPendingKey(key);
       try {
-        const result = await completeTask({
+        await completeTask.mutateAsync({
           templateId: task.templateId,
           date: task.date,
           scheduledTime: task.scheduledTime,
         });
-        updateFromReturnedItem(result);
+        pendingAwaitingResponseRef.current = true;
+        await refetch();
       } catch (error) {
-        toast.error((error as Error).message || t("toasts.doneError"));
-      } finally {
         setPendingKey(null);
+        toast.error(getErrorMessage(error, t("toasts.doneError")));
       }
     },
-    [completeTask, t, updateFromReturnedItem],
+    [completeTask, refetch, t],
   );
 
   const handleTemperatureDone = useCallback(
@@ -323,44 +188,49 @@ export function TodayView({
       const key = occurrenceKey(tempDialogTask);
       setPendingKey(key);
       try {
-        const result = await completeTemperatureTask({
+        await completeTemperatureTask.mutateAsync({
           templateId: tempDialogTask.templateId,
           date: tempDialogTask.date,
           scheduledTime: tempDialogTask.scheduledTime,
           recordedC,
           correctiveAction,
         });
-
-        updateFromReturnedItem(result);
+        pendingAwaitingResponseRef.current = true;
+        await refetch();
         setTempDialogOpen(false);
         setTempDialogTask(null);
       } catch (error) {
-        toast.error((error as Error).message || t("toasts.doneError"));
-      } finally {
         setPendingKey(null);
+        toast.error(getErrorMessage(error, t("toasts.doneError")));
       }
     },
-    [completeTemperatureTask, tempDialogTask, t, updateFromReturnedItem],
+    [completeTemperatureTask, refetch, tempDialogTask, t],
   );
 
-  if (isLoading) {
-    return <TodayPageSkeleton />;
+  if (isLoading && !response) {
+    return (
+      <TodayWorkspace>
+        <div className="flex items-center justify-center py-24">
+          <Spinner className="size-8" />
+        </div>
+      </TodayWorkspace>
+    );
   }
 
-  if (loadError || !response) {
+  if (isError || !response) {
     return (
       <TodayWorkspace>
         <TodayHeader
           title={t("title")}
-          dateLabel={formatDate(selectedDate, locale)}
+          dateLabel={formatLocalDate(selectedDate, locale)}
           completed={0}
           total={0}
           remaining={0}
           attention={0}
           isToday={selectedDate === todayDate}
-          onPreviousDay={() => setSelectedDate((date) => shiftDate(date, -1))}
-          onToday={() => setSelectedDate(todayDate)}
-          onNextDay={() => setSelectedDate((date) => shiftDate(date, 1))}
+          onPreviousDay={handlePreviousDay}
+          onToday={handleToday}
+          onNextDay={handleNextDay}
         />
         <Alert>
           <AlertTitle>{t("error.title")}</AlertTitle>
@@ -369,7 +239,7 @@ export function TodayView({
             type="button"
             className="mt-4"
             onClick={() => {
-              void load(selectedDate);
+              void refetch();
             }}
           >
             {t("error.retry")}
@@ -385,15 +255,15 @@ export function TodayView({
         title={
           selectedDate === todayDate ? t("title") : t("selectedDayTitle")
         }
-        dateLabel={formatDate(response.date, locale)}
+        dateLabel={formatLocalDate(response.date, locale)}
         completed={completedCount}
         total={totalCount}
         remaining={remainingCount}
         attention={attentionCount}
         isToday={selectedDate === todayDate}
-        onPreviousDay={() => setSelectedDate((date) => shiftDate(date, -1))}
-        onToday={() => setSelectedDate(todayDate)}
-        onNextDay={() => setSelectedDate((date) => shiftDate(date, 1))}
+        onPreviousDay={handlePreviousDay}
+        onToday={handleToday}
+        onNextDay={handleNextDay}
       />
 
       {totalCount === 0 ? (
@@ -411,13 +281,18 @@ export function TodayView({
           />
 
           <TodayPriorityBanner
-            task={nextActionableTask(groupedAll)}
+            task={nextTask}
             pendingKey={pendingKey}
             onComplete={handleComplete}
             onRecordTemperature={openTemperatureDialog}
           />
 
-          <div className="grid items-start gap-6 min-[1400px]:grid-cols-[minmax(0,11fr)_minmax(0,9fr)]">
+          <div className="relative grid items-start gap-6 min-[1400px]:grid-cols-[minmax(0,11fr)_minmax(0,9fr)]">
+            {isFetching && response.date !== selectedDate ? (
+              <div className="absolute inset-x-0 top-0 z-10 flex justify-center pt-2">
+                <Spinner className="size-5" />
+              </div>
+            ) : null}
             <main className="min-w-0">
               <TodayTaskWorkspace
                 filter={filter}
@@ -450,6 +325,13 @@ export function TodayView({
           <TemperatureCheckDialog
             open={tempDialogOpen}
             onOpenChange={(open) => {
+              if (
+                !open &&
+                (pendingKey === occurrenceKey(tempDialogTask) ||
+                  completeTemperatureTask.isPending)
+              ) {
+                return;
+              }
               setTempDialogOpen(open);
               if (!open) setTempDialogTask(null);
             }}
