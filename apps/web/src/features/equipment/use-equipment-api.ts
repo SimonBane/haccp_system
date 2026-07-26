@@ -8,98 +8,46 @@ import {
   type EquipmentFieldsInput,
   type UpdateEquipmentInput,
 } from "@haccp/shared";
-import { useAuth } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
 import { useCallback } from "react";
 import { useLocation } from "@/features/location/location-provider";
-import { parseApiError, API_BASE_URL, ApiRequestError } from "@/lib/api-utils";
-
-async function fetchWithToken(
-  getToken: () => Promise<string | null>,
-  path: string,
-  init?: RequestInit,
-): Promise<Response> {
-  const token = await getToken();
-
-  return fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      ...init?.headers,
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
-}
-
-async function fetchJsonWithToken<T>(
-  getToken: () => Promise<string | null>,
-  path: string,
-  schema: { parse: (data: unknown) => T },
-  init?: RequestInit,
-): Promise<T> {
-  const response = await fetchWithToken(getToken, path, init);
-
-  if (!response.ok) {
-    const error = await parseApiError(response);
-    throw new ApiRequestError(
-      error?.message ?? `Request failed with ${response.status}`,
-      error?.error ?? "UNKNOWN",
-    );
-  }
-
-  const body: unknown = await response.json();
-  return schema.parse(body);
-}
+import { ApiRequestError, parseApiError } from "@/lib/api-utils";
+import { useAuthenticatedFetch } from "@/lib/api/client";
 
 export function useEquipmentApi() {
-  const { getToken } = useAuth();
   const { locationId } = useLocation();
-  const router = useRouter();
-
-  const refresh = useCallback(() => {
-    router.refresh();
-  }, [router]);
+  const { fetchJson, fetchApi, refresh } = useAuthenticatedFetch();
 
   const create = useCallback(
     async (input: EquipmentFieldsInput) => {
       const payload = createEquipmentSchema.parse({ ...input, locationId });
-      const result = await fetchJsonWithToken(
-        getToken,
-        "/equipment",
-        equipmentResponseSchema,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        },
-      );
+      const result = await fetchJson("/equipment", equipmentResponseSchema, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
       refresh();
       return result;
     },
-    [getToken, locationId, refresh],
+    [fetchJson, locationId, refresh],
   );
 
   const update = useCallback(
     async (id: string, input: UpdateEquipmentInput) => {
       updateEquipmentSchema.parse(input);
-      const result = await fetchJsonWithToken(
-        getToken,
-        `/equipment/${id}`,
-        equipmentResponseSchema,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(input),
-        },
-      );
+      const result = await fetchJson(`/equipment/${id}`, equipmentResponseSchema, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
       refresh();
       return result;
     },
-    [getToken, refresh],
+    [fetchJson, refresh],
   );
 
   const remove = useCallback(
     async (id: string) => {
-      const response = await fetchWithToken(getToken, `/equipment/${id}`, {
+      const response = await fetchApi(`/equipment/${id}`, {
         method: "DELETE",
       });
 
@@ -113,12 +61,12 @@ export function useEquipmentApi() {
 
       refresh();
     },
-    [getToken, refresh],
+    [fetchApi, refresh],
   );
 
   const list = useCallback(async () => {
-    return fetchJsonWithToken(getToken, "/equipment", equipmentListResponseSchema);
-  }, [getToken]);
+    return fetchJson("/equipment", equipmentListResponseSchema);
+  }, [fetchJson]);
 
   return { create, update, remove, list };
 }

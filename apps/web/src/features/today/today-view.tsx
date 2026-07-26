@@ -4,12 +4,12 @@ import type { TodayResponse, TodayTaskItem } from "@haccp/shared";
 import { computeTodayTaskStatus } from "@haccp/shared";
 import { useAuth } from "@clerk/nextjs";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { TemperatureCheckDialog } from "./temperature-check-dialog";
-import { TodayEmptyState } from "./today-empty-state";
+import { TemperatureCheckDialog } from "./components/temperature-check-dialog";
+import { TodayEmptyState } from "./components/today-empty-state";
 import {
   applyTodayFilter,
   filterCountsFromGrouped,
@@ -18,15 +18,15 @@ import {
   nextActionableTask,
   occurrenceKey,
   type TodayFilter,
-} from "./today-grouping";
-import { TodayHeader } from "./today-header";
-import { TodayOverview } from "./today-overview";
-import { TodayPageSkeleton } from "./today-page-skeleton";
-import { TodayPriorityBanner } from "./today-priority-banner";
-import { TodaySummary } from "./today-summary";
-import { TodayTaskWorkspace } from "./today-task-workspace";
-import { TodayWorkspace } from "./today-workspace";
-import { useTodayApi } from "./use-today-api";
+} from "./lib/today-grouping";
+import { TodayHeader } from "./components/today-header";
+import { TodayOverview } from "./components/today-overview";
+import { TodayPageSkeleton } from "./components/today-page-skeleton";
+import { TodayPriorityBanner } from "./components/today-priority-banner";
+import { TodaySummary } from "./components/today-summary";
+import { TodayTaskWorkspace } from "./components/today-task-workspace";
+import { TodayWorkspace } from "./components/today-workspace";
+import { useTodayApi } from "./hooks/use-today-api";
 
 function parseLocalDate(date: string): Date {
   const [year, month, day] = date.split("-").map((value) => Number(value));
@@ -112,20 +112,29 @@ function replaceTaskItem(
   };
 }
 
-export function TodayView() {
+export function TodayView({
+  initialData,
+  initialDate,
+}: {
+  initialData: TodayResponse;
+  initialDate: string;
+}) {
   const t = useTranslations("TodayPage");
   const locale = useLocale();
   const { userId } = useAuth();
 
-  const { getToday, completeTask, uncompleteTask, completeTemperatureTask } =
+  const { getToday, completeTask, uncompleteTask, completeTemperatureTask, localTodayDate } =
     useTodayApi();
 
-  const localTodayDate = useMemo(() => formatLocalIsoDate(new Date()), []);
+  const initialNow = useMemo(() => new Date(), []);
+  const todayDate = useMemo(() => localTodayDate(), [localTodayDate]);
 
-  const [selectedDate, setSelectedDate] = useState(localTodayDate);
-  const [isLoading, setIsLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(initialDate);
+  const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const [response, setResponse] = useState<TodayResponse | null>(null);
+  const [response, setResponse] = useState<TodayResponse | null>(() =>
+    applyClientStatuses(initialData, initialNow),
+  );
   const [filter, setFilter] = useState<TodayFilter>("todo");
   const [now, setNow] = useState(() => new Date());
   const [pendingKey, setPendingKey] = useState<string | null>(null);
@@ -155,10 +164,19 @@ export function TodayView() {
     [getToday, t],
   );
 
+  const isFirstMount = useRef(true);
+
   useEffect(() => {
+    if (isFirstMount.current && selectedDate === initialDate) {
+      isFirstMount.current = false;
+      return;
+    }
+
+    isFirstMount.current = false;
+
     let mounted = true;
 
-    async function initialLoad() {
+    async function loadSelectedDate() {
       try {
         setIsLoading(true);
         setLoadError(false);
@@ -177,12 +195,12 @@ export function TodayView() {
       }
     }
 
-    void initialLoad();
+    void loadSelectedDate();
 
     return () => {
       mounted = false;
     };
-  }, [getToday, selectedDate, t]);
+  }, [getToday, initialDate, selectedDate, t]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -339,9 +357,9 @@ export function TodayView() {
           total={0}
           remaining={0}
           attention={0}
-          isToday={selectedDate === localTodayDate}
+          isToday={selectedDate === todayDate}
           onPreviousDay={() => setSelectedDate((date) => shiftDate(date, -1))}
-          onToday={() => setSelectedDate(localTodayDate)}
+          onToday={() => setSelectedDate(todayDate)}
           onNextDay={() => setSelectedDate((date) => shiftDate(date, 1))}
         />
         <Alert>
@@ -365,16 +383,16 @@ export function TodayView() {
     <TodayWorkspace>
       <TodayHeader
         title={
-          selectedDate === localTodayDate ? t("title") : t("selectedDayTitle")
+          selectedDate === todayDate ? t("title") : t("selectedDayTitle")
         }
         dateLabel={formatDate(response.date, locale)}
         completed={completedCount}
         total={totalCount}
         remaining={remainingCount}
         attention={attentionCount}
-        isToday={selectedDate === localTodayDate}
+        isToday={selectedDate === todayDate}
         onPreviousDay={() => setSelectedDate((date) => shiftDate(date, -1))}
-        onToday={() => setSelectedDate(localTodayDate)}
+        onToday={() => setSelectedDate(todayDate)}
         onNextDay={() => setSelectedDate((date) => shiftDate(date, 1))}
       />
 
