@@ -15,6 +15,13 @@ export {
   type UpdateOrganizationInput,
 } from "./schemas/organization.js";
 export {
+  ORGANIZATION_LOGO_ACCEPT,
+  ORGANIZATION_LOGO_ACCEPTED_TYPES,
+  ORGANIZATION_LOGO_MAX_BYTES,
+  validateOrganizationLogoFile,
+  type OrganizationLogoValidationError,
+} from "./schemas/organization-logo.js";
+export {
   tenantContextResponseSchema,
   createLocationSchema,
   updateLocationSchema,

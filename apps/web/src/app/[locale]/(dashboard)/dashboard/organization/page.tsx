@@ -4,7 +4,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { DashboardPageHeader } from "@/components/layout/dashboard-page-header";
 import { OrganizationSettingsForm } from "@/features/organization/organization-settings-form";
 
-export default async function SettingsPage({
+export default async function OrganizationPage({
   params,
 }: {
   params: Promise<{ locale: string }>;
@@ -18,10 +18,7 @@ export default async function SettingsPage({
   return (
     <>
       <DashboardPageHeader
-        breadcrumbs={[
-          { label: t("breadcrumbSettings") },
-          { label: t("breadcrumb"), current: true },
-        ]}
+        breadcrumbs={[{ label: t("breadcrumb"), current: true }]}
       />
       <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
         <OrganizationSettingsForm initialOrganization={tenant.organization} />

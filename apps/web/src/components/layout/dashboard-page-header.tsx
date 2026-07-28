@@ -1,6 +1,7 @@
 import {
   Breadcrumb,
   BreadcrumbItem,
+  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
@@ -8,9 +9,11 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { LocationPickerSlot } from "@/features/tenant/location-picker";
+import { Link } from "@/i18n/navigation";
 
 type BreadcrumbEntry = {
   label: string;
+  href?: string;
   current?: boolean;
 };
 
@@ -39,6 +42,10 @@ export function DashboardPageHeader({ breadcrumbs }: DashboardPageHeaderProps) {
                 >
                   {entry.current ? (
                     <BreadcrumbPage>{entry.label}</BreadcrumbPage>
+                  ) : entry.href ? (
+                    <BreadcrumbLink render={<Link href={entry.href} />}>
+                      {entry.label}
+                    </BreadcrumbLink>
                   ) : (
                     <span>{entry.label}</span>
                   )}

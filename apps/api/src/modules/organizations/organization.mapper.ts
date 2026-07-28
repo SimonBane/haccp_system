@@ -8,6 +8,8 @@ export function toOrganizationResponse(
     id: organization.id,
     clerkOrgId: organization.clerkOrgId,
     name: organization.name,
+    imageUrl: "",
+    hasImage: false,
     timezone: organization.timezone,
     locale: organization.locale as OrganizationResponse["locale"],
     multipleLocationsEnabled: organization.multipleLocationsEnabled,

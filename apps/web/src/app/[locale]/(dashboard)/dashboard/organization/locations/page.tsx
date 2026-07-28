@@ -1,12 +1,11 @@
 import { type Locale } from "@/i18n/routing";
-import { listLocations } from "@/lib/api-client";
+import { getTenantContext, listLocations } from "@/lib/api-client";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { DashboardPageHeader } from "@/components/layout/dashboard-page-header";
 import { LocationsManager } from "@/features/locations/locations-manager";
-import { getTenantContext } from "@/lib/api-client";
 
-export default async function LocationsPage({
+export default async function OrganizationLocationsPage({
   params,
 }: {
   params: Promise<{ locale: string }>;
@@ -18,7 +17,7 @@ export default async function LocationsPage({
   const tenant = await getTenantContext();
 
   if (!tenant.organization.multipleLocationsEnabled) {
-    redirect("/dashboard");
+    redirect("/dashboard/organization");
   }
 
   const locations = await listLocations();
@@ -27,7 +26,10 @@ export default async function LocationsPage({
     <>
       <DashboardPageHeader
         breadcrumbs={[
-          { label: t("breadcrumbSettings") },
+          {
+            label: t("breadcrumbOrganization"),
+            href: "/dashboard/organization",
+          },
           { label: t("breadcrumb"), current: true },
         ]}
       />

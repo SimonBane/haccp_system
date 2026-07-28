@@ -14,6 +14,7 @@ import {
   locationRepository,
 } from "../locations/location.repository.js";
 import { toOrganizationResponse } from "../organizations/organization.mapper.js";
+import { enrichOrganizationFromClerk } from "../organizations/organization-clerk.js";
 import { organizationRepository } from "../organizations/organization.repository.js";
 import {
   buildTenantCacheBlob,
@@ -84,8 +85,12 @@ async function loadTenantFromDb(
     return null;
   }
 
-  return buildTenantCacheBlob(
+  const organization = await enrichOrganizationFromClerk(
     toOrganizationResponse(tenant.organization),
+  );
+
+  return buildTenantCacheBlob(
+    organization,
     tenant.locations.map(toLocationResponse),
   );
 }
@@ -141,7 +146,7 @@ export const tenantService = {
     }
 
     const blob = buildTenantCacheBlob(
-      toOrganizationResponse(organization),
+      await enrichOrganizationFromClerk(toOrganizationResponse(organization)),
       locationRows.map(toLocationResponse),
     );
 
@@ -196,6 +201,6 @@ export const tenantService = {
       throw new NotFoundError("Organization not found");
     }
 
-    return toOrganizationResponse(organization);
+    return enrichOrganizationFromClerk(toOrganizationResponse(organization));
   },
 };

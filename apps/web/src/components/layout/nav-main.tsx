@@ -31,13 +31,15 @@ type NavItem = {
   items?: {
     title: string;
     url: string;
+    isActive?: boolean;
   }[];
 };
 
 function NavMainItem({ item }: { item: NavItem }) {
   const t = useTranslations("Sidebar");
   const { isMobile, setOpenMobile } = useSidebar();
-  const [open, setOpen] = useState(item.isActive ?? false);
+  const hasActiveChild = item.items?.some((subItem) => subItem.isActive) ?? false;
+  const [open, setOpen] = useState(item.isActive || hasActiveChild);
 
   const closeMobileSidebar = () => {
     if (isMobile) {
@@ -46,10 +48,10 @@ function NavMainItem({ item }: { item: NavItem }) {
   };
 
   useEffect(() => {
-    if (item.isActive) {
+    if (item.isActive || hasActiveChild) {
       setOpen(true);
     }
-  }, [item.isActive]);
+  }, [hasActiveChild, item.isActive]);
 
   if (!item.items?.length) {
     return (
@@ -93,6 +95,7 @@ function NavMainItem({ item }: { item: NavItem }) {
             {item.items.map((subItem) => (
               <SidebarMenuSubItem key={subItem.title}>
                 <SidebarMenuSubButton
+                  isActive={subItem.isActive}
                   render={<Link href={subItem.url} />}
                   onClick={closeMobileSidebar}
                 >
