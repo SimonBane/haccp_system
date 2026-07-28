@@ -1,0 +1,31 @@
+import { z } from "zod";
+
+export const organizationLocaleSchema = z.enum(["bg", "en"]);
+
+export const organizationResponseSchema = z.object({
+  id: z.string().uuid(),
+  clerkOrgId: z.string(),
+  name: z.string(),
+  timezone: z.string(),
+  locale: organizationLocaleSchema,
+  multipleLocationsEnabled: z.boolean(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export type OrganizationResponse = z.infer<typeof organizationResponseSchema>;
+
+export const updateOrganizationSchema = z
+  .object({
+    timezone: z.string().min(1).optional(),
+    locale: organizationLocaleSchema.optional(),
+    multipleLocationsEnabled: z.boolean().optional(),
+  })
+  .refine(
+    (data) =>
+      Object.keys(data).length > 0 &&
+      Object.values(data).some((value) => value !== undefined),
+    { message: "At least one field must be provided" },
+  );
+
+export type UpdateOrganizationInput = z.infer<typeof updateOrganizationSchema>;

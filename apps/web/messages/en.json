@@ -356,12 +356,14 @@
     "brandName": "HACCP System",
     "brandPlan": "Enterprise",
     "platform": "Platform",
+    "admin": "Management",
     "toggle": "Toggle",
     "nav": {
       "today": "Today",
+      "organization": "Organization",
       "tasks": "Tasks",
       "equipment": "Cold storage",
-      "settings": "Settings"
+      "locations": "Locations"
     },
     "userMenu": {
       "account": "Account",
@@ -378,5 +380,80 @@
     "label": "Language",
     "bg": "Български",
     "en": "English"
+  },
+  "LocationPicker": {
+    "placeholder": "Select location",
+    "default": "default"
+  },
+  "LocationsPage": {
+    "breadcrumbSettings": "Settings",
+    "breadcrumb": "Locations",
+    "title": "Locations",
+    "description": "Manage sites for your organization and choose which location is the default.",
+    "emptyTitle": "No locations yet",
+    "searchPlaceholder": "Search locations",
+    "add": "Add location",
+    "addTitle": "Add location",
+    "addDescription": "Create a new site for your organization.",
+    "editTitle": "Rename location",
+    "editDescription": "Update the location name.",
+    "nameLabel": "Location name",
+    "namePlaceholder": "e.g. Downtown kitchen",
+    "save": "Save",
+    "cancel": "Cancel",
+    "rename": "Rename",
+    "delete": "Delete",
+    "setAsDefault": "Set as default",
+    "openMenu": "Open menu",
+    "status": {
+      "default": "Default"
+    },
+    "columns": {
+      "name": "Name",
+      "default": "Default"
+    },
+    "deleteDialog": {
+      "title": "Delete location",
+      "confirm": "Delete \"{name}\"? This cannot be undone.",
+      "fallback": "This will permanently delete the location.",
+      "cancel": "Cancel",
+      "confirmAction": "Delete"
+    },
+    "tooltips": {
+      "cannotDeleteDefault": "Set another location as default before deleting this one.",
+      "cannotDeleteLast": "An organization must have at least one location."
+    },
+    "toast": {
+      "createSuccess": "Location was added.",
+      "renameSuccess": "Location was renamed.",
+      "deleteSuccess": "Location was deleted.",
+      "deleteError": "Could not delete location. Please try again.",
+      "setDefaultSuccess": "\"{name}\" is now the default location."
+    },
+    "validation": {
+      "nameRequired": "Name is required.",
+      "nameMaxLength": "Name must be at most 100 characters."
+    },
+    "errors": {
+      "generic": "Something went wrong. Please try again."
+    }
+  },
+  "SettingsPage": {
+    "breadcrumbSettings": "Settings",
+    "breadcrumb": "Organization",
+    "title": "Organization settings",
+    "description": "Configure timezone, locale, and location options for your organization.",
+    "organizationName": "Organization name",
+    "timezone": "Timezone",
+    "locale": "Locale",
+    "localeBg": "Bulgarian",
+    "localeEn": "English",
+    "multipleLocations": "Multiple locations",
+    "multipleLocationsDescription": "Enable managing more than one site and switching between them.",
+    "save": "Save changes",
+    "saved": "Settings saved.",
+    "errors": {
+      "generic": "Something went wrong. Please try again."
+    }
   }
 }

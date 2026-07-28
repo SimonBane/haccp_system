@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { LocationPickerSlot } from "@/features/tenant/location-picker";
 
 type BreadcrumbEntry = {
   label: string;
@@ -47,6 +48,7 @@ export function DashboardPageHeader({ breadcrumbs }: DashboardPageHeaderProps) {
           </BreadcrumbList>
         </Breadcrumb>
       </div>
+      <LocationPickerSlot />
     </header>
   );
 }

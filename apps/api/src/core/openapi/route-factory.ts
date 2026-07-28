@@ -8,7 +8,11 @@ import type { Context } from "hono";
 import type { z } from "zod";
 import type { Db } from "../db/client.js";
 import { ForbiddenError } from "../errors/app-errors.js";
-import { getDb, getCurrentLocation, requireOrgContext } from "../../lib/context.js";
+import {
+  getDb,
+  getCurrentLocation,
+  requireOrgContext,
+} from "../../lib/context.js";
 import type { AppEnv } from "../../types.js";
 import { errorResponse, jsonResponse } from "./responses.js";
 
@@ -28,19 +32,19 @@ type AdminCrudService<
   TList extends z.ZodType,
   TItem extends z.ZodType,
 > = {
-  list: (db: Db, orgId: string, locationId: string) => Promise<z.infer<TList>>;
+  list: (db: Db, locationId: string) => Promise<z.infer<TList>>;
   create: (
     db: Db,
-    orgId: string,
+    organizationId: string,
     input: z.infer<TCreate>,
   ) => Promise<z.infer<TItem>>;
   update: (
     db: Db,
-    orgId: string,
+    locationId: string,
     id: string,
     input: z.infer<TUpdate>,
   ) => Promise<z.infer<TItem>>;
-  delete: (db: Db, orgId: string, id: string) => Promise<void>;
+  delete: (db: Db, locationId: string, id: string) => Promise<void>;
 };
 
 export function registerAdminCrudRoutes<
@@ -138,9 +142,8 @@ export function registerAdminCrudRoutes<
   options.router.openapi(
     listRoute,
     async (c) => {
-      const { orgId } = requireOrgContext(c);
       const { id: locationId } = getCurrentLocation(c);
-      const result = await options.service.list(getDb(c), orgId, locationId);
+      const result = await options.service.list(getDb(c), locationId);
       return c.json(result, 200);
     },
   );
@@ -149,9 +152,13 @@ export function registerAdminCrudRoutes<
     createRouteDef,
     async (c) => {
       assertOrgAdmin(c);
-      const { orgId } = requireOrgContext(c);
+      const { organizationId } = requireOrgContext(c);
       const input = c.req.valid("json");
-      const created = await options.service.create(getDb(c), orgId, input);
+      const created = await options.service.create(
+        getDb(c),
+        organizationId,
+        input,
+      );
       return c.json(created, 201);
     },
   );
@@ -160,10 +167,15 @@ export function registerAdminCrudRoutes<
     updateRouteDef,
     async (c) => {
       assertOrgAdmin(c);
-      const { orgId } = requireOrgContext(c);
+      const { id: locationId } = getCurrentLocation(c);
       const { id } = c.req.valid("param");
       const input = c.req.valid("json");
-      const updated = await options.service.update(getDb(c), orgId, id, input);
+      const updated = await options.service.update(
+        getDb(c),
+        locationId,
+        id,
+        input,
+      );
       return c.json(updated, 200);
     },
   );
@@ -172,9 +184,9 @@ export function registerAdminCrudRoutes<
     deleteRouteDef,
     async (c) => {
       assertOrgAdmin(c);
-      const { orgId } = requireOrgContext(c);
+      const { id: locationId } = getCurrentLocation(c);
       const { id } = c.req.valid("param");
-      await options.service.delete(getDb(c), orgId, id);
+      await options.service.delete(getDb(c), locationId, id);
       return c.body(null, 204);
     },
   );

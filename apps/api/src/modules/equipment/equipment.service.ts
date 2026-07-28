@@ -19,14 +19,9 @@ import { equipmentRepository } from "./equipment.repository.js";
 export const equipmentService = {
   async list(
     db: Db,
-    orgId: string,
     locationId: string,
   ): Promise<EquipmentListResponse> {
-    const rows = await equipmentRepository.findManyByOrgAndLocation(
-      db,
-      orgId,
-      locationId,
-    );
+    const rows = await equipmentRepository.findManyByLocation(db, locationId);
 
     return {
       items: rows.map(toEquipmentResponse),
@@ -35,18 +30,17 @@ export const equipmentService = {
 
   async create(
     db: Db,
-    orgId: string,
+    organizationId: string,
     input: CreateEquipmentInput,
   ): Promise<EquipmentResponse> {
-    await locationService.assertLocationBelongsToOrg(
+    await locationService.assertLocationBelongsToOrganization(
       db,
-      orgId,
+      organizationId,
       input.locationId,
     );
 
     try {
       const created = await equipmentRepository.insert(db, {
-        orgId,
         locationId: input.locationId,
         name: input.name,
         type: input.type,
@@ -72,7 +66,7 @@ export const equipmentService = {
 
   async update(
     db: Db,
-    orgId: string,
+    locationId: string,
     equipmentId: string,
     input: UpdateEquipmentInput,
   ): Promise<EquipmentResponse> {
@@ -90,9 +84,9 @@ export const equipmentService = {
     }
 
     try {
-      const updated = await equipmentRepository.updateByIdAndOrg(
+      const updated = await equipmentRepository.updateByIdAndLocation(
         db,
-        orgId,
+        locationId,
         equipmentId,
         updates,
       );
@@ -117,10 +111,10 @@ export const equipmentService = {
     }
   },
 
-  async delete(db: Db, orgId: string, equipmentId: string): Promise<void> {
-    const deleted = await equipmentRepository.deleteByIdAndOrg(
+  async delete(db: Db, locationId: string, equipmentId: string): Promise<void> {
+    const deleted = await equipmentRepository.deleteByIdAndLocation(
       db,
-      orgId,
+      locationId,
       equipmentId,
     );
 

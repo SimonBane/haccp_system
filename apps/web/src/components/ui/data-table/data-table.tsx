@@ -59,6 +59,7 @@ interface DataTableProps<TData, TValue> {
   onColumnVisibilityChange?: OnChangeFn<VisibilityState>;
   rowSelection?: RowSelectionState;
   onRowSelectionChange?: OnChangeFn<RowSelectionState>;
+  initialSorting?: SortingState;
 }
 
 const TABLE_FILTER_FNS = {
@@ -106,9 +107,12 @@ export function DataTable<TData, TValue>({
   onColumnVisibilityChange,
   rowSelection: rowSelectionProp,
   onRowSelectionChange,
+  initialSorting,
 }: DataTableProps<TData, TValue>) {
   const t = useTranslations("DataTable.selection");
-  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [sorting, setSorting] = React.useState<SortingState>(
+    initialSorting ?? [],
+  );
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     [],
   );

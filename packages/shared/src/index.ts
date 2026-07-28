@@ -8,6 +8,23 @@ export {
   type LocationResponse,
 } from "./schemas/location.js";
 export {
+  organizationResponseSchema,
+  organizationLocaleSchema,
+  updateOrganizationSchema,
+  type OrganizationResponse,
+  type UpdateOrganizationInput,
+} from "./schemas/organization.js";
+export {
+  tenantContextResponseSchema,
+  createLocationSchema,
+  updateLocationSchema,
+  locationListResponseSchema,
+  type TenantContextResponse,
+  type CreateLocationInput,
+  type UpdateLocationInput,
+  type LocationListResponse,
+} from "./schemas/tenant.js";
+export {
   EQUIPMENT_DEFAULT_TEMPS,
   EQUIPMENT_TEMP_MAX_C,
   EQUIPMENT_TEMP_MIN_C,

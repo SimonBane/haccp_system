@@ -356,12 +356,14 @@
     "brandName": "HACCP Система",
     "brandPlan": "Предприятие",
     "platform": "Платформа",
+    "admin": "Управление",
     "toggle": "Превключване",
     "nav": {
       "today": "Днес",
+      "organization": "Организация",
       "tasks": "Задачи",
       "equipment": "Хладилна техника",
-      "settings": "Настройки"
+      "locations": "Локации"
     },
     "userMenu": {
       "account": "Акаунт",
@@ -378,5 +380,80 @@
     "label": "Език",
     "bg": "Български",
     "en": "English"
+  },
+  "LocationPicker": {
+    "placeholder": "Изберете локация",
+    "default": "основна"
+  },
+  "LocationsPage": {
+    "breadcrumbSettings": "Настройки",
+    "breadcrumb": "Локации",
+    "title": "Локации",
+    "description": "Управлявайте обектите на организацията и изберете коя локация е основна.",
+    "emptyTitle": "Все още няма локации",
+    "searchPlaceholder": "Търсене на локации",
+    "add": "Добави локация",
+    "addTitle": "Добавяне на локация",
+    "addDescription": "Създайте нов обект за организацията.",
+    "editTitle": "Преименуване на локация",
+    "editDescription": "Актуализирайте името на локацията.",
+    "nameLabel": "Име на локацията",
+    "namePlaceholder": "напр. Централен кухненски блок",
+    "save": "Запази",
+    "cancel": "Отказ",
+    "rename": "Преименувай",
+    "delete": "Изтрий",
+    "setAsDefault": "Задай като основна",
+    "openMenu": "Отвори менюто",
+    "status": {
+      "default": "Основна"
+    },
+    "columns": {
+      "name": "Име",
+      "default": "Основна"
+    },
+    "deleteDialog": {
+      "title": "Изтриване на локация",
+      "confirm": "Изтриване на \"{name}\"? Това действие е необратимо.",
+      "fallback": "Локацията ще бъде изтрита за постоянно.",
+      "cancel": "Отказ",
+      "confirmAction": "Изтрий"
+    },
+    "tooltips": {
+      "cannotDeleteDefault": "Задайте друга локация като основна, преди да изтриете тази.",
+      "cannotDeleteLast": "Организацията трябва да има поне една локация."
+    },
+    "toast": {
+      "createSuccess": "Локацията беше добавена.",
+      "renameSuccess": "Локацията беше преименувана.",
+      "deleteSuccess": "Локацията беше изтрита.",
+      "deleteError": "Локацията не можа да бъде изтрита. Опитайте отново.",
+      "setDefaultSuccess": "\"{name}\" вече е основната локация."
+    },
+    "validation": {
+      "nameRequired": "Името е задължително.",
+      "nameMaxLength": "Името трябва да е най-много 100 символа."
+    },
+    "errors": {
+      "generic": "Нещо се обърка. Опитайте отново."
+    }
+  },
+  "SettingsPage": {
+    "breadcrumbSettings": "Настройки",
+    "breadcrumb": "Организация",
+    "title": "Настройки на организацията",
+    "description": "Конфигурирайте часова зона, език и опции за локации.",
+    "organizationName": "Име на организацията",
+    "timezone": "Часова зона",
+    "locale": "Език",
+    "localeBg": "Български",
+    "localeEn": "Английски",
+    "multipleLocations": "Множество локации",
+    "multipleLocationsDescription": "Позволява управление на повече от един обект и превключване между тях.",
+    "save": "Запази промените",
+    "saved": "Настройките са запазени.",
+    "errors": {
+      "generic": "Нещо се обърка. Опитайте отново."
+    }
   }
 }

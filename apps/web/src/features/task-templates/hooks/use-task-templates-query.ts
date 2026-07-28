@@ -3,7 +3,7 @@
 import type { TaskTemplateResponse } from "@haccp/shared";
 import { taskTemplateListResponseSchema } from "@haccp/shared";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "@/features/location/location-provider";
+import { useLocation } from "@/features/tenant/tenant-provider";
 import { useAuthenticatedFetch } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
 

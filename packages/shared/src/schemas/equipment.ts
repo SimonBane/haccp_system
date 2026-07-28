@@ -68,7 +68,6 @@ export type UpdateEquipmentInput = z.infer<typeof updateEquipmentSchema>;
 
 export const equipmentResponseSchema = z.object({
   id: z.string().uuid(),
-  orgId: z.string(),
   locationId: z.string().uuid(),
   name: z.string(),
   type: equipmentTypeSchema,

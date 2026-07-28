@@ -1,59 +1,182 @@
-import type { LocationResponse } from "@haccp/shared";
+import type {
+  CreateLocationInput,
+  LocationListResponse,
+  LocationResponse,
+  UpdateLocationInput,
+} from "@haccp/shared";
 import type { Db } from "../../core/db/client.js";
-import { InternalError, NotFoundError } from "../../core/errors/app-errors.js";
-import { locationCache } from "./location-cache.js";
+import {
+  ConflictError,
+  InternalError,
+  NotFoundError,
+} from "../../core/errors/app-errors.js";
+import { mapDbMutationError } from "../../lib/db-errors.js";
+import { tenantCache } from "../tenant/tenant-cache.js";
 import { toLocationResponse } from "./location.mapper.js";
 import { locationRepository } from "./location.repository.js";
+import { organizationRepository } from "../organizations/organization.repository.js";
 
 export const locationService = {
-  async getCurrentLocation(
+  async listByOrganization(
     db: Db,
-    orgId: string,
+    organizationId: string,
+  ): Promise<LocationListResponse> {
+    const rows = await locationRepository.findByOrganizationId(
+      db,
+      organizationId,
+    );
+
+    return {
+      items: rows.map(toLocationResponse),
+    };
+  },
+
+  async create(
+    db: Db,
+    clerkOrgId: string,
+    organizationId: string,
+    input: CreateLocationInput,
   ): Promise<LocationResponse> {
-    const cached = await locationCache.get(orgId);
+    const organization = await organizationRepository.findById(
+      db,
+      organizationId,
+    );
 
-    if (cached) {
-      return cached;
+    if (!organization?.multipleLocationsEnabled) {
+      throw new ConflictError("Multiple locations are not enabled");
     }
 
-    const existing = await locationRepository.findDefaultByOrg(db, orgId);
+    try {
+      if (input.isDefault) {
+        await locationRepository.clearDefaultForOrganization(db, organizationId);
+      }
 
-    if (existing) {
-      const location = toLocationResponse(existing);
-      await locationCache.set(orgId, location);
-      return location;
+      const created = await locationRepository.insert(db, {
+        organizationId,
+        name: input.name,
+        isDefault: input.isDefault ?? false,
+      });
+
+      if (!created) {
+        throw new InternalError("Failed to create location");
+      }
+
+      await tenantCache.invalidate(clerkOrgId);
+      return toLocationResponse(created);
+    } catch (error) {
+      mapDbMutationError(error, {
+        unique: () =>
+          new ConflictError("A location with this name already exists"),
+        foreignKey: () => new NotFoundError("Organization not found"),
+      });
     }
-
-    return locationService.ensureDefaultLocation(db, orgId);
   },
 
-  async ensureDefaultLocation(
+  async update(
     db: Db,
-    orgId: string,
+    clerkOrgId: string,
+    organizationId: string,
+    locationId: string,
+    input: UpdateLocationInput,
   ): Promise<LocationResponse> {
-    const location = await locationRepository.upsertDefaultForOrg(db, orgId);
-
-    if (!location) {
-      throw new InternalError("Failed to resolve location");
+    if (input.isDefault) {
+      await locationRepository.clearDefaultForOrganization(db, organizationId);
     }
 
-    const response = toLocationResponse(location);
-    await locationCache.set(orgId, response);
-    return response;
+    try {
+      const updated = await locationRepository.updateByIdAndOrganization(
+        db,
+        organizationId,
+        locationId,
+        {
+          ...(input.name !== undefined ? { name: input.name } : {}),
+          ...(input.isDefault !== undefined
+            ? { isDefault: input.isDefault }
+            : {}),
+        },
+      );
+
+      if (!updated) {
+        throw new NotFoundError("Location not found");
+      }
+
+      await tenantCache.invalidate(clerkOrgId);
+      return toLocationResponse(updated);
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        throw error;
+      }
+
+      mapDbMutationError(error, {
+        unique: () =>
+          new ConflictError("A location with this name already exists"),
+      });
+    }
   },
 
-  async invalidateCachedLocation(orgId: string): Promise<void> {
-    await locationCache.invalidate(orgId);
-  },
-
-  async assertLocationBelongsToOrg(
+  async delete(
     db: Db,
-    orgId: string,
+    clerkOrgId: string,
+    organizationId: string,
     locationId: string,
   ): Promise<void> {
-    const location = await locationRepository.findByIdAndOrg(
+    const location = await locationRepository.findByIdAndOrganization(
       db,
-      orgId,
+      organizationId,
+      locationId,
+    );
+
+    if (!location) {
+      throw new NotFoundError("Location not found");
+    }
+
+    if (location.isDefault) {
+      throw new ConflictError("Cannot delete the default location");
+    }
+
+    const locationCount = await locationRepository.countByOrganizationId(
+      db,
+      organizationId,
+    );
+
+    if (locationCount <= 1) {
+      throw new ConflictError("Cannot delete the last location");
+    }
+
+    try {
+      const deleted = await locationRepository.deleteByIdAndOrganization(
+        db,
+        organizationId,
+        locationId,
+      );
+
+      if (!deleted) {
+        throw new NotFoundError("Location not found");
+      }
+
+      await tenantCache.invalidate(clerkOrgId);
+    } catch (error) {
+      if (error instanceof NotFoundError || error instanceof ConflictError) {
+        throw error;
+      }
+
+      mapDbMutationError(error, {
+        foreignKey: () =>
+          new ConflictError(
+            "Cannot delete location while it has equipment or task data",
+          ),
+      });
+    }
+  },
+
+  async assertLocationBelongsToOrganization(
+    db: Db,
+    organizationId: string,
+    locationId: string,
+  ): Promise<void> {
+    const location = await locationRepository.findByIdAndOrganization(
+      db,
+      organizationId,
       locationId,
     );
 

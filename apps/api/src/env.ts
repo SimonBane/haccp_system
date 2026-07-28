@@ -16,6 +16,7 @@ const envSchema = z.object({
   DIRECT_DATABASE_URL: z.string().url().optional(),
   CLERK_SECRET_KEY: z.string().min(1),
   CLERK_PUBLISHABLE_KEY: z.string().min(1),
+  CLERK_WEBHOOK_SIGNING_SECRET: z.string().min(1).optional(),
   REDIS_URL: z
     .string()
     .regex(/^rediss?:\/\//, "REDIS_URL must be a redis:// or rediss:// URL"),
@@ -31,6 +32,7 @@ const parsedEnv = envSchema.parse({
   DIRECT_DATABASE_URL: process.env.DIRECT_DATABASE_URL,
   CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
   CLERK_PUBLISHABLE_KEY: process.env.CLERK_PUBLISHABLE_KEY,
+  CLERK_WEBHOOK_SIGNING_SECRET: process.env.CLERK_WEBHOOK_SIGNING_SECRET,
   REDIS_URL: process.env.REDIS_URL,
   NODE_ENV: process.env.NODE_ENV,
 });
