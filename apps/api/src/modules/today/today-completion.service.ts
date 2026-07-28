@@ -72,13 +72,11 @@ function buildTaskItemFromTemplate(
 
 async function resolveTemplateForCompletion(
   db: Db,
-  orgId: string,
   locationId: string,
   templateId: string,
 ): Promise<TemplateRow> {
   const templateRow = await taskTemplateRepository.findWithEquipmentById(
     db,
-    orgId,
     locationId,
     templateId,
   );
@@ -92,7 +90,6 @@ async function resolveTemplateForCompletion(
 
 async function withCompletionContext<T>(
   db: Db,
-  orgId: string,
   locationId: string,
   input: CompletionContextInput,
   handler: (context: CompletionContext) => Promise<T>,
@@ -102,7 +99,6 @@ async function withCompletionContext<T>(
 
   const template = await resolveTemplateForCompletion(
     db,
-    orgId,
     locationId,
     input.templateId,
   );
@@ -114,14 +110,12 @@ async function withCompletionContext<T>(
 
 async function createOrFetchCompletion(
   db: DbClient,
-  orgId: string,
   locationId: string,
   userId: string,
   input: CompleteTodayTaskInput,
   now: Date,
 ): Promise<typeof taskCompletions.$inferSelect> {
   const completion = await todayRepository.upsertCompletion(db, {
-    orgId,
     locationId,
     taskTemplateId: input.templateId,
     occurrenceDate: input.date,
@@ -140,14 +134,12 @@ async function createOrFetchCompletion(
 export const todayCompletionService = {
   async completeTask(
     db: Db,
-    orgId: string,
     locationId: string,
     userId: string,
     input: CompleteTodayTaskInput,
   ): Promise<TodayTaskItem> {
     return withCompletionContext(
       db,
-      orgId,
       locationId,
       input,
       async ({ locationId: resolvedLocationId, template, now }) => {
@@ -157,7 +149,6 @@ export const todayCompletionService = {
 
         const completionRow = await createOrFetchCompletion(
           db,
-          orgId,
           resolvedLocationId,
           userId,
           input,
@@ -178,19 +169,16 @@ export const todayCompletionService = {
 
   async uncompleteTask(
     db: Db,
-    orgId: string,
     locationId: string,
     input: CompleteTodayTaskInput,
   ): Promise<TodayTaskItem> {
     return withCompletionContext(
       db,
-      orgId,
       locationId,
       input,
       async ({ locationId: resolvedLocationId, template, now }) => {
         const deleted = await todayRepository.deleteCompletion(
           db,
-          orgId,
           resolvedLocationId,
           input.templateId,
           input.date,
@@ -215,14 +203,12 @@ export const todayCompletionService = {
 
   async completeTemperatureTask(
     db: Db,
-    orgId: string,
     locationId: string,
     userId: string,
     input: CompleteTodayTemperatureTaskInput,
   ): Promise<TodayTaskItem> {
     return withCompletionContext(
       db,
-      orgId,
       locationId,
       input,
       async ({ locationId: resolvedLocationId, template, now }) => {
@@ -268,7 +254,6 @@ export const todayCompletionService = {
         return db.transaction(async (tx) => {
           const completionRow = await createOrFetchCompletion(
             tx,
-            orgId,
             resolvedLocationId,
             userId,
             input,
@@ -278,7 +263,6 @@ export const todayCompletionService = {
           const tempLog = await todayRepository.upsertTemperatureLog(
             tx,
             {
-              orgId,
               locationId: resolvedLocationId,
               taskCompletionId: completionRow.id,
               equipmentId: template.equipmentId!,

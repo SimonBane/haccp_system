@@ -1,8 +1,9 @@
 export {
   fetchApi,
-  getCurrentLocation,
+  getTenantContext,
   getToday,
   listEquipment,
+  listLocations,
   listTaskTemplates,
   parseApiError,
 } from "./api/server";

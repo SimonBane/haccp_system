@@ -112,20 +112,18 @@ const uncompleteTaskRoute = createRoute({
 });
 
 todayRoutes.openapi(getTodayRoute, async (c) => {
-  const { orgId } = requireOrgContext(c);
   const { date } = c.req.valid("query");
   const { id: locationId } = getCurrentLocation(c);
-  const result = await todayService.getToday(getDb(c), orgId, locationId, date);
+  const result = await todayService.getToday(getDb(c), locationId, date);
   return c.json(result, 200);
 });
 
 todayRoutes.openapi(completeTaskRoute, async (c) => {
-  const { orgId, userId } = requireOrgContext(c);
+  const { userId } = requireOrgContext(c);
   const { id: locationId } = getCurrentLocation(c);
   const input = c.req.valid("json");
   const result = await todayCompletionService.completeTask(
     getDb(c),
-    orgId,
     locationId,
     userId,
     input,
@@ -134,12 +132,11 @@ todayRoutes.openapi(completeTaskRoute, async (c) => {
 });
 
 todayRoutes.openapi(completeTemperatureRoute, async (c) => {
-  const { orgId, userId } = requireOrgContext(c);
+  const { userId } = requireOrgContext(c);
   const { id: locationId } = getCurrentLocation(c);
   const input = c.req.valid("json");
   const result = await todayCompletionService.completeTemperatureTask(
     getDb(c),
-    orgId,
     locationId,
     userId,
     input,
@@ -148,12 +145,10 @@ todayRoutes.openapi(completeTemperatureRoute, async (c) => {
 });
 
 todayRoutes.openapi(uncompleteTaskRoute, async (c) => {
-  const { orgId } = requireOrgContext(c);
   const { id: locationId } = getCurrentLocation(c);
   const input = c.req.valid("json");
   const result = await todayCompletionService.uncompleteTask(
     getDb(c),
-    orgId,
     locationId,
     input,
   );

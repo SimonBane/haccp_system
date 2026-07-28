@@ -1,17 +1,24 @@
+import { sql } from "drizzle-orm";
 import {
+  boolean,
+  index,
   pgTable,
   text,
   timestamp,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { organizations } from "./organizations.js";
 
 export const locations = pgTable(
   "locations",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    orgId: text("org_id").notNull(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    isDefault: boolean("is_default").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -19,7 +26,16 @@ export const locations = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [uniqueIndex("locations_org_id_unique").on(table.orgId)],
+  (table) => [
+    index("locations_organization_id_idx").on(table.organizationId),
+    uniqueIndex("locations_organization_id_name_unique").on(
+      table.organizationId,
+      table.name,
+    ),
+    uniqueIndex("locations_organization_id_is_default_unique")
+      .on(table.organizationId)
+      .where(sql`${table.isDefault} = true`),
+  ],
 );
 
 export type Location = typeof locations.$inferSelect;

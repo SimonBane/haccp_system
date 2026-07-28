@@ -10,7 +10,6 @@ export function toTaskTemplateResponse(
 ): TaskTemplateResponse {
   return {
     id: row.id,
-    orgId: row.orgId,
     locationId: row.locationId,
     title: row.title,
     type: row.type as TaskTemplateResponse["type"],

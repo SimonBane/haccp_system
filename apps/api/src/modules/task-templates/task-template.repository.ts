@@ -11,9 +11,8 @@ export type TaskTemplateWithEquipmentRow = {
 };
 
 export const taskTemplateRepository = {
-  async findManyWithEquipmentByOrgLocationAndWeekday(
+  async findManyWithEquipmentByLocationAndWeekday(
     db: Db,
-    orgId: string,
     locationId: string,
     weekday: string,
   ) {
@@ -28,7 +27,6 @@ export const taskTemplateRepository = {
       .leftJoin(equipment, eq(taskTemplates.equipmentId, equipment.id))
       .where(
         and(
-          eq(taskTemplates.orgId, orgId),
           eq(taskTemplates.locationId, locationId),
           sql`${weekday} = ANY(${taskTemplates.weekdays})`,
         ),
@@ -36,11 +34,7 @@ export const taskTemplateRepository = {
       .orderBy(asc(taskTemplates.title));
   },
 
-  async findManyWithEquipmentByOrgAndLocation(
-    db: Db,
-    orgId: string,
-    locationId: string,
-  ) {
+  async findManyWithEquipmentByLocation(db: Db, locationId: string) {
     return db
       .select({
         template: taskTemplates,
@@ -50,18 +44,12 @@ export const taskTemplateRepository = {
       })
       .from(taskTemplates)
       .leftJoin(equipment, eq(taskTemplates.equipmentId, equipment.id))
-      .where(
-        and(
-          eq(taskTemplates.orgId, orgId),
-          eq(taskTemplates.locationId, locationId),
-        ),
-      )
+      .where(eq(taskTemplates.locationId, locationId))
       .orderBy(asc(taskTemplates.title));
   },
 
   async findWithEquipmentById(
     db: Db,
-    orgId: string,
     locationId: string,
     templateId: string,
   ) {
@@ -77,7 +65,6 @@ export const taskTemplateRepository = {
       .where(
         and(
           eq(taskTemplates.id, templateId),
-          eq(taskTemplates.orgId, orgId),
           eq(taskTemplates.locationId, locationId),
         ),
       )
@@ -86,14 +73,18 @@ export const taskTemplateRepository = {
     return row ?? null;
   },
 
-  async findByIdAndOrg(db: Db, orgId: string, taskTemplateId: string) {
+  async findByIdAndLocation(
+    db: Db,
+    locationId: string,
+    taskTemplateId: string,
+  ) {
     const [row] = await db
       .select()
       .from(taskTemplates)
       .where(
         and(
           eq(taskTemplates.id, taskTemplateId),
-          eq(taskTemplates.orgId, orgId),
+          eq(taskTemplates.locationId, locationId),
         ),
       )
       .limit(1);
@@ -106,9 +97,9 @@ export const taskTemplateRepository = {
     return created ?? null;
   },
 
-  async updateByIdAndOrg(
+  async updateByIdAndLocation(
     db: Db,
-    orgId: string,
+    locationId: string,
     taskTemplateId: string,
     updates: Partial<typeof taskTemplates.$inferInsert>,
   ) {
@@ -118,7 +109,7 @@ export const taskTemplateRepository = {
       .where(
         and(
           eq(taskTemplates.id, taskTemplateId),
-          eq(taskTemplates.orgId, orgId),
+          eq(taskTemplates.locationId, locationId),
         ),
       )
       .returning();
@@ -126,13 +117,17 @@ export const taskTemplateRepository = {
     return updated ?? null;
   },
 
-  async deleteByIdAndOrg(db: Db, orgId: string, taskTemplateId: string) {
+  async deleteByIdAndLocation(
+    db: Db,
+    locationId: string,
+    taskTemplateId: string,
+  ) {
     const [deleted] = await db
       .delete(taskTemplates)
       .where(
         and(
           eq(taskTemplates.id, taskTemplateId),
-          eq(taskTemplates.orgId, orgId),
+          eq(taskTemplates.locationId, locationId),
         ),
       )
       .returning({ id: taskTemplates.id });

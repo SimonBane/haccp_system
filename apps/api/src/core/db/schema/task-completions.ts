@@ -14,7 +14,6 @@ export const taskCompletions = pgTable(
   "task_completions",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    orgId: text("org_id").notNull(),
     locationId: uuid("location_id")
       .notNull()
       .references(() => locations.id, { onDelete: "restrict" }),
@@ -34,7 +33,6 @@ export const taskCompletions = pgTable(
     uniqueIndex(
       "task_completions_template_date_time_unique",
     ).on(table.taskTemplateId, table.occurrenceDate, table.scheduledTime),
-    index("task_completions_org_id_idx").on(table.orgId),
     index("task_completions_location_date_idx").on(
       table.locationId,
       table.occurrenceDate,
@@ -44,4 +42,3 @@ export const taskCompletions = pgTable(
 
 export type TaskCompletion = typeof taskCompletions.$inferSelect;
 export type NewTaskCompletion = typeof taskCompletions.$inferInsert;
-

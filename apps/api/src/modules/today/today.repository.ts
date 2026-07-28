@@ -19,7 +19,6 @@ export type CompletionWithTemperatureRow = {
 export const todayRepository = {
   async findCompletionsWithTemperatureLogs(
     db: Db,
-    orgId: string,
     locationId: string,
     date: string,
   ): Promise<CompletionWithTemperatureRow[]> {
@@ -42,7 +41,6 @@ export const todayRepository = {
       )
       .where(
         and(
-          eq(taskCompletions.orgId, orgId),
           eq(taskCompletions.locationId, locationId),
           eq(taskCompletions.occurrenceDate, date),
         ),
@@ -73,7 +71,6 @@ export const todayRepository = {
 
   async findCompletion(
     db: DbClient,
-    orgId: string,
     locationId: string,
     templateId: string,
     date: string,
@@ -84,7 +81,6 @@ export const todayRepository = {
       .from(taskCompletions)
       .where(
         and(
-          eq(taskCompletions.orgId, orgId),
           eq(taskCompletions.locationId, locationId),
           eq(taskCompletions.taskTemplateId, templateId),
           eq(taskCompletions.occurrenceDate, date),
@@ -98,7 +94,6 @@ export const todayRepository = {
 
   async deleteCompletion(
     db: DbClient,
-    orgId: string,
     locationId: string,
     templateId: string,
     date: string,
@@ -108,7 +103,6 @@ export const todayRepository = {
       .delete(taskCompletions)
       .where(
         and(
-          eq(taskCompletions.orgId, orgId),
           eq(taskCompletions.locationId, locationId),
           eq(taskCompletions.taskTemplateId, templateId),
           eq(taskCompletions.occurrenceDate, date),

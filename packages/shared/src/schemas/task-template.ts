@@ -242,7 +242,6 @@ export type UpdateTaskTemplateInput = z.infer<typeof updateTaskTemplateSchema>;
 
 export const taskTemplateResponseSchema = z.object({
   id: z.string().uuid(),
-  orgId: z.string(),
   locationId: z.string().uuid(),
   title: z.string(),
   type: taskTemplateTypeSchema,

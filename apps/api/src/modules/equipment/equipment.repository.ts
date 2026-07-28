@@ -3,27 +3,11 @@ import type { Db } from "../../core/db/client.js";
 import { equipment } from "../../core/db/schema/equipment.js";
 
 export const equipmentRepository = {
-  async findManyByOrgAndLocation(
-    db: Db,
-    orgId: string,
-    locationId: string,
-  ) {
+  async findManyByLocation(db: Db, locationId: string) {
     return db
-      .select({
-        id: equipment.id,
-        orgId: equipment.orgId,
-        locationId: equipment.locationId,
-        name: equipment.name,
-        type: equipment.type,
-        minTempC: equipment.minTempC,
-        maxTempC: equipment.maxTempC,
-        createdAt: equipment.createdAt,
-        updatedAt: equipment.updatedAt,
-      })
+      .select()
       .from(equipment)
-      .where(
-        and(eq(equipment.orgId, orgId), eq(equipment.locationId, locationId)),
-      )
+      .where(eq(equipment.locationId, locationId))
       .orderBy(asc(equipment.name));
   },
 
@@ -32,35 +16,40 @@ export const equipmentRepository = {
     return created ?? null;
   },
 
-  async updateByIdAndOrg(
+  async updateByIdAndLocation(
     db: Db,
-    orgId: string,
+    locationId: string,
     equipmentId: string,
     updates: Partial<typeof equipment.$inferInsert>,
   ) {
     const [updated] = await db
       .update(equipment)
       .set(updates)
-      .where(and(eq(equipment.id, equipmentId), eq(equipment.orgId, orgId)))
+      .where(
+        and(eq(equipment.id, equipmentId), eq(equipment.locationId, locationId)),
+      )
       .returning();
 
     return updated ?? null;
   },
 
-  async deleteByIdAndOrg(db: Db, orgId: string, equipmentId: string) {
+  async deleteByIdAndLocation(
+    db: Db,
+    locationId: string,
+    equipmentId: string,
+  ) {
     const [deleted] = await db
       .delete(equipment)
       .where(
-        and(eq(equipment.id, equipmentId), eq(equipment.orgId, orgId)),
+        and(eq(equipment.id, equipmentId), eq(equipment.locationId, locationId)),
       )
       .returning({ id: equipment.id });
 
     return deleted ?? null;
   },
 
-  async findByIdAndOrgAndLocation(
+  async findByIdAndLocation(
     db: Db,
-    orgId: string,
     locationId: string,
     equipmentId: string,
   ) {
@@ -68,11 +57,7 @@ export const equipmentRepository = {
       .select({ id: equipment.id, name: equipment.name })
       .from(equipment)
       .where(
-        and(
-          eq(equipment.id, equipmentId),
-          eq(equipment.orgId, orgId),
-          eq(equipment.locationId, locationId),
-        ),
+        and(eq(equipment.id, equipmentId), eq(equipment.locationId, locationId)),
       )
       .limit(1);
 

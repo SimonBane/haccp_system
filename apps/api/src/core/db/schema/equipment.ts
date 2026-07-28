@@ -15,7 +15,6 @@ export const equipment = pgTable(
   "equipment",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    orgId: text("org_id").notNull(),
     locationId: uuid("location_id")
       .notNull()
       .references(() => locations.id, { onDelete: "restrict" }),
@@ -35,10 +34,7 @@ export const equipment = pgTable(
       table.locationId,
       table.name,
     ),
-    index("equipment_org_id_location_id_idx").on(
-      table.orgId,
-      table.locationId,
-    ),
+    index("equipment_location_id_idx").on(table.locationId),
     check(
       "equipment_min_temp_less_than_max_temp",
       sql`${table.minTempC} < ${table.maxTempC}`,

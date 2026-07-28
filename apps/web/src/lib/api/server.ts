@@ -2,19 +2,35 @@ import "server-only";
 
 import {
   equipmentListResponseSchema,
-  locationResponseSchema,
+  locationListResponseSchema,
   taskTemplateListResponseSchema,
+  tenantContextResponseSchema,
   todayResponseSchema,
   type EquipmentListResponse,
-  type LocationResponse,
+  type LocationListResponse,
   type TaskTemplateListResponse,
+  type TenantContextResponse,
   type TodayResponse,
 } from "@haccp/shared";
 import { auth } from "@clerk/nextjs/server";
+import { cookies } from "next/headers";
 import { localTodayDate } from "@/lib/date";
 import { API_BASE_URL, ApiRequestError, parseApiError } from "./api-utils";
 
 export { parseApiError } from "./api-utils";
+
+const LOCATION_COOKIE = "haccp_location_id";
+
+async function getLocationHeader(): Promise<Record<string, string>> {
+  const cookieStore = await cookies();
+  const locationId = cookieStore.get(LOCATION_COOKIE)?.value;
+
+  if (!locationId) {
+    return {};
+  }
+
+  return { "X-Location-Id": locationId };
+}
 
 export async function fetchApi(
   path: string,
@@ -22,12 +38,14 @@ export async function fetchApi(
 ): Promise<Response> {
   const { getToken } = await auth();
   const token = await getToken();
+  const locationHeader = await getLocationHeader();
 
   return fetch(`${API_BASE_URL}${path}`, {
     ...init,
     cache: "no-store",
     headers: {
       ...init?.headers,
+      ...locationHeader,
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   });
@@ -52,8 +70,12 @@ async function fetchJson<T>(
   return schema.parse(body);
 }
 
-export async function getCurrentLocation(): Promise<LocationResponse> {
-  return fetchJson("/locations/current", locationResponseSchema);
+export async function getTenantContext(): Promise<TenantContextResponse> {
+  return fetchJson("/tenant/current", tenantContextResponseSchema);
+}
+
+export async function listLocations(): Promise<LocationListResponse> {
+  return fetchJson("/locations", locationListResponseSchema);
 }
 
 export async function listEquipment(): Promise<EquipmentListResponse> {

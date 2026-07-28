@@ -8,7 +8,7 @@ import {
   type UpdateEquipmentInput,
 } from "@haccp/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "@/features/location/location-provider";
+import { useLocation } from "@/features/tenant/tenant-provider";
 import { ApiRequestError, parseApiError } from "@/lib/api-utils";
 import { useAuthenticatedFetch } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";

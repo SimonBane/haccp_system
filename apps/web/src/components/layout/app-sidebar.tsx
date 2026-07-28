@@ -5,14 +5,17 @@ import { useTranslations } from "next-intl";
 import { usePathname } from "@/i18n/navigation";
 import { useAuth } from "@clerk/nextjs";
 import {
+  Building2Icon,
   CalendarDaysIcon,
   ListChecksIcon,
+  MapPinIcon,
   ShieldCheckIcon,
   ThermometerSnowflakeIcon,
 } from "lucide-react";
 import { useMemo } from "react";
 import { NavMain } from "@/components/layout/nav-main";
 import { NavUser } from "@/components/layout/nav-user";
+import { useTenant } from "@/features/tenant/tenant-provider";
 import {
   Sidebar,
   SidebarContent,
@@ -27,6 +30,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const t = useTranslations("Sidebar");
   const pathname = usePathname();
   const { orgRole } = useAuth();
+  const { organization } = useTenant();
 
   const isAdmin = orgRole === "org:admin";
 
@@ -42,8 +46,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     [pathname, t],
   );
 
-  const adminNav = useMemo(
-    () => [
+  const adminNav = useMemo(() => {
+    const items = [
+      {
+        title: t("nav.organization"),
+        url: "/dashboard/settings",
+        icon: <Building2Icon />,
+        isActive: pathname.startsWith("/dashboard/settings"),
+      },
       {
         title: t("nav.tasks"),
         url: "/dashboard/task-templates",
@@ -56,9 +66,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         icon: <ThermometerSnowflakeIcon />,
         isActive: pathname.startsWith("/dashboard/equipment"),
       },
-    ],
-    [pathname, t],
-  );
+    ];
+
+    if (organization.multipleLocationsEnabled) {
+      items.push({
+        title: t("nav.locations"),
+        url: "/dashboard/locations",
+        icon: <MapPinIcon />,
+        isActive: pathname.startsWith("/dashboard/locations"),
+      });
+    }
+
+    return items;
+  }, [organization.multipleLocationsEnabled, pathname, t]);
 
   return (
     <Sidebar variant="inset" {...props}>
@@ -82,7 +102,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={platformNav} groupLabel={t("platform")} />
-        {isAdmin ? <NavMain items={adminNav} groupLabel={t("nav.settings")} /> : null}
+        {isAdmin ? <NavMain items={adminNav} groupLabel={t("admin")} /> : null}
       </SidebarContent>
       <SidebarFooter>
         <NavUser />

@@ -6,7 +6,6 @@ export const taskTemplates = pgTable(
   "task_templates",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    orgId: text("org_id").notNull(),
     locationId: uuid("location_id")
       .notNull()
       .references(() => locations.id, { onDelete: "restrict" }),
@@ -25,10 +24,7 @@ export const taskTemplates = pgTable(
       .notNull(),
   },
   (table) => [
-    index("task_templates_org_id_location_id_idx").on(
-      table.orgId,
-      table.locationId,
-    ),
+    index("task_templates_location_id_idx").on(table.locationId),
     index("task_templates_equipment_id_idx").on(table.equipmentId),
   ],
 );

@@ -16,7 +16,6 @@ import { todayRepository } from "./today.repository.js";
 export const todayService = {
   async getToday(
     db: Db,
-    orgId: string,
     locationId: string,
     date: string,
   ): Promise<TodayResponse> {
@@ -24,15 +23,13 @@ export const todayService = {
     const now = new Date();
 
     const [templateRows, completionRows] = await Promise.all([
-      taskTemplateRepository.findManyWithEquipmentByOrgLocationAndWeekday(
+      taskTemplateRepository.findManyWithEquipmentByLocationAndWeekday(
         db,
-        orgId,
         locationId,
         weekday,
       ),
       todayRepository.findCompletionsWithTemperatureLogs(
         db,
-        orgId,
         locationId,
         date,
       ),

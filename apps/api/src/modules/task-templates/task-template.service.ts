@@ -20,13 +20,11 @@ import { taskTemplateRepository } from "./task-template.repository.js";
 
 async function resolveEquipmentForTemplate(
   db: Db,
-  orgId: string,
   locationId: string,
   equipmentId: string,
 ): Promise<{ id: string; name: string }> {
-  const matched = await equipmentRepository.findByIdAndOrgAndLocation(
+  const matched = await equipmentRepository.findByIdAndLocation(
     db,
-    orgId,
     locationId,
     equipmentId,
   );
@@ -41,13 +39,11 @@ async function resolveEquipmentForTemplate(
 export const taskTemplateService = {
   async list(
     db: Db,
-    orgId: string,
     locationId: string,
   ): Promise<TaskTemplateListResponse> {
     const rows =
-      await taskTemplateRepository.findManyWithEquipmentByOrgAndLocation(
+      await taskTemplateRepository.findManyWithEquipmentByLocation(
         db,
-        orgId,
         locationId,
       );
 
@@ -60,28 +56,22 @@ export const taskTemplateService = {
 
   async create(
     db: Db,
-    orgId: string,
+    organizationId: string,
     input: CreateTaskTemplateInput,
   ): Promise<TaskTemplateResponse> {
     const [, resolvedEquipment] = await Promise.all([
-      locationService.assertLocationBelongsToOrg(
+      locationService.assertLocationBelongsToOrganization(
         db,
-        orgId,
+        organizationId,
         input.locationId,
       ),
       input.equipmentId
-        ? resolveEquipmentForTemplate(
-            db,
-            orgId,
-            input.locationId,
-            input.equipmentId,
-          )
+        ? resolveEquipmentForTemplate(db, input.locationId, input.equipmentId)
         : Promise.resolve(null),
     ]);
 
     try {
       const created = await taskTemplateRepository.insert(db, {
-        orgId,
         locationId: input.locationId,
         title: input.title,
         type: input.type,
@@ -111,13 +101,13 @@ export const taskTemplateService = {
 
   async update(
     db: Db,
-    orgId: string,
+    locationId: string,
     taskTemplateId: string,
     input: UpdateTaskTemplateInput,
   ): Promise<TaskTemplateResponse> {
-    const existing = await taskTemplateRepository.findByIdAndOrg(
+    const existing = await taskTemplateRepository.findByIdAndLocation(
       db,
-      orgId,
+      locationId,
       taskTemplateId,
     );
 
@@ -141,7 +131,6 @@ export const taskTemplateService = {
     if (nextEquipmentId) {
       resolvedEquipment = await resolveEquipmentForTemplate(
         db,
-        orgId,
         existing.locationId,
         nextEquipmentId,
       );
@@ -166,9 +155,9 @@ export const taskTemplateService = {
     }
 
     try {
-      const updated = await taskTemplateRepository.updateByIdAndOrg(
+      const updated = await taskTemplateRepository.updateByIdAndLocation(
         db,
-        orgId,
+        locationId,
         taskTemplateId,
         updates,
       );
@@ -192,10 +181,14 @@ export const taskTemplateService = {
     }
   },
 
-  async delete(db: Db, orgId: string, taskTemplateId: string): Promise<void> {
-    const deleted = await taskTemplateRepository.deleteByIdAndOrg(
+  async delete(
+    db: Db,
+    locationId: string,
+    taskTemplateId: string,
+  ): Promise<void> {
+    const deleted = await taskTemplateRepository.deleteByIdAndLocation(
       db,
-      orgId,
+      locationId,
       taskTemplateId,
     );
 

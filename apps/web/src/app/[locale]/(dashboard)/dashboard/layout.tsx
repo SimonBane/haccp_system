@@ -1,18 +1,18 @@
 import type { ReactNode } from "react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
-import { LocationProvider } from "@/features/location/location-provider";
-import { getCurrentLocation } from "@/lib/api-client";
+import { TenantProvider } from "@/features/tenant/tenant-provider";
+import { getTenantContext } from "@/lib/api-client";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: ReactNode;
 }) {
-  const location = await getCurrentLocation();
+  const tenant = await getTenantContext();
 
   return (
-    <DashboardShell>
-      <LocationProvider initialLocation={location}>{children}</LocationProvider>
-    </DashboardShell>
+    <TenantProvider initialTenant={tenant}>
+      <DashboardShell>{children}</DashboardShell>
+    </TenantProvider>
   );
 }

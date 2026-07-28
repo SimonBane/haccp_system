@@ -15,7 +15,6 @@ export const temperatureLogs = pgTable(
   "temperature_logs",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    orgId: text("org_id").notNull(),
     locationId: uuid("location_id")
       .notNull()
       .references(() => locations.id, { onDelete: "restrict" }),
@@ -42,7 +41,6 @@ export const temperatureLogs = pgTable(
     uniqueIndex("temperature_logs_task_completion_id_unique").on(
       table.taskCompletionId,
     ),
-    index("temperature_logs_org_id_idx").on(table.orgId),
     index("temperature_logs_location_id_recorded_at_idx").on(
       table.locationId,
       table.recordedAt,
