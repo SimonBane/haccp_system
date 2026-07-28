@@ -1,0 +1,38 @@
+---
+description: Use descriptive names for Drizzle migrations, not auto-generated ones
+globs: apps/api/drizzle/**,apps/api/src/core/db/schema/**
+alwaysApply: false
+---
+
+# Drizzle Migration Naming
+
+When creating migrations, always use a clear, descriptive name that explains what the migration does. Never leave drizzle-kit's auto-generated names (e.g. `random_adjective_noun`, hash suffixes, or generic placeholders).
+
+## Naming format
+
+```
+NNNN_<action>_<subject>.sql
+```
+
+- `NNNN` — zero-padded sequence number (next after the latest in `apps/api/drizzle/`)
+- `<action>` — verb: `create`, `add`, `drop`, `rename`, `alter`, `replace`, `optimize`
+- `<subject>` — snake_case description of tables/columns changed
+
+## Examples from this project
+
+| ✅ Good | ❌ Bad |
+|---------|--------|
+| `0007_create_organizations_and_replace_org_id` | `0007_wandering_fox` |
+| `0005_add_temperature_corrective_action` | `0005_migration` |
+| `0006_optimize_table_indexes` | `0008_snapshot_diff` |
+
+## Workflow
+
+1. After changing schema in `apps/api/src/core/db/schema/`, generate with an explicit name:
+   ```bash
+   cd apps/api && pnpm db:generate --name create_organizations_and_replace_org_id
+   ```
+2. If drizzle-kit already generated a file with a bad name, rename both:
+   - The `.sql` file in `apps/api/drizzle/`
+   - The `tag` in `apps/api/drizzle/meta/_journal.json` (must match the filename without `.sql`)
+3. Keep names specific enough to understand the migration without opening the file.
