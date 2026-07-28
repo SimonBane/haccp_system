@@ -382,6 +382,7 @@
     "en": "English"
   },
   "LocationPicker": {
+    "label": "Location",
     "placeholder": "Select location",
     "default": "default"
   },

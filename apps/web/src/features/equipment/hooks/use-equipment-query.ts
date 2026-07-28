@@ -9,11 +9,17 @@ import { queryKeys } from "@/lib/api/query-keys";
 
 type UseEquipmentQueryOptions = {
   initialData?: EquipmentResponse[];
+  initialLocationId?: string;
 };
 
 export function useEquipmentQuery(options?: UseEquipmentQueryOptions) {
   const { locationId } = useLocation();
   const { fetchJson } = useAuthenticatedFetch();
+
+  const initialData =
+    options?.initialData && locationId === options.initialLocationId
+      ? options.initialData
+      : undefined;
 
   return useQuery({
     queryKey: queryKeys.equipment(locationId),
@@ -21,7 +27,7 @@ export function useEquipmentQuery(options?: UseEquipmentQueryOptions) {
       const response = await fetchJson("/equipment", equipmentListResponseSchema);
       return response.items;
     },
-    initialData: options?.initialData,
+    initialData,
   });
 }
 

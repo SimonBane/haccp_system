@@ -9,11 +9,17 @@ import { queryKeys } from "@/lib/api/query-keys";
 
 type UseTaskTemplatesQueryOptions = {
   initialData?: TaskTemplateResponse[];
+  initialLocationId?: string;
 };
 
 export function useTaskTemplatesQuery(options?: UseTaskTemplatesQueryOptions) {
   const { locationId } = useLocation();
   const { fetchJson } = useAuthenticatedFetch();
+
+  const initialData =
+    options?.initialData && locationId === options.initialLocationId
+      ? options.initialData
+      : undefined;
 
   return useQuery({
     queryKey: queryKeys.taskTemplates(locationId),
@@ -24,6 +30,6 @@ export function useTaskTemplatesQuery(options?: UseTaskTemplatesQueryOptions) {
       );
       return response.items;
     },
-    initialData: options?.initialData,
+    initialData,
   });
 }

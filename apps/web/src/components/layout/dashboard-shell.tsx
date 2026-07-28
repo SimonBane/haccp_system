@@ -5,6 +5,7 @@ import { Loader2Icon } from "lucide-react";
 import type { ReactNode } from "react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { LocationQuerySync } from "@/features/tenant/location-query-sync";
 
 export function DashboardShell({ children }: { children: ReactNode }) {
   const { isLoaded } = useAuth();
@@ -19,6 +20,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
 
   return (
     <SidebarProvider>
+      <LocationQuerySync />
       <AppSidebar />
       <SidebarInset>{children}</SidebarInset>
     </SidebarProvider>
