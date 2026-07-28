@@ -8,11 +8,11 @@ import {
   Building2Icon,
   CalendarDaysIcon,
   ListChecksIcon,
-  MapPinIcon,
   ShieldCheckIcon,
   ThermometerSnowflakeIcon,
 } from "lucide-react";
 import { useMemo } from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { NavMain } from "@/components/layout/nav-main";
 import { NavUser } from "@/components/layout/nav-user";
 import { useTenant } from "@/features/tenant/tenant-provider";
@@ -34,6 +34,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const isAdmin = orgRole === "org:admin";
 
+  const organizationInitials = useMemo(() => {
+    const parts = organization.name.trim().split(/\s+/).filter(Boolean);
+
+    if (parts.length === 0) {
+      return "?";
+    }
+
+    if (parts.length === 1) {
+      return parts[0].slice(0, 2).toUpperCase();
+    }
+
+    return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+  }, [organization.name]);
+
   const platformNav = useMemo(
     () => [
       {
@@ -47,13 +61,24 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   );
 
   const adminNav = useMemo(() => {
-    const items = [
-      {
-        title: t("nav.organization"),
-        url: "/dashboard/settings",
-        icon: <Building2Icon />,
-        isActive: pathname.startsWith("/dashboard/settings"),
-      },
+    const organizationNav = {
+      title: t("nav.organization"),
+      url: "/dashboard/organization",
+      icon: <Building2Icon />,
+      isActive: pathname === "/dashboard/organization",
+      items: organization.multipleLocationsEnabled
+        ? [
+            {
+              title: t("nav.locations"),
+              url: "/dashboard/organization/locations",
+              isActive: pathname.startsWith("/dashboard/organization/locations"),
+            },
+          ]
+        : undefined,
+    };
+
+    return [
+      organizationNav,
       {
         title: t("nav.tasks"),
         url: "/dashboard/task-templates",
@@ -67,17 +92,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         isActive: pathname.startsWith("/dashboard/equipment"),
       },
     ];
-
-    if (organization.multipleLocationsEnabled) {
-      items.push({
-        title: t("nav.locations"),
-        url: "/dashboard/locations",
-        icon: <MapPinIcon />,
-        isActive: pathname.startsWith("/dashboard/locations"),
-      });
-    }
-
-    return items;
   }, [organization.multipleLocationsEnabled, pathname, t]);
 
   return (
@@ -89,12 +103,25 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               size="lg"
               className="pointer-events-none cursor-default hover:bg-transparent active:bg-transparent"
             >
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                <ShieldCheckIcon className="size-4" />
+              <div className="flex aspect-square size-8 items-center justify-center overflow-hidden rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                {organization.hasImage ? (
+                  <Avatar className="size-8 rounded-lg after:rounded-lg">
+                    <AvatarImage
+                      src={organization.imageUrl}
+                      alt={organization.name}
+                      className="rounded-lg"
+                    />
+                    <AvatarFallback className="rounded-lg text-xs">
+                      {organizationInitials}
+                    </AvatarFallback>
+                  </Avatar>
+                ) : (
+                  <ShieldCheckIcon className="size-4" />
+                )}
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{t("brandName")}</span>
-                <span className="truncate text-xs">{t("brandPlan")}</span>
+                <span className="truncate text-xs">{organization.name}</span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>

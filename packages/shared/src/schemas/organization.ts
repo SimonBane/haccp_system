@@ -6,6 +6,8 @@ export const organizationResponseSchema = z.object({
   id: z.string().uuid(),
   clerkOrgId: z.string(),
   name: z.string(),
+  imageUrl: z.string(),
+  hasImage: z.boolean(),
   timezone: z.string(),
   locale: organizationLocaleSchema,
   multipleLocationsEnabled: z.boolean(),
@@ -17,6 +19,7 @@ export type OrganizationResponse = z.infer<typeof organizationResponseSchema>;
 
 export const updateOrganizationSchema = z
   .object({
+    name: z.string().trim().min(1).max(256).optional(),
     timezone: z.string().min(1).optional(),
     locale: organizationLocaleSchema.optional(),
     multipleLocationsEnabled: z.boolean().optional(),

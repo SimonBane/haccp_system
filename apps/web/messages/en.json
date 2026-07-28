@@ -387,14 +387,14 @@
     "default": "default"
   },
   "LocationsPage": {
-    "breadcrumbSettings": "Settings",
+    "breadcrumbOrganization": "Organization",
     "breadcrumb": "Locations",
     "title": "Locations",
     "description": "Manage sites for your organization and choose which location is the default.",
     "emptyTitle": "No locations yet",
     "searchPlaceholder": "Search locations",
-    "add": "Add location",
-    "addTitle": "Add location",
+    "add": "Add",
+    "addTitle": "Add",
     "addDescription": "Create a new site for your organization.",
     "editTitle": "Rename location",
     "editDescription": "Update the location name.",
@@ -440,21 +440,53 @@
     }
   },
   "SettingsPage": {
-    "breadcrumbSettings": "Settings",
     "breadcrumb": "Organization",
-    "title": "Organization settings",
-    "description": "Configure timezone, locale, and location options for your organization.",
-    "organizationName": "Organization name",
+    "title": "Organization",
+    "description": "Manage your organization identity, regional preferences, and location settings.",
+    "name": "Name",
+    "logo": "Logo",
+    "changeLogo": "Change logo",
+    "removeLogo": "Remove logo",
+    "removeLogoConfirm": "This will remove your organization logo. You can upload a new one at any time.",
+    "removeLogoCancel": "Cancel",
+    "removeLogoConfirmAction": "Remove",
+    "logoHint": "Recommend size 1:1, up to 2mb",
+    "logoUploading": "Uploading…",
     "timezone": "Timezone",
-    "locale": "Locale",
+    "timezonePlaceholder": "Search timezones…",
+    "timezoneEmpty": "No timezone found.",
+    "locale": "Default locale",
     "localeBg": "Bulgarian",
     "localeEn": "English",
     "multipleLocations": "Multiple locations",
-    "multipleLocationsDescription": "Enable managing more than one site and switching between them.",
-    "save": "Save changes",
-    "saved": "Settings saved.",
+    "multipleLocationsDescription": "Allow your organization to manage multiple sites.",
+    "multipleLocationsDisableWarningTitle": "Cannot disable multiple locations",
+    "multipleLocationsDisableWarningDescription": "You can't turn this off until there is only one location remaining.",
+    "cancel": "Cancel",
+    "save": "Save",
+    "sections": {
+      "general": {
+        "title": "General",
+        "description": "Your organization's identity."
+      },
+      "regional": {
+        "title": "Regional preferences",
+        "description": "Timezone and default language for your organization."
+      },
+      "locations": {
+        "title": "Locations",
+        "description": "Control whether your organization can manage multiple sites."
+      }
+    },
+    "toast": {
+      "saved": "Organization settings saved.",
+      "logoSaved": "Organization logo updated.",
+      "logoRemoved": "Organization logo removed."
+    },
     "errors": {
-      "generic": "Something went wrong. Please try again."
+      "generic": "Something went wrong. Please try again.",
+      "invalidLogoType": "Logo must be a JPG, PNG, GIF, or WebP image.",
+      "logoTooLarge": "Logo must be 2 MB or smaller."
     }
   }
 }

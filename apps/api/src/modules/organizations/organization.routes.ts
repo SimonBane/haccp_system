@@ -8,7 +8,7 @@ import {
   errorResponse,
   jsonResponse,
 } from "../../core/openapi/route-factory.js";
-import { ForbiddenError } from "../../core/errors/app-errors.js";
+import { ForbiddenError, ValidationError } from "../../core/errors/app-errors.js";
 import { getDb, requireOrgContext } from "../../lib/context.js";
 import { organizationService } from "./organization.service.js";
 import type { AppEnv } from "../../types.js";
@@ -53,6 +53,42 @@ organizationRoutes.openapi(patchCurrentRoute, async (c) => {
     clerkOrgId,
     input,
   );
+
+  return c.json(updated, 200);
+});
+
+function requireAdmin(c: Parameters<typeof organizationRoutes.get>[1] extends infer H ? H : never) {
+  if (c.get("orgRole") !== "org:admin") {
+    throw new ForbiddenError("Admin access required");
+  }
+}
+
+organizationRoutes.put("/current/logo", async (c) => {
+  requireAdmin(c);
+
+  const { clerkOrgId, userId } = requireOrgContext(c);
+  const body = await c.req.parseBody();
+  const file = body.file;
+
+  if (!(file instanceof File)) {
+    throw new ValidationError("Logo file is required");
+  }
+
+  const updated = await organizationService.uploadLogo(
+    getDb(c),
+    clerkOrgId,
+    userId,
+    file,
+  );
+
+  return c.json(updated, 200);
+});
+
+organizationRoutes.delete("/current/logo", async (c) => {
+  requireAdmin(c);
+
+  const { clerkOrgId } = requireOrgContext(c);
+  const updated = await organizationService.deleteLogo(getDb(c), clerkOrgId);
 
   return c.json(updated, 200);
 });
