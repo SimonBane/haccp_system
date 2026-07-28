@@ -1,0 +1,77 @@
+---
+description: Clean, performant API code — minimal DB roundtrips, no N+1, optimal queries
+globs: apps/api/src/**/*.ts
+alwaysApply: false
+---
+
+# API Clean Code & Performance
+
+When writing routes, services, or repositories, prioritize readability, simplicity, and performance. Prefer the simplest correct solution; optimize for fewer DB roundtrips and sound algorithmic complexity.
+
+## Layer responsibilities
+
+- **Routes**: HTTP concerns only — parse input, call service, map response. No business logic or direct DB access.
+- **Services**: Orchestrate use cases, enforce business rules, coordinate repositories. Keep methods focused and named after domain actions.
+- **Repositories**: All SQL/Drizzle queries live here. Return only the columns needed; push filtering, sorting, and aggregation to the database.
+
+## Database performance
+
+- **Minimize roundtrips**: Batch related reads/writes. One query with a join or `IN (...)` beats N sequential lookups.
+- **Avoid N+1**: Never fetch a list then loop with per-item queries. Use joins, subqueries, or batched `whereIn` instead.
+- **Select only what you need**: Avoid `select *` when a subset of columns suffices.
+- **Filter in SQL**: Apply `where`, `orderBy`, `limit`, and counts in the query — not in application memory after over-fetching.
+- **Use transactions** when multiple writes must succeed or fail together.
+- **Index-aware queries**: Structure `where`/`join` conditions to match existing indexes; avoid functions on indexed columns that prevent index use.
+
+## Algorithm & memory
+
+- Prefer O(n) single-pass transforms over nested loops when processing collections.
+- Build lookup maps (`Map`, `Record`) once when joining in-memory data from two query results — O(n + m), not O(n × m).
+- Do not load unbounded result sets; paginate or stream when lists can grow large.
+
+## Clean code
+
+- Name functions after what they do (`findManyByLocation`, `assertLocationBelongsToOrganization`).
+- Extract non-obvious query logic into the repository; keep services readable at a glance.
+- Reuse existing repository methods instead of duplicating queries.
+- Handle errors at the service layer with domain errors; let repositories stay thin and throw only on DB failures.
+
+## Examples
+
+```typescript
+// ❌ BAD — N+1: one query per item
+const items = await repo.findMany(db, locationId);
+const enriched = await Promise.all(
+  items.map(async (item) => ({
+    ...item,
+    location: await locationRepo.findById(db, item.locationId),
+  })),
+);
+
+// ✅ GOOD — single query with join or batched lookup
+const rows = await repo.findManyWithLocation(db, locationId);
+// or: const locations = await locationRepo.findByIds(db, ids);
+```
+
+```typescript
+// ❌ BAD — two roundtrips for a check + update
+const existing = await repo.findById(db, id);
+if (!existing) throw new NotFoundError();
+await repo.update(db, id, input);
+
+// ✅ GOOD — one conditional update, check affected rows
+const updated = await repo.updateById(db, id, input);
+if (!updated) throw new NotFoundError();
+```
+
+```typescript
+// ❌ BAD — business logic and SQL mixed in a route handler
+app.get("/equipment", async (c) => {
+  const rows = await db.select().from(equipment).where(...);
+  return c.json(rows.filter((r) => r.active));
+});
+
+// ✅ GOOD — route delegates to service; repository owns the query
+const result = await equipmentService.list(db, locationId);
+return c.json(result);
+```
