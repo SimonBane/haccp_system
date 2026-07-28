@@ -34,9 +34,11 @@ import { useTodayQuery } from "./hooks/use-today-query";
 export function TodayView({
   initialData,
   initialDate,
+  initialLocationId,
 }: {
   initialData: TodayResponse;
   initialDate: string;
+  initialLocationId: string;
 }) {
   const t = useTranslations("TodayPage");
   const locale = useLocale();
@@ -61,6 +63,7 @@ export function TodayView({
     refetch,
   } = useTodayQuery(selectedDate, {
     initialData: selectedDate === initialDate ? initialData : undefined,
+    initialLocationId,
   });
 
   const { completeTask, uncompleteTask, completeTemperatureTask } =

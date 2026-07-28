@@ -2,14 +2,16 @@
 
 import { useTranslations } from "next-intl";
 import { MapPinIcon } from "lucide-react";
-import { useTenant } from "@/features/tenant/tenant-provider";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useTenant } from "@/features/tenant/tenant-provider";
 
 export function LocationPickerSlot() {
   const { organization } = useTenant();
@@ -23,35 +25,50 @@ export function LocationPickerSlot() {
 
 export function LocationPicker() {
   const t = useTranslations("LocationPicker");
-  const { locations, locationId, setCurrentLocation } = useTenant();
+  const { locations, locationId, currentLocation, setCurrentLocation } =
+    useTenant();
 
   if (locations.length <= 1) {
     return null;
   }
 
   return (
-    <div className="flex items-center gap-2 px-4">
-      <MapPinIcon className="size-4 shrink-0 text-muted-foreground" />
-      <Select
-        value={locationId}
-        onValueChange={(value) => {
-          if (value) {
-            setCurrentLocation(value);
+    <div className="mr-4">
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <button
+              type="button"
+              className="flex cursor-pointer items-center gap-2 rounded-md px-4 py-2 text-sm hover:bg-accent/50 aria-expanded:bg-accent data-expanded:bg-accent"
+            />
           }
-        }}
-      >
-        <SelectTrigger className="w-full max-w-[220px]">
-          <SelectValue placeholder={t("placeholder")} />
-        </SelectTrigger>
-        <SelectContent>
-          {locations.map((location) => (
-            <SelectItem key={location.id} value={location.id}>
-              {location.name}
-              {location.isDefault ? ` (${t("default")})` : ""}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        >
+          <MapPinIcon className="size-4 shrink-0 text-muted-foreground" />
+          <span className="max-w-[220px] truncate font-medium">
+            {currentLocation.name}
+          </span>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" sideOffset={4} className="min-w-48">
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>{t("label")}</DropdownMenuLabel>
+            <DropdownMenuRadioGroup
+              value={locationId}
+              onValueChange={(value) => {
+                if (value) {
+                  setCurrentLocation(value);
+                }
+              }}
+            >
+              {locations.map((location) => (
+                <DropdownMenuRadioItem key={location.id} value={location.id}>
+                  {location.name}
+                  {location.isDefault ? ` (${t("default")})` : ""}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

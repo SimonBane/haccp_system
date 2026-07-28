@@ -382,6 +382,7 @@
     "en": "English"
   },
   "LocationPicker": {
+    "label": "Локация",
     "placeholder": "Изберете локация",
     "default": "основна"
   },

@@ -1,5 +1,5 @@
 import { type Locale } from "@/i18n/routing";
-import { getToday } from "@/lib/api-client";
+import { getTenantContext, getToday } from "@/lib/api-client";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { DashboardPageHeader } from "@/components/layout/dashboard-page-header";
 import { TodayView } from "@/features/today/today-view";
@@ -15,6 +15,7 @@ export default async function DashboardPage({
   const tDashboard = await getTranslations("DashboardPage");
   const tToday = await getTranslations("TodayPage");
 
+  const tenant = await getTenantContext();
   const today = await getToday();
 
   return (
@@ -26,7 +27,11 @@ export default async function DashboardPage({
         ]}
       />
       <div className="flex flex-1 flex-col">
-        <TodayView initialData={today} initialDate={today.date} />
+        <TodayView
+          initialData={today}
+          initialDate={today.date}
+          initialLocationId={tenant.currentLocation.id}
+        />
       </div>
     </>
   );

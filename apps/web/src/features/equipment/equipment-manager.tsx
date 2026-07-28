@@ -23,11 +23,18 @@ import { getErrorMessage } from "@/lib/api/get-error-message";
 
 type EquipmentManagerProps = {
   initialItems: EquipmentResponse[];
+  initialLocationId: string;
 };
 
-export function EquipmentManager({ initialItems }: EquipmentManagerProps) {
+export function EquipmentManager({
+  initialItems,
+  initialLocationId,
+}: EquipmentManagerProps) {
   const t = useTranslations("EquipmentPage");
-  const { data: items = [], refetch } = useEquipmentQuery({ initialData: initialItems });
+  const { data: items = [], refetch } = useEquipmentQuery({
+    initialData: initialItems,
+    initialLocationId,
+  });
   const { create, update, remove } = useEquipmentMutations();
 
   const [formOpen, setFormOpen] = useState(false);

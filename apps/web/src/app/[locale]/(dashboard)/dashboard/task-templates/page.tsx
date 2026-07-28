@@ -1,5 +1,5 @@
 import { type Locale } from "@/i18n/routing";
-import { listTaskTemplates } from "@/lib/api-client";
+import { getTenantContext, listTaskTemplates } from "@/lib/api-client";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { DashboardPageHeader } from "@/components/layout/dashboard-page-header";
 import { TaskTemplatesManager } from "@/features/task-templates/task-templates-manager";
@@ -14,6 +14,7 @@ export default async function TaskTemplatesPage({
 
   const t = await getTranslations("TasksPage");
 
+  const tenant = await getTenantContext();
   const taskTemplates = await listTaskTemplates();
 
   return (
@@ -25,7 +26,10 @@ export default async function TaskTemplatesPage({
         ]}
       />
       <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-        <TaskTemplatesManager initialItems={taskTemplates.items} />
+        <TaskTemplatesManager
+          initialItems={taskTemplates.items}
+          initialLocationId={tenant.currentLocation.id}
+        />
       </div>
     </>
   );

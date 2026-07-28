@@ -24,13 +24,18 @@ import { getErrorMessage } from "@/lib/api/get-error-message";
 
 type TaskTemplatesManagerProps = {
   initialItems: TaskTemplateResponse[];
+  initialLocationId: string;
 };
 
 export function TaskTemplatesManager({
   initialItems,
+  initialLocationId,
 }: TaskTemplatesManagerProps) {
   const t = useTranslations("TasksPage");
-  const { data: items = [], refetch } = useTaskTemplatesQuery({ initialData: initialItems });
+  const { data: items = [], refetch } = useTaskTemplatesQuery({
+    initialData: initialItems,
+    initialLocationId,
+  });
   const equipment = useEquipmentOptions();
   const { create, update, remove } = useTaskTemplatesMutations();
 
