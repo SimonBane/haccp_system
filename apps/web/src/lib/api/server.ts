@@ -1,11 +1,13 @@
 import "server-only";
 
 import {
+  employeeListResponseSchema,
   equipmentListResponseSchema,
   locationListResponseSchema,
   taskTemplateListResponseSchema,
   tenantContextResponseSchema,
   todayResponseSchema,
+  type EmployeeListResponse,
   type EquipmentListResponse,
   type LocationListResponse,
   type TaskTemplateListResponse,
@@ -76,6 +78,10 @@ export async function getTenantContext(): Promise<TenantContextResponse> {
 
 export async function listLocations(): Promise<LocationListResponse> {
   return fetchJson("/locations", locationListResponseSchema);
+}
+
+export async function listEmployees(): Promise<EmployeeListResponse> {
+  return fetchJson("/employees", employeeListResponseSchema);
 }
 
 export async function listEquipment(): Promise<EquipmentListResponse> {

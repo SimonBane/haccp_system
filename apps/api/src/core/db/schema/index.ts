@@ -1,4 +1,7 @@
 export * from "./organizations.js";
+export * from "./users.js";
+export * from "./organization-memberships.js";
+export * from "./organization-member-locations.js";
 export * from "./locations.js";
 export * from "./equipment.js";
 export * from "./task-templates.js";

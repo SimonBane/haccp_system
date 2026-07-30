@@ -62,6 +62,20 @@ export const organizationRepository = {
     return updated ?? null;
   },
 
+  async updateByClerkOrgId(
+    db: Db,
+    clerkOrgId: string,
+    updates: Partial<typeof organizations.$inferInsert>,
+  ) {
+    const [updated] = await db
+      .update(organizations)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(organizations.clerkOrgId, clerkOrgId))
+      .returning();
+
+    return updated ?? null;
+  },
+
   async softDeleteByClerkOrgId(db: Db, clerkOrgId: string) {
     const [updated] = await db
       .update(organizations)

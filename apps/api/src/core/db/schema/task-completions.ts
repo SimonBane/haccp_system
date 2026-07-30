@@ -9,6 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { locations } from "./locations.js";
 import { taskTemplates } from "./task-templates.js";
+import { users } from "./users.js";
 
 export const taskCompletions = pgTable(
   "task_completions",
@@ -24,7 +25,9 @@ export const taskCompletions = pgTable(
     scheduledTime: text("scheduled_time").notNull(),
     completedAt: timestamp("completed_at", { withTimezone: true })
       .notNull(),
-    completedBy: text("completed_by").notNull(),
+    completedByUserId: uuid("completed_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),

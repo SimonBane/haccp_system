@@ -4,12 +4,16 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 config({ path: resolve(dirname(fileURLToPath(import.meta.url)), ".env") });
+config({
+  path: resolve(dirname(fileURLToPath(import.meta.url)), ".env.local"),
+  override: true,
+});
 
 const directDatabaseUrl = process.env.DIRECT_DATABASE_URL;
 
 if (!directDatabaseUrl) {
   throw new Error(
-    "DIRECT_DATABASE_URL is not set. Copy apps/api/.env.example to apps/api/.env and set your Supabase database password.",
+    "DIRECT_DATABASE_URL is not set. Copy apps/api/.env.example to apps/api/.env and set DIRECT_DATABASE_URL (or use local Docker URLs in .env.local).",
   );
 }
 

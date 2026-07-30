@@ -65,16 +65,27 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       title: t("nav.organization"),
       url: "/dashboard/organization",
       icon: <Building2Icon />,
-      isActive: pathname === "/dashboard/organization",
-      items: organization.multipleLocationsEnabled
-        ? [
-            {
-              title: t("nav.locations"),
-              url: "/dashboard/organization/locations",
-              isActive: pathname.startsWith("/dashboard/organization/locations"),
-            },
-          ]
-        : undefined,
+      isActive:
+        pathname === "/dashboard/organization" ||
+        pathname.startsWith("/dashboard/organization/"),
+      items: [
+        {
+          title: t("nav.employees"),
+          url: "/dashboard/organization/employees",
+          isActive: pathname.startsWith("/dashboard/organization/employees"),
+        },
+        ...(organization.multipleLocationsEnabled
+          ? [
+              {
+                title: t("nav.locations"),
+                url: "/dashboard/organization/locations",
+                isActive: pathname.startsWith(
+                  "/dashboard/organization/locations",
+                ),
+              },
+            ]
+          : []),
+      ],
     };
 
     return [

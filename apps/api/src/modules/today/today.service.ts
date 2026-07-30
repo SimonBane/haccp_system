@@ -17,7 +17,9 @@ export const todayService = {
   async getToday(
     db: Db,
     locationId: string,
+    organizationId: string,
     date: string,
+    currentUserId: string,
   ): Promise<TodayResponse> {
     const weekday = getWeekdayFromDate(date);
     const now = new Date();
@@ -31,6 +33,7 @@ export const todayService = {
       todayRepository.findCompletionsWithTemperatureLogs(
         db,
         locationId,
+        organizationId,
         date,
       ),
     ]);
@@ -90,6 +93,7 @@ export const todayService = {
     return {
       date,
       locationId,
+      currentUserId,
       sections: {
         morning: sortItemsByScheduledTime(sections.morning),
         afternoon: sortItemsByScheduledTime(sections.afternoon),

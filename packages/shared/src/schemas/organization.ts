@@ -17,9 +17,16 @@ export const organizationResponseSchema = z.object({
 
 export type OrganizationResponse = z.infer<typeof organizationResponseSchema>;
 
+export const updateOrganizationNameSchema = z.object({
+  name: z.string().trim().min(1).max(256),
+});
+
+export type UpdateOrganizationNameInput = z.infer<
+  typeof updateOrganizationNameSchema
+>;
+
 export const updateOrganizationSchema = z
   .object({
-    name: z.string().trim().min(1).max(256).optional(),
     timezone: z.string().min(1).optional(),
     locale: organizationLocaleSchema.optional(),
     multipleLocationsEnabled: z.boolean().optional(),

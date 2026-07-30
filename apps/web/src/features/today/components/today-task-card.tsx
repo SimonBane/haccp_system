@@ -28,6 +28,13 @@ type Props = {
   onRecordTemperature: (task: TodayTaskItem) => void;
 };
 
+function formatUserName(
+  user: NonNullable<TodayTaskItem["completedBy"]>,
+): string {
+  const parts = [user.firstName, user.lastName].filter(Boolean);
+  return parts.length > 0 ? parts.join(" ") : user.id.slice(-6);
+}
+
 function taskTypeLabel(
   type: TodayTaskItem["type"],
   t: ReturnType<typeof useTranslations<"TodayPage">>,
@@ -190,11 +197,9 @@ export const TodayTaskCard = memo(function TodayTaskCard({
       ? t("audit.completed", {
           time: formatCompletionTime(task.completedAt, locale),
           user:
-            task.completedBy === currentUserId
+            task.completedBy.id === currentUserId
               ? t("audit.you")
-              : t("audit.employee", {
-                  id: task.completedBy.slice(-6),
-                }),
+              : formatUserName(task.completedBy),
         })
       : null;
 

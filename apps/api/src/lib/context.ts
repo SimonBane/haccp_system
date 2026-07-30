@@ -11,15 +11,21 @@ import type {
 export function requireOrgContext(c: Context<AppEnv>) {
   const clerkOrgId = c.get("orgId");
   const organizationId = c.get("organizationId");
+  const userDbId = c.get("userDbId");
 
   if (!clerkOrgId || !organizationId) {
     throw new InternalError("Organization context is not resolved");
+  }
+
+  if (!userDbId) {
+    throw new InternalError("User context is not resolved");
   }
 
   return {
     clerkOrgId,
     organizationId,
     userId: c.get("userId")!,
+    userDbId,
   };
 }
 

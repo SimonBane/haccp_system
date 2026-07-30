@@ -363,7 +363,8 @@
       "organization": "Организация",
       "tasks": "Задачи",
       "equipment": "Хладилна техника",
-      "locations": "Локации"
+      "locations": "Локации",
+      "employees": "Служители"
     },
     "userMenu": {
       "account": "Акаунт",
@@ -434,6 +435,82 @@
     "validation": {
       "nameRequired": "Името е задължително.",
       "nameMaxLength": "Името трябва да е най-много 100 символа."
+    },
+    "errors": {
+      "generic": "Нещо се обърка. Опитайте отново."
+    }
+  },
+  "EmployeesPage": {
+    "breadcrumbOrganization": "Организация",
+    "breadcrumb": "Служители",
+    "title": "Служители",
+    "description": "Управлявайте членовете на организацията, поканите и достъпа до локации.",
+    "emptyTitle": "Все още няма служители",
+    "searchPlaceholder": "Търсене на служители",
+    "add": "Добави служител",
+    "addTitle": "Добави служител",
+    "addDescription": "Добавете служител към организацията.",
+    "editTitle": "Редактирай служител",
+    "editDescription": "Обновете данните на служителя и назначените локации.",
+    "emailLabel": "Имейл",
+    "emailPlaceholder": "slujitel@example.com",
+    "firstNameLabel": "Име",
+    "firstNamePlaceholder": "Име",
+    "lastNameLabel": "Фамилия",
+    "lastNamePlaceholder": "Фамилия",
+    "roleLabel": "Роля",
+    "rolePlaceholder": "Изберете роля",
+    "locationsLabel": "Локации",
+    "locationsDescription": "Изберете до кои локации има достъп този служител.",
+    "locationsPlaceholder": "Изберете локации",
+    "locationsEmpty": "Няма намерени локации.",
+    "noLocationsAvailable": "Все още няма налични локации.",
+    "noLocations": "Няма локации",
+    "noLocationsWarning": "Този служител няма да има достъп до локация, докато не бъде назначена поне една.",
+    "save": "Запази",
+    "saveAndInvite": "Запази и покани",
+    "cancel": "Отказ",
+    "edit": "Редактирай",
+    "delete": "Изтрий",
+    "sendInvitation": "Изпрати покана",
+    "revokeInvitation": "Отмени поканата",
+    "openMenu": "Отвори меню",
+    "status": {
+      "draft": "Чернова",
+      "invited": "Поканен",
+      "active": "Активен"
+    },
+    "roles": {
+      "admin": "Администратор",
+      "member": "Служител"
+    },
+    "columns": {
+      "employee": "Служител",
+      "status": "Статус",
+      "role": "Роля",
+      "locations": "Локации"
+    },
+    "deleteDialog": {
+      "title": "Изтрий служител",
+      "confirm": "Да се изтрие ли {email}? Това действие е необратимо.",
+      "fallback": "Това ще изтрие окончателно записа за служителя.",
+      "cancel": "Отказ",
+      "confirmAction": "Изтрий"
+    },
+    "toast": {
+      "createSuccess": "Служителят беше запазен.",
+      "createInviteSuccess": "Служителят беше запазен и поканата беше изпратена.",
+      "updateSuccess": "Служителят беше обновен.",
+      "inviteSuccess": "Поканата беше изпратена.",
+      "revokeSuccess": "Поканата беше отменена.",
+      "deleteSuccess": "Служителят беше изтрит."
+    },
+    "validation": {
+      "emailInvalid": "Въведете валиден имейл адрес.",
+      "firstNameRequired": "Името е задължително.",
+      "lastNameRequired": "Фамилията е задължителна.",
+      "roleRequired": "Изберете роля.",
+      "locationsRequired": "Изберете поне една локация."
     },
     "errors": {
       "generic": "Нещо се обърка. Опитайте отново."

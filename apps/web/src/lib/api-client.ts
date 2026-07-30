@@ -2,6 +2,7 @@ export {
   fetchApi,
   getTenantContext,
   getToday,
+  listEmployees,
   listEquipment,
   listLocations,
   listTaskTemplates,

@@ -1,7 +1,6 @@
 "use client";
 
 import type { TodayResponse, TodayTaskItem } from "@haccp/shared";
-import { useAuth } from "@clerk/nextjs";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -42,7 +41,6 @@ export function TodayView({
 }) {
   const t = useTranslations("TodayPage");
   const locale = useLocale();
-  const { userId } = useAuth();
   const now = useNow();
 
   const todayDate = useMemo(() => localTodayDate(), []);
@@ -305,7 +303,9 @@ export function TodayView({
                 completedCount={completedCount}
                 now={now}
                 pendingKey={pendingKey}
-                currentUserId={userId ?? null}
+                currentUserId={
+                  response?.currentUserId ?? initialData.currentUserId
+                }
                 onFilterChange={setFilter}
                 onComplete={handleComplete}
                 onUndo={handleUndo}

@@ -8,6 +8,7 @@ import {
   taskTemplateWeekdaySchema,
   TASK_TEMPLATE_WEEKDAYS,
 } from "./task-template.js";
+import { userSummarySchema } from "./user.js";
 
 export const todayTaskStatusSchema = z.enum([
   "pending",
@@ -50,7 +51,7 @@ export const todayTaskItemSchema = z.object({
   date: isoDateSchema,
   status: todayTaskStatusSchema,
   completedAt: z.string().datetime().nullable(),
-  completedBy: z.string().nullable(),
+  completedBy: userSummarySchema.nullable(),
   temperatureReading: todayTaskTemperatureReadingSchema,
 });
 
@@ -59,6 +60,7 @@ export type TodayTaskItem = z.infer<typeof todayTaskItemSchema>;
 export const todayResponseSchema = z.object({
   date: isoDateSchema,
   locationId: z.string().uuid(),
+  currentUserId: z.string().uuid(),
   sections: z.object({
     morning: z.array(todayTaskItemSchema),
     afternoon: z.array(todayTaskItemSchema),
@@ -166,7 +168,7 @@ export function buildTodayTaskItem(params: {
   scheduledTime: TodayTaskItem["scheduledTime"];
   date: TodayTaskItem["date"];
   completedAt: string | null;
-  completedBy: string | null;
+  completedBy: z.infer<typeof userSummarySchema> | null;
   now: Date;
   temperatureReading?: TodayTaskItem["temperatureReading"];
 }): TodayTaskItem {

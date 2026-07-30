@@ -57,6 +57,20 @@
       "when": 1785000000000,
       "tag": "0007_create_organizations_and_replace_org_id",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785100000000,
+      "tag": "0008_create_users_memberships_and_replace_user_refs",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785200000000,
+      "tag": "0009_add_organization_image_fields",
+      "breakpoints": true
     }
   ]
 }
