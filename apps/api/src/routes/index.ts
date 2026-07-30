@@ -3,6 +3,7 @@ import { env } from "../env.js";
 import {
   requireAuth,
   requireOrg,
+  requireOrgAdmin,
 } from "../core/middleware/auth.js";
 import { userContextMiddleware } from "../core/middleware/user-context.js";
 import { tenantContextMiddleware } from "../core/middleware/tenant-context.js";
@@ -43,10 +44,24 @@ function mountProtected(
   routes.route(path, protectedRouter);
 }
 
+function mountAdminProtected(
+  path: string,
+  moduleRoutes: OpenAPIHono<AppEnv>,
+): void {
+  const adminRouter = new OpenAPIHono<AppEnv>();
+  adminRouter.use("*", requireAuth);
+  adminRouter.use("*", userContextMiddleware);
+  adminRouter.use("*", requireOrg);
+  adminRouter.use("*", requireOrgAdmin);
+  adminRouter.use("*", tenantContextMiddleware);
+  adminRouter.route("/", moduleRoutes);
+  routes.route(path, adminRouter);
+}
+
 mountProtected("/tenant", tenantRoutes);
-mountProtected("/organizations", organizationRoutes);
-mountProtected("/employees", employeeRoutes);
-mountProtected("/locations", locationRoutes);
-mountProtected("/equipment", equipmentRoutes);
-mountProtected("/task-templates", taskTemplateRoutes);
+mountAdminProtected("/organizations", organizationRoutes);
+mountAdminProtected("/employees", employeeRoutes);
+mountAdminProtected("/locations", locationRoutes);
+mountAdminProtected("/equipment", equipmentRoutes);
+mountAdminProtected("/task-templates", taskTemplateRoutes);
 mountProtected("/today", todayRoutes);

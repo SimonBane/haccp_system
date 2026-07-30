@@ -4,10 +4,8 @@ import {
   type OpenAPIHono,
 } from "@hono/zod-openapi";
 import { uuidParamSchema } from "@haccp/shared";
-import type { Context } from "hono";
 import type { z } from "zod";
 import type { Db } from "../db/client.js";
-import { ForbiddenError } from "../errors/app-errors.js";
 import {
   getDb,
   getCurrentLocation,
@@ -19,12 +17,6 @@ import { errorResponse, jsonResponse } from "./responses.js";
 export { errorResponse, jsonResponse } from "./responses.js";
 
 const bearerSecurity = [{ Bearer: [] }];
-
-function assertOrgAdmin(c: Context<AppEnv>): void {
-  if (c.get("orgRole") !== "org:admin") {
-    throw new ForbiddenError("Admin access required");
-  }
-}
 
 type AdminCrudService<
   TCreate extends z.ZodType,
@@ -151,7 +143,6 @@ export function registerAdminCrudRoutes<
   options.router.openapi(
     createRouteDef,
     async (c) => {
-      assertOrgAdmin(c);
       const { organizationId } = requireOrgContext(c);
       const input = c.req.valid("json");
       const created = await options.service.create(
@@ -166,7 +157,6 @@ export function registerAdminCrudRoutes<
   options.router.openapi(
     updateRouteDef,
     async (c) => {
-      assertOrgAdmin(c);
       const { id: locationId } = getCurrentLocation(c);
       const { id } = c.req.valid("param");
       const input = c.req.valid("json");
@@ -183,7 +173,6 @@ export function registerAdminCrudRoutes<
   options.router.openapi(
     deleteRouteDef,
     async (c) => {
-      assertOrgAdmin(c);
       const { id: locationId } = getCurrentLocation(c);
       const { id } = c.req.valid("param");
       await options.service.delete(getDb(c), locationId, id);

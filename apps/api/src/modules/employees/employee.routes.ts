@@ -13,7 +13,6 @@ import {
   errorResponse,
   jsonResponse,
 } from "../../core/openapi/route-factory.js";
-import { ForbiddenError } from "../../core/errors/app-errors.js";
 import { getDb, requireOrgContext } from "../../lib/context.js";
 import { employeeService } from "./employee.service.js";
 import type { AppEnv } from "../../types.js";
@@ -21,12 +20,6 @@ import type { AppEnv } from "../../types.js";
 const bearerSecurity = [{ Bearer: [] }];
 
 export const employeeRoutes = new OpenAPIHono<AppEnv>();
-
-function requireAdmin(c: { get: (key: "orgRole") => string | null }) {
-  if (c.get("orgRole") !== "org:admin") {
-    throw new ForbiddenError("Admin access required");
-  }
-}
 
 const listRoute = createRoute({
   method: "get",
@@ -187,14 +180,12 @@ const deleteRouteDef = createRoute({
 });
 
 employeeRoutes.openapi(listRoute, async (c) => {
-  requireAdmin(c);
   const { organizationId } = requireOrgContext(c);
   const result = await employeeService.list(getDb(c), organizationId);
   return c.json(result, 200);
 });
 
 employeeRoutes.openapi(createRouteDef, async (c) => {
-  requireAdmin(c);
   const { clerkOrgId, organizationId, userId } = requireOrgContext(c);
   const input = c.req.valid("json");
   const created = await employeeService.create(
@@ -208,7 +199,6 @@ employeeRoutes.openapi(createRouteDef, async (c) => {
 });
 
 employeeRoutes.openapi(updateRouteDef, async (c) => {
-  requireAdmin(c);
   const { organizationId } = requireOrgContext(c);
   const { id } = c.req.valid("param");
   const input = c.req.valid("json");
@@ -222,7 +212,6 @@ employeeRoutes.openapi(updateRouteDef, async (c) => {
 });
 
 employeeRoutes.openapi(inviteRoute, async (c) => {
-  requireAdmin(c);
   const { clerkOrgId, organizationId, userId } = requireOrgContext(c);
   const { id } = c.req.valid("param");
   const updated = await employeeService.invite(
@@ -236,7 +225,6 @@ employeeRoutes.openapi(inviteRoute, async (c) => {
 });
 
 employeeRoutes.openapi(revokeInvitationRoute, async (c) => {
-  requireAdmin(c);
   const { clerkOrgId, organizationId } = requireOrgContext(c);
   const { id } = c.req.valid("param");
   const updated = await employeeService.revokeInvitation(
@@ -249,7 +237,6 @@ employeeRoutes.openapi(revokeInvitationRoute, async (c) => {
 });
 
 employeeRoutes.openapi(updateRoleRoute, async (c) => {
-  requireAdmin(c);
   const { clerkOrgId, organizationId } = requireOrgContext(c);
   const { id } = c.req.valid("param");
   const input = c.req.valid("json");
@@ -264,7 +251,6 @@ employeeRoutes.openapi(updateRoleRoute, async (c) => {
 });
 
 employeeRoutes.openapi(updateLocationsRoute, async (c) => {
-  requireAdmin(c);
   const { organizationId } = requireOrgContext(c);
   const { id } = c.req.valid("param");
   const input = c.req.valid("json");
@@ -278,7 +264,6 @@ employeeRoutes.openapi(updateLocationsRoute, async (c) => {
 });
 
 employeeRoutes.openapi(deleteRouteDef, async (c) => {
-  requireAdmin(c);
   const { clerkOrgId, organizationId } = requireOrgContext(c);
   const { id } = c.req.valid("param");
   await employeeService.remove(getDb(c), organizationId, clerkOrgId, id);

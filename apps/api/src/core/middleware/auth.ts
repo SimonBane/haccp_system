@@ -1,4 +1,5 @@
 import { verifyToken } from "@clerk/backend";
+import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
 import { env } from "../../env.js";
 import {
@@ -43,10 +44,13 @@ export const requireOrg = createMiddleware<AppEnv>(async (c, next) => {
   await next();
 });
 
-export const requireOrgAdmin = createMiddleware<AppEnv>(async (c, next) => {
+export function assertOrgAdmin(c: Context<AppEnv>): void {
   if (c.get("orgRole") !== "org:admin") {
     throw new ForbiddenError("Admin access required");
   }
+}
 
+export const requireOrgAdmin = createMiddleware<AppEnv>(async (c, next) => {
+  assertOrgAdmin(c);
   await next();
 });

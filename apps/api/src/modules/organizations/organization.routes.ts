@@ -9,7 +9,7 @@ import {
   errorResponse,
   jsonResponse,
 } from "../../core/openapi/route-factory.js";
-import { ForbiddenError, ValidationError } from "../../core/errors/app-errors.js";
+import { ValidationError } from "../../core/errors/app-errors.js";
 import { getDb, requireOrgContext } from "../../lib/context.js";
 import { organizationService } from "./organization.service.js";
 import type { AppEnv } from "../../types.js";
@@ -43,10 +43,6 @@ const patchCurrentRoute = createRoute({
 });
 
 organizationRoutes.openapi(patchCurrentRoute, async (c) => {
-  if (c.get("orgRole") !== "org:admin") {
-    throw new ForbiddenError("Admin access required");
-  }
-
   const { clerkOrgId } = requireOrgContext(c);
   const input = c.req.valid("json");
   const updated = await organizationService.updateSettings(
@@ -82,10 +78,6 @@ const patchCurrentNameRoute = createRoute({
 });
 
 organizationRoutes.openapi(patchCurrentNameRoute, async (c) => {
-  if (c.get("orgRole") !== "org:admin") {
-    throw new ForbiddenError("Admin access required");
-  }
-
   const { clerkOrgId } = requireOrgContext(c);
   const input = c.req.valid("json");
   const updated = await organizationService.updateName(
@@ -97,15 +89,7 @@ organizationRoutes.openapi(patchCurrentNameRoute, async (c) => {
   return c.json(updated, 200);
 });
 
-function requireAdmin(c: Parameters<typeof organizationRoutes.get>[1] extends infer H ? H : never) {
-  if (c.get("orgRole") !== "org:admin") {
-    throw new ForbiddenError("Admin access required");
-  }
-}
-
 organizationRoutes.put("/current/logo", async (c) => {
-  requireAdmin(c);
-
   const { clerkOrgId, userId } = requireOrgContext(c);
   const body = await c.req.parseBody();
   const file = body.file;
@@ -125,8 +109,6 @@ organizationRoutes.put("/current/logo", async (c) => {
 });
 
 organizationRoutes.delete("/current/logo", async (c) => {
-  requireAdmin(c);
-
   const { clerkOrgId } = requireOrgContext(c);
   const updated = await organizationService.deleteLogo(getDb(c), clerkOrgId);
 

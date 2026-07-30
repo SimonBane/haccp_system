@@ -11,7 +11,6 @@ import {
   errorResponse,
   jsonResponse,
 } from "../../core/openapi/route-factory.js";
-import { ForbiddenError } from "../../core/errors/app-errors.js";
 import {
   getDb,
   getTenantContext,
@@ -128,10 +127,6 @@ locationRoutes.openapi(listRoute, async (c) => {
 });
 
 locationRoutes.openapi(createRouteDef, async (c) => {
-  if (c.get("orgRole") !== "org:admin") {
-    throw new ForbiddenError("Admin access required");
-  }
-
   const { clerkOrgId, organizationId } = requireOrgContext(c);
   const input = c.req.valid("json");
   const created = await locationService.create(
@@ -144,10 +139,6 @@ locationRoutes.openapi(createRouteDef, async (c) => {
 });
 
 locationRoutes.openapi(updateRouteDef, async (c) => {
-  if (c.get("orgRole") !== "org:admin") {
-    throw new ForbiddenError("Admin access required");
-  }
-
   const { clerkOrgId, organizationId } = requireOrgContext(c);
   const { id } = c.req.valid("param");
   const input = c.req.valid("json");
@@ -162,10 +153,6 @@ locationRoutes.openapi(updateRouteDef, async (c) => {
 });
 
 locationRoutes.openapi(deleteRouteDef, async (c) => {
-  if (c.get("orgRole") !== "org:admin") {
-    throw new ForbiddenError("Admin access required");
-  }
-
   const { clerkOrgId, organizationId } = requireOrgContext(c);
   const { id } = c.req.valid("param");
   await locationService.delete(getDb(c), clerkOrgId, organizationId, id);
