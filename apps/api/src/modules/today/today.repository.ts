@@ -2,13 +2,16 @@ import { and, eq, sql } from "drizzle-orm";
 import type { Db, DbClient } from "../../core/db/client.js";
 import { taskCompletions } from "../../core/db/schema/task-completions.js";
 import { temperatureLogs } from "../../core/db/schema/temperature-logs.js";
+import { users } from "../../core/db/schema/users.js";
 import type { CompletionRecord } from "./today.mapper.js";
 
 export type CompletionWithTemperatureRow = {
   taskTemplateId: string;
   scheduledTime: string;
   completedAt: Date;
-  completedBy: string;
+  completedByUserId: string;
+  completedByFirstName: string;
+  completedByLastName: string;
   recordedC: string | null;
   minTempC: string | null;
   maxTempC: string | null;
@@ -20,6 +23,7 @@ export const todayRepository = {
   async findCompletionsWithTemperatureLogs(
     db: Db,
     locationId: string,
+    _organizationId: string,
     date: string,
   ): Promise<CompletionWithTemperatureRow[]> {
     return db
@@ -27,7 +31,9 @@ export const todayRepository = {
         taskTemplateId: taskCompletions.taskTemplateId,
         scheduledTime: taskCompletions.scheduledTime,
         completedAt: taskCompletions.completedAt,
-        completedBy: taskCompletions.completedBy,
+        completedByUserId: taskCompletions.completedByUserId,
+        completedByFirstName: users.firstName,
+        completedByLastName: users.lastName,
         recordedC: temperatureLogs.recordedC,
         minTempC: temperatureLogs.minTempC,
         maxTempC: temperatureLogs.maxTempC,
@@ -35,6 +41,7 @@ export const todayRepository = {
         correctiveAction: temperatureLogs.correctiveAction,
       })
       .from(taskCompletions)
+      .innerJoin(users, eq(taskCompletions.completedByUserId, users.id))
       .leftJoin(
         temperatureLogs,
         eq(taskCompletions.id, temperatureLogs.taskCompletionId),
@@ -123,7 +130,7 @@ export const todayRepository = {
       maxTempC: string;
       result: string;
       correctiveAction: string | null;
-      recordedBy: string;
+      recordedByUserId: string;
       recordedAt: Date;
     },
   ) {
@@ -138,7 +145,7 @@ export const todayRepository = {
           maxTempC: update.maxTempC,
           result: update.result,
           correctiveAction: update.correctiveAction,
-          recordedBy: update.recordedBy,
+          recordedByUserId: update.recordedByUserId,
           recordedAt: update.recordedAt,
         },
       })
@@ -156,7 +163,11 @@ export const todayRepository = {
       const key = `${row.taskTemplateId}|${row.scheduledTime}`;
       completionByKey.set(key, {
         completedAt: row.completedAt,
-        completedBy: row.completedBy,
+        completedBy: {
+          id: row.completedByUserId,
+          firstName: row.completedByFirstName,
+          lastName: row.completedByLastName,
+        },
         temperatureLog:
           row.recordedC !== null &&
           row.minTempC !== null &&

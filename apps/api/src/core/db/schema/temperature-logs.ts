@@ -10,6 +10,7 @@ import {
 import { taskCompletions } from "./task-completions.js";
 import { equipment } from "./equipment.js";
 import { locations } from "./locations.js";
+import { users } from "./users.js";
 
 export const temperatureLogs = pgTable(
   "temperature_logs",
@@ -32,7 +33,9 @@ export const temperatureLogs = pgTable(
     recordedAt: timestamp("recorded_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
-    recordedBy: text("recorded_by").notNull(),
+    recordedByUserId: uuid("recorded_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),

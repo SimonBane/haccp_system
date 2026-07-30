@@ -14,6 +14,7 @@ export type AppEnv = {
   Variables: {
     requestId: string;
     userId: string;
+    userDbId: string | null;
     orgId: string | null;
     orgRole: string | null;
     organizationId: string | null;

@@ -363,7 +363,8 @@
       "organization": "Organization",
       "tasks": "Tasks",
       "equipment": "Cold storage",
-      "locations": "Locations"
+      "locations": "Locations",
+      "employees": "Employees"
     },
     "userMenu": {
       "account": "Account",
@@ -434,6 +435,82 @@
     "validation": {
       "nameRequired": "Name is required.",
       "nameMaxLength": "Name must be at most 100 characters."
+    },
+    "errors": {
+      "generic": "Something went wrong. Please try again."
+    }
+  },
+  "EmployeesPage": {
+    "breadcrumbOrganization": "Organization",
+    "breadcrumb": "Employees",
+    "title": "Employees",
+    "description": "Manage organization members, invitations, and location access.",
+    "emptyTitle": "No employees yet",
+    "searchPlaceholder": "Search employees",
+    "add": "Add employee",
+    "addTitle": "Add employee",
+    "addDescription": "Add an employee to your organization.",
+    "editTitle": "Edit employee",
+    "editDescription": "Update employee details and location assignments.",
+    "emailLabel": "Email",
+    "emailPlaceholder": "employee@example.com",
+    "firstNameLabel": "First name",
+    "firstNamePlaceholder": "First name",
+    "lastNameLabel": "Last name",
+    "lastNamePlaceholder": "Last name",
+    "roleLabel": "Role",
+    "rolePlaceholder": "Select a role",
+    "locationsLabel": "Locations",
+    "locationsDescription": "Assign which locations this employee can access.",
+    "locationsPlaceholder": "Select locations",
+    "locationsEmpty": "No locations found.",
+    "noLocationsAvailable": "No locations available yet.",
+    "noLocations": "No locations",
+    "noLocationsWarning": "This employee will not have access to any location until at least one is assigned.",
+    "save": "Save",
+    "saveAndInvite": "Save and Invite",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "sendInvitation": "Send invitation",
+    "revokeInvitation": "Revoke invitation",
+    "openMenu": "Open menu",
+    "status": {
+      "draft": "Draft",
+      "invited": "Invited",
+      "active": "Active"
+    },
+    "roles": {
+      "admin": "Admin",
+      "member": "Employee"
+    },
+    "columns": {
+      "employee": "Employee",
+      "status": "Status",
+      "role": "Role",
+      "locations": "Locations"
+    },
+    "deleteDialog": {
+      "title": "Delete employee",
+      "confirm": "Delete {email}? This cannot be undone.",
+      "fallback": "This will permanently delete the employee record.",
+      "cancel": "Cancel",
+      "confirmAction": "Delete"
+    },
+    "toast": {
+      "createSuccess": "Employee was saved.",
+      "createInviteSuccess": "Employee was saved and invitation sent.",
+      "updateSuccess": "Employee was updated.",
+      "inviteSuccess": "Invitation was sent.",
+      "revokeSuccess": "Invitation was revoked.",
+      "deleteSuccess": "Employee was deleted."
+    },
+    "validation": {
+      "emailInvalid": "Enter a valid email address.",
+      "firstNameRequired": "First name is required.",
+      "lastNameRequired": "Last name is required.",
+      "roleRequired": "Select a role.",
+      "locationsRequired": "Select at least one location."
     },
     "errors": {
       "generic": "Something went wrong. Please try again."

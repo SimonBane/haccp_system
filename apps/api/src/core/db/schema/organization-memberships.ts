@@ -1,0 +1,53 @@
+import {
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
+import { organizations } from "./organizations.js";
+import { users } from "./users.js";
+
+export const MEMBERSHIP_STATUS = {
+  DRAFT: "draft",
+  INVITED: "invited",
+  ACTIVE: "active",
+} as const;
+
+export type MembershipStatus =
+  (typeof MEMBERSHIP_STATUS)[keyof typeof MEMBERSHIP_STATUS];
+
+export const organizationMemberships = pgTable(
+  "organization_memberships",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    role: text("role").notNull(),
+    status: text("status").notNull(),
+    clerkInvitationId: text("clerk_invitation_id"),
+    invitedAt: timestamp("invited_at", { withTimezone: true }),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("organization_memberships_org_user_unique").on(
+      table.organizationId,
+      table.userId,
+    ),
+  ],
+);
+
+export type OrganizationMembership =
+  typeof organizationMemberships.$inferSelect;
+export type NewOrganizationMembership =
+  typeof organizationMemberships.$inferInsert;

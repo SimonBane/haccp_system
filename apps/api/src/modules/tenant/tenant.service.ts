@@ -14,7 +14,6 @@ import {
   locationRepository,
 } from "../locations/location.repository.js";
 import { toOrganizationResponse } from "../organizations/organization.mapper.js";
-import { enrichOrganizationFromClerk } from "../organizations/organization-clerk.js";
 import { organizationRepository } from "../organizations/organization.repository.js";
 import {
   buildTenantCacheBlob,
@@ -27,6 +26,12 @@ const DEFAULT_ORG_NAME = "Organization";
 
 export type ResolvedTenant = TenantContextResponse & {
   organizationId: string;
+};
+
+type ProvisionTenantOptions = {
+  name?: string;
+  imageUrl?: string;
+  hasImage?: boolean;
 };
 
 function pickCurrentLocation(
@@ -85,12 +90,8 @@ async function loadTenantFromDb(
     return null;
   }
 
-  const organization = await enrichOrganizationFromClerk(
-    toOrganizationResponse(tenant.organization),
-  );
-
   return buildTenantCacheBlob(
-    organization,
+    toOrganizationResponse(tenant.organization),
     tenant.locations.map(toLocationResponse),
   );
 }
@@ -99,8 +100,14 @@ export const tenantService = {
   async provisionTenant(
     db: Db,
     clerkOrgId: string,
-    name = DEFAULT_ORG_NAME,
+    options: ProvisionTenantOptions = {},
   ): Promise<TenantCacheBlob> {
+    const {
+      name = DEFAULT_ORG_NAME,
+      imageUrl = "",
+      hasImage = false,
+    } = options;
+
     let organization = await organizationRepository.findByClerkOrgId(
       db,
       clerkOrgId,
@@ -119,6 +126,8 @@ export const tenantService = {
       organization = await organizationRepository.insert(db, {
         clerkOrgId,
         name,
+        imageUrl,
+        hasImage,
       });
 
       if (!organization) {
@@ -146,7 +155,7 @@ export const tenantService = {
     }
 
     const blob = buildTenantCacheBlob(
-      await enrichOrganizationFromClerk(toOrganizationResponse(organization)),
+      toOrganizationResponse(organization),
       locationRows.map(toLocationResponse),
     );
 
@@ -201,6 +210,6 @@ export const tenantService = {
       throw new NotFoundError("Organization not found");
     }
 
-    return enrichOrganizationFromClerk(toOrganizationResponse(organization));
+    return toOrganizationResponse(organization);
   },
 };

@@ -27,27 +27,147 @@ clerkWebhookRoutes.post("/clerk", async (c) => {
 
   switch (event.type) {
     case "organization.created": {
-      const { id, name } = event.data;
-      await clerkWebhookService.handleOrganizationCreated(
-        db,
-        id,
-        name ?? "Organization",
-      );
+      const { id, name, image_url: imageUrl, has_image: hasImage } = event.data;
+      await clerkWebhookService.handleOrganizationCreated(db, id, {
+        name: name ?? "Organization",
+        imageUrl: imageUrl ?? "",
+        hasImage: hasImage ?? false,
+      });
       break;
     }
     case "organization.updated": {
-      const { id, name } = event.data;
-      await clerkWebhookService.handleOrganizationUpdated(
-        db,
-        id,
-        name ?? "Organization",
-      );
+      const { id, name, image_url: imageUrl, has_image: hasImage } = event.data;
+      await clerkWebhookService.handleOrganizationUpdated(db, id, {
+        name: name ?? "Organization",
+        imageUrl: imageUrl ?? "",
+        hasImage: hasImage ?? false,
+      });
       break;
     }
     case "organization.deleted": {
       const id = event.data.id;
       if (id) {
         await clerkWebhookService.handleOrganizationDeleted(db, id);
+      }
+      break;
+    }
+    case "user.created": {
+      const id = event.data.id;
+      if (id) {
+        await clerkWebhookService.handleUserCreated(db, id, event.data);
+      }
+      break;
+    }
+    case "user.updated": {
+      const id = event.data.id;
+      if (id) {
+        await clerkWebhookService.handleUserUpdated(db, id, event.data);
+      }
+      break;
+    }
+    case "user.deleted": {
+      const id = event.data.id;
+      if (id) {
+        await clerkWebhookService.handleUserDeleted(db, id);
+      }
+      break;
+    }
+    case "organizationMembership.created": {
+      const data = event.data;
+      const clerkOrgId = data.organization?.id;
+      const clerkUserId = data.public_user_data?.user_id;
+      const email = data.public_user_data?.identifier;
+      const role = data.role;
+
+      if (clerkOrgId && clerkUserId && email && role) {
+        await clerkWebhookService.handleMembershipCreated(
+          db,
+          clerkOrgId,
+          clerkUserId,
+          email,
+          role,
+          {
+            first_name: data.public_user_data?.first_name,
+            last_name: data.public_user_data?.last_name,
+            email_addresses: [
+              {
+                id: "primary",
+                email_address: email,
+              },
+            ],
+            primary_email_address_id: "primary",
+            image_url: data.public_user_data?.image_url,
+            has_image: data.public_user_data?.has_image,
+          },
+        );
+      }
+      break;
+    }
+    case "organizationMembership.updated": {
+      const data = event.data;
+      const clerkOrgId = data.organization?.id;
+      const clerkUserId = data.public_user_data?.user_id;
+      const role = data.role;
+
+      if (clerkOrgId && clerkUserId && role) {
+        await clerkWebhookService.handleMembershipUpdated(
+          db,
+          clerkOrgId,
+          clerkUserId,
+          role,
+        );
+      }
+      break;
+    }
+    case "organizationMembership.deleted": {
+      const data = event.data;
+      const clerkOrgId = data.organization?.id;
+      const clerkUserId = data.public_user_data?.user_id;
+
+      if (clerkOrgId && clerkUserId) {
+        await clerkWebhookService.handleMembershipDeleted(
+          db,
+          clerkOrgId,
+          clerkUserId,
+        );
+      }
+      break;
+    }
+    case "organizationInvitation.accepted": {
+      const data = event.data;
+      const clerkOrgId = data.organization_id;
+      const clerkUserId = data.user_id;
+      const email = data.email_address;
+      const role = data.role;
+      const invitationId = data.id;
+
+      if (clerkOrgId && clerkUserId && email && role && invitationId) {
+        await clerkWebhookService.handleInvitationAccepted(
+          db,
+          clerkOrgId,
+          clerkUserId,
+          email,
+          role,
+          invitationId,
+          {
+            first_name: null,
+            last_name: null,
+            email_addresses: [
+              {
+                id: "primary",
+                email_address: email,
+              },
+            ],
+            primary_email_address_id: "primary",
+          },
+        );
+      }
+      break;
+    }
+    case "organizationInvitation.revoked": {
+      const invitationId = event.data.id;
+      if (invitationId) {
+        await clerkWebhookService.handleInvitationRevoked(db, invitationId);
       }
       break;
     }

@@ -18,6 +18,8 @@ export const organizations = pgTable(
     multipleLocationsEnabled: boolean("multiple_locations_enabled")
       .notNull()
       .default(false),
+    imageUrl: text("image_url").notNull().default(""),
+    hasImage: boolean("has_image").notNull().default(false),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()

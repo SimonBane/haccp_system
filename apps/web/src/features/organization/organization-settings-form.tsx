@@ -1,11 +1,7 @@
 "use client";
 
 import type { OrganizationResponse } from "@haccp/shared";
-import {
-  organizationResponseSchema,
-  tenantContextResponseSchema,
-  updateOrganizationSchema,
-} from "@haccp/shared";
+import { tenantContextResponseSchema } from "@haccp/shared";
 import { useTranslations } from "next-intl";
 import { TriangleAlertIcon } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -22,6 +18,7 @@ import {
 } from "@/components/ui/card";
 import { TimezonePicker } from "@/features/organization/timezone-picker";
 import { OrganizationLogoUpload } from "@/features/organization/organization-logo-upload";
+import { useOrganizationMutations } from "@/features/organization/hooks/use-organization-mutations";
 import {
   Field,
   FieldContent,
@@ -57,6 +54,7 @@ export function OrganizationSettingsForm({
 }: OrganizationSettingsFormProps) {
   const t = useTranslations("SettingsPage");
   const { fetchJson } = useAuthenticatedFetch();
+  const { updateName, updateSettings } = useOrganizationMutations();
   const { organization, refreshTenant, locations } = useTenant();
   const localeLabels = useMemo(
     () => ({
@@ -100,6 +98,14 @@ export function OrganizationSettingsForm({
     setMultipleLocationsEnabled(checked);
   }
 
+  async function refreshTenantContext() {
+    const tenant = await fetchJson(
+      "/tenant/current",
+      tenantContextResponseSchema,
+    );
+    refreshTenant(tenant);
+  }
+
   async function saveSection(section: SettingsSection) {
     const isSectionDirty =
       section === "general"
@@ -115,33 +121,20 @@ export function OrganizationSettingsForm({
     setSubmittingSections((current) => ({ ...current, [section]: true }));
 
     try {
-      const input = updateOrganizationSchema.parse({
-        name: section === "general" && isGeneralDirty ? name : undefined,
-        timezone:
-          section === "regional" && timezone !== organization.timezone
-            ? timezone
-            : undefined,
-        locale:
-          section === "regional" && locale !== organization.locale
-            ? locale
-            : undefined,
-        multipleLocationsEnabled:
-          section === "locations" && isLocationsDirty
-            ? multipleLocationsEnabled
-            : undefined,
-      });
+      if (section === "general") {
+        await updateName.mutateAsync({ name });
+      } else if (section === "regional") {
+        await updateSettings.mutateAsync({
+          ...(timezone !== organization.timezone ? { timezone } : {}),
+          ...(locale !== organization.locale ? { locale } : {}),
+        });
+      } else {
+        await updateSettings.mutateAsync({
+          multipleLocationsEnabled,
+        });
+      }
 
-      await fetchJson("/organizations/current", organizationResponseSchema, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      });
-
-      const tenant = await fetchJson(
-        "/tenant/current",
-        tenantContextResponseSchema,
-      );
-      refreshTenant(tenant);
+      await refreshTenantContext();
       if (section === "locations") {
         setShowMultipleLocationsDisableWarning(false);
       }
@@ -179,6 +172,7 @@ export function OrganizationSettingsForm({
         </CardContent>
         <CardFooter className={settingsCardFooterClassName}>
           <Button
+            disabled={!isGeneralDirty}
             isLoading={submittingSections.general}
             onClick={() => void saveSection("general")}
             size="sm"
@@ -226,6 +220,7 @@ export function OrganizationSettingsForm({
         </CardContent>
         <CardFooter className={settingsCardFooterClassName}>
           <Button
+            disabled={!isRegionalDirty}
             isLoading={submittingSections.regional}
             onClick={() => void saveSection("regional")}
             size="sm"
@@ -271,6 +266,7 @@ export function OrganizationSettingsForm({
         </CardContent>
         <CardFooter className={settingsCardFooterClassName}>
           <Button
+            disabled={!isLocationsDirty}
             isLoading={submittingSections.locations}
             onClick={() => void saveSection("locations")}
             size="sm"

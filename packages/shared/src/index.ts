@@ -1,7 +1,32 @@
 export type { ApiError, HealthResponse } from "./types/api.js";
 export { apiErrorSchema } from "./schemas/error.js";
 export { uuidParamSchema, type UuidParam } from "./schemas/common.js";
-export { meResponseSchema, type MeResponse } from "./schemas/me.js";
+export {
+  userSummarySchema,
+  userResponseSchema,
+  type UserSummary,
+  type UserResponse,
+} from "./schemas/user.js";
+export {
+  ORG_ROLE,
+  membershipStatusSchema,
+  normalizeOrgRole,
+  orgRoleSchema,
+  employeeResponseSchema,
+  employeeListResponseSchema,
+  createEmployeeSchema,
+  updateEmployeeSchema,
+  updateEmployeeRoleSchema,
+  updateEmployeeLocationsSchema,
+  type MembershipStatus,
+  type OrgRole,
+  type EmployeeResponse,
+  type EmployeeListResponse,
+  type CreateEmployeeInput,
+  type UpdateEmployeeInput,
+  type UpdateEmployeeRoleInput,
+  type UpdateEmployeeLocationsInput,
+} from "./schemas/employee.js";
 export { healthResponseSchema, type HealthResponseSchema } from "./schemas/health.js";
 export {
   locationResponseSchema,
@@ -10,8 +35,10 @@ export {
 export {
   organizationResponseSchema,
   organizationLocaleSchema,
+  updateOrganizationNameSchema,
   updateOrganizationSchema,
   type OrganizationResponse,
+  type UpdateOrganizationNameInput,
   type UpdateOrganizationInput,
 } from "./schemas/organization.js";
 export {

@@ -31,6 +31,13 @@ cp apps/web/.env.example apps/web/.env.local
 cp apps/api/.env.example apps/api/.env
 ```
 
+Start local Postgres and Redis (overrides remote URLs via `apps/api/.env.local`):
+
+```bash
+pnpm docker:up
+pnpm db:migrate
+```
+
 ## Scripts
 
 | Command | Description |

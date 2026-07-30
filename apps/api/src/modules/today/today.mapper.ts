@@ -1,4 +1,4 @@
-import type { TodayTaskItem } from "@haccp/shared";
+import type { TodayTaskItem, UserSummary } from "@haccp/shared";
 import {
   parseScheduledTimeToMinutes,
   type TaskTemplateType,
@@ -19,7 +19,7 @@ export type TemplateRow = {
 
 export type CompletionRecord = {
   completedAt: Date;
-  completedBy: string;
+  completedBy: UserSummary;
   temperatureLog: {
     recordedC: unknown;
     minTempC: unknown;

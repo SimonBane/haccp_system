@@ -1,6 +1,7 @@
 import {
   type OrganizationResponse,
   type UpdateOrganizationInput,
+  type UpdateOrganizationNameInput,
   validateOrganizationLogoFile,
 } from "@haccp/shared";
 import type { Db } from "../../core/db/client.js";
@@ -12,10 +13,9 @@ import {
   ValidationError,
 } from "../../core/errors/app-errors.js";
 import { locationRepository } from "../locations/location.repository.js";
-import { enrichOrganizationFromClerk } from "./organization-clerk.js";
 import { toOrganizationResponse } from "./organization.mapper.js";
 import { organizationRepository } from "./organization.repository.js";
-import { tenantCache } from "../tenant/tenant-cache.js";
+import { tenantService } from "../tenant/tenant.service.js";
 
 function assertValidLogoFile(file: { size: number; type: string }): void {
   const validationError = validateOrganizationLogoFile(file);
@@ -32,6 +32,47 @@ function assertValidLogoFile(file: { size: number; type: string }): void {
 }
 
 export const organizationService = {
+  async updateName(
+    db: Db,
+    clerkOrgId: string,
+    input: UpdateOrganizationNameInput,
+  ): Promise<OrganizationResponse> {
+    const organization = await organizationRepository.findByClerkOrgId(
+      db,
+      clerkOrgId,
+    );
+
+    if (!organization) {
+      throw new NotFoundError("Organization not found");
+    }
+
+    if (input.name === organization.name) {
+      return toOrganizationResponse(organization);
+    }
+
+    try {
+      await clerkClient.organizations.updateOrganization(clerkOrgId, {
+        name: input.name,
+      });
+    } catch {
+      throw new InternalError("Failed to update organization name in Clerk");
+    }
+
+    const updated = await organizationRepository.updateNameByClerkOrgId(
+      db,
+      clerkOrgId,
+      input.name,
+    );
+
+    if (!updated) {
+      throw new InternalError("Failed to update organization name");
+    }
+
+    await tenantService.warmCache(db, clerkOrgId);
+
+    return toOrganizationResponse(updated);
+  },
+
   async updateSettings(
     db: Db,
     clerkOrgId: string,
@@ -62,26 +103,6 @@ export const organizationService = {
       }
     }
 
-    if (input.name !== undefined && input.name !== organization.name) {
-      try {
-        await clerkClient.organizations.updateOrganization(clerkOrgId, {
-          name: input.name,
-        });
-      } catch {
-        throw new InternalError("Failed to update organization name in Clerk");
-      }
-
-      const nameUpdated = await organizationRepository.updateNameByClerkOrgId(
-        db,
-        clerkOrgId,
-        input.name,
-      );
-
-      if (!nameUpdated) {
-        throw new InternalError("Failed to update organization name");
-      }
-    }
-
     const updated = await organizationRepository.updateById(
       db,
       organization.id,
@@ -98,9 +119,9 @@ export const organizationService = {
       throw new InternalError("Failed to update organization");
     }
 
-    await tenantCache.invalidate(clerkOrgId);
+    await tenantService.warmCache(db, clerkOrgId);
 
-    return enrichOrganizationFromClerk(toOrganizationResponse(updated));
+    return toOrganizationResponse(updated);
   },
 
   async uploadLogo(
@@ -120,18 +141,35 @@ export const organizationService = {
 
     assertValidLogoFile(file);
 
+    let clerkOrg;
     try {
-      await clerkClient.organizations.updateOrganizationLogo(clerkOrgId, {
-        file,
-        uploaderUserId: userId,
-      });
+      clerkOrg = await clerkClient.organizations.updateOrganizationLogo(
+        clerkOrgId,
+        {
+          file,
+          uploaderUserId: userId,
+        },
+      );
     } catch {
       throw new InternalError("Failed to upload organization logo");
     }
 
-    await tenantCache.invalidate(clerkOrgId);
+    const updated = await organizationRepository.updateById(
+      db,
+      organization.id,
+      {
+        imageUrl: clerkOrg.imageUrl,
+        hasImage: clerkOrg.hasImage,
+      },
+    );
 
-    return enrichOrganizationFromClerk(toOrganizationResponse(organization));
+    if (!updated) {
+      throw new InternalError("Failed to update organization logo");
+    }
+
+    await tenantService.warmCache(db, clerkOrgId);
+
+    return toOrganizationResponse(updated);
   },
 
   async deleteLogo(
@@ -147,14 +185,30 @@ export const organizationService = {
       throw new NotFoundError("Organization not found");
     }
 
+    let clerkOrg;
     try {
-      await clerkClient.organizations.deleteOrganizationLogo(clerkOrgId);
+      clerkOrg = await clerkClient.organizations.deleteOrganizationLogo(
+        clerkOrgId,
+      );
     } catch {
       throw new InternalError("Failed to delete organization logo");
     }
 
-    await tenantCache.invalidate(clerkOrgId);
+    const updated = await organizationRepository.updateById(
+      db,
+      organization.id,
+      {
+        imageUrl: clerkOrg.imageUrl,
+        hasImage: clerkOrg.hasImage,
+      },
+    );
 
-    return enrichOrganizationFromClerk(toOrganizationResponse(organization));
+    if (!updated) {
+      throw new InternalError("Failed to update organization logo");
+    }
+
+    await tenantService.warmCache(db, clerkOrgId);
+
+    return toOrganizationResponse(updated);
   },
 };

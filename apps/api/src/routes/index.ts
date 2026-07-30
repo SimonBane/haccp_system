@@ -4,12 +4,13 @@ import {
   requireAuth,
   requireOrg,
 } from "../core/middleware/auth.js";
+import { userContextMiddleware } from "../core/middleware/user-context.js";
 import { tenantContextMiddleware } from "../core/middleware/tenant-context.js";
 import { dbMiddleware } from "../core/middleware/db.js";
+import { employeeRoutes } from "../modules/employees/employee.routes.js";
 import { equipmentRoutes } from "../modules/equipment/equipment.routes.js";
 import { healthRoutes } from "../modules/health/health.routes.js";
 import { locationRoutes } from "../modules/locations/location.routes.js";
-import { meRoutes } from "../modules/me/me.routes.js";
 import { organizationRoutes } from "../modules/organizations/organization.routes.js";
 import { taskTemplateRoutes } from "../modules/task-templates/task-template.routes.js";
 import { tenantRoutes } from "../modules/tenant/tenant.routes.js";
@@ -35,15 +36,16 @@ function mountProtected(
 ): void {
   const protectedRouter = new OpenAPIHono<AppEnv>();
   protectedRouter.use("*", requireAuth);
+  protectedRouter.use("*", userContextMiddleware);
   protectedRouter.use("*", requireOrg);
   protectedRouter.use("*", tenantContextMiddleware);
   protectedRouter.route("/", moduleRoutes);
   routes.route(path, protectedRouter);
 }
 
-mountProtected("/me", meRoutes);
 mountProtected("/tenant", tenantRoutes);
 mountProtected("/organizations", organizationRoutes);
+mountProtected("/employees", employeeRoutes);
 mountProtected("/locations", locationRoutes);
 mountProtected("/equipment", equipmentRoutes);
 mountProtected("/task-templates", taskTemplateRoutes);
