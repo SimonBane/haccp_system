@@ -21,6 +21,12 @@
     "description": "Your account is not linked to an organization. Contact your administrator to receive an invitation.",
     "backHome": "Back to home"
   },
+  "ForbiddenPage": {
+    "description": "You do not have permission to access this page."
+  },
+  "NotFoundPage": {
+    "description": "This page could not be found."
+  },
   "AcceptInvitationPage": {
     "noToken": "No invitation token found. Use the link from your invitation email.",
     "processing": "Processing your invitation…",
