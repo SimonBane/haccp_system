@@ -3,14 +3,11 @@
 import type { TaskTemplateResponse, TaskTemplateType } from "@haccp/shared";
 import type { Row } from "@tanstack/react-table";
 import type { useTranslations } from "next-intl";
-import { Badge } from "@/components/ui/badge";
+import type { ReactNode } from "react";
 import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  DataTableMobileCard,
+  DataTableMobileCardBadge,
+} from "@/components/ui/data-table/data-table-mobile-card";
 import { formatScheduleSummary } from "@/features/task-templates/lib/format-schedule";
 import { TaskTemplatesTableRowActions } from "@/features/task-templates/data-table/row-actions";
 
@@ -42,28 +39,36 @@ export function TaskTemplatesMobileCard({
   onDelete,
 }: TaskTemplatesMobileCardProps) {
   const task = row.original;
+  const scheduleSummary = formatScheduleSummary(
+    task.weekdays,
+    task.scheduledTimes,
+    scheduleLabels,
+  );
+  const timesSummary = task.scheduledTimes.join(", ");
+
+  const metadata: { label: string; value: ReactNode }[] = [
+    {
+      label: t("columns.schedule"),
+      value: scheduleSummary,
+    },
+    {
+      label: t("timesLabel"),
+      value: <span className="tabular-nums">{timesSummary}</span>,
+    },
+  ];
+
+  if (task.type === "temperature") {
+    metadata.push({
+      label: t("columns.equipment"),
+      value: task.equipmentName ?? "—",
+    });
+  }
 
   return (
-    <Card className="py-4">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">{task.title}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2 text-sm">
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="secondary">{typeLabels[task.type]}</Badge>
-        </div>
-        <p className="text-muted-foreground">
-          {formatScheduleSummary(
-            task.weekdays,
-            task.scheduledTimes,
-            scheduleLabels,
-          )}
-        </p>
-        {task.equipmentName ? (
-          <p className="text-muted-foreground">{task.equipmentName}</p>
-        ) : null}
-      </CardContent>
-      <CardFooter className="justify-end border-t pt-3">
+    <DataTableMobileCard
+      title={task.title}
+      showChevron
+      actions={
         <TaskTemplatesTableRowActions
           row={row}
           t={t}
@@ -71,7 +76,13 @@ export function TaskTemplatesMobileCard({
           onDuplicate={onDuplicate}
           onDelete={onDelete}
         />
-      </CardFooter>
-    </Card>
+      }
+      badges={
+        <DataTableMobileCardBadge>
+          {typeLabels[task.type]}
+        </DataTableMobileCardBadge>
+      }
+      metadata={metadata}
+    />
   );
 }

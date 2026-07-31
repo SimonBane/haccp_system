@@ -13,17 +13,14 @@ import { useNow } from "@/hooks/use-now";
 import { TemperatureCheckDialog } from "./components/temperature-check-dialog";
 import { TodayEmptyState } from "./components/today-empty-state";
 import {
-  applyTodayFilter,
-  filterCountsFromGrouped,
   flatTodayTasks,
   groupTodayTasks,
   nextActionableTask,
   occurrenceKey,
-  type TodayFilter,
 } from "./lib/today-grouping";
 import { TodayHeader } from "./components/today-header";
 import { TodayOverview } from "./components/today-overview";
-import { TodayPriorityBanner } from "./components/today-priority-banner";
+import { TodayProgressStrip } from "./components/today-progress-strip";
 import { TodaySummary } from "./components/today-summary";
 import { TodayTaskWorkspace } from "./components/today-task-workspace";
 import { TodayWorkspace } from "./components/today-workspace";
@@ -45,7 +42,6 @@ export function TodayView({
 
   const todayDate = useMemo(() => localTodayDate(), []);
   const [selectedDate, setSelectedDate] = useState(initialDate);
-  const [filter, setFilter] = useState<TodayFilter>("todo");
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const pendingAwaitingResponseRef = useRef(false);
   const [tempDialogOpen, setTempDialogOpen] = useState(false);
@@ -83,24 +79,8 @@ export function TodayView({
     [allTasks, now],
   );
 
-  const filterCounts = useMemo(
-    () => filterCountsFromGrouped(groupedAll),
-    [groupedAll],
-  );
-
-  const groupedVisible = useMemo(
-    () =>
-      applyTodayFilter(groupedAll, filter, {
-        includeCompletedWhenAllDone: true,
-      }),
-    [groupedAll, filter],
-  );
-
   const nextTask = useMemo(
-    () =>
-      groupedAll.dueNow[0] ??
-      groupedAll.upcoming[0] ??
-      nextActionableTask(groupedAll),
+    () => nextActionableTask(groupedAll),
     [groupedAll],
   );
 
@@ -208,6 +188,11 @@ export function TodayView({
     [completeTemperatureTask, refetch, tempDialogTask, t],
   );
 
+  const dateLabel = formatLocalDate(
+    response?.date ?? selectedDate,
+    locale,
+  );
+
   if (isLoading && !response) {
     return (
       <TodayWorkspace>
@@ -224,10 +209,6 @@ export function TodayView({
         <TodayHeader
           title={t("title")}
           dateLabel={formatLocalDate(selectedDate, locale)}
-          completed={0}
-          total={0}
-          remaining={0}
-          attention={0}
           isToday={selectedDate === todayDate}
           onPreviousDay={handlePreviousDay}
           onToday={handleToday}
@@ -256,11 +237,7 @@ export function TodayView({
         title={
           selectedDate === todayDate ? t("title") : t("selectedDayTitle")
         }
-        dateLabel={formatLocalDate(response.date, locale)}
-        completed={completedCount}
-        total={totalCount}
-        remaining={remainingCount}
-        attention={attentionCount}
+        dateLabel={dateLabel}
         isToday={selectedDate === todayDate}
         onPreviousDay={handlePreviousDay}
         onToday={handleToday}
@@ -271,6 +248,11 @@ export function TodayView({
         <TodayEmptyState />
       ) : (
         <>
+          <TodayProgressStrip
+            completed={completedCount}
+            total={totalCount}
+          />
+
           <TodaySummary
             completed={completedCount}
             total={totalCount}
@@ -278,14 +260,6 @@ export function TodayView({
             attention={attentionCount}
             nextTask={nextTask}
             now={now}
-            onFilterChange={setFilter}
-          />
-
-          <TodayPriorityBanner
-            task={nextTask}
-            pendingKey={pendingKey}
-            onComplete={handleComplete}
-            onRecordTemperature={openTemperatureDialog}
           />
 
           <div className="relative grid items-start gap-6 min-[1400px]:grid-cols-[minmax(0,11fr)_minmax(0,9fr)]">
@@ -295,13 +269,8 @@ export function TodayView({
               </div>
             ) : null}
             <main className="min-w-0">
-              <div className="mb-6 lg:hidden">
-                <TodayOverview grouped={groupedAll} />
-              </div>
               <TodayTaskWorkspace
-                filter={filter}
-                counts={filterCounts}
-                grouped={groupedVisible}
+                grouped={groupedAll}
                 totalCount={totalCount}
                 completedCount={completedCount}
                 now={now}
@@ -309,7 +278,6 @@ export function TodayView({
                 currentUserId={
                   response?.currentUserId ?? initialData.currentUserId
                 }
-                onFilterChange={setFilter}
                 onComplete={handleComplete}
                 onUndo={handleUndo}
                 onRecordTemperature={openTemperatureDialog}

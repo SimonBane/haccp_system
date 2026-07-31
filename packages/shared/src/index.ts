@@ -1,3 +1,4 @@
+export { isSentryEnabled } from "./sentry.js";
 export type { ApiError, HealthResponse } from "./types/api.js";
 export { apiErrorSchema } from "./schemas/error.js";
 export {

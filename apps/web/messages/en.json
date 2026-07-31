@@ -112,7 +112,8 @@
       "ariaLabel": "Choose a day",
       "previous": "Previous day",
       "today": "Today",
-      "next": "Next day"
+      "next": "Next day",
+      "jumpToToday": "Jump to today"
     },
     "relative": {
       "inMinutes": "In {count}m",
@@ -206,7 +207,9 @@
       "rowsCount": "{current} of {total} row(s)",
       "rowsSelected": "{selected} of {total} row(s) selected.",
       "rowsPerPage": "Rows per page",
-      "pageCount": "Page {current} of {total}"
+      "pageCount": "Page {current} of {total}",
+      "previousPage": "Previous page",
+      "nextPage": "Next page"
     }
   },
   "EquipmentPage": {

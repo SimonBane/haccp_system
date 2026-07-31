@@ -17,6 +17,11 @@ function isAllowedOrigin(origin: string): boolean {
 export const corsMiddleware = cors({
   origin: (origin) => (origin && isAllowedOrigin(origin) ? origin : null),
   allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowHeaders: ["Content-Type", "Authorization"],
+  allowHeaders: [
+    "Content-Type",
+    "Authorization",
+    "sentry-trace",
+    "baggage",
+  ],
   exposeHeaders: ["X-Request-Id"],
 });

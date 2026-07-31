@@ -312,6 +312,42 @@ export function EquipmentForm({
 
   const hasChanges = !isEditing || !equipment || isDirty;
 
+  const formFooter = (
+    <DialogFooter>
+      {isEditing ? (
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isSubmitting}
+            onClick={onDuplicate}
+          >
+            <CopyPlusIcon data-icon="inline-start" />
+            {t("duplicate")}
+          </Button>
+          <Button
+            type="submit"
+            form={EQUIPMENT_FORM_ID}
+            isLoading={isSubmitting}
+            disabled={!hasChanges}
+          >
+            <SaveIcon data-icon="inline-start" />
+            {t("save")}
+          </Button>
+        </>
+      ) : (
+        <Button
+          type="submit"
+          form={EQUIPMENT_FORM_ID}
+          isLoading={isSubmitting}
+        >
+          <PlusIcon data-icon="inline-start" />
+          {t("add")}
+        </Button>
+      )}
+    </DialogFooter>
+  );
+
   return (
     <ResponsiveFormDialog
       open={open}
@@ -332,6 +368,7 @@ export function EquipmentForm({
       }
       className="sm:min-h-[24rem]"
       initialFocus={isEditing || isDuplicating ? undefined : false}
+      footer={formFooter}
     >
         <form
           id={EQUIPMENT_FORM_ID}
@@ -525,35 +562,6 @@ export function EquipmentForm({
               <FieldError>{errors.maxTempC.message}</FieldError>
             ) : null}
           </FieldSet>
-
-          <DialogFooter>
-              {isEditing ? (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={isSubmitting}
-                    onClick={onDuplicate}
-                  >
-                    <CopyPlusIcon data-icon="inline-start" />
-                    {t("duplicate")}
-                  </Button>
-                  <Button
-                    type="submit"
-                    isLoading={isSubmitting}
-                    disabled={!hasChanges}
-                  >
-                    <SaveIcon data-icon="inline-start" />
-                    {t("save")}
-                  </Button>
-                </>
-              ) : (
-                <Button type="submit" isLoading={isSubmitting}>
-                  <PlusIcon data-icon="inline-start" />
-                  {t("add")}
-                </Button>
-              )}
-            </DialogFooter>
         </form>
     </ResponsiveFormDialog>
   );
