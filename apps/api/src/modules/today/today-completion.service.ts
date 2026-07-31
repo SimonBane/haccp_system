@@ -1,13 +1,13 @@
-import type {
-  CompleteTodayTaskInput,
-  CompleteTodayTemperatureTaskInput,
-  TodayTaskItem,
-  UserSummary,
-} from "@haccp/shared";
+import type { UserSummary } from "@haccp/shared";
 import {
   buildTodayTaskItem,
   classifyTemperatureResult,
   getWeekdayFromDate,
+} from "@haccp/shared";
+import type {
+  CompleteTodayTaskInput,
+  CompleteTodayTemperatureTaskInput,
+  TodayTaskItem,
 } from "@haccp/shared";
 import type { Db, DbClient } from "../../core/db/client.js";
 import { taskCompletions } from "../../core/db/schema/task-completions.js";
@@ -17,8 +17,6 @@ import {
   ValidationError,
 } from "../../core/errors/app-errors.js";
 import { taskTemplateRepository } from "../task-templates/task-template.repository.js";
-import { toUserSummary } from "../users/user.mapper.js";
-import { userRepository } from "../users/user.repository.js";
 import { toTemplateRow, type TemplateRow } from "./today.mapper.js";
 import { todayRepository } from "./today.repository.js";
 
@@ -138,7 +136,7 @@ export const todayCompletionService = {
   async completeTask(
     db: Db,
     locationId: string,
-    userDbId: string,
+    completedBy: UserSummary,
     input: CompleteTodayTaskInput,
   ): Promise<TodayTaskItem> {
     return withCompletionContext(
@@ -153,22 +151,16 @@ export const todayCompletionService = {
         const completionRow = await createOrFetchCompletion(
           db,
           resolvedLocationId,
-          userDbId,
+          completedBy.id,
           input,
           now,
         );
-
-        const user = await userRepository.findById(db, userDbId);
 
         return buildTaskItemFromTemplate(
           template,
           input,
           completionRow.completedAt.toISOString(),
-          user ? toUserSummary(user) : {
-            id: userDbId,
-            firstName: "",
-            lastName: "",
-          },
+          completedBy,
           null,
           now,
         );
@@ -213,7 +205,7 @@ export const todayCompletionService = {
   async completeTemperatureTask(
     db: Db,
     locationId: string,
-    userDbId: string,
+    completedBy: UserSummary,
     input: CompleteTodayTemperatureTaskInput,
   ): Promise<TodayTaskItem> {
     return withCompletionContext(
@@ -256,7 +248,7 @@ export const todayCompletionService = {
           maxTempC: String(maxTempC),
           result,
           correctiveAction: result === "out_of_range" ? correctiveAction : null,
-          recordedByUserId: userDbId,
+          recordedByUserId: completedBy.id,
           recordedAt: now,
         };
 
@@ -264,7 +256,7 @@ export const todayCompletionService = {
           const completionRow = await createOrFetchCompletion(
             tx,
             resolvedLocationId,
-            userDbId,
+            completedBy.id,
             input,
             now,
           );
@@ -289,17 +281,11 @@ export const todayCompletionService = {
             throw new InternalError("Failed to create/update temperature log");
           }
 
-          const user = await userRepository.findById(tx, userDbId);
-
           return buildTaskItemFromTemplate(
             template,
             input,
             completionRow.completedAt.toISOString(),
-            user ? toUserSummary(user) : {
-              id: userDbId,
-              firstName: "",
-              lastName: "",
-            },
+            completedBy,
             {
               recordedC,
               result,

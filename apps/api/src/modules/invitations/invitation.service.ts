@@ -43,6 +43,10 @@ export const invitationService = {
       orgRole,
       membershipRow?.membership.clerkInvitationId ?? null,
       profile,
+      {
+        organization,
+        membershipRow,
+      },
     );
   },
 };

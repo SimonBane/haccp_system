@@ -162,17 +162,4 @@ export const tenantService = {
   async invalidateCache(clerkOrgId: string): Promise<void> {
     await tenantCache.invalidate(clerkOrgId);
   },
-
-  async getOrganizationByClerkOrgId(db: Db, clerkOrgId: string) {
-    const organization = await organizationRepository.findByClerkOrgId(
-      db,
-      clerkOrgId,
-    );
-
-    if (!organization) {
-      throw new NotFoundError("Organization not found");
-    }
-
-    return toOrganizationResponse(organization);
-  },
 };

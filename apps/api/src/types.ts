@@ -3,6 +3,7 @@ import type {
   LocationResponse,
   OrganizationResponse,
   TenantContextResponse,
+  UserResponse,
 } from "@haccp/shared";
 import type { Db } from "./core/db/client.js";
 import type { ResolvedTenant } from "./modules/tenant/tenant.service.js";
@@ -15,7 +16,7 @@ export type AppEnv = {
   Variables: {
     requestId: string;
     userId: string;
-    userDbId: string | null;
+    user: UserResponse | null;
     orgId: string | null;
     orgRole: string | null;
     tenant: ResolvedTenant | undefined;

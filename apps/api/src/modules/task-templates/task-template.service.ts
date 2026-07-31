@@ -55,7 +55,7 @@ export const taskTemplateService = {
       return toTaskTemplateResponse(created, null);
     } catch (error) {
       mapDbMutationError(error, {
-        foreignKey: () => new NotFoundError("Equipment or location not found"),
+        foreignKey: () => new NotFoundError("Equipment not found"),
       });
     }
   },
@@ -94,7 +94,7 @@ export const taskTemplateService = {
       }
 
       mapDbMutationError(error, {
-        foreignKey: () => new NotFoundError("Equipment or location not found"),
+        foreignKey: () => new NotFoundError("Equipment not found"),
       });
     }
   },

@@ -13,7 +13,7 @@ import {
   errorResponse,
   jsonResponse,
 } from "../../core/openapi/route-factory.js";
-import { getDb, requireOrgContext } from "../../lib/context.js";
+import { getDb, getTenant, requireOrgContext } from "../../lib/context.js";
 import { employeeService } from "./employee.service.js";
 import type { AppEnv } from "../../types.js";
 
@@ -194,6 +194,7 @@ employeeRoutes.openapi(createRouteDef, async (c) => {
     clerkOrgId,
     userId,
     input,
+    getTenant(c).locations,
   );
   return c.json(created, 201);
 });
@@ -207,6 +208,7 @@ employeeRoutes.openapi(updateRouteDef, async (c) => {
     organizationId,
     id,
     input,
+    getTenant(c).locations,
   );
   return c.json(updated, 200);
 });
@@ -220,6 +222,7 @@ employeeRoutes.openapi(inviteRoute, async (c) => {
     clerkOrgId,
     userId,
     id,
+    getTenant(c).locations,
   );
   return c.json(updated, 200);
 });
@@ -232,6 +235,7 @@ employeeRoutes.openapi(revokeInvitationRoute, async (c) => {
     organizationId,
     clerkOrgId,
     id,
+    getTenant(c).locations,
   );
   return c.json(updated, 200);
 });
@@ -246,6 +250,7 @@ employeeRoutes.openapi(updateRoleRoute, async (c) => {
     clerkOrgId,
     id,
     input,
+    getTenant(c).locations,
   );
   return c.json(updated, 200);
 });
@@ -259,6 +264,7 @@ employeeRoutes.openapi(updateLocationsRoute, async (c) => {
     organizationId,
     id,
     input,
+    getTenant(c).locations,
   );
   return c.json(updated, 200);
 });
