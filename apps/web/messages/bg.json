@@ -112,7 +112,8 @@
       "ariaLabel": "Избор на ден",
       "previous": "Предишен ден",
       "today": "Днес",
-      "next": "Следващ ден"
+      "next": "Следващ ден",
+      "jumpToToday": "Към днес"
     },
     "relative": {
       "inMinutes": "След {count} мин",
@@ -206,7 +207,9 @@
       "rowsCount": "{current} от {total} ред(а)",
       "rowsSelected": "{selected} от {total} ред(а) избрани.",
       "rowsPerPage": "Редове на страница",
-      "pageCount": "Страница {current} от {total}"
+      "pageCount": "Страница {current} от {total}",
+      "previousPage": "Предишна страница",
+      "nextPage": "Следваща страница"
     }
   },
   "EquipmentPage": {

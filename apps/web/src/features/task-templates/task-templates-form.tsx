@@ -85,10 +85,14 @@ const REQUIRED_LABEL_CLASS =
 const SCHEDULED_TIME_SLOT_CLASS =
   "w-full min-w-0 sm:w-[calc((100%-1.5rem)/3)] md:w-[calc((100%-1.5rem)/4)]";
 
-const WEEKDAY_TOGGLE_GROUP_CLASS = "w-full flex flex-wrap gap-1";
+const WEEKDAY_TOGGLE_GROUP_CLASS =
+  "w-full flex flex-wrap gap-1.5";
+
+const WEEKDAY_PRESET_ITEM_CLASS =
+  "min-h-10 min-w-[calc(33%-0.375rem)] flex-1 cursor-pointer aria-pressed:!border-primary aria-pressed:!bg-primary aria-pressed:!text-primary-foreground aria-pressed:hover:!bg-primary/80";
 
 const WEEKDAY_TOGGLE_ITEM_CLASS =
-  "cursor-pointer aria-pressed:!border-primary aria-pressed:!bg-primary aria-pressed:!text-primary-foreground aria-pressed:hover:!bg-primary/80";
+  "min-h-10 cursor-pointer aria-pressed:!border-primary aria-pressed:!bg-primary aria-pressed:!text-primary-foreground aria-pressed:hover:!bg-primary/80";
 
 function hasDuplicateScheduledTimes(times: string[]): boolean {
   const filledTimes = times.filter(Boolean);
@@ -406,6 +410,42 @@ export function TaskTemplatesForm({
     });
   }
 
+  const formFooter = (
+    <DialogFooter>
+      {isEditing ? (
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isSubmitting}
+            onClick={onDuplicate}
+          >
+            <CopyPlusIcon data-icon="inline-start" />
+            {t("duplicate")}
+          </Button>
+          <Button
+            type="submit"
+            form={TASK_TEMPLATES_FORM_ID}
+            isLoading={isSubmitting}
+            disabled={!hasChanges}
+          >
+            <SaveIcon data-icon="inline-start" />
+            {t("save")}
+          </Button>
+        </>
+      ) : (
+        <Button
+          type="submit"
+          form={TASK_TEMPLATES_FORM_ID}
+          isLoading={isSubmitting}
+        >
+          <PlusIcon data-icon="inline-start" />
+          {t("add")}
+        </Button>
+      )}
+    </DialogFooter>
+  );
+
   return (
     <ResponsiveFormDialog
       open={open}
@@ -425,6 +465,7 @@ export function TaskTemplatesForm({
             : t("addDescription")
       }
       initialFocus={isEditing || isDuplicating ? undefined : false}
+      footer={formFooter}
     >
         <form
           id={TASK_TEMPLATES_FORM_ID}
@@ -612,19 +653,19 @@ export function TaskTemplatesForm({
                   >
                     <ToggleGroupItem
                       value="everyDay"
-                      className={cn("flex-1", WEEKDAY_TOGGLE_ITEM_CLASS)}
+                      className={WEEKDAY_PRESET_ITEM_CLASS}
                     >
                       {t("presets.everyDay")}
                     </ToggleGroupItem>
                     <ToggleGroupItem
                       value="monFri"
-                      className={cn("flex-1", WEEKDAY_TOGGLE_ITEM_CLASS)}
+                      className={WEEKDAY_PRESET_ITEM_CLASS}
                     >
                       {t("presets.monFri")}
                     </ToggleGroupItem>
                     <ToggleGroupItem
                       value="custom"
-                      className={cn("flex-1", WEEKDAY_TOGGLE_ITEM_CLASS)}
+                      className={WEEKDAY_PRESET_ITEM_CLASS}
                     >
                       {t("presets.custom")}
                     </ToggleGroupItem>
@@ -653,7 +694,7 @@ export function TaskTemplatesForm({
                           key={weekday}
                           value={weekday}
                           className={cn(
-                            "flex-1 px-1",
+                            "min-w-[calc(14%-0.25rem)] flex-1 px-1",
                             WEEKDAY_TOGGLE_ITEM_CLASS,
                           )}
                           aria-label={weekdayShortLabels[weekday]}
@@ -740,35 +781,6 @@ export function TaskTemplatesForm({
               <FieldError>{scheduledTimeRowsErrorMessage}</FieldError>
             ) : null}
           </FieldSet>
-
-          <DialogFooter>
-              {isEditing ? (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={isSubmitting}
-                    onClick={onDuplicate}
-                  >
-                    <CopyPlusIcon data-icon="inline-start" />
-                    {t("duplicate")}
-                  </Button>
-                  <Button
-                    type="submit"
-                    isLoading={isSubmitting}
-                    disabled={!hasChanges}
-                  >
-                    <SaveIcon data-icon="inline-start" />
-                    {t("save")}
-                  </Button>
-                </>
-              ) : (
-                <Button type="submit" isLoading={isSubmitting}>
-                  <PlusIcon data-icon="inline-start" />
-                  {t("add")}
-                </Button>
-              )}
-            </DialogFooter>
         </form>
     </ResponsiveFormDialog>
   );

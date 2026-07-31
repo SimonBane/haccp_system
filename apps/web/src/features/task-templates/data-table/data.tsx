@@ -102,6 +102,13 @@ export function TaskTemplatesData({
       searchColumn="title"
       searchPlaceholder={t("searchPlaceholder")}
       emptyMessage={t("emptyTitle")}
+      emptyDescription={t("emptyDescription")}
+      emptyAction={
+        <Button type="button" onClick={onAdd}>
+          <PlusIcon />
+          {t("add")}
+        </Button>
+      }
       noResultsMessage={tTable("noResults")}
       enablePagination
       pageSize={10}

@@ -8,16 +8,10 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { DialogFooter } from "@/components/ui/dialog";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
 import { Textarea } from "@/components/ui/textarea";
 
 const TEMPERATURE_FORM_ID = "temperature-check-form";
@@ -140,121 +134,123 @@ export function TemperatureCheckDialog({
 
   const { isSubmitting } = form.formState;
 
-  return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[min(100dvh-2rem,40rem)] overflow-y-auto sm:max-w-md">
-        <DialogHeader className="gap-1">
-          <DialogTitle className="text-left text-lg">{task.title}</DialogTitle>
-          <DialogDescription className="text-left">
-            {task.equipmentName ? `${task.equipmentName} · ` : ""}
-            {task.scheduledTime} · {t("temperatureDialog.allowedRange")}:{" "}
-            {rangeLabel}
-          </DialogDescription>
-        </DialogHeader>
+  const description = (
+    <>
+      {task.equipmentName ? `${task.equipmentName} · ` : ""}
+      {task.scheduledTime} · {t("temperatureDialog.allowedRange")}: {rangeLabel}
+    </>
+  );
 
-        <form
-          id={TEMPERATURE_FORM_ID}
-          onSubmit={form.handleSubmit(handleValidSubmit)}
-          className="space-y-3"
-        >
+  return (
+    <ResponsiveFormDialog
+      open={open}
+      onOpenChange={handleOpenChange}
+      title={task.title}
+      description={description}
+      footer={
+        <DialogFooter className="gap-2 sm:gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-11 sm:min-h-9"
+            onClick={() => handleOpenChange(false)}
+            disabled={isSubmitting}
+          >
+            {t("temperatureDialog.cancel")}
+          </Button>
+          <Button
+            type="submit"
+            form={TEMPERATURE_FORM_ID}
+            className="min-h-11 sm:min-h-9"
+            isLoading={isSubmitting}
+            disabled={isSubmitting}
+          >
+            {t("temperatureDialog.confirm")}
+          </Button>
+        </DialogFooter>
+      }
+    >
+      <form
+        id={TEMPERATURE_FORM_ID}
+        onSubmit={form.handleSubmit(handleValidSubmit)}
+        className="space-y-3"
+      >
+        <Controller
+          name="recordedC"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel htmlFor={`${TEMPERATURE_FORM_ID}-recorded-c`}>
+                {t("temperatureDialog.recordedCLabel")} (
+                {t("temperatureDialog.celsius")})
+              </FieldLabel>
+              <Input
+                {...field}
+                id={`${TEMPERATURE_FORM_ID}-recorded-c`}
+                inputMode="decimal"
+                autoComplete="off"
+                autoFocus
+                aria-invalid={fieldState.invalid}
+                aria-describedby={result ? "temperature-result" : undefined}
+                className="h-12 text-center text-2xl font-semibold tabular-nums"
+                placeholder={t("temperatureDialog.recordedCPlaceholder")}
+              />
+              {fieldState.invalid && (
+                <FieldError errors={[fieldState.error]} />
+              )}
+            </Field>
+          )}
+        />
+
+        {result && (
+          <div
+            id="temperature-result"
+            className="flex flex-wrap items-center gap-2"
+          >
+            <Badge variant={result === "ok" ? "secondary" : "destructive"}>
+              {result === "ok"
+                ? t("temperatureDialog.ok")
+                : t("temperatureDialog.outOfRange")}
+            </Badge>
+            <span className="text-sm text-muted-foreground">
+              {result === "ok"
+                ? t("temperatureDialog.okHint")
+                : t("temperatureDialog.outOfRangeHint")}
+            </span>
+          </div>
+        )}
+
+        {result === "out_of_range" && (
           <Controller
-            name="recordedC"
+            name="correctiveAction"
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor={`${TEMPERATURE_FORM_ID}-recorded-c`}>
-                  {t("temperatureDialog.recordedCLabel")} (
-                  {t("temperatureDialog.celsius")})
+                <FieldLabel
+                  htmlFor={`${TEMPERATURE_FORM_ID}-corrective-action`}
+                >
+                  {t("temperatureDialog.correctiveActionLabel")}
                 </FieldLabel>
-                <Input
+                <Textarea
                   {...field}
-                  id={`${TEMPERATURE_FORM_ID}-recorded-c`}
-                  inputMode="decimal"
-                  autoComplete="off"
-                  autoFocus
+                  id={`${TEMPERATURE_FORM_ID}-corrective-action`}
                   aria-invalid={fieldState.invalid}
-                  aria-describedby={result ? "temperature-result" : undefined}
-                  className="h-12 text-center text-2xl font-semibold tabular-nums"
-                  placeholder={t("temperatureDialog.recordedCPlaceholder")}
+                  placeholder={t(
+                    "temperatureDialog.correctiveActionPlaceholder",
+                  )}
+                  className="min-h-24 resize-y"
                 />
+                <p className="text-xs text-muted-foreground">
+                  {t("temperatureDialog.correctiveActionHint")}
+                </p>
                 {fieldState.invalid && (
                   <FieldError errors={[fieldState.error]} />
                 )}
               </Field>
             )}
           />
-
-          {result && (
-            <div
-              id="temperature-result"
-              className="flex flex-wrap items-center gap-2"
-            >
-              <Badge variant={result === "ok" ? "secondary" : "destructive"}>
-                {result === "ok"
-                  ? t("temperatureDialog.ok")
-                  : t("temperatureDialog.outOfRange")}
-              </Badge>
-              <span className="text-sm text-muted-foreground">
-                {result === "ok"
-                  ? t("temperatureDialog.okHint")
-                  : t("temperatureDialog.outOfRangeHint")}
-              </span>
-            </div>
-          )}
-
-          {result === "out_of_range" && (
-            <Controller
-              name="correctiveAction"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel
-                    htmlFor={`${TEMPERATURE_FORM_ID}-corrective-action`}
-                  >
-                    {t("temperatureDialog.correctiveActionLabel")}
-                  </FieldLabel>
-                  <Textarea
-                    {...field}
-                    id={`${TEMPERATURE_FORM_ID}-corrective-action`}
-                    aria-invalid={fieldState.invalid}
-                    placeholder={t(
-                      "temperatureDialog.correctiveActionPlaceholder",
-                    )}
-                    className="min-h-24 resize-y"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {t("temperatureDialog.correctiveActionHint")}
-                  </p>
-                  {fieldState.invalid && (
-                    <FieldError errors={[fieldState.error]} />
-                  )}
-                </Field>
-              )}
-            />
-          )}
-
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="min-h-11 sm:min-h-9"
-              onClick={() => handleOpenChange(false)}
-              disabled={isSubmitting}
-            >
-              {t("temperatureDialog.cancel")}
-            </Button>
-            <Button
-              type="submit"
-              form={TEMPERATURE_FORM_ID}
-              className="min-h-11 sm:min-h-9"
-              isLoading={isSubmitting}
-              disabled={isSubmitting}
-            >
-              {t("temperatureDialog.confirm")}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        )}
+      </form>
+    </ResponsiveFormDialog>
   );
 }

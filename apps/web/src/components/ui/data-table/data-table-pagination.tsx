@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface DataTablePaginationProps<TData> {
   table: Table<TData>;
@@ -29,10 +30,59 @@ export function DataTablePagination<TData>({
   showSelectionCount = false,
 }: DataTablePaginationProps<TData>) {
   const t = useTranslations("DataTable.pagination");
+  const isMobile = useIsMobile();
   const totalRowsCount = table.getFilteredRowModel().rows.length;
   const currentPageRowsCount = table.getRowModel().rows.length;
   const pageSize = table.getState().pagination.pageSize;
   const selectedRowsCount = table.getFilteredSelectedRowModel().rows.length;
+  const pageIndex = table.getState().pagination.pageIndex;
+  const pageCount = table.getPageCount();
+
+  if (isMobile) {
+    return (
+      <div className="flex items-center justify-between gap-2 px-2">
+        <span className="text-sm text-muted-foreground">
+          {showSelectionCount
+            ? t("rowsSelected", {
+                selected: selectedRowsCount,
+                total: totalRowsCount,
+              })
+            : t("rowsCount", {
+                current: currentPageRowsCount,
+                total: totalRowsCount,
+              })}
+        </span>
+        <div className="flex items-center gap-1">
+          <Button
+            type="button"
+            variant="outline"
+            className="size-11 p-0"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+            aria-label={t("previousPage")}
+          >
+            <ChevronLeftIcon className="size-4" />
+          </Button>
+          <span className="min-w-16 text-center text-sm font-medium">
+            {t("pageCount", {
+              current: pageIndex + 1,
+              total: pageCount,
+            })}
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            className="size-11 p-0"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+            aria-label={t("nextPage")}
+          >
+            <ChevronRightIcon className="size-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col justify-between gap-2 px-2 md:flex-row md:items-center">
@@ -74,8 +124,8 @@ export function DataTablePagination<TData>({
 
         <div className="flex items-center justify-center text-sm font-medium">
           {t("pageCount", {
-            current: table.getState().pagination.pageIndex + 1,
-            total: table.getPageCount(),
+            current: pageIndex + 1,
+            total: pageCount,
           })}
         </div>
 

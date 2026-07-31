@@ -7,21 +7,12 @@ export const DUE_NOW_WINDOW_MINUTES = 30;
 export type TodayUiBucket =
   "attention" | "overdue" | "dueNow" | "upcoming" | "completed";
 
-export type TodayFilter = "todo" | "attention" | "completed" | "all";
-
 export type GroupedTodayTasks = {
   attention: TodayTaskItem[];
   overdue: TodayTaskItem[];
   dueNow: TodayTaskItem[];
   upcoming: TodayTaskItem[];
   completed: TodayTaskItem[];
-};
-
-export type TodayFilterCounts = {
-  todo: number;
-  attention: number;
-  completed: number;
-  all: number;
 };
 
 function parseScheduledTimeToMinutes(time: string): number {
@@ -129,68 +120,16 @@ export function groupTodayTasks(
   return { attention, overdue, dueNow, upcoming, completed };
 }
 
-export function filterCountsFromGrouped(
-  grouped: GroupedTodayTasks,
-): TodayFilterCounts {
-  const attention = grouped.attention.length + grouped.overdue.length;
-  const overdue = grouped.overdue.length;
-  const dueNow = grouped.dueNow.length;
-  const upcoming = grouped.upcoming.length;
-  const completed = grouped.completed.length;
-  const todo = grouped.attention.length + overdue + dueNow + upcoming;
-  const all = todo + completed;
-
-  return { todo, attention, completed, all };
-}
-
 export function nextActionableTask(
   grouped: GroupedTodayTasks,
 ): TodayTaskItem | null {
-  return grouped.overdue[0] ?? grouped.dueNow[0] ?? grouped.upcoming[0] ?? null;
-}
-
-export function applyTodayFilter(
-  grouped: GroupedTodayTasks,
-  filter: TodayFilter,
-  options?: { includeCompletedWhenAllDone?: boolean },
-): GroupedTodayTasks {
-  const allDone =
-    options?.includeCompletedWhenAllDone === true &&
-    grouped.completed.length > 0 &&
-    grouped.attention.length === 0 &&
-    grouped.overdue.length === 0 &&
-    grouped.dueNow.length === 0 &&
-    grouped.upcoming.length === 0;
-
-  switch (filter) {
-    case "todo":
-      return {
-        attention: grouped.attention,
-        overdue: grouped.overdue,
-        dueNow: grouped.dueNow,
-        upcoming: grouped.upcoming,
-        // Keep completed visible when the day is fully done.
-        completed: allDone ? grouped.completed : [],
-      };
-    case "attention":
-      return {
-        attention: grouped.attention,
-        overdue: grouped.overdue,
-        dueNow: [],
-        upcoming: [],
-        completed: [],
-      };
-    case "completed":
-      return {
-        attention: [],
-        overdue: [],
-        dueNow: [],
-        upcoming: [],
-        completed: grouped.completed,
-      };
-    case "all":
-      return grouped;
-  }
+  return (
+    grouped.attention[0] ??
+    grouped.overdue[0] ??
+    grouped.dueNow[0] ??
+    grouped.upcoming[0] ??
+    null
+  );
 }
 
 export function minutesUntilScheduled(
