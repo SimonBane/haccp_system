@@ -5,7 +5,6 @@ import { organizationResponseSchema } from "./organization.js";
 export const tenantContextResponseSchema = z.object({
   organization: organizationResponseSchema,
   locations: z.array(locationResponseSchema),
-  currentLocation: locationResponseSchema,
 });
 
 export type TenantContextResponse = z.infer<typeof tenantContextResponseSchema>;

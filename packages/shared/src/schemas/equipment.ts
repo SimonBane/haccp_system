@@ -46,9 +46,7 @@ function withTempRangeValidation<T extends z.ZodTypeAny>(schema: T) {
 }
 
 export const createEquipmentSchema = withTempRangeValidation(
-  equipmentFieldsSchema.extend({
-    locationId: z.string().uuid(),
-  }),
+  equipmentFieldsSchema,
 );
 
 export type CreateEquipmentInput = z.infer<typeof createEquipmentSchema>;

@@ -12,11 +12,13 @@ import { useLocation } from "@/features/tenant/tenant-provider";
 import { ApiRequestError, parseApiError } from "@/lib/api-utils";
 import { useAuthenticatedFetch } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
+import { locationScopedPath } from "@/lib/api/paths";
 
 export function useEquipmentMutations() {
   const { locationId } = useLocation();
   const { fetchJson, fetchApi } = useAuthenticatedFetch();
   const queryClient = useQueryClient();
+  const equipmentPath = locationScopedPath(locationId, "equipment");
 
   const invalidateEquipment = () => {
     void queryClient.invalidateQueries({
@@ -26,8 +28,8 @@ export function useEquipmentMutations() {
 
   const create = useMutation({
     mutationFn: async (input: EquipmentFieldsInput) => {
-      const payload = createEquipmentSchema.parse({ ...input, locationId });
-      return fetchJson("/equipment", equipmentResponseSchema, {
+      const payload = createEquipmentSchema.parse(input);
+      return fetchJson(equipmentPath, equipmentResponseSchema, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -45,7 +47,7 @@ export function useEquipmentMutations() {
       input: UpdateEquipmentInput;
     }) => {
       updateEquipmentSchema.parse(input);
-      return fetchJson(`/equipment/${id}`, equipmentResponseSchema, {
+      return fetchJson(`${equipmentPath}/${id}`, equipmentResponseSchema, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
@@ -56,7 +58,7 @@ export function useEquipmentMutations() {
 
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetchApi(`/equipment/${id}`, {
+      const response = await fetchApi(`${equipmentPath}/${id}`, {
         method: "DELETE",
       });
 

@@ -2,14 +2,12 @@
 
 import { useAuth } from "@clerk/nextjs";
 import { useCallback } from "react";
-import { useTenant } from "@/features/tenant/tenant-provider";
 import { API_BASE_URL, ApiRequestError, parseApiError } from "./api-utils";
 
 export async function fetchWithToken(
   getToken: () => Promise<string | null>,
   path: string,
   init?: RequestInit,
-  locationId?: string,
 ): Promise<Response> {
   const token = await getToken();
 
@@ -17,7 +15,6 @@ export async function fetchWithToken(
     ...init,
     headers: {
       ...init?.headers,
-      ...(locationId ? { "X-Location-Id": locationId } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   });
@@ -28,14 +25,8 @@ export async function fetchJsonWithToken<T>(
   path: string,
   schema: { parse: (data: unknown) => T },
   init?: RequestInit,
-  locationId?: string,
 ): Promise<T> {
-  const response = await fetchWithToken(
-    getToken,
-    path,
-    init,
-    locationId,
-  );
+  const response = await fetchWithToken(getToken, path, init);
 
   if (!response.ok) {
     const error = await parseApiError(response);
@@ -57,25 +48,23 @@ export function useAuthenticatedFetch(): {
   ) => Promise<T>;
   fetchApi: (path: string, init?: RequestInit) => Promise<Response>;
   getToken: () => Promise<string | null>;
-  locationId: string;
 } {
   const { getToken } = useAuth();
-  const { locationId } = useTenant();
 
   const fetchJson = useCallback(
     async <T>(
       path: string,
       schema: { parse: (data: unknown) => T },
       init?: RequestInit,
-    ) => fetchJsonWithToken(getToken, path, schema, init, locationId),
-    [getToken, locationId],
+    ) => fetchJsonWithToken(getToken, path, schema, init),
+    [getToken],
   );
 
   const fetchApi = useCallback(
     async (path: string, init?: RequestInit) =>
-      fetchWithToken(getToken, path, init, locationId),
-    [getToken, locationId],
+      fetchWithToken(getToken, path, init),
+    [getToken],
   );
 
-  return { fetchJson, fetchApi, getToken, locationId };
+  return { fetchJson, fetchApi, getToken };
 }
