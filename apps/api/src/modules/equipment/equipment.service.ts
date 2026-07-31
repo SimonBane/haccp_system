@@ -12,7 +12,6 @@ import {
   NotFoundError,
 } from "../../core/errors/app-errors.js";
 import { mapDbMutationError } from "../../lib/db-errors.js";
-import { locationService } from "../locations/location.service.js";
 import { toEquipmentResponse } from "./equipment.mapper.js";
 import { equipmentRepository } from "./equipment.repository.js";
 
@@ -30,16 +29,9 @@ export const equipmentService = {
 
   async create(
     db: Db,
-    organizationId: string,
     locationId: string,
     input: CreateEquipmentInput,
   ): Promise<EquipmentResponse> {
-    await locationService.assertLocationBelongsToOrganization(
-      db,
-      organizationId,
-      locationId,
-    );
-
     try {
       const created = await equipmentRepository.insert(db, {
         locationId,
@@ -73,16 +65,11 @@ export const equipmentService = {
   ): Promise<EquipmentResponse> {
     const updates: Partial<typeof equipment.$inferInsert> = {
       updatedAt: new Date(),
+      name: input.name,
+      type: input.type,
+      minTempC: String(input.minTempC),
+      maxTempC: String(input.maxTempC),
     };
-
-    if (input.name !== undefined) updates.name = input.name;
-    if (input.type !== undefined) updates.type = input.type;
-    if (input.minTempC !== undefined) {
-      updates.minTempC = String(input.minTempC);
-    }
-    if (input.maxTempC !== undefined) {
-      updates.maxTempC = String(input.maxTempC);
-    }
 
     try {
       const updated = await equipmentRepository.updateByIdAndLocation(

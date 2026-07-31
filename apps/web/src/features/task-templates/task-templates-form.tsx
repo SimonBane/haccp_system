@@ -12,7 +12,6 @@ import {
   type TaskTemplateResponse,
   type TaskTemplateType,
   type TaskTemplateWeekday,
-  type UpdateTaskTemplateInput,
 } from "@haccp/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CopyPlusIcon, PlusIcon, SaveIcon } from "lucide-react";
@@ -134,9 +133,7 @@ type TaskTemplatesFormProps = {
   suggestedDuplicateTitle?: string;
   equipment: Pick<EquipmentResponse, "id" | "name">[];
   onDuplicate?: () => void;
-  onSubmit: (
-    values: TaskTemplateFieldsInput | UpdateTaskTemplateInput,
-  ) => Promise<void>;
+  onSubmit: (values: TaskTemplateFieldsInput) => Promise<void>;
 };
 
 function buildDefaultTimeRows(

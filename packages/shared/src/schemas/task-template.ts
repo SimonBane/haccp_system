@@ -176,39 +176,22 @@ const taskTemplateFieldsSchema = z.object({
   equipmentId: z.string().uuid().nullable().optional(),
 });
 
-function withTaskTemplateValidation<T extends z.ZodTypeAny>(
-  schema: T,
-  options: { partial?: boolean } = {},
-) {
+function withTaskTemplateValidation<T extends z.ZodTypeAny>(schema: T) {
   return schema.superRefine((data, ctx) => {
     const value = data as {
-      type?: TaskTemplateType;
+      type: TaskTemplateType;
       equipmentId?: string | null;
     };
 
-    if (value.type === "temperature") {
-      if (options.partial) {
-        if (value.equipmentId !== undefined && !value.equipmentId) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Equipment is required for temperature tasks",
-            path: ["equipmentId"],
-          });
-        }
-      } else if (!value.equipmentId) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Equipment is required for temperature tasks",
-          path: ["equipmentId"],
-        });
-      }
+    if (value.type === "temperature" && !value.equipmentId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Equipment is required for temperature tasks",
+        path: ["equipmentId"],
+      });
     }
 
-    if (
-      value.type !== undefined &&
-      value.type !== "temperature" &&
-      value.equipmentId
-    ) {
+    if (value.type !== "temperature" && value.equipmentId) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Equipment applies only to temperature tasks",
@@ -226,17 +209,9 @@ export type CreateTaskTemplateInput = z.infer<typeof createTaskTemplateSchema>;
 
 export type TaskTemplateFieldsInput = z.infer<typeof taskTemplateFieldsSchema>;
 
-export const updateTaskTemplateSchema = withTaskTemplateValidation(
-  taskTemplateFieldsSchema.partial().refine(
-    (data) =>
-      Object.keys(data).length > 0 &&
-      Object.values(data).some((value) => value !== undefined),
-    { message: "At least one field must be provided" },
-  ),
-  { partial: true },
-);
+export const updateTaskTemplateSchema = createTaskTemplateSchema;
 
-export type UpdateTaskTemplateInput = z.infer<typeof updateTaskTemplateSchema>;
+export type UpdateTaskTemplateInput = CreateTaskTemplateInput;
 
 export const taskTemplateResponseSchema = z.object({
   id: z.string().uuid(),
