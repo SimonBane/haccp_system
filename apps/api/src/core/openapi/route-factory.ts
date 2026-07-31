@@ -9,7 +9,6 @@ import type { Db } from "../db/client.js";
 import {
   getDb,
   getCurrentLocation,
-  requireOrgContext,
 } from "../../lib/context.js";
 import type { AppEnv } from "../../types.js";
 import { errorResponse, jsonResponse } from "./responses.js";
@@ -27,7 +26,6 @@ type AdminCrudService<
   list: (db: Db, locationId: string) => Promise<z.infer<TList>>;
   create: (
     db: Db,
-    organizationId: string,
     locationId: string,
     input: z.infer<TCreate>,
   ) => Promise<z.infer<TItem>>;
@@ -144,12 +142,10 @@ export function registerAdminCrudRoutes<
   options.router.openapi(
     createRouteDef,
     async (c) => {
-      const { organizationId } = requireOrgContext(c);
-      const locationId = c.req.param("locationId");
+      const { id: locationId } = getCurrentLocation(c);
       const input = c.req.valid("json");
       const created = await options.service.create(
         getDb(c),
-        organizationId,
         locationId,
         input,
       );

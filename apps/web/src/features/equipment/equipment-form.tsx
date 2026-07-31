@@ -8,7 +8,6 @@ import {
   type EquipmentFieldsInput,
   type EquipmentResponse,
   type EquipmentType,
-  type UpdateEquipmentInput,
 } from "@haccp/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
@@ -59,9 +58,7 @@ type EquipmentFormProps = {
   suggestedDuplicateName?: string;
   existingItems?: Pick<EquipmentResponse, "id" | "name">[];
   onDuplicate?: () => void;
-  onSubmit: (
-    values: EquipmentFieldsInput | UpdateEquipmentInput,
-  ) => Promise<void>;
+  onSubmit: (values: EquipmentFieldsInput) => Promise<void>;
 };
 
 const EQUIPMENT_TYPES: EquipmentType[] = [

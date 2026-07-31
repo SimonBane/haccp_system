@@ -53,16 +53,9 @@ export type CreateEquipmentInput = z.infer<typeof createEquipmentSchema>;
 
 export type EquipmentFieldsInput = z.infer<typeof equipmentFieldsSchema>;
 
-export const updateEquipmentSchema = withTempRangeValidation(
-  equipmentFieldsSchema.partial().refine(
-    (data) =>
-      Object.keys(data).length > 0 &&
-      Object.values(data).some((value) => value !== undefined),
-    { message: "At least one field must be provided" },
-  ),
-);
+export const updateEquipmentSchema = createEquipmentSchema;
 
-export type UpdateEquipmentInput = z.infer<typeof updateEquipmentSchema>;
+export type UpdateEquipmentInput = CreateEquipmentInput;
 
 export const equipmentResponseSchema = z.object({
   id: z.string().uuid(),
