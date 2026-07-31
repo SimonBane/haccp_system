@@ -8,7 +8,7 @@ type Props = {
 export function TodayWorkspace({ children }: Props) {
   return (
     <div className="w-full">
-      <div className="w-full space-y-6 px-4 py-5 sm:px-6 sm:py-6 lg:px-4 lg:py-4">
+      <div className="w-full space-y-6 px-4 pt-3 pb-5 sm:px-6 sm:py-6 lg:px-4 lg:py-4">
         {children}
       </div>
     </div>

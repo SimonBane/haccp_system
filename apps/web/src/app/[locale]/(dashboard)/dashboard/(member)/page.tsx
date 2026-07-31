@@ -26,6 +26,7 @@ export default async function DashboardPage({
   return (
     <>
       <DashboardPageHeader
+        compact
         breadcrumbs={[
           { label: tDashboard("breadcrumbDashboard") },
           { label: tToday("breadcrumb"), current: true },

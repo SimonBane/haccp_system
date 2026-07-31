@@ -8,11 +8,9 @@ import {
   ListTodoIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import type { TodayFilter } from "../lib/today-grouping";
 import { minutesUntilScheduled } from "../lib/today-grouping";
 
 type Props = {
@@ -22,7 +20,6 @@ type Props = {
   attention: number;
   nextTask: TodayTaskItem | null;
   now: Date;
-  onFilterChange: (filter: TodayFilter) => void;
 };
 
 function durationLabel(
@@ -52,7 +49,6 @@ export function TodaySummary({
   attention,
   nextTask,
   now,
-  onFilterChange,
 }: Props) {
   const t = useTranslations("TodayPage");
   const progressValue = total > 0 ? Math.round((completed / total) * 100) : 0;
@@ -67,12 +63,7 @@ export function TodaySummary({
       aria-label={t("summary.ariaLabel")}
     >
       <Card className="gap-0 py-0">
-        <Button
-          type="button"
-          variant="ghost"
-          className="h-full min-h-24 w-full justify-start rounded-xl px-4 py-3 text-left"
-          onClick={() => onFilterChange("completed")}
-        >
+        <div className="flex h-full min-h-24 w-full items-start rounded-xl px-4 py-3">
           <div className="flex w-full min-w-0 items-center gap-3">
             <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <CheckCircle2Icon className="size-4" aria-hidden />
@@ -97,7 +88,7 @@ export function TodaySummary({
               />
             </div>
           </div>
-        </Button>
+        </div>
       </Card>
 
       <SummaryMetric
@@ -108,7 +99,6 @@ export function TodaySummary({
           attention > 0 ? t("summary.requiresAction") : t("overview.onTrack")
         }
         urgent={attention > 0}
-        onClick={() => onFilterChange("attention")}
       />
 
       <SummaryMetric
@@ -116,16 +106,10 @@ export function TodaySummary({
         value={remaining}
         label={t("metrics.remaining")}
         detail={t("summary.tasksLeft")}
-        onClick={() => onFilterChange("todo")}
       />
 
       <Card className="gap-0 py-0">
-        <Button
-          type="button"
-          variant="ghost"
-          className="h-full min-h-24 w-full justify-start rounded-xl px-4 py-3 text-left"
-          onClick={() => onFilterChange("todo")}
-        >
+        <div className="flex h-full min-h-24 w-full items-start rounded-xl px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <CalendarClockIcon className="size-4" aria-hidden />
@@ -160,7 +144,7 @@ export function TodaySummary({
               )}
             </div>
           </div>
-        </Button>
+        </div>
       </Card>
     </section>
   );
@@ -172,7 +156,6 @@ type SummaryMetricProps = {
   label: string;
   detail: string;
   urgent?: boolean;
-  onClick: () => void;
 };
 
 function SummaryMetric({
@@ -181,16 +164,10 @@ function SummaryMetric({
   label,
   detail,
   urgent,
-  onClick,
 }: SummaryMetricProps) {
   return (
     <Card className="gap-0 py-0">
-      <Button
-        type="button"
-        variant="ghost"
-        className="h-full min-h-24 w-full justify-start rounded-xl px-4 py-3 text-left"
-        onClick={onClick}
-      >
+      <div className="flex h-full min-h-24 w-full items-start rounded-xl px-4 py-3">
         <div className="flex min-w-0 items-center gap-3">
           <div
             className={cn(
@@ -219,7 +196,7 @@ function SummaryMetric({
             </div>
           </div>
         </div>
-      </Button>
+      </div>
     </Card>
   );
 }

@@ -2,20 +2,14 @@
 
 import type { TodayTaskItem } from "@haccp/shared";
 import { computeTodayTaskStatus } from "@haccp/shared";
-import {
-  CheckIcon,
-  CircleAlertIcon,
-  Clock3Icon,
-  ThermometerIcon,
-} from "lucide-react";
+import { CircleAlertIcon, Clock3Icon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { memo } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { minutesUntilScheduled, type TodayUiBucket } from "../lib/today-grouping";
+import { TodayTaskRow } from "./today-task-row";
 
 type Props = {
   task: TodayTaskItem;
@@ -56,10 +50,13 @@ function primaryActionLabel(
 ): string {
   const isTemperature = task.type === "temperature";
   const isOverdue = bucket === "overdue";
+  const isDueNow = bucket === "dueNow";
 
   if (isTemperature) {
+    if (isDueNow) return t("actions.recordNow");
     return isOverdue ? t("actions.recordLate") : t("actions.record");
   }
+  if (isDueNow) return t("actions.completeNow");
   return isOverdue ? t("actions.completeLate") : t("actions.complete");
 }
 
@@ -127,45 +124,25 @@ export const TodayTaskCard = memo(function TodayTaskCard({
   const minutesToTask = minutesUntilScheduled(task.scheduledTime, now);
   const isTaskToday = task.date === localIsoDate(now);
 
-  const statusBadge = (() => {
-    if (isAttention) {
-      return {
-        label: t("status.attention"),
-        variant: "destructive" as const,
-        showCheck: false,
-      };
-    }
-    if (isCompleted) {
-      return {
-        label: t("status.completed"),
-        variant: "secondary" as const,
-        showCheck: true,
-      };
-    }
-    if (isDueNow) {
-      return {
-        label: t("status.now"),
-        variant: "default" as const,
-        showCheck: false,
-      };
-    }
+  const statusLabel = (() => {
+    if (isAttention) return t("status.attention");
+    if (isCompleted) return t("status.completed");
+    if (isDueNow) return t("status.now");
     if (isOverdue) {
-      return {
-        label: isTaskToday
-          ? durationLabel(minutesToTask, "late", t)
-          : t("status.overdue"),
-        variant: "destructive" as const,
-        showCheck: false,
-      };
+      return isTaskToday
+        ? durationLabel(minutesToTask, "late", t)
+        : t("status.overdue");
     }
-    return {
-      label:
-        isTaskToday && minutesToTask > 0
-          ? durationLabel(minutesToTask, "until", t)
-          : t("status.pending"),
-      variant: "outline" as const,
-      showCheck: false,
-    };
+    return isTaskToday && minutesToTask > 0
+      ? durationLabel(minutesToTask, "until", t)
+      : t("status.pending");
+  })();
+
+  const timeBadgeVariant = (() => {
+    if (isAttention || isOverdue) return "destructive" as const;
+    if (isDueNow) return "default" as const;
+    if (isCompleted) return "secondary" as const;
+    return "outline" as const;
   })();
 
   const resultBadge = (() => {
@@ -185,13 +162,9 @@ export const TodayTaskCard = memo(function TodayTaskCard({
     };
   })();
 
-  const showAllowedRange =
-    isTemperature &&
-    task.minTempC !== null &&
-    task.maxTempC !== null &&
-    (!isRecorded || resultBadge?.outOfRange);
-
   const typeLabel = taskTypeLabel(task.type, t);
+  const subtitle = [task.equipmentName, typeLabel].filter(Boolean).join(" · ");
+
   const auditLabel =
     task.completedAt && task.completedBy
       ? t("audit.completed", {
@@ -215,32 +188,10 @@ export const TodayTaskCard = memo(function TodayTaskCard({
     onComplete(task);
   }
 
-  const taskDetails = (
+  const secondary = (
     <>
-      <div
-        className={cn(
-          "text-sm font-medium leading-snug",
-          isCompleted && "text-foreground/80",
-        )}
-      >
-        {task.title}
-      </div>
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs leading-snug text-muted-foreground">
-        <span>
-          {[task.equipmentName, typeLabel].filter(Boolean).join(" · ")}
-        </span>
-        {showAllowedRange && (
-          <span className="inline-flex items-center gap-1 tabular-nums">
-            <ThermometerIcon className="size-3" aria-hidden />
-            {t("allowedRangeCompact", {
-              min: task.minTempC!,
-              max: task.maxTempC!,
-            })}
-          </span>
-        )}
-      </div>
       {resultBadge && (
-        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <span
             className={cn(
               "text-xs font-semibold tabular-nums",
@@ -257,7 +208,7 @@ export const TodayTaskCard = memo(function TodayTaskCard({
       {resultBadge?.correctiveAction && (
         <Alert
           variant="destructive"
-          className="mt-1.5 bg-destructive/5 px-2.5 py-2"
+          className="bg-destructive/5 px-2.5 py-2"
         >
           <CircleAlertIcon className="size-3.5" aria-hidden />
           <AlertDescription className="text-xs leading-relaxed text-foreground!">
@@ -267,7 +218,7 @@ export const TodayTaskCard = memo(function TodayTaskCard({
         </Alert>
       )}
       {auditLabel && (
-        <div className="flex items-center gap-1.5 pt-1 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Clock3Icon className="size-3" aria-hidden />
           <span>{auditLabel}</span>
         </div>
@@ -275,103 +226,23 @@ export const TodayTaskCard = memo(function TodayTaskCard({
     </>
   );
 
+  const hasSecondary = resultBadge !== null || auditLabel !== null;
+
   return (
-    <Card
-      size="sm"
-      className={cn(
-        "gap-0 py-0 shadow-none transition-all hover:bg-muted/25 hover:shadow-xs focus-within:ring-2 focus-within:ring-ring/40",
-        isAttention &&
-          "border-l-[3px] border-l-destructive bg-destructive/[0.025]",
-        isOverdue && "border-l-[3px] border-l-destructive",
-        isDueNow && "border-l-[3px] border-l-primary bg-primary/[0.025]",
-        isCompleted && "bg-muted/10",
-      )}
-    >
-      <div className="hidden items-stretch gap-4 p-3.5 md:flex">
-        <div
-          className={cn(
-            "flex w-20 shrink-0 flex-col items-center justify-center rounded-lg bg-muted/60 px-2 py-3",
-            isAttention && "bg-destructive/8",
-            isDueNow && "bg-primary/8",
-          )}
-        >
-          <Clock3Icon
-            className="mb-1.5 size-3.5 text-muted-foreground"
-            aria-hidden
-          />
-          <time
-            dateTime={task.scheduledTime}
-            className={cn(
-              "text-base font-semibold tabular-nums tracking-tight",
-              isCompleted && "text-muted-foreground",
-            )}
-          >
-            {task.scheduledTime}
-          </time>
-        </div>
-
-        <div className="flex min-w-0 flex-1 items-center">
-          <div className="min-w-0">{taskDetails}</div>
-        </div>
-
-        <div className="flex w-28 shrink-0 flex-col items-stretch justify-center gap-2">
-          <Badge
-            variant={statusBadge.variant}
-            className="max-w-full justify-center gap-1 text-[11px]"
-          >
-            {statusBadge.showCheck && <CheckIcon aria-hidden />}
-            <span className="truncate">{statusBadge.label}</span>
-          </Badge>
-
-          <Button
-            type="button"
-            variant={isRecorded ? "outline" : "default"}
-            size="sm"
-            className={cn(
-              "w-full",
-              isRecorded && "text-muted-foreground hover:text-foreground",
-            )}
-            isLoading={isPending}
-            onClick={handlePrimaryAction}
-          >
-            {isRecorded
-              ? t("actions.undo")
-              : primaryActionLabel(task, bucket, t)}
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-3 px-3.5 py-3.5 md:hidden">
-        <div className="flex items-center justify-between gap-3">
-          <time
-            dateTime={task.scheduledTime}
-            className={cn(
-              "text-base font-semibold tabular-nums tracking-tight",
-              isCompleted && "text-muted-foreground",
-            )}
-          >
-            {task.scheduledTime}
-          </time>
-          <Badge variant={statusBadge.variant} className="gap-1 text-[11px]">
-            {statusBadge.showCheck && <CheckIcon aria-hidden />}
-            {statusBadge.label}
-          </Badge>
-        </div>
-
-        <div className="min-w-0">{taskDetails}</div>
-
-        <Button
-          type="button"
-          variant={isRecorded ? "outline" : "default"}
-          size="lg"
-          className="h-11 w-full"
-          isLoading={isPending}
-          onClick={handlePrimaryAction}
-        >
-          {isRecorded ? t("actions.undo") : primaryActionLabel(task, bucket, t)}
-        </Button>
-      </div>
-    </Card>
+    <TodayTaskRow
+      task={task}
+      bucket={bucket}
+      statusLabel={statusLabel}
+      timeBadgeVariant={timeBadgeVariant}
+      subtitle={subtitle}
+      actionLabel={
+        isRecorded ? t("actions.undo") : primaryActionLabel(task, bucket, t)
+      }
+      actionVariant={isRecorded ? "outline" : "default"}
+      isPending={isPending}
+      onAction={handlePrimaryAction}
+      secondary={hasSecondary ? secondary : undefined}
+    />
   );
 }, areTodayTaskCardPropsEqual);
 

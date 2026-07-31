@@ -24,6 +24,7 @@ type ResponsiveFormDialogProps = {
   title: ReactNode;
   description?: ReactNode;
   children: ReactNode;
+  footer?: ReactNode;
   className?: string;
   initialFocus?: boolean;
 };
@@ -34,6 +35,7 @@ export function ResponsiveFormDialog({
   title,
   description,
   children,
+  footer,
   className,
   initialFocus,
 }: ResponsiveFormDialogProps) {
@@ -44,9 +46,9 @@ export function ResponsiveFormDialog({
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent
           side="bottom"
-          className="flex h-[90dvh] flex-col gap-0 overflow-hidden rounded-t-xl pb-[env(safe-area-inset-bottom)]"
+          className="flex h-[90dvh] flex-col gap-0 overflow-hidden rounded-t-xl p-0 pb-0"
         >
-          <SheetHeader className="shrink-0 text-left">
+          <SheetHeader className="shrink-0 px-4 pt-4 text-left">
             <SheetTitle>{title}</SheetTitle>
             {description ? (
               <SheetDescription>{description}</SheetDescription>
@@ -55,6 +57,11 @@ export function ResponsiveFormDialog({
           <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
             {children}
           </div>
+          {footer ? (
+            <div className="shrink-0 border-t bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] [&_[data-slot=dialog-footer]]:flex-col [&_[data-slot=dialog-footer]]:gap-2 [&_button]:w-full">
+              {footer}
+            </div>
+          ) : null}
         </SheetContent>
       </Sheet>
     );
@@ -76,6 +83,7 @@ export function ResponsiveFormDialog({
           ) : null}
         </DialogHeader>
         {children}
+        {footer}
       </DialogContent>
     </Dialog>
   );
