@@ -3,10 +3,11 @@
 import type { LocationResponse } from "@haccp/shared";
 import { PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useMemo, type ReactNode } from "react";
+import { useCallback, useMemo, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { getColumns } from "@/features/locations/data-table/columns";
+import { LocationsMobileCard } from "@/features/locations/data-table/mobile-card";
 
 type LocationsDataProps = {
   items: LocationResponse[];
@@ -55,6 +56,19 @@ export function LocationsData({
     [onAdd, t],
   );
 
+  const renderMobileCard = useCallback(
+    (row: Parameters<typeof LocationsMobileCard>[0]["row"]) => (
+      <LocationsMobileCard
+        row={row}
+        t={t}
+        totalCount={items.length}
+        onRename={onRename}
+        onDelete={onDelete}
+      />
+    ),
+    [t, items.length, onRename, onDelete],
+  );
+
   return (
     <DataTable
       columns={columns}
@@ -70,6 +84,7 @@ export function LocationsData({
       ]}
       classNameWrapper="bg-sidebar ring-1 ring-sidebar-border"
       onRowClick={(row) => onRename(row.original)}
+      renderMobileCard={renderMobileCard}
       toolbar={toolbar}
     />
   );

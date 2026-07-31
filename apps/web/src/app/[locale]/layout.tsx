@@ -50,6 +50,7 @@ export async function generateMetadata({
 export function generateViewport() {
   return {
     themeColor: "#1d6fa8",
+    viewportFit: "cover",
   };
 }
 
@@ -87,7 +88,7 @@ export default async function LocaleLayout({
         <QueryProvider>
           <TooltipProvider>
             {children}
-            <Toaster position="top-right" />
+            <Toaster position="top-center" />
           </TooltipProvider>
         </QueryProvider>
       </NextIntlClientProvider>

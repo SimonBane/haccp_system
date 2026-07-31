@@ -1,20 +1,17 @@
 "use client";
 
-import * as React from "react";
 import { useTranslations } from "next-intl";
 import { usePathname } from "@/i18n/navigation";
 import { useAuth } from "@clerk/nextjs";
-import {
-  Building2Icon,
-  CalendarDaysIcon,
-  ListChecksIcon,
-  ShieldCheckIcon,
-  ThermometerSnowflakeIcon,
-} from "lucide-react";
+import { ShieldCheckIcon } from "lucide-react";
 import { useMemo } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { NavMain } from "@/components/layout/nav-main";
 import { NavUser } from "@/components/layout/nav-user";
+import {
+  getAdminNavItems,
+  getPlatformNavItems,
+} from "@/components/layout/nav-config";
 import { useTenant } from "@/features/tenant/tenant-provider";
 import {
   Sidebar,
@@ -25,6 +22,18 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+
+function toNavMainItems(
+  items: ReturnType<typeof getPlatformNavItems>,
+) {
+  return items.map((item) => ({
+    title: item.title,
+    url: item.url,
+    icon: <item.icon />,
+    isActive: item.isActive,
+    items: item.items,
+  }));
+}
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const t = useTranslations("Sidebar");
@@ -48,62 +57,35 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
   }, [organization.name]);
 
-  const platformNav = useMemo(
-    () => [
-      {
-        title: t("nav.today"),
-        url: "/dashboard",
-        icon: <CalendarDaysIcon />,
-        isActive: pathname === "/dashboard",
-      },
-    ],
-    [pathname, t],
+  const navLabels = useMemo(
+    () => ({
+      today: t("nav.today"),
+      organization: t("nav.organization"),
+      tasks: t("nav.tasks"),
+      equipment: t("nav.equipment"),
+      locations: t("nav.locations"),
+      employees: t("nav.employees"),
+      more: t("nav.more"),
+    }),
+    [t],
   );
 
-  const adminNav = useMemo(() => {
-    const organizationNav = {
-      title: t("nav.organization"),
-      url: "/dashboard/organization",
-      icon: <Building2Icon />,
-      isActive:
-        pathname === "/dashboard/organization" ||
-        pathname.startsWith("/dashboard/organization/"),
-      items: [
-        {
-          title: t("nav.employees"),
-          url: "/dashboard/organization/employees",
-          isActive: pathname.startsWith("/dashboard/organization/employees"),
-        },
-        ...(organization.multipleLocationsEnabled
-          ? [
-              {
-                title: t("nav.locations"),
-                url: "/dashboard/organization/locations",
-                isActive: pathname.startsWith(
-                  "/dashboard/organization/locations",
-                ),
-              },
-            ]
-          : []),
-      ],
-    };
+  const platformNav = useMemo(
+    () => toNavMainItems(getPlatformNavItems(pathname, navLabels)),
+    [navLabels, pathname],
+  );
 
-    return [
-      organizationNav,
-      {
-        title: t("nav.tasks"),
-        url: "/dashboard/task-templates",
-        icon: <ListChecksIcon />,
-        isActive: pathname.startsWith("/dashboard/task-templates"),
-      },
-      {
-        title: t("nav.equipment"),
-        url: "/dashboard/equipment",
-        icon: <ThermometerSnowflakeIcon />,
-        isActive: pathname.startsWith("/dashboard/equipment"),
-      },
-    ];
-  }, [organization.multipleLocationsEnabled, pathname, t]);
+  const adminNav = useMemo(
+    () =>
+      toNavMainItems(
+        getAdminNavItems(
+          pathname,
+          navLabels,
+          organization.multipleLocationsEnabled,
+        ),
+      ),
+    [navLabels, organization.multipleLocationsEnabled, pathname],
+  );
 
   return (
     <Sidebar variant="inset" {...props}>

@@ -3,10 +3,11 @@
 import type { EquipmentResponse, EquipmentType } from "@haccp/shared";
 import { PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useMemo, type ReactNode } from "react";
+import { useCallback, useMemo, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { getColumns } from "@/features/equipment/data-table/columns";
+import { EquipmentMobileCard } from "@/features/equipment/data-table/mobile-card";
 
 type EquipmentDataProps = {
   items: EquipmentResponse[];
@@ -61,6 +62,20 @@ export function EquipmentData({
     [onAdd, t],
   );
 
+  const renderMobileCard = useCallback(
+    (row: Parameters<typeof EquipmentMobileCard>[0]["row"]) => (
+      <EquipmentMobileCard
+        row={row}
+        t={t}
+        typeLabels={typeLabels}
+        onEdit={onEdit}
+        onDuplicate={onDuplicate}
+        onDelete={onDelete}
+      />
+    ),
+    [t, typeLabels, onEdit, onDuplicate, onDelete],
+  );
+
   return (
     <DataTable
       columns={columns}
@@ -75,6 +90,7 @@ export function EquipmentData({
       enableColumnVisibility
       classNameWrapper="bg-sidebar ring-1 ring-sidebar-border"
       onRowClick={(row) => onEdit(row.original)}
+      renderMobileCard={renderMobileCard}
       toolbar={toolbar}
     />
   );
