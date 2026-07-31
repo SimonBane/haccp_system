@@ -1,3 +1,7 @@
+"use client";
+
+import { ORG_ROLE } from "@haccp/shared";
+import { useAuth } from "@clerk/nextjs";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -8,8 +12,11 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { HeaderUserMenu } from "@/components/layout/header-user-menu";
 import { LocationPickerSlot } from "@/features/tenant/location-picker";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Link } from "@/i18n/navigation";
+import { cn } from "@/lib/utils";
 
 type BreadcrumbEntry = {
   label: string;
@@ -22,13 +29,22 @@ type DashboardPageHeaderProps = {
 };
 
 export function DashboardPageHeader({ breadcrumbs }: DashboardPageHeaderProps) {
+  const isMobile = useIsMobile();
+  const { orgRole } = useAuth();
+  const isAdmin = orgRole === ORG_ROLE.ADMIN;
+  const showMemberMenu = isMobile && !isAdmin;
+
   return (
-    <header className="flex h-16 shrink-0 items-center gap-2">
-      <div className="flex flex-1 items-center gap-2 px-4">
-        <SidebarTrigger className="-ml-1" />
+    <header
+      className={cn(
+        "flex shrink-0 flex-col gap-2 pt-[env(safe-area-inset-top)] md:h-16 md:flex-row md:items-center md:gap-2 md:pt-0",
+      )}
+    >
+      <div className="flex min-h-14 flex-1 items-center gap-2 px-4 md:min-h-0">
+        <SidebarTrigger className="-ml-1 hidden md:inline-flex" />
         <Separator
           orientation="vertical"
-          className="mr-2 data-vertical:h-4 data-vertical:self-auto"
+          className="mr-2 hidden data-vertical:h-4 data-vertical:self-auto md:block"
         />
         <Breadcrumb>
           <BreadcrumbList>
@@ -55,7 +71,10 @@ export function DashboardPageHeader({ breadcrumbs }: DashboardPageHeaderProps) {
           </BreadcrumbList>
         </Breadcrumb>
       </div>
-      <LocationPickerSlot />
+      <div className="flex items-center gap-2 px-4 pb-2 md:pb-0 md:pr-4">
+        {showMemberMenu ? <HeaderUserMenu /> : null}
+        <LocationPickerSlot />
+      </div>
     </header>
   );
 }

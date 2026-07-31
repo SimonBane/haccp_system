@@ -3,10 +3,11 @@
 import type { TaskTemplateResponse, TaskTemplateType } from "@haccp/shared";
 import { PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useMemo, type ReactNode } from "react";
+import { useCallback, useMemo, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { getColumns } from "@/features/task-templates/data-table/columns";
+import { TaskTemplatesMobileCard } from "@/features/task-templates/data-table/mobile-card";
 
 type TaskTemplatesDataProps = {
   items: TaskTemplateResponse[];
@@ -78,6 +79,21 @@ export function TaskTemplatesData({
     [onAdd, t],
   );
 
+  const renderMobileCard = useCallback(
+    (row: Parameters<typeof TaskTemplatesMobileCard>[0]["row"]) => (
+      <TaskTemplatesMobileCard
+        row={row}
+        t={t}
+        typeLabels={typeLabels}
+        scheduleLabels={scheduleLabels}
+        onEdit={onEdit}
+        onDuplicate={onDuplicate}
+        onDelete={onDelete}
+      />
+    ),
+    [t, typeLabels, scheduleLabels, onEdit, onDuplicate, onDelete],
+  );
+
   return (
     <DataTable
       columns={columns}
@@ -92,6 +108,7 @@ export function TaskTemplatesData({
       enableColumnVisibility
       classNameWrapper="bg-sidebar ring-1 ring-sidebar-border"
       onRowClick={(row) => onEdit(row.original)}
+      renderMobileCard={renderMobileCard}
       toolbar={toolbar}
     />
   );

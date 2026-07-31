@@ -33,13 +33,9 @@ import {
   InputGroupText,
 } from "@/components/ui/input-group";
 import { ApiRequestError } from "@/lib/api-utils";
+import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
   DialogFooter,
-  DialogHeader,
-  DialogTitle,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -317,28 +313,26 @@ export function EquipmentForm({
   const hasChanges = !isEditing || !equipment || isDirty;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="w-full py-8 sm:max-w-md sm:min-h-[24rem]"
-        initialFocus={isEditing || isDuplicating ? undefined : false}
-      >
-        <DialogHeader>
-          <DialogTitle>
-            {isEditing
-              ? t("editTitle")
-              : isDuplicating
-                ? t("duplicateTitle")
-                : t("addTitle")}
-          </DialogTitle>
-          <DialogDescription>
-            {isEditing
-              ? t("editDescription")
-              : isDuplicating
-                ? t("duplicateDescription")
-                : t("addDescription")}
-          </DialogDescription>
-        </DialogHeader>
-
+    <ResponsiveFormDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={
+        isEditing
+          ? t("editTitle")
+          : isDuplicating
+            ? t("duplicateTitle")
+            : t("addTitle")
+      }
+      description={
+        isEditing
+          ? t("editDescription")
+          : isDuplicating
+            ? t("duplicateDescription")
+            : t("addDescription")
+      }
+      className="sm:min-h-[24rem]"
+      initialFocus={isEditing || isDuplicating ? undefined : false}
+    >
         <form
           id={EQUIPMENT_FORM_ID}
           onSubmit={form.handleSubmit(handleValidSubmit)}
@@ -561,7 +555,6 @@ export function EquipmentForm({
               )}
             </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveFormDialog>
   );
 }
