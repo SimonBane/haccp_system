@@ -78,7 +78,7 @@ features/today/
     today-header.tsx
     today-overview.tsx
     today-summary.tsx
-    today-filters.tsx
+    today-progress-strip.tsx
     today-section.tsx
     today-task-card.tsx
     today-task-list.tsx

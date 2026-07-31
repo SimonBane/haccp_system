@@ -42,6 +42,8 @@ interface DataTableProps<TData, TValue> {
   onRowClick?: (row: Row<TData>) => void;
   renderMobileCard?: (row: Row<TData>) => React.ReactNode;
   emptyMessage?: string;
+  emptyDescription?: string;
+  emptyAction?: React.ReactNode;
   noResultsMessage?: string;
   className?: string;
   classNameWrapper?: string;
@@ -91,6 +93,8 @@ export function DataTable<TData, TValue>({
   onRowClick,
   renderMobileCard,
   emptyMessage = "No results.",
+  emptyDescription,
+  emptyAction,
   noResultsMessage = "No results found.",
   className,
   classNameWrapper,
@@ -188,8 +192,12 @@ export function DataTable<TData, TValue>({
   const visibleRows = table.getRowModel().rows;
   const isFiltered = columnFilters.length > 0;
   const displayEmptyMessage = isFiltered ? noResultsMessage : emptyMessage;
+  const showColumnVisibility = enableColumnVisibility && !useCardList;
   const showToolbar =
-    enableSearch || Boolean(Toolbar) || Boolean(toolbar) || enableColumnVisibility;
+    enableSearch ||
+    Boolean(Toolbar) ||
+    Boolean(toolbar) ||
+    showColumnVisibility;
   const shouldShowSelectionCount = showSelectionCount ?? enableRowSelection;
 
   return (
@@ -201,8 +209,18 @@ export function DataTable<TData, TValue>({
     >
       {showToolbar ? (
         <div className="shrink-0">
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-end">
+          <div
+            className={cn(
+              "flex flex-col gap-2",
+              !useCardList && "sm:flex-row sm:flex-wrap sm:items-end sm:justify-between",
+            )}
+          >
+            <div
+              className={cn(
+                "flex w-full flex-col gap-2",
+                !useCardList && "sm:w-auto sm:flex-row sm:flex-wrap sm:items-end",
+              )}
+            >
               {enableSearch && searchColumn ? (
                 <DataTableSearch
                   table={table}
@@ -210,11 +228,21 @@ export function DataTable<TData, TValue>({
                   placeholder={searchPlaceholder ?? ""}
                 />
               ) : null}
-              {enableColumnVisibility ? (
+              {showColumnVisibility ? (
                 <DataTableViewOptions table={table} />
               ) : null}
             </div>
-            {Toolbar ? <Toolbar table={table} /> : toolbar}
+            {Toolbar ? (
+              <Toolbar table={table} />
+            ) : toolbar ? (
+              <div
+                className={cn(
+                  useCardList && "w-full [&_[data-slot=button]]:w-full",
+                )}
+              >
+                {toolbar}
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -225,6 +253,8 @@ export function DataTable<TData, TValue>({
           renderMobileCard={renderMobileCard}
           onRowClick={onRowClick}
           emptyMessage={displayEmptyMessage}
+          emptyDescription={isFiltered ? undefined : emptyDescription}
+          emptyAction={isFiltered ? undefined : emptyAction}
           className={className}
         />
       ) : (
@@ -259,7 +289,7 @@ export function DataTable<TData, TValue>({
                           header.column.columnDef.header,
                           header.getContext(),
                         )}
-                        {enableColumnVisibility ? (
+                        {showColumnVisibility ? (
                           <DataTableColumnHideButton column={header.column} />
                         ) : null}
                       </div>

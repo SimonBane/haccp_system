@@ -5,16 +5,7 @@ import { Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
 import { EquipmentForm } from "@/features/equipment/equipment-form";
 import { EquipmentData } from "@/features/equipment/data-table/data";
 import { useEquipmentMutations } from "@/features/equipment/hooks/use-equipment-mutations";
@@ -121,8 +112,12 @@ export function EquipmentManager({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t("title")}</h1>
-        <p className="text-sm text-muted-foreground">{t("description")}</p>
+        <h1 className="text-xl font-semibold tracking-tight md:text-2xl">
+          {t("title")}
+        </h1>
+        <p className="hidden text-sm text-muted-foreground md:block">
+          {t("description")}
+        </p>
       </div>
 
       <EquipmentData
@@ -133,36 +128,24 @@ export function EquipmentManager({
         onDelete={handleDelete}
       />
 
-      <AlertDialog
+      <ResponsiveAlertDialog
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => {
           if (!open && !isDeleting) setDeleteTarget(null);
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("deleteDialog.title")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteTarget
-                ? t("deleteConfirm", { name: deleteTarget.name })
-                : t("deleteDialog.fallback")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>
-              {t("deleteDialog.cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              isLoading={isDeleting}
-              onClick={confirmDelete}
-            >
-              <Trash2Icon data-icon="inline-start" />
-              {t("deleteDialog.confirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        title={t("deleteDialog.title")}
+        description={
+          deleteTarget
+            ? t("deleteConfirm", { name: deleteTarget.name })
+            : t("deleteDialog.fallback")
+        }
+        cancelLabel={t("deleteDialog.cancel")}
+        confirmLabel={t("deleteDialog.confirm")}
+        confirmIcon={<Trash2Icon data-icon="inline-start" />}
+        isLoading={isDeleting}
+        cancelDisabled={isDeleting}
+        onConfirm={confirmDelete}
+      />
 
       {formOpen ? (
         <EquipmentForm

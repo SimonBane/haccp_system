@@ -21,6 +21,7 @@
   "devDependencies": {
     "@haccp/eslint-config": "workspace:*",
     "@haccp/typescript-config": "workspace:*",
+    "@types/node": "^20.19.43",
     "eslint": "^9.28.0",
     "typescript": "^5.8.3"
   }

@@ -2,39 +2,28 @@
 
 import type { TodayTaskItem } from "@haccp/shared";
 import { useTranslations } from "next-intl";
-import { TodayFilters } from "./today-filters";
-import type {
-  GroupedTodayTasks,
-  TodayFilter,
-  TodayFilterCounts,
-} from "../lib/today-grouping";
+import type { GroupedTodayTasks } from "../lib/today-grouping";
 import { TodayTaskList } from "./today-task-list";
 
 type Props = {
-  filter: TodayFilter;
-  counts: TodayFilterCounts;
   grouped: GroupedTodayTasks;
   totalCount: number;
   completedCount: number;
   now: Date;
   pendingKey: string | null;
   currentUserId: string | null;
-  onFilterChange: (filter: TodayFilter) => void;
   onComplete: (task: TodayTaskItem) => void;
   onUndo: (task: TodayTaskItem) => void;
   onRecordTemperature: (task: TodayTaskItem) => void;
 };
 
 export function TodayTaskWorkspace({
-  filter,
-  counts,
   grouped,
   totalCount,
   completedCount,
   now,
   pendingKey,
   currentUserId,
-  onFilterChange,
   onComplete,
   onUndo,
   onRecordTemperature,
@@ -51,8 +40,6 @@ export function TodayTaskWorkspace({
           {t("workspace.description")}
         </p>
       </div>
-
-      <TodayFilters value={filter} onChange={onFilterChange} counts={counts} />
 
       <TodayTaskList
         grouped={grouped}

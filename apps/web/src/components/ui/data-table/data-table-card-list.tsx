@@ -2,6 +2,14 @@
 
 import type { Row, Table as ReactTable } from "@tanstack/react-table";
 import type { ReactNode } from "react";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { cn } from "@/lib/utils";
 
 type DataTableCardListProps<TData> = {
@@ -9,6 +17,8 @@ type DataTableCardListProps<TData> = {
   renderMobileCard: (row: Row<TData>) => ReactNode;
   onRowClick?: (row: Row<TData>) => void;
   emptyMessage: string;
+  emptyDescription?: string;
+  emptyAction?: ReactNode;
   className?: string;
 };
 
@@ -17,6 +27,8 @@ export function DataTableCardList<TData>({
   renderMobileCard,
   onRowClick,
   emptyMessage,
+  emptyDescription,
+  emptyAction,
   className,
 }: DataTableCardListProps<TData>) {
   const rows = table.getRowModel().rows;
@@ -25,11 +37,21 @@ export function DataTableCardList<TData>({
     return (
       <div
         className={cn(
-          "flex h-24 items-center justify-center rounded-md border bg-card text-sm text-muted-foreground",
+          "rounded-md border bg-card",
           className,
         )}
       >
-        {emptyMessage}
+        <Empty className="border-none py-10">
+          <EmptyHeader>
+            <EmptyTitle className="text-base">{emptyMessage}</EmptyTitle>
+            {emptyDescription ? (
+              <EmptyDescription>{emptyDescription}</EmptyDescription>
+            ) : null}
+          </EmptyHeader>
+          {emptyAction ? (
+            <EmptyContent>{emptyAction}</EmptyContent>
+          ) : null}
+        </Empty>
       </div>
     );
   }
