@@ -51,13 +51,6 @@ clerkWebhookRoutes.post("/clerk", async (c) => {
       }
       break;
     }
-    case "user.created": {
-      const id = event.data.id;
-      if (id) {
-        await clerkWebhookService.handleUserCreated(db, id, event.data);
-      }
-      break;
-    }
     case "user.updated": {
       const id = event.data.id;
       if (id) {
@@ -69,53 +62,6 @@ clerkWebhookRoutes.post("/clerk", async (c) => {
       const id = event.data.id;
       if (id) {
         await clerkWebhookService.handleUserDeleted(db, id);
-      }
-      break;
-    }
-    case "organizationMembership.created": {
-      const data = event.data;
-      const clerkOrgId = data.organization?.id;
-      const clerkUserId = data.public_user_data?.user_id;
-      const email = data.public_user_data?.identifier;
-      const role = data.role;
-
-      if (clerkOrgId && clerkUserId && email && role) {
-        await clerkWebhookService.handleMembershipCreated(
-          db,
-          clerkOrgId,
-          clerkUserId,
-          email,
-          role,
-          {
-            first_name: data.public_user_data?.first_name,
-            last_name: data.public_user_data?.last_name,
-            email_addresses: [
-              {
-                id: "primary",
-                email_address: email,
-              },
-            ],
-            primary_email_address_id: "primary",
-            image_url: data.public_user_data?.image_url,
-            has_image: data.public_user_data?.has_image,
-          },
-        );
-      }
-      break;
-    }
-    case "organizationMembership.updated": {
-      const data = event.data;
-      const clerkOrgId = data.organization?.id;
-      const clerkUserId = data.public_user_data?.user_id;
-      const role = data.role;
-
-      if (clerkOrgId && clerkUserId && role) {
-        await clerkWebhookService.handleMembershipUpdated(
-          db,
-          clerkOrgId,
-          clerkUserId,
-          role,
-        );
       }
       break;
     }

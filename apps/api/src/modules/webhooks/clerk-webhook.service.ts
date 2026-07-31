@@ -57,14 +57,6 @@ export const clerkWebhookService = {
     await tenantCache.invalidate(clerkOrgId);
   },
 
-  async handleUserCreated(
-    db: Db,
-    clerkUserId: string,
-    data: Parameters<typeof extractClerkProfile>[0],
-  ): Promise<void> {
-    await userService.syncUserFromClerkWebhook(db, clerkUserId, data);
-  },
-
   async handleUserUpdated(
     db: Db,
     clerkUserId: string,
@@ -77,39 +69,6 @@ export const clerkWebhookService = {
     const { userRepository } = await import("../users/user.repository.js");
     await userRepository.softDeleteByClerkUserId(db, clerkUserId);
     await userService.invalidateCache(clerkUserId);
-  },
-
-  async handleMembershipCreated(
-    db: Db,
-    clerkOrgId: string,
-    clerkUserId: string,
-    email: string,
-    role: string,
-    profile: Parameters<typeof extractClerkProfile>[0],
-  ): Promise<void> {
-    await membershipWebhookService.linkMembershipFromClerk(
-      db,
-      clerkOrgId,
-      clerkUserId,
-      email,
-      role,
-      null,
-      extractClerkProfile(profile),
-    );
-  },
-
-  async handleMembershipUpdated(
-    db: Db,
-    clerkOrgId: string,
-    clerkUserId: string,
-    role: string,
-  ): Promise<void> {
-    await membershipWebhookService.syncMembershipRole(
-      db,
-      clerkOrgId,
-      clerkUserId,
-      role,
-    );
   },
 
   async handleMembershipDeleted(
