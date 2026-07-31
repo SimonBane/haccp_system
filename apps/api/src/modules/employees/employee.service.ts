@@ -2,15 +2,18 @@ import type {
   CreateEmployeeInput,
   EmployeeListResponse,
   EmployeeResponse,
+  LocationResponse,
   UpdateEmployeeInput,
   UpdateEmployeeLocationsInput,
   UpdateEmployeeRoleInput,
 } from "@haccp/shared";
-import { normalizeOrgRole, ORG_ROLE } from "@haccp/shared";
+import { normalizeEmail, normalizeOrgRole, ORG_ROLE } from "@haccp/shared";
 import type { Db } from "../../core/db/client.js";
 import { clerkClient } from "../../core/auth/clerk-client.js";
 import { env } from "../../env.js";
 import { MEMBERSHIP_STATUS } from "../../core/db/schema/organization-memberships.js";
+import type { Organization } from "../../core/db/schema/organizations.js";
+import type { OrganizationMembership } from "../../core/db/schema/organization-memberships.js";
 import type { User } from "../../core/db/schema/users.js";
 import {
   ConflictError,
@@ -23,40 +26,51 @@ import { locationRepository } from "../locations/location.repository.js";
 import { organizationRepository } from "../organizations/organization.repository.js";
 import { userService } from "../users/user.service.js";
 import { userRepository } from "../users/user.repository.js";
-import { mapLocations, toEmployeeResponse } from "./employee.mapper.js";
+import { mapLocationResponses, mapLocations, toEmployeeResponse } from "./employee.mapper.js";
 import { membershipLocationsCache } from "./membership-locations-cache.js";
-import { employeeRepository } from "./employee.repository.js";
+import {
+  employeeRepository,
+  type MembershipWithUserRow,
+} from "./employee.repository.js";
 
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
+type LinkMembershipRow = {
+  membership: OrganizationMembership;
+  user: User;
+};
+
+type EmployeeDetail = NonNullable<
+  Awaited<ReturnType<typeof employeeRepository.findDetailById>>
+>;
+
+function buildEmployeeResponseFromDetail(
+  detail: EmployeeDetail,
+  allLocations: LocationResponse[],
+  overrides?: {
+    membership?: Partial<EmployeeDetail["membership"]>;
+    user?: Partial<EmployeeDetail["user"]>;
+    locationIds?: string[];
+  },
+): EmployeeResponse {
+  return toEmployeeResponse({
+    membership: { ...detail.membership, ...overrides?.membership },
+    user: { ...detail.user, ...overrides?.user },
+    locationIds: overrides?.locationIds ?? detail.locationIds,
+    locations: mapLocationResponses(
+      allLocations,
+      overrides?.locationIds ?? detail.locationIds,
+    ),
+  });
 }
 
-async function buildEmployeeResponse(
-  db: Db,
-  organizationId: string,
-  membershipId: string,
-): Promise<EmployeeResponse> {
-  const detail = await employeeRepository.findDetailById(
-    db,
-    organizationId,
-    membershipId,
-  );
+function assertLocationIdsInTenant(
+  locationIds: string[],
+  tenantLocations: LocationResponse[],
+): void {
+  const validIds = new Set(tenantLocations.map((location) => location.id));
 
-  if (!detail) {
-    throw new NotFoundError("Employee not found");
+  if (!locationIds.every((locationId) => validIds.has(locationId))) {
+    throw new ValidationError("One or more locations are invalid");
   }
-
-  const allLocations = await locationRepository.findByOrganizationId(
-    db,
-    organizationId,
-  );
-
-  return toEmployeeResponse({
-    membership: detail.membership,
-    user: detail.user,
-    locationIds: detail.locationIds,
-    locations: mapLocations(allLocations, detail.locationIds),
-  });
 }
 
 async function sendClerkInvitation(
@@ -192,6 +206,7 @@ export const employeeService = {
     clerkOrgId: string,
     inviterUserId: string,
     input: CreateEmployeeInput,
+    tenantLocations: LocationResponse[],
   ): Promise<EmployeeResponse> {
     const email = normalizeEmail(input.email);
     const existing = await employeeRepository.findByEmailIncludingDeleted(
@@ -204,19 +219,11 @@ export const employeeService = {
       throw new ConflictError("An employee with this email already exists");
     }
 
-    const locationsValid = await employeeRepository.assertLocationsBelongToOrg(
-      db,
-      organizationId,
-      input.locationIds,
-    );
-
-    if (!locationsValid) {
-      throw new ValidationError("One or more locations are invalid");
-    }
+    assertLocationIdsInTenant(input.locationIds, tenantLocations);
 
     const role = normalizeOrgRole(input.role);
 
-    const membership = await db.transaction(async (tx) => {
+    const created = await db.transaction(async (tx) => {
       let user: User | null | undefined = existing?.user;
 
       if (existing?.membership.deletedAt) {
@@ -268,29 +275,38 @@ export const employeeService = {
         input.locationIds,
       );
 
-      if (input.inviteNow) {
-        const invitation = await sendClerkInvitation(
-          clerkOrgId,
-          inviterUserId,
-          email,
-          role,
-        );
-
-        const invited = await employeeRepository.updateById(tx, employee.id, {
-          status: MEMBERSHIP_STATUS.INVITED,
-          clerkInvitationId: invitation.id,
-          invitedAt: new Date(),
-        });
-
-        return invited ?? employee;
-      }
-
-      return employee;
+      return { employee, user, email, role };
     });
+
+    let membership = created.employee;
+
+    if (input.inviteNow) {
+      const invitation = await sendClerkInvitation(
+        clerkOrgId,
+        inviterUserId,
+        created.email,
+        created.role,
+      );
+
+      const invited = await employeeRepository.updateById(db, membership.id, {
+        status: MEMBERSHIP_STATUS.INVITED,
+        clerkInvitationId: invitation.id,
+        invitedAt: new Date(),
+      });
+
+      membership = invited ?? membership;
+    }
 
     await invalidateMembershipLocationsCache(organizationId, membership.userId);
 
-    return buildEmployeeResponse(db, organizationId, membership.id);
+    return buildEmployeeResponseFromDetail(
+      {
+        membership,
+        user: created.user,
+        locationIds: input.locationIds,
+      },
+      tenantLocations,
+    );
   },
 
   async update(
@@ -298,6 +314,7 @@ export const employeeService = {
     organizationId: string,
     membershipId: string,
     input: UpdateEmployeeInput,
+    tenantLocations: LocationResponse[],
   ): Promise<EmployeeResponse> {
     const detail = await employeeRepository.findDetailById(
       db,
@@ -313,6 +330,8 @@ export const employeeService = {
       throw new ValidationError("Active employees cannot be edited this way");
     }
 
+    let updatedUser = detail.user;
+
     if (input.email) {
       const email = normalizeEmail(input.email);
       const existing = await employeeRepository.findByEmail(
@@ -326,19 +345,42 @@ export const employeeService = {
       }
     }
 
-    await userService.updateProfile(db, detail.user.id, {
-      email: input.email ? normalizeEmail(input.email) : undefined,
-      firstName: input.firstName,
-      lastName: input.lastName,
-    });
-
-    if (input.role) {
-      await employeeRepository.updateById(db, membershipId, {
-        role: normalizeOrgRole(input.role),
+    if (
+      input.email !== undefined ||
+      input.firstName !== undefined ||
+      input.lastName !== undefined
+    ) {
+      const user = await userService.updateProfile(db, detail.user.id, {
+        email: input.email ? normalizeEmail(input.email) : undefined,
+        firstName: input.firstName,
+        lastName: input.lastName,
       });
+
+      if (user) {
+        updatedUser = user;
+      }
     }
 
-    return buildEmployeeResponse(db, organizationId, membershipId);
+    let updatedMembership = detail.membership;
+
+    if (input.role) {
+      const membership = await employeeRepository.updateById(db, membershipId, {
+        role: normalizeOrgRole(input.role),
+      });
+
+      if (membership) {
+        updatedMembership = membership;
+      }
+    }
+
+    return buildEmployeeResponseFromDetail(
+      detail,
+      tenantLocations,
+      {
+        membership: updatedMembership,
+        user: updatedUser,
+      },
+    );
   },
 
   async invite(
@@ -347,6 +389,7 @@ export const employeeService = {
     clerkOrgId: string,
     inviterUserId: string,
     membershipId: string,
+    tenantLocations: LocationResponse[],
   ): Promise<EmployeeResponse> {
     const detail = await employeeRepository.findDetailById(
       db,
@@ -369,13 +412,19 @@ export const employeeService = {
       detail.membership.role,
     );
 
-    await employeeRepository.updateById(db, membershipId, {
-      status: MEMBERSHIP_STATUS.INVITED,
-      clerkInvitationId: invitation.id,
-      invitedAt: new Date(),
-    });
+    const updatedMembership = await employeeRepository.updateById(
+      db,
+      membershipId,
+      {
+        status: MEMBERSHIP_STATUS.INVITED,
+        clerkInvitationId: invitation.id,
+        invitedAt: new Date(),
+      },
+    );
 
-    return buildEmployeeResponse(db, organizationId, membershipId);
+    return buildEmployeeResponseFromDetail(detail, tenantLocations, {
+      membership: updatedMembership ?? detail.membership,
+    });
   },
 
   async revokeInvitation(
@@ -383,6 +432,7 @@ export const employeeService = {
     organizationId: string,
     clerkOrgId: string,
     membershipId: string,
+    tenantLocations: LocationResponse[],
   ): Promise<EmployeeResponse> {
     const detail = await employeeRepository.findDetailById(
       db,
@@ -406,13 +456,19 @@ export const employeeService = {
       invitationId: detail.membership.clerkInvitationId,
     });
 
-    await employeeRepository.updateById(db, membershipId, {
-      status: MEMBERSHIP_STATUS.DRAFT,
-      clerkInvitationId: null,
-      invitedAt: null,
-    });
+    const updatedMembership = await employeeRepository.updateById(
+      db,
+      membershipId,
+      {
+        status: MEMBERSHIP_STATUS.DRAFT,
+        clerkInvitationId: null,
+        invitedAt: null,
+      },
+    );
 
-    return buildEmployeeResponse(db, organizationId, membershipId);
+    return buildEmployeeResponseFromDetail(detail, tenantLocations, {
+      membership: updatedMembership ?? detail.membership,
+    });
   },
 
   async updateRole(
@@ -421,6 +477,7 @@ export const employeeService = {
     clerkOrgId: string,
     membershipId: string,
     input: UpdateEmployeeRoleInput,
+    tenantLocations: LocationResponse[],
   ): Promise<EmployeeResponse> {
     const detail = await employeeRepository.findDetailById(
       db,
@@ -445,11 +502,15 @@ export const employeeService = {
       });
     }
 
-    await employeeRepository.updateById(db, membershipId, {
-      role,
-    });
+    const updatedMembership = await employeeRepository.updateById(
+      db,
+      membershipId,
+      { role },
+    );
 
-    return buildEmployeeResponse(db, organizationId, membershipId);
+    return buildEmployeeResponseFromDetail(detail, tenantLocations, {
+      membership: updatedMembership ?? detail.membership,
+    });
   },
 
   async updateLocations(
@@ -457,6 +518,7 @@ export const employeeService = {
     organizationId: string,
     membershipId: string,
     input: UpdateEmployeeLocationsInput,
+    tenantLocations: LocationResponse[],
   ): Promise<EmployeeResponse> {
     const detail = await employeeRepository.findDetailById(
       db,
@@ -468,15 +530,7 @@ export const employeeService = {
       throw new NotFoundError("Employee not found");
     }
 
-    const locationsValid = await employeeRepository.assertLocationsBelongToOrg(
-      db,
-      organizationId,
-      input.locationIds,
-    );
-
-    if (!locationsValid) {
-      throw new ValidationError("One or more locations are invalid");
-    }
+    assertLocationIdsInTenant(input.locationIds, tenantLocations);
 
     await employeeRepository.replaceLocationAssignments(
       db,
@@ -489,7 +543,9 @@ export const employeeService = {
       detail.membership.userId,
     );
 
-    return buildEmployeeResponse(db, organizationId, membershipId);
+    return buildEmployeeResponseFromDetail(detail, tenantLocations, {
+      locationIds: input.locationIds,
+    });
   },
 
   async remove(
@@ -567,11 +623,14 @@ export const membershipWebhookService = {
     role: string,
     clerkInvitationId?: string | null,
     profile?: ClerkLinkProfile,
+    options?: {
+      organization?: Organization;
+      membershipRow?: LinkMembershipRow | MembershipWithUserRow | null;
+    },
   ) {
-    const organization = await organizationRepository.findByClerkOrgId(
-      db,
-      clerkOrgId,
-    );
+    const organization =
+      options?.organization ??
+      (await organizationRepository.findByClerkOrgId(db, clerkOrgId));
 
     if (!organization) {
       return;
@@ -580,14 +639,16 @@ export const membershipWebhookService = {
     const normalizedEmail = normalizeEmail(email);
     const normalizedRole = normalizeOrgRole(role);
     const membershipRow =
-      (clerkInvitationId
-        ? await employeeRepository.findByInvitationId(db, clerkInvitationId)
-        : null) ??
-      (await employeeRepository.findByEmail(
-        db,
-        organization.id,
-        normalizedEmail,
-      ));
+      options?.membershipRow !== undefined
+        ? options.membershipRow
+        : ((clerkInvitationId
+            ? await employeeRepository.findByInvitationId(db, clerkInvitationId)
+            : null) ??
+          (await employeeRepository.findByEmail(
+            db,
+            organization.id,
+            normalizedEmail,
+          )));
 
     const clerkProfile = profile ?? {
       firstName: "",
@@ -598,12 +659,18 @@ export const membershipWebhookService = {
     };
 
     if (membershipRow) {
+      if (
+        membershipRow.membership.status === MEMBERSHIP_STATUS.ACTIVE &&
+        membershipRow.user.clerkUserId === clerkUserId
+      ) {
+        return;
+      }
+
+      let linkedUserId: string;
       const existingClerkUser = await userRepository.findByClerkUserId(
         db,
         clerkUserId,
       );
-
-      let linkedUserId: string;
 
       if (
         existingClerkUser &&
@@ -687,60 +754,22 @@ export const membershipWebhookService = {
     await invalidateMembershipLocationsCache(organization.id, user.id);
   },
 
-  async removeMembership(
-    db: Db,
-    clerkOrgId: string,
-    clerkUserId: string,
-  ) {
-    const organization = await organizationRepository.findByClerkOrgId(
+  async removeMembership(db: Db, clerkOrgId: string, clerkUserId: string) {
+    const row = await employeeRepository.findMembershipByClerkIds(
       db,
       clerkOrgId,
+      clerkUserId,
     );
 
-    if (!organization) {
+    if (!row) {
       return;
     }
 
-    const user = await userRepository.findByClerkUserId(db, clerkUserId);
-
-    if (!user) {
-      return;
-    }
-
-    const membership = await employeeRepository.findByUserAndOrg(
-      db,
-      organization.id,
-      user.id,
-    );
-
-    if (!membership) {
-      return;
-    }
-
-    await employeeRepository.updateById(db, membership.id, {
-      deletedAt: new Date(),
-    });
-
-    await membershipLocationsCache.invalidate(organization.id, user.id);
+    await employeeRepository.softDeleteById(db, row.membership.id);
+    await membershipLocationsCache.invalidate(row.organizationId, row.userId);
   },
 
   async handleInvitationRevoked(db: Db, clerkInvitationId: string) {
-    const membershipRow = await employeeRepository.findByInvitationId(
-      db,
-      clerkInvitationId,
-    );
-
-    if (
-      !membershipRow ||
-      membershipRow.membership.status !== MEMBERSHIP_STATUS.INVITED
-    ) {
-      return;
-    }
-
-    await employeeRepository.updateById(db, membershipRow.membership.id, {
-      status: MEMBERSHIP_STATUS.DRAFT,
-      clerkInvitationId: null,
-      invitedAt: null,
-    });
+    await employeeRepository.revertInvitationById(db, clerkInvitationId);
   },
 };

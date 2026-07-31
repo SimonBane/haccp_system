@@ -21,6 +21,14 @@ export function toUserSummary(user: User) {
   };
 }
 
+export function toUserSummaryFromResponse(user: UserResponse) {
+  return {
+    id: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+  };
+}
+
 export type ClerkUserProfile = {
   firstName: string;
   lastName: string;

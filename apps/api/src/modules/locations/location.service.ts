@@ -14,35 +14,20 @@ import { mapDbMutationError } from "../../lib/db-errors.js";
 import { tenantCache } from "../tenant/tenant-cache.js";
 import { toLocationResponse } from "./location.mapper.js";
 import { locationRepository } from "./location.repository.js";
-import { organizationRepository } from "../organizations/organization.repository.js";
 
 export const locationService = {
-  async listByOrganization(
-    db: Db,
-    organizationId: string,
-  ): Promise<LocationListResponse> {
-    const rows = await locationRepository.findByOrganizationId(
-      db,
-      organizationId,
-    );
-
-    return {
-      items: rows.map(toLocationResponse),
-    };
+  listFromTenant(locations: LocationResponse[]): LocationListResponse {
+    return { items: locations };
   },
 
   async create(
     db: Db,
     clerkOrgId: string,
     organizationId: string,
+    multipleLocationsEnabled: boolean,
     input: CreateLocationInput,
   ): Promise<LocationResponse> {
-    const organization = await organizationRepository.findById(
-      db,
-      organizationId,
-    );
-
-    if (!organization?.multipleLocationsEnabled) {
+    if (!multipleLocationsEnabled) {
       throw new ConflictError("Multiple locations are not enabled");
     }
 
@@ -67,7 +52,6 @@ export const locationService = {
       mapDbMutationError(error, {
         unique: () =>
           new ConflictError("A location with this name already exists"),
-        foreignKey: () => new NotFoundError("Organization not found"),
       });
     }
   },
@@ -78,8 +62,9 @@ export const locationService = {
     organizationId: string,
     locationId: string,
     input: UpdateLocationInput,
+    currentLocation?: LocationResponse,
   ): Promise<LocationResponse> {
-    if (input.isDefault) {
+    if (input.isDefault && currentLocation && !currentLocation.isDefault) {
       await locationRepository.clearDefaultForOrganization(db, organizationId);
     }
 
@@ -119,12 +104,9 @@ export const locationService = {
     clerkOrgId: string,
     organizationId: string,
     locationId: string,
+    tenantLocations: LocationResponse[],
   ): Promise<void> {
-    const location = await locationRepository.findByIdAndOrganization(
-      db,
-      organizationId,
-      locationId,
-    );
+    const location = tenantLocations.find((entry) => entry.id === locationId);
 
     if (!location) {
       throw new NotFoundError("Location not found");
@@ -134,12 +116,7 @@ export const locationService = {
       throw new ConflictError("Cannot delete the default location");
     }
 
-    const locationCount = await locationRepository.countByOrganizationId(
-      db,
-      organizationId,
-    );
-
-    if (locationCount <= 1) {
+    if (tenantLocations.length <= 1) {
       throw new ConflictError("Cannot delete the last location");
     }
 
@@ -166,22 +143,6 @@ export const locationService = {
             "Cannot delete location while it has equipment or task data",
           ),
       });
-    }
-  },
-
-  async assertLocationBelongsToOrganization(
-    db: Db,
-    organizationId: string,
-    locationId: string,
-  ): Promise<void> {
-    const location = await locationRepository.findByIdAndOrganization(
-      db,
-      organizationId,
-      locationId,
-    );
-
-    if (!location) {
-      throw new NotFoundError("Location not found");
     }
   },
 };

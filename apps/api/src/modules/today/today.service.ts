@@ -17,7 +17,6 @@ export const todayService = {
   async getToday(
     db: Db,
     locationId: string,
-    organizationId: string,
     date: string,
     currentUserId: string,
   ): Promise<TodayResponse> {
@@ -33,7 +32,6 @@ export const todayService = {
       todayRepository.findCompletionsWithTemperatureLogs(
         db,
         locationId,
-        organizationId,
         date,
       ),
     ]);
