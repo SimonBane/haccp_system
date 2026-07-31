@@ -370,7 +370,8 @@
       "tasks": "Tasks",
       "equipment": "Cold storage",
       "locations": "Locations",
-      "employees": "Employees"
+      "employees": "Employees",
+      "more": "More"
     },
     "userMenu": {
       "account": "Account",

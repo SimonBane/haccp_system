@@ -370,7 +370,8 @@
       "tasks": "Задачи",
       "equipment": "Хладилна техника",
       "locations": "Локации",
-      "employees": "Служители"
+      "employees": "Служители",
+      "more": "Още"
     },
     "userMenu": {
       "account": "Акаунт",

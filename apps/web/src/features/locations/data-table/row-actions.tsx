@@ -56,7 +56,7 @@ export function LocationsTableRowActions({
             <Button
               type="button"
               variant="ghost"
-              className="h-8 w-8 p-0"
+              className="h-10 w-10 p-0 md:h-8 md:w-8"
               onClick={(event) => event.stopPropagation()}
             />
           }
