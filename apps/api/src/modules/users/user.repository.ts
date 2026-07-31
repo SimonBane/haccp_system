@@ -46,7 +46,7 @@ export const userRepository = {
       .where(and(inArray(users.id, userIds), isNull(users.deletedAt)));
   },
 
-  async findByEmail(db: Db, email: string) {
+  async findByEmail(db: DbClient, email: string) {
     const [row] = await db
       .select()
       .from(users)
