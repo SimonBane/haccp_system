@@ -1,6 +1,6 @@
 import type { Db, DbClient } from "../../core/db/client.js";
 import type { User } from "../../core/db/schema/users.js";
-import { ConflictError } from "../../core/errors/app-errors.js";
+import { ConflictError, NotFoundError } from "../../core/errors/app-errors.js";
 import { mapDbMutationError } from "../../lib/db-errors.js";
 import { buildUserCacheBlob, userCache } from "./user-cache.js";
 import {
@@ -48,13 +48,11 @@ export const userService = {
 
   async resolveUserDbId(db: Db, clerkUserId: string): Promise<string | null> {
     const cached = await userCache.get(clerkUserId);
-
     if (cached) {
       return cached.id;
     }
 
     const user = await userRepository.findByClerkUserId(db, clerkUserId);
-
     if (!user) {
       return null;
     }
@@ -63,11 +61,14 @@ export const userService = {
     return user.id;
   },
 
-  async resolveOrSyncUserDbId(
-    db: Db,
-    clerkUserId: string,
-  ): Promise<string | null> {
-    return this.resolveUserDbId(db, clerkUserId);
+  async requireUserDbId(db: Db, clerkUserId: string): Promise<string> {
+    const userDbId = await this.resolveUserDbId(db, clerkUserId);
+
+    if (!userDbId) {
+      throw new NotFoundError("User not found");
+    }
+
+    return userDbId;
   },
 
   async syncUserFromClerk(

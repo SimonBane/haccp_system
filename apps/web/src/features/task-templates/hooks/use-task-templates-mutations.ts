@@ -12,11 +12,13 @@ import { useLocation } from "@/features/tenant/tenant-provider";
 import { ApiRequestError, parseApiError } from "@/lib/api-utils";
 import { useAuthenticatedFetch } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
+import { locationScopedPath } from "@/lib/api/paths";
 
 export function useTaskTemplatesMutations() {
   const { locationId } = useLocation();
   const { fetchJson, fetchApi } = useAuthenticatedFetch();
   const queryClient = useQueryClient();
+  const taskTemplatesPath = locationScopedPath(locationId, "task-templates");
 
   const invalidateTaskTemplates = () => {
     void queryClient.invalidateQueries({
@@ -26,8 +28,8 @@ export function useTaskTemplatesMutations() {
 
   const create = useMutation({
     mutationFn: async (input: TaskTemplateFieldsInput) => {
-      const payload = createTaskTemplateSchema.parse({ ...input, locationId });
-      return fetchJson("/task-templates", taskTemplateResponseSchema, {
+      const payload = createTaskTemplateSchema.parse(input);
+      return fetchJson(taskTemplatesPath, taskTemplateResponseSchema, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -45,7 +47,7 @@ export function useTaskTemplatesMutations() {
       input: UpdateTaskTemplateInput;
     }) => {
       updateTaskTemplateSchema.parse(input);
-      return fetchJson(`/task-templates/${id}`, taskTemplateResponseSchema, {
+      return fetchJson(`${taskTemplatesPath}/${id}`, taskTemplateResponseSchema, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
@@ -56,7 +58,7 @@ export function useTaskTemplatesMutations() {
 
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetchApi(`/task-templates/${id}`, {
+      const response = await fetchApi(`${taskTemplatesPath}/${id}`, {
         method: "DELETE",
       });
 

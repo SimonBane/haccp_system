@@ -25,7 +25,7 @@ export function LocationPickerSlot() {
 
 export function LocationPicker() {
   const t = useTranslations("LocationPicker");
-  const { locations, locationId, currentLocation, setCurrentLocation } =
+  const { locations, locationId, selectedLocation, setLocationId } =
     useTenant();
 
   if (locations.length <= 1) {
@@ -45,7 +45,7 @@ export function LocationPicker() {
         >
           <MapPinIcon className="size-4 shrink-0 text-muted-foreground" />
           <span className="max-w-[220px] truncate font-medium">
-            {currentLocation.name}
+            {selectedLocation.name}
           </span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" sideOffset={4} className="min-w-48">
@@ -55,7 +55,7 @@ export function LocationPicker() {
               value={locationId}
               onValueChange={(value) => {
                 if (value) {
-                  setCurrentLocation(value);
+                  setLocationId(value);
                 }
               }}
             >

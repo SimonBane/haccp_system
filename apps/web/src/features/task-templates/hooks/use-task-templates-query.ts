@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "@/features/tenant/tenant-provider";
 import { useAuthenticatedFetch } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
+import { locationScopedPath } from "@/lib/api/paths";
 
 type UseTaskTemplatesQueryOptions = {
   initialData?: TaskTemplateResponse[];
@@ -25,7 +26,7 @@ export function useTaskTemplatesQuery(options?: UseTaskTemplatesQueryOptions) {
     queryKey: queryKeys.taskTemplates(locationId),
     queryFn: async () => {
       const response = await fetchJson(
-        "/task-templates",
+        locationScopedPath(locationId, "task-templates"),
         taskTemplateListResponseSchema,
       );
       return response.items;
