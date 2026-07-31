@@ -8,14 +8,8 @@ import { useCallback, useEffect, useMemo } from "react";
 import { Controller, useForm, useFormState } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
+import { DialogFooter } from "@/components/ui/dialog";
 import {
   Field,
   FieldDescription,
@@ -173,17 +167,12 @@ export function EmployeeForm({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="gap-8 py-8 sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>
-            {isEditing ? t("editTitle") : t("addTitle")}
-          </DialogTitle>
-          <DialogDescription>
-            {isEditing ? t("editDescription") : t("addDescription")}
-          </DialogDescription>
-        </DialogHeader>
-
+    <ResponsiveFormDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={isEditing ? t("editTitle") : t("addTitle")}
+      description={isEditing ? t("editDescription") : t("addDescription")}
+    >
         <form id={EMPLOYEE_FORM_ID} className="space-y-6">
           <FieldGroup>
             <Controller
@@ -368,7 +357,6 @@ export function EmployeeForm({
             )}
           </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveFormDialog>
   );
 }

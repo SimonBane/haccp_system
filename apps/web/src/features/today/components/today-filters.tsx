@@ -68,7 +68,7 @@ export function TodayFilters({ value, onChange, counts }: Props) {
               </span>
               <Badge
                 variant="secondary"
-                className="hidden min-w-5 px-1 text-[10px] tabular-nums sm:inline-flex sm:text-xs group-data-active:bg-background"
+                className="min-w-5 px-1 text-[10px] tabular-nums sm:text-xs group-data-active:bg-background"
               >
                 {count}
               </Badge>

@@ -53,7 +53,7 @@ export function ScheduledTimeRow({
         <Button
           type="button"
           variant="ghost"
-          size="icon-xs"
+          size="icon-sm"
           aria-label={t("removeTime")}
           onClick={(event) => {
             event.preventDefault();

@@ -3,10 +3,11 @@
 import type { EmployeeResponse } from "@haccp/shared";
 import { PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useMemo, type ReactNode } from "react";
+import { useCallback, useMemo, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { getColumns } from "@/features/employees/data-table/columns";
+import { EmployeesMobileCard } from "@/features/employees/data-table/mobile-card";
 import { useTenant } from "@/features/tenant/tenant-provider";
 
 type EmployeesDataProps = {
@@ -58,6 +59,20 @@ export function EmployeesData({
     [onAdd, t],
   );
 
+  const renderMobileCard = useCallback(
+    (row: Parameters<typeof EmployeesMobileCard>[0]["row"]) => (
+      <EmployeesMobileCard
+        row={row}
+        t={t}
+        onEdit={onEdit}
+        onInvite={onInvite}
+        onRevokeInvitation={onRevokeInvitation}
+        onDelete={onDelete}
+      />
+    ),
+    [t, onEdit, onInvite, onRevokeInvitation, onDelete],
+  );
+
   return (
     <DataTable
       columns={columns}
@@ -71,6 +86,7 @@ export function EmployeesData({
       pageSize={10}
       classNameWrapper="bg-sidebar ring-1 ring-sidebar-border"
       onRowClick={(row) => onEdit(row.original)}
+      renderMobileCard={renderMobileCard}
       toolbar={toolbar}
     />
   );

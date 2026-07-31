@@ -28,13 +28,9 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { ApiRequestError } from "@/lib/api-utils";
+import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
   DialogFooter,
-  DialogHeader,
-  DialogTitle,
 } from "@/components/ui/dialog";
 import {
   Field,
@@ -87,9 +83,9 @@ const REQUIRED_LABEL_CLASS =
   "gap-1 after:text-destructive after:content-['*']";
 
 const SCHEDULED_TIME_SLOT_CLASS =
-  "w-[calc((100%-1.5rem)/4)] min-w-0 shrink-0";
+  "w-full min-w-0 sm:w-[calc((100%-1.5rem)/3)] md:w-[calc((100%-1.5rem)/4)]";
 
-const WEEKDAY_TOGGLE_GROUP_CLASS = "w-full";
+const WEEKDAY_TOGGLE_GROUP_CLASS = "w-full flex flex-wrap gap-1";
 
 const WEEKDAY_TOGGLE_ITEM_CLASS =
   "cursor-pointer aria-pressed:!border-primary aria-pressed:!bg-primary aria-pressed:!text-primary-foreground aria-pressed:hover:!bg-primary/80";
@@ -411,28 +407,25 @@ export function TaskTemplatesForm({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="w-full sm:max-w-lg"
-        initialFocus={isEditing || isDuplicating ? undefined : false}
-      >
-        <DialogHeader>
-          <DialogTitle>
-            {isEditing
-              ? t("editTitle")
-              : isDuplicating
-                ? t("duplicateTitle")
-                : t("addTitle")}
-          </DialogTitle>
-          <DialogDescription>
-            {isEditing
-              ? t("editDescription")
-              : isDuplicating
-                ? t("duplicateDescription")
-                : t("addDescription")}
-          </DialogDescription>
-        </DialogHeader>
-
+    <ResponsiveFormDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={
+        isEditing
+          ? t("editTitle")
+          : isDuplicating
+            ? t("duplicateTitle")
+            : t("addTitle")
+      }
+      description={
+        isEditing
+          ? t("editDescription")
+          : isDuplicating
+            ? t("duplicateDescription")
+            : t("addDescription")
+      }
+      initialFocus={isEditing || isDuplicating ? undefined : false}
+    >
         <form
           id={TASK_TEMPLATES_FORM_ID}
           onSubmit={form.handleSubmit(handleValidSubmit)}
@@ -777,7 +770,6 @@ export function TaskTemplatesForm({
               )}
             </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveFormDialog>
   );
 }

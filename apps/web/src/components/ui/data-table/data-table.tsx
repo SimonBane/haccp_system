@@ -19,6 +19,7 @@ import {
 } from "@tanstack/react-table";
 import { useTranslations } from "next-intl";
 import * as React from "react";
+import { DataTableCardList } from "@/components/ui/data-table/data-table-card-list";
 import { DataTableColumnHideButton } from "@/components/ui/data-table/data-table-column-hide-button";
 import { DataTablePagination } from "@/components/ui/data-table/data-table-pagination";
 import { DataTableSearch } from "@/components/ui/data-table/data-table-search";
@@ -33,11 +34,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   onRowClick?: (row: Row<TData>) => void;
+  renderMobileCard?: (row: Row<TData>) => React.ReactNode;
   emptyMessage?: string;
   noResultsMessage?: string;
   className?: string;
@@ -86,6 +89,7 @@ export function DataTable<TData, TValue>({
   columns,
   data,
   onRowClick,
+  renderMobileCard,
   emptyMessage = "No results.",
   noResultsMessage = "No results found.",
   className,
@@ -110,6 +114,8 @@ export function DataTable<TData, TValue>({
   initialSorting,
 }: DataTableProps<TData, TValue>) {
   const t = useTranslations("DataTable.selection");
+  const isMobile = useIsMobile();
+  const useCardList = isMobile && Boolean(renderMobileCard);
   const [sorting, setSorting] = React.useState<SortingState>(
     initialSorting ?? [],
   );
@@ -195,8 +201,8 @@ export function DataTable<TData, TValue>({
     >
       {showToolbar ? (
         <div className="shrink-0">
-          <div className="flex flex-wrap items-end justify-between gap-2">
-            <div className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-end">
               {enableSearch && searchColumn ? (
                 <DataTableSearch
                   table={table}
@@ -213,6 +219,15 @@ export function DataTable<TData, TValue>({
         </div>
       ) : null}
 
+      {useCardList && renderMobileCard ? (
+        <DataTableCardList
+          table={table}
+          renderMobileCard={renderMobileCard}
+          onRowClick={onRowClick}
+          emptyMessage={displayEmptyMessage}
+          className={className}
+        />
+      ) : (
       <div
         className={cn(
           "min-h-0 overflow-auto rounded-md border bg-card px-1 pb-1 shadow-xs md:px-0 md:pb-2",
@@ -327,6 +342,7 @@ export function DataTable<TData, TValue>({
           </TableBody>
         </Table>
       </div>
+      )}
 
       {enablePagination ? (
         <div className="shrink-0">

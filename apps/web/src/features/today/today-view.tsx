@@ -295,6 +295,9 @@ export function TodayView({
               </div>
             ) : null}
             <main className="min-w-0">
+              <div className="mb-6 lg:hidden">
+                <TodayOverview grouped={groupedAll} />
+              </div>
               <TodayTaskWorkspace
                 filter={filter}
                 counts={filterCounts}
