@@ -17,6 +17,7 @@ import { taskTemplateRoutes } from "../modules/task-templates/task-template.rout
 import { tenantRoutes } from "../modules/tenant/tenant.routes.js";
 import { todayRoutes } from "../modules/today/today.routes.js";
 import { clerkWebhookRoutes } from "../modules/webhooks/clerk-webhook.routes.js";
+import { invitationRoutes } from "../modules/invitations/invitation.routes.js";
 import type { AppEnv } from "../types.js";
 
 export const routes = new OpenAPIHono<AppEnv>();
@@ -30,6 +31,17 @@ if (env.NODE_ENV === "development") {
 
 routes.route("/health", healthRoutes);
 routes.route("/webhooks", clerkWebhookRoutes);
+
+function mountOrgAuthOnly(
+  path: string,
+  moduleRoutes: OpenAPIHono<AppEnv>,
+): void {
+  const router = new OpenAPIHono<AppEnv>();
+  router.use("*", requireAuth);
+  router.use("*", requireOrg);
+  router.route("/", moduleRoutes);
+  routes.route(path, router);
+}
 
 function mountProtected(
   path: string,
@@ -58,6 +70,7 @@ function mountAdminProtected(
   routes.route(path, adminRouter);
 }
 
+mountOrgAuthOnly("/invitations", invitationRoutes);
 mountProtected("/tenant", tenantRoutes);
 mountAdminProtected("/organizations", organizationRoutes);
 mountAdminProtected("/employees", employeeRoutes);

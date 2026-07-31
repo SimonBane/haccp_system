@@ -1,10 +1,10 @@
 import type { Db, DbClient } from "../../core/db/client.js";
-import { clerkClient } from "../../core/auth/clerk-client.js";
 import type { User } from "../../core/db/schema/users.js";
+import { ConflictError } from "../../core/errors/app-errors.js";
+import { mapDbMutationError } from "../../lib/db-errors.js";
 import { buildUserCacheBlob, userCache } from "./user-cache.js";
 import {
   extractClerkProfile,
-  mapClerkApiUserToProfile,
   toUserResponse,
   type ClerkUserProfile,
 } from "./user.mapper.js";
@@ -23,14 +23,27 @@ export const userService = {
     db: DbClient,
     input: { email: string; firstName?: string; lastName?: string },
   ) {
-    return userRepository.insert(db, {
-      email: normalizeEmail(input.email),
-      firstName: normalizeName(input.firstName),
-      lastName: normalizeName(input.lastName),
-      clerkUserId: null,
-      imageUrl: "",
-      hasImage: false,
-    });
+    const email = normalizeEmail(input.email);
+    const existing = await userRepository.findByEmail(db, email);
+
+    if (existing) {
+      throw new ConflictError("A user with this email already exists");
+    }
+
+    try {
+      return await userRepository.insert(db, {
+        email,
+        firstName: normalizeName(input.firstName),
+        lastName: normalizeName(input.lastName),
+        clerkUserId: null,
+        imageUrl: "",
+        hasImage: false,
+      });
+    } catch (error) {
+      mapDbMutationError(error, {
+        unique: () => new ConflictError("A user with this email already exists"),
+      });
+    }
   },
 
   async resolveUserDbId(db: Db, clerkUserId: string): Promise<string | null> {
@@ -54,32 +67,7 @@ export const userService = {
     db: Db,
     clerkUserId: string,
   ): Promise<string | null> {
-    const existingId = await this.resolveUserDbId(db, clerkUserId);
-
-    if (existingId) {
-      return existingId;
-    }
-
-    const clerkUser = await clerkClient.users.getUser(clerkUserId);
-    const profile = mapClerkApiUserToProfile(clerkUser);
-
-    if (profile.email) {
-      const draftUser = await userRepository.findByEmail(db, profile.email);
-
-      if (draftUser && !draftUser.clerkUserId) {
-        const linked = await this.linkClerkProfileToDraftUser(
-          db,
-          draftUser.id,
-          clerkUserId,
-          profile,
-        );
-
-        return linked?.id ?? null;
-      }
-    }
-
-    const user = await this.syncUserFromClerk(db, clerkUserId, profile);
-    return user?.id ?? null;
+    return this.resolveUserDbId(db, clerkUserId);
   },
 
   async syncUserFromClerk(
@@ -102,15 +90,35 @@ export const userService = {
       hasImage: profile.hasImage,
     };
 
-    const user = existing
-      ? await userRepository.updateById(db, existing.id, profileData)
-      : await userRepository.insert(db, profileData);
+    if (!existing) {
+      const emailTaken = await userRepository.findByEmail(
+        db,
+        profileData.email,
+      );
 
-    if (user) {
-      await userCache.set(clerkUserId, buildUserCacheBlob(toUserResponse(user)));
+      if (emailTaken) {
+        throw new ConflictError("A user with this email already exists");
+      }
     }
 
-    return user;
+    try {
+      const user = existing
+        ? await userRepository.updateById(db, existing.id, profileData)
+        : await userRepository.insert(db, profileData);
+
+      if (user) {
+        await userCache.set(
+          clerkUserId,
+          buildUserCacheBlob(toUserResponse(user)),
+        );
+      }
+
+      return user;
+    } catch (error) {
+      mapDbMutationError(error, {
+        unique: () => new ConflictError("A user with this email already exists"),
+      });
+    }
   },
 
   async syncUserFromClerkWebhook(
@@ -118,6 +126,12 @@ export const userService = {
     clerkUserId: string,
     data: Parameters<typeof extractClerkProfile>[0],
   ): Promise<User | null> {
+    const existing = await userRepository.findByClerkUserId(db, clerkUserId);
+
+    if (!existing) {
+      return null;
+    }
+
     return this.syncUserFromClerk(db, clerkUserId, extractClerkProfile(data));
   },
 

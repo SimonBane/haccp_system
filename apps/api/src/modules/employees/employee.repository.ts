@@ -186,6 +186,22 @@ export const employeeRepository = {
     return row ?? null;
   },
 
+  async findByUserAndOrg(db: Db, organizationId: string, userId: string) {
+    const [row] = await db
+      .select()
+      .from(organizationMemberships)
+      .where(
+        and(
+          eq(organizationMemberships.organizationId, organizationId),
+          eq(organizationMemberships.userId, userId),
+          isNull(organizationMemberships.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    return row ?? null;
+  },
+
   async getLocationIdsForMembership(db: Db, membershipId: string) {
     const rows = await db
       .select({ locationId: organizationMemberLocations.locationId })
