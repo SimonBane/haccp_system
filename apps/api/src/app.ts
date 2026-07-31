@@ -1,3 +1,4 @@
+import "./instrument.js";
 // Required for Vercel Hono entrypoint detection (must import the "hono" package directly).
 import "hono";
 import { OpenAPIHono } from "@hono/zod-openapi";
