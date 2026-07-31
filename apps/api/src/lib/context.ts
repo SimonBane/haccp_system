@@ -1,6 +1,11 @@
+import type { LocationResponse } from "@haccp/shared";
 import type { Context } from "hono";
 import type { Db } from "../core/db/client.js";
-import { InternalError } from "../core/errors/app-errors.js";
+import {
+  InternalError,
+  NotFoundError,
+} from "../core/errors/app-errors.js";
+import type { ResolvedTenant } from "../modules/tenant/tenant.service.js";
 import type {
   AppEnv,
   AppLocationContext,
@@ -8,22 +13,45 @@ import type {
   AppTenantContext,
 } from "../types.js";
 
+function filterAccessibleLocations(
+  tenant: ResolvedTenant,
+  assignedLocationIds: string[] | null | undefined,
+): LocationResponse[] {
+  if (!assignedLocationIds) {
+    return tenant.locations;
+  }
+
+  return tenant.locations.filter((location) =>
+    assignedLocationIds.includes(location.id),
+  );
+}
+
+export function getTenant(c: Context<AppEnv>): ResolvedTenant {
+  const tenant = c.get("tenant");
+
+  if (!tenant) {
+    throw new InternalError("Tenant context is not resolved");
+  }
+
+  return tenant;
+}
+
 export function requireOrgContext(c: Context<AppEnv>) {
   const clerkOrgId = c.get("orgId");
-  const organizationId = c.get("organizationId");
+  const tenant = getTenant(c);
   const userDbId = c.get("userDbId");
 
-  if (!clerkOrgId || !organizationId) {
+  if (!clerkOrgId) {
     throw new InternalError("Organization context is not resolved");
   }
 
   if (!userDbId) {
-    throw new InternalError("User context is not resolved");
+    throw new NotFoundError("User not found");
   }
 
   return {
     clerkOrgId,
-    organizationId,
+    organizationId: tenant.organizationId,
     userId: c.get("userId")!,
     userDbId,
   };
@@ -46,27 +74,14 @@ export function getCurrentLocation(c: Context<AppEnv>): AppLocationContext {
 export function getCurrentOrganization(
   c: Context<AppEnv>,
 ): AppOrganizationContext {
-  const organization = c.get("currentOrganization");
-
-  if (!organization) {
-    throw new InternalError("Current organization not resolved for request");
-  }
-
-  return organization;
+  return getTenant(c).organization;
 }
 
 export function getTenantContext(c: Context<AppEnv>): AppTenantContext {
-  const organization = c.get("currentOrganization");
-  const locations = c.get("tenantLocations");
-  const currentLocation = c.get("currentLocation");
-
-  if (!organization || !locations || !currentLocation) {
-    throw new InternalError("Tenant context is not resolved for request");
-  }
+  const tenant = getTenant(c);
 
   return {
-    organization,
-    locations,
-    currentLocation,
+    organization: tenant.organization,
+    locations: filterAccessibleLocations(tenant, c.get("assignedLocationIds")),
   };
 }

@@ -36,14 +36,6 @@ export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
   await next();
 });
 
-export const requireOrg = createMiddleware<AppEnv>(async (c, next) => {
-  if (!c.get("orgId")) {
-    throw new ForbiddenError("Organization membership required");
-  }
-
-  await next();
-});
-
 export function assertOrgAdmin(c: Context<AppEnv>): void {
   if (c.get("orgRole") !== "org:admin") {
     throw new ForbiddenError("Admin access required");

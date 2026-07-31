@@ -31,17 +31,18 @@ export const equipmentService = {
   async create(
     db: Db,
     organizationId: string,
+    locationId: string,
     input: CreateEquipmentInput,
   ): Promise<EquipmentResponse> {
     await locationService.assertLocationBelongsToOrganization(
       db,
       organizationId,
-      input.locationId,
+      locationId,
     );
 
     try {
       const created = await equipmentRepository.insert(db, {
-        locationId: input.locationId,
+        locationId,
         name: input.name,
         type: input.type,
         minTempC: String(input.minTempC),

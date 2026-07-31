@@ -7,4 +7,5 @@ export {
   listLocations,
   listTaskTemplates,
   parseApiError,
+  resolveActiveLocationId,
 } from "./api/server";

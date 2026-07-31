@@ -1,5 +1,9 @@
 import { type Locale } from "@/i18n/routing";
-import { getTenantContext, getToday } from "@/lib/api-client";
+import {
+  getTenantContext,
+  getToday,
+  resolveActiveLocationId,
+} from "@/lib/api-client";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { DashboardPageHeader } from "@/components/layout/dashboard-page-header";
 import { TodayView } from "@/features/today/today-view";
@@ -16,7 +20,8 @@ export default async function DashboardPage({
   const tToday = await getTranslations("TodayPage");
 
   const tenant = await getTenantContext();
-  const today = await getToday();
+  const locationId = await resolveActiveLocationId(tenant);
+  const today = await getToday(locationId);
 
   return (
     <>
@@ -30,7 +35,7 @@ export default async function DashboardPage({
         <TodayView
           initialData={today}
           initialDate={today.date}
-          initialLocationId={tenant.currentLocation.id}
+          initialLocationId={locationId}
         />
       </div>
     </>

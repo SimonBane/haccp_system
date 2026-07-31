@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "@/features/tenant/tenant-provider";
 import { useAuthenticatedFetch } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
+import { locationScopedPath } from "@/lib/api/paths";
 
 type UseTodayQueryOptions = {
   initialData?: TodayResponse;
@@ -27,7 +28,7 @@ export function useTodayQuery(date: string, options?: UseTodayQueryOptions) {
     queryKey: queryKeys.today(locationId, date),
     queryFn: () =>
       fetchJson(
-        `/today?date=${encodeURIComponent(date)}`,
+        `${locationScopedPath(locationId, "today")}?date=${encodeURIComponent(date)}`,
         todayResponseSchema,
       ),
     initialData,

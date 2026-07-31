@@ -1,5 +1,4 @@
 import type {
-  LocationResponse,
   TenantContextResponse,
 } from "@haccp/shared";
 import type { Db } from "../../core/db/client.js";
@@ -34,45 +33,10 @@ type ProvisionTenantOptions = {
   hasImage?: boolean;
 };
 
-function pickCurrentLocation(
-  locations: LocationResponse[],
-  defaultLocationId: string,
-  requestedLocationId?: string | null,
-): LocationResponse {
-  if (requestedLocationId) {
-    const requested = locations.find(
-      (location) => location.id === requestedLocationId,
-    );
-    if (requested) {
-      return requested;
-    }
-  }
-
-  const defaultLocation = locations.find(
-    (location) => location.id === defaultLocationId,
-  );
-
-  if (!defaultLocation) {
-    throw new InternalError("Default location not found in tenant context");
-  }
-
-  return defaultLocation;
-}
-
-function toTenantContext(
-  blob: TenantCacheBlob,
-  requestedLocationId?: string | null,
-): ResolvedTenant {
-  const currentLocation = pickCurrentLocation(
-    blob.locations,
-    blob.defaultLocationId,
-    requestedLocationId,
-  );
-
+function toTenantContext(blob: TenantCacheBlob): ResolvedTenant {
   return {
     organization: blob.organization,
     locations: blob.locations,
-    currentLocation,
     organizationId: blob.organization.id,
   };
 }
@@ -163,26 +127,25 @@ export const tenantService = {
     return blob;
   },
 
-  async resolveTenant(
+  async requireTenant(
     db: Db,
     clerkOrgId: string,
-    requestedLocationId?: string | null,
   ): Promise<ResolvedTenant> {
     const cached = await tenantCache.get(clerkOrgId);
 
     if (cached) {
-      return toTenantContext(cached, requestedLocationId);
+      return toTenantContext(cached);
     }
 
-    let blob = await loadTenantFromDb(db, clerkOrgId);
+    const blob = await loadTenantFromDb(db, clerkOrgId);
 
     if (!blob) {
-      blob = await tenantService.provisionTenant(db, clerkOrgId);
-    } else {
-      await tenantCache.set(clerkOrgId, blob);
+      throw new NotFoundError("Organization not found");
     }
 
-    return toTenantContext(blob, requestedLocationId);
+    await tenantCache.set(clerkOrgId, blob);
+
+    return toTenantContext(blob);
   },
 
   async warmCache(db: Db, clerkOrgId: string): Promise<TenantCacheBlob | null> {

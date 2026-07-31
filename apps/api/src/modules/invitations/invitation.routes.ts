@@ -4,6 +4,10 @@ import {
   errorResponse,
   jsonResponse,
 } from "../../core/openapi/route-factory.js";
+import {
+  ForbiddenError,
+  UnauthorizedError,
+} from "../../core/errors/app-errors.js";
 import { getDb } from "../../lib/context.js";
 import type { AppEnv } from "../../types.js";
 import { invitationService } from "./invitation.service.js";
@@ -34,8 +38,12 @@ invitationRoutes.openapi(acceptRoute, async (c) => {
   const clerkUserId = c.get("userId");
   const orgRole = c.get("orgRole");
 
-  if (!clerkOrgId || !clerkUserId || !orgRole) {
-    return c.json({ error: "UNAUTHORIZED", message: "Unauthorized" }, 401);
+  if (!clerkUserId || !orgRole) {
+    throw new UnauthorizedError();
+  }
+
+  if (!clerkOrgId) {
+    throw new ForbiddenError("Organization membership required");
   }
 
   await invitationService.accept(getDb(c), clerkOrgId, clerkUserId, orgRole);

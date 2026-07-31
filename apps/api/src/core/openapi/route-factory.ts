@@ -3,7 +3,7 @@ import {
   createRoute,
   type OpenAPIHono,
 } from "@hono/zod-openapi";
-import { uuidParamSchema } from "@haccp/shared";
+import { locationResourceParamSchema } from "@haccp/shared";
 import type { z } from "zod";
 import type { Db } from "../db/client.js";
 import {
@@ -28,6 +28,7 @@ type AdminCrudService<
   create: (
     db: Db,
     organizationId: string,
+    locationId: string,
     input: z.infer<TCreate>,
   ) => Promise<z.infer<TItem>>;
   update: (
@@ -96,7 +97,7 @@ export function registerAdminCrudRoutes<
     tags: [options.tag],
     security: bearerSecurity,
     request: {
-      params: uuidParamSchema,
+      params: locationResourceParamSchema,
       body: {
         content: {
           "application/json": {
@@ -121,7 +122,7 @@ export function registerAdminCrudRoutes<
     tags: [options.tag],
     security: bearerSecurity,
     request: {
-      params: uuidParamSchema,
+      params: locationResourceParamSchema,
     },
     responses: {
       204: { description: "Deleted" },
@@ -144,10 +145,12 @@ export function registerAdminCrudRoutes<
     createRouteDef,
     async (c) => {
       const { organizationId } = requireOrgContext(c);
+      const locationId = c.req.param("locationId");
       const input = c.req.valid("json");
       const created = await options.service.create(
         getDb(c),
         organizationId,
+        locationId,
         input,
       );
       return c.json(created, 201);

@@ -5,6 +5,7 @@ import type {
   TenantContextResponse,
 } from "@haccp/shared";
 import type { Db } from "./core/db/client.js";
+import type { ResolvedTenant } from "./modules/tenant/tenant.service.js";
 
 export type AppLocationContext = LocationResponse;
 export type AppOrganizationContext = OrganizationResponse;
@@ -17,10 +18,9 @@ export type AppEnv = {
     userDbId: string | null;
     orgId: string | null;
     orgRole: string | null;
-    organizationId: string | null;
+    tenant: ResolvedTenant | undefined;
+    assignedLocationIds: string[] | null | undefined;
     db: Db;
-    currentOrganization: AppOrganizationContext | undefined;
-    tenantLocations: LocationResponse[] | undefined;
     currentLocation: AppLocationContext | undefined;
   };
 };
