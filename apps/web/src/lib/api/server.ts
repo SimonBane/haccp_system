@@ -17,22 +17,11 @@ import {
 import { auth } from "@clerk/nextjs/server";
 import { cookies } from "next/headers";
 import { localTodayDate } from "@/lib/date";
+import { LOCATION_COOKIE, resolveLocationId } from "@/lib/location-preference";
+import { locationScopedPath } from "./paths";
 import { API_BASE_URL, ApiRequestError, parseApiError } from "./api-utils";
 
 export { parseApiError } from "./api-utils";
-
-const LOCATION_COOKIE = "haccp_location_id";
-
-async function getLocationHeader(): Promise<Record<string, string>> {
-  const cookieStore = await cookies();
-  const locationId = cookieStore.get(LOCATION_COOKIE)?.value;
-
-  if (!locationId) {
-    return {};
-  }
-
-  return { "X-Location-Id": locationId };
-}
 
 export async function fetchApi(
   path: string,
@@ -40,14 +29,12 @@ export async function fetchApi(
 ): Promise<Response> {
   const { getToken } = await auth();
   const token = await getToken();
-  const locationHeader = await getLocationHeader();
 
   return fetch(`${API_BASE_URL}${path}`, {
     ...init,
     cache: "no-store",
     headers: {
       ...init?.headers,
-      ...locationHeader,
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   });
@@ -76,6 +63,15 @@ export async function getTenantContext(): Promise<TenantContextResponse> {
   return fetchJson("/tenant/current", tenantContextResponseSchema);
 }
 
+export async function resolveActiveLocationId(
+  tenant: TenantContextResponse,
+): Promise<string> {
+  const cookieStore = await cookies();
+  const cookieLocationId = cookieStore.get(LOCATION_COOKIE)?.value;
+
+  return resolveLocationId(tenant.locations, cookieLocationId);
+}
+
 export async function listLocations(): Promise<LocationListResponse> {
   return fetchJson("/locations", locationListResponseSchema);
 }
@@ -84,18 +80,31 @@ export async function listEmployees(): Promise<EmployeeListResponse> {
   return fetchJson("/employees", employeeListResponseSchema);
 }
 
-export async function listEquipment(): Promise<EquipmentListResponse> {
-  return fetchJson("/equipment", equipmentListResponseSchema);
+export async function listEquipment(
+  locationId: string,
+): Promise<EquipmentListResponse> {
+  return fetchJson(
+    locationScopedPath(locationId, "equipment"),
+    equipmentListResponseSchema,
+  );
 }
 
-export async function listTaskTemplates(): Promise<TaskTemplateListResponse> {
-  return fetchJson("/task-templates", taskTemplateListResponseSchema);
+export async function listTaskTemplates(
+  locationId: string,
+): Promise<TaskTemplateListResponse> {
+  return fetchJson(
+    locationScopedPath(locationId, "task-templates"),
+    taskTemplateListResponseSchema,
+  );
 }
 
-export async function getToday(date?: string): Promise<TodayResponse> {
+export async function getToday(
+  locationId: string,
+  date?: string,
+): Promise<TodayResponse> {
   const occurrenceDate = date ?? localTodayDate();
   return fetchJson(
-    `/today?date=${encodeURIComponent(occurrenceDate)}`,
+    `${locationScopedPath(locationId, "today")}?date=${encodeURIComponent(occurrenceDate)}`,
     todayResponseSchema,
   );
 }

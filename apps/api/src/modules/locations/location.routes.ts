@@ -13,7 +13,6 @@ import {
 } from "../../core/openapi/route-factory.js";
 import {
   getDb,
-  getTenantContext,
   requireOrgContext,
 } from "../../lib/context.js";
 import { locationService } from "./location.service.js";
@@ -22,18 +21,6 @@ import type { AppEnv } from "../../types.js";
 const bearerSecurity = [{ Bearer: [] }];
 
 export const locationRoutes = new OpenAPIHono<AppEnv>();
-
-const getCurrentRoute = createRoute({
-  method: "get",
-  path: "/current",
-  tags: ["Locations"],
-  security: bearerSecurity,
-  responses: {
-    200: jsonResponse(locationResponseSchema),
-    401: errorResponse("Unauthorized"),
-    403: errorResponse("Forbidden"),
-  },
-});
 
 const listRoute = createRoute({
   method: "get",
@@ -110,11 +97,6 @@ const deleteRouteDef = createRoute({
     404: errorResponse("Not found"),
     409: errorResponse("Conflict"),
   },
-});
-
-locationRoutes.openapi(getCurrentRoute, async (c) => {
-  const tenant = getTenantContext(c);
-  return c.json(tenant.currentLocation, 200);
 });
 
 locationRoutes.openapi(listRoute, async (c) => {

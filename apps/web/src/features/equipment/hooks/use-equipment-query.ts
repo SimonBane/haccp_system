@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "@/features/tenant/tenant-provider";
 import { useAuthenticatedFetch } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
+import { locationScopedPath } from "@/lib/api/paths";
 
 type UseEquipmentQueryOptions = {
   initialData?: EquipmentResponse[];
@@ -24,7 +25,10 @@ export function useEquipmentQuery(options?: UseEquipmentQueryOptions) {
   return useQuery({
     queryKey: queryKeys.equipment(locationId),
     queryFn: async () => {
-      const response = await fetchJson("/equipment", equipmentListResponseSchema);
+      const response = await fetchJson(
+        locationScopedPath(locationId, "equipment"),
+        equipmentListResponseSchema,
+      );
       return response.items;
     },
     initialData,
@@ -32,9 +36,8 @@ export function useEquipmentQuery(options?: UseEquipmentQueryOptions) {
 }
 
 export function useEquipmentOptions() {
-  const { data: items = [] } = useEquipmentQuery();
-
-  return items.map((item) => ({
+  const { data: equipment = [] } = useEquipmentQuery();
+  return equipment.map((item) => ({
     id: item.id,
     name: item.name,
   }));

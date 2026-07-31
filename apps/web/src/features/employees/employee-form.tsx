@@ -73,13 +73,13 @@ export function EmployeeForm({
   onSave,
 }: EmployeeFormProps) {
   const t = useTranslations("EmployeesPage");
-  const { organization, locations: tenantLocations, currentLocation } =
+  const { organization, locations: tenantLocations, locationId } =
     useTenant();
   const multipleLocationsEnabled = organization.multipleLocationsEnabled;
   const defaultLocationId = useMemo(() => {
     const defaultLocation = tenantLocations.find((location) => location.isDefault);
-    return defaultLocation?.id ?? currentLocation.id;
-  }, [tenantLocations, currentLocation.id]);
+    return defaultLocation?.id ?? locationId;
+  }, [tenantLocations, locationId]);
   const isEditing = Boolean(employee);
   const isActive = employee?.status === "active";
 

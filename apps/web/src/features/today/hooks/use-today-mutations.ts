@@ -10,11 +10,15 @@ import {
   todayTaskItemSchema,
 } from "@haccp/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "@/features/tenant/tenant-provider";
 import { useAuthenticatedFetch } from "@/lib/api/client";
+import { locationScopedPath } from "@/lib/api/paths";
 
 export function useTodayMutations() {
+  const { locationId } = useLocation();
   const { fetchJson } = useAuthenticatedFetch();
   const queryClient = useQueryClient();
+  const todayPath = locationScopedPath(locationId, "today");
 
   const invalidateToday = () => {
     void queryClient.invalidateQueries({ queryKey: ["today"] });
@@ -23,7 +27,7 @@ export function useTodayMutations() {
   const completeTask = useMutation({
     mutationFn: async (input: CompleteTodayTaskInput) => {
       const payload = completeTodayTaskSchema.parse(input);
-      return fetchJson("/today/complete", todayTaskItemSchema, {
+      return fetchJson(`${todayPath}/complete`, todayTaskItemSchema, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -35,7 +39,7 @@ export function useTodayMutations() {
   const uncompleteTask = useMutation({
     mutationFn: async (input: CompleteTodayTaskInput) => {
       const payload = completeTodayTaskSchema.parse(input);
-      return fetchJson("/today/uncomplete", todayTaskItemSchema, {
+      return fetchJson(`${todayPath}/uncomplete`, todayTaskItemSchema, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -47,7 +51,7 @@ export function useTodayMutations() {
   const completeTemperatureTask = useMutation({
     mutationFn: async (input: CompleteTodayTemperatureTaskInput) => {
       const payload = completeTodayTemperatureTaskSchema.parse(input);
-      return fetchJson("/today/complete-temperature", todayTaskItemSchema, {
+      return fetchJson(`${todayPath}/complete-temperature`, todayTaskItemSchema, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

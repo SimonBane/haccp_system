@@ -1,0 +1,48 @@
+import { createMiddleware } from "hono/factory";
+import { ForbiddenError } from "../errors/app-errors.js";
+import { getDb } from "../../lib/context.js";
+import { employeeService } from "../../modules/employees/employee.service.js";
+import { tenantService } from "../../modules/tenant/tenant.service.js";
+import { userService } from "../../modules/users/user.service.js";
+import type { AppEnv } from "../../types.js";
+
+export const requestContextMiddleware = createMiddleware<AppEnv>(
+  async (c, next) => {
+    const clerkOrgId = c.get("orgId");
+
+    if (!clerkOrgId) {
+      throw new ForbiddenError("Organization membership required");
+    }
+
+    const clerkUserId = c.get("userId");
+    const orgRole = c.get("orgRole");
+    const db = getDb(c);
+
+    const [userDbId, tenant] = await Promise.all([
+      userService.requireUserDbId(db, clerkUserId),
+      tenantService.requireTenant(db, clerkOrgId),
+    ]);
+
+    let assignedLocationIds: string[] | null = null;
+
+    if (orgRole !== "org:admin") {
+      assignedLocationIds = await employeeService.getAssignedLocationIdsForUser(
+        db,
+        tenant.organizationId,
+        userDbId,
+      );
+
+      if (assignedLocationIds.length === 0) {
+        throw new ForbiddenError(
+          "No locations assigned. Contact your administrator.",
+        );
+      }
+    }
+
+    c.set("tenant", tenant);
+    c.set("userDbId", userDbId);
+    c.set("assignedLocationIds", assignedLocationIds);
+
+    await next();
+  },
+);

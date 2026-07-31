@@ -1,6 +1,13 @@
 export type { ApiError, HealthResponse } from "./types/api.js";
 export { apiErrorSchema } from "./schemas/error.js";
-export { uuidParamSchema, type UuidParam } from "./schemas/common.js";
+export {
+  uuidParamSchema,
+  locationIdParamSchema,
+  locationResourceParamSchema,
+  type UuidParam,
+  type LocationIdParam,
+  type LocationResourceParam,
+} from "./schemas/common.js";
 export {
   userSummarySchema,
   userResponseSchema,
@@ -32,6 +39,7 @@ export {
   locationResponseSchema,
   type LocationResponse,
 } from "./schemas/location.js";
+export { pickDefaultLocation } from "./location-utils.js";
 export {
   organizationResponseSchema,
   organizationLocaleSchema,

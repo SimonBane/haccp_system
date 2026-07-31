@@ -57,22 +57,23 @@ export const taskTemplateService = {
   async create(
     db: Db,
     organizationId: string,
+    locationId: string,
     input: CreateTaskTemplateInput,
   ): Promise<TaskTemplateResponse> {
     const [, resolvedEquipment] = await Promise.all([
       locationService.assertLocationBelongsToOrganization(
         db,
         organizationId,
-        input.locationId,
+        locationId,
       ),
       input.equipmentId
-        ? resolveEquipmentForTemplate(db, input.locationId, input.equipmentId)
+        ? resolveEquipmentForTemplate(db, locationId, input.equipmentId)
         : Promise.resolve(null),
     ]);
 
     try {
       const created = await taskTemplateRepository.insert(db, {
-        locationId: input.locationId,
+        locationId,
         title: input.title,
         type: input.type,
         weekdays: sortWeekdays(input.weekdays),

@@ -14,7 +14,6 @@ const DEFAULT_TTL_SECONDS = 2 * 24 * 60 * 60;
 export const tenantCacheBlobSchema = z.object({
   organization: organizationResponseSchema,
   locations: z.array(locationResponseSchema),
-  defaultLocationId: z.string().uuid(),
 });
 
 export type TenantCacheBlob = z.infer<typeof tenantCacheBlobSchema>;
@@ -70,16 +69,12 @@ export function buildTenantCacheBlob(
   organization: OrganizationResponse,
   locations: LocationResponse[],
 ): TenantCacheBlob {
-  const defaultLocation =
-    locations.find((location) => location.isDefault) ?? locations[0];
-
-  if (!defaultLocation) {
+  if (locations.length === 0) {
     throw new Error("Tenant must have at least one location");
   }
 
   return {
     organization,
     locations,
-    defaultLocationId: defaultLocation.id,
   };
 }

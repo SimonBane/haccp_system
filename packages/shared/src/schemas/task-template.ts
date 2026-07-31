@@ -219,9 +219,7 @@ function withTaskTemplateValidation<T extends z.ZodTypeAny>(
 }
 
 export const createTaskTemplateSchema = withTaskTemplateValidation(
-  taskTemplateFieldsSchema.extend({
-    locationId: z.string().uuid(),
-  }),
+  taskTemplateFieldsSchema,
 );
 
 export type CreateTaskTemplateInput = z.infer<typeof createTaskTemplateSchema>;

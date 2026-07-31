@@ -31,12 +31,11 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
   const {
     organization,
     locations: tenantLocations,
-    currentLocation,
+    locationId,
   } = useTenant();
   const multipleLocationsEnabled = organization.multipleLocationsEnabled;
   const defaultLocationId =
-    tenantLocations.find((location) => location.isDefault)?.id ??
-    currentLocation.id;
+    tenantLocations.find((location) => location.isDefault)?.id ?? locationId;
   const { data: items = [], refetch } = useEmployeesQuery({
     initialData: initialItems,
   });

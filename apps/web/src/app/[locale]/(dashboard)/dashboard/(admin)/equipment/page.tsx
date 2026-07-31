@@ -1,5 +1,5 @@
 import { type Locale } from "@/i18n/routing";
-import { getTenantContext, listEquipment } from "@/lib/api-client";
+import { getTenantContext, listEquipment, resolveActiveLocationId } from "@/lib/api-client";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { DashboardPageHeader } from "@/components/layout/dashboard-page-header";
 import { EquipmentManager } from "@/features/equipment/equipment-manager";
@@ -15,7 +15,8 @@ export default async function EquipmentPage({
   const t = await getTranslations("EquipmentPage");
 
   const tenant = await getTenantContext();
-  const equipment = await listEquipment();
+  const locationId = await resolveActiveLocationId(tenant);
+  const equipment = await listEquipment(locationId);
 
   return (
     <>
@@ -28,7 +29,7 @@ export default async function EquipmentPage({
       <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
         <EquipmentManager
           initialItems={equipment.items}
-          initialLocationId={tenant.currentLocation.id}
+          initialLocationId={locationId}
         />
       </div>
     </>

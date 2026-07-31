@@ -1,7 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
-import type { LocationResponse, TenantContextResponse } from "@haccp/shared";
+import {
+  pickDefaultLocation,
+  type LocationResponse,
+  type TenantContextResponse,
+} from "@haccp/shared";
 import {
   createContext,
   useCallback,
@@ -9,14 +13,16 @@ import {
   useMemo,
   useState,
 } from "react";
-
-const LOCATION_COOKIE = "haccp_location_id";
-const LOCATION_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
+import {
+  buildLocationCookie,
+  resolveLocationId,
+} from "@/lib/location-preference";
 
 type TenantContextValue = TenantContextResponse & {
   locationId: string;
+  selectedLocation: LocationResponse;
   organizationId: string;
-  setCurrentLocation: (locationId: string) => void;
+  setLocationId: (locationId: string) => void;
   refreshTenant: (tenant: TenantContextResponse) => void;
 };
 
@@ -24,48 +30,71 @@ const TenantContext = createContext<TenantContextValue | null>(null);
 
 type TenantProviderProps = {
   initialTenant: TenantContextResponse;
+  initialLocationId: string;
   children: ReactNode;
 };
 
 function setLocationCookie(locationId: string) {
-  document.cookie = `${LOCATION_COOKIE}=${encodeURIComponent(locationId)}; path=/; max-age=${LOCATION_COOKIE_MAX_AGE}; samesite=lax`;
+  document.cookie = buildLocationCookie(locationId);
 }
 
 export function TenantProvider({
   initialTenant,
+  initialLocationId,
   children,
 }: TenantProviderProps) {
   const [tenant, setTenant] = useState(initialTenant);
+  const [locationId, setLocationIdState] = useState(initialLocationId);
 
-  const setCurrentLocation = useCallback((locationId: string) => {
-    const nextLocation = tenant.locations.find(
-      (location) => location.id === locationId,
+  const selectedLocation = useMemo(() => {
+    return (
+      tenant.locations.find((location) => location.id === locationId) ??
+      pickDefaultLocation(tenant.locations)
     );
+  }, [tenant.locations, locationId]);
 
-    if (!nextLocation) {
-      return;
-    }
+  const setLocationId = useCallback(
+    (nextLocationId: string) => {
+      const nextLocation = tenant.locations.find(
+        (location) => location.id === nextLocationId,
+      );
 
-    setLocationCookie(locationId);
-    setTenant((current) => ({
-      ...current,
-      currentLocation: nextLocation,
-    }));
-  }, [tenant.locations]);
+      if (!nextLocation) {
+        return;
+      }
+
+      setLocationCookie(nextLocationId);
+      setLocationIdState(nextLocationId);
+    },
+    [tenant.locations],
+  );
 
   const refreshTenant = useCallback((nextTenant: TenantContextResponse) => {
     setTenant(nextTenant);
+    setLocationIdState((currentLocationId) => {
+      const nextLocationId = resolveLocationId(
+        nextTenant.locations,
+        currentLocationId,
+      );
+
+      if (nextLocationId !== currentLocationId) {
+        setLocationCookie(nextLocationId);
+      }
+
+      return nextLocationId;
+    });
   }, []);
 
   const value = useMemo(
     () => ({
       ...tenant,
-      locationId: tenant.currentLocation.id,
+      locationId: selectedLocation.id,
+      selectedLocation,
       organizationId: tenant.organization.id,
-      setCurrentLocation,
+      setLocationId,
       refreshTenant,
     }),
-    [tenant, setCurrentLocation, refreshTenant],
+    [tenant, selectedLocation, setLocationId, refreshTenant],
   );
 
   return (
@@ -87,10 +116,10 @@ export function useLocation(): {
   location: LocationResponse;
   locationId: string;
 } {
-  const { currentLocation, locationId } = useTenant();
+  const { selectedLocation, locationId } = useTenant();
 
   return {
-    location: currentLocation,
+    location: selectedLocation,
     locationId,
   };
 }
