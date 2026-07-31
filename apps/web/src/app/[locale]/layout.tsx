@@ -6,6 +6,7 @@ import { hasLocale } from "next-intl";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { LocaleHtmlLang } from "@/components/locale-html-lang";
+import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryProvider } from "@/components/providers/query-provider";
@@ -33,6 +34,22 @@ export async function generateMetadata({
   return {
     title: t("title"),
     description: t("description"),
+    manifest: "/manifest.webmanifest",
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: "default",
+      title: t("title"),
+    },
+    icons: {
+      icon: "/icons/icon-192.png",
+      apple: "/icons/apple-touch-icon.png",
+    },
+  };
+}
+
+export function generateViewport() {
+  return {
+    themeColor: "#1d6fa8",
   };
 }
 
@@ -66,6 +83,7 @@ export default async function LocaleLayout({
     >
       <NextIntlClientProvider messages={messages}>
         <LocaleHtmlLang />
+        <ServiceWorkerRegistration />
         <QueryProvider>
           <TooltipProvider>
             {children}
