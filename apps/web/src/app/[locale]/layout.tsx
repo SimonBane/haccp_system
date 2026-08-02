@@ -74,6 +74,7 @@ export default async function LocaleLayout({
 
   return (
     <ClerkProvider
+      telemetry={false}
       appearance={{ theme: shadcn }}
       localization={getClerkLocalization(resolvedLocale)}
       signInUrl={getClerkLocalePath(resolvedLocale, "/sign-in")}

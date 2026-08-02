@@ -3,10 +3,10 @@ import type {
 } from "@haccp/shared";
 import type { Db } from "../../core/db/client.js";
 import {
-  ForbiddenError,
-  InternalError,
+  ConflictError,
   NotFoundError,
 } from "../../core/errors/app-errors.js";
+import { isUniqueViolation } from "../../lib/db-errors.js";
 import { toLocationResponse } from "../locations/location.mapper.js";
 import {
   DEFAULT_LOCATION_NAME,
@@ -72,59 +72,38 @@ export const tenantService = {
       hasImage = false,
     } = options;
 
-    let organization = await organizationRepository.findByClerkOrgId(
-      db,
-      clerkOrgId,
-    );
+    try {
+      const { organization, location } = await db.transaction(async (tx) => {
+        const organization = await organizationRepository.insert(tx, {
+          clerkOrgId,
+          name,
+          imageUrl,
+          hasImage,
+        });
 
-    if (!organization) {
-      const existing = await organizationRepository.findAnyByClerkOrgId(
-        db,
-        clerkOrgId,
+        const location = await locationRepository.insert(tx, {
+          organizationId: organization!.id,
+          name: DEFAULT_LOCATION_NAME,
+          isDefault: true,
+        });
+
+        return { organization, location };
+      });
+
+      const blob = buildTenantCacheBlob(
+        toOrganizationResponse(organization!),
+        [toLocationResponse(location!)],
       );
 
-      if (existing?.deletedAt) {
-        throw new ForbiddenError("Organization is no longer available");
+      await tenantCache.set(clerkOrgId, blob);
+      return blob;
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictError("Organization already exists");
       }
 
-      organization = await organizationRepository.insert(db, {
-        clerkOrgId,
-        name,
-        imageUrl,
-        hasImage,
-      });
-
-      if (!organization) {
-        throw new InternalError("Failed to create organization");
-      }
+      throw error;
     }
-
-    let locationRows = await locationRepository.findByOrganizationId(
-      db,
-      organization.id,
-    );
-
-    if (locationRows.length === 0) {
-      const created = await locationRepository.insert(db, {
-        organizationId: organization.id,
-        name: DEFAULT_LOCATION_NAME,
-        isDefault: true,
-      });
-
-      if (!created) {
-        throw new InternalError("Failed to create default location");
-      }
-
-      locationRows = [created];
-    }
-
-    const blob = buildTenantCacheBlob(
-      toOrganizationResponse(organization),
-      locationRows.map(toLocationResponse),
-    );
-
-    await tenantCache.set(clerkOrgId, blob);
-    return blob;
   },
 
   async requireTenant(
@@ -132,25 +111,21 @@ export const tenantService = {
     clerkOrgId: string,
   ): Promise<ResolvedTenant> {
     const cached = await tenantCache.get(clerkOrgId);
-
     if (cached) {
       return toTenantContext(cached);
     }
 
     const blob = await loadTenantFromDb(db, clerkOrgId);
-
     if (!blob) {
       throw new NotFoundError("Organization not found");
     }
 
     await tenantCache.set(clerkOrgId, blob);
-
     return toTenantContext(blob);
   },
 
   async warmCache(db: Db, clerkOrgId: string): Promise<TenantCacheBlob | null> {
     const blob = await loadTenantFromDb(db, clerkOrgId);
-
     if (!blob) {
       return null;
     }

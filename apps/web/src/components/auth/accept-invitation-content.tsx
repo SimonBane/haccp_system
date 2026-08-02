@@ -3,26 +3,30 @@
 import { SignIn, SignUp, useAuth } from "@clerk/nextjs";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
-import { useRouter } from "@/i18n/navigation";
 import { type Locale } from "@/i18n/routing";
 import { getClerkLocalePath } from "@/lib/clerk-localization";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { API_BASE_URL } from "@/lib/api/api-utils";
+import { FullPageLoader } from "@/components/layout/full-page-loader";
 
 export function AcceptInvitationContent() {
   const t = useTranslations("AcceptInvitationPage");
   const locale = useLocale() as Locale;
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { getToken, isLoaded, isSignedIn, orgId } = useAuth();
   const acceptStarted = useRef(false);
+  const [acceptError, setAcceptError] = useState(false);
   const token = searchParams.get("__clerk_ticket");
   const accountStatus = searchParams.get("__clerk_status");
-  const dashboardUrl = getClerkLocalePath(locale, "/dashboard");
+  const firstName = searchParams.get("firstName");
+  const lastName = searchParams.get("lastName");
   const acceptPageUrl = getClerkLocalePath(locale, "/accept-invitation");
   const completionRedirectUrl = `${acceptPageUrl}?__clerk_status=complete`;
   const invitationAccepted =
-    accountStatus === "complete" || (!token && isSignedIn && Boolean(orgId));
+    isLoaded &&
+    isSignedIn &&
+    Boolean(orgId) &&
+    (accountStatus === "complete" || !token);
 
   useEffect(() => {
     if (!isLoaded || !invitationAccepted || acceptStarted.current) {
@@ -32,60 +36,52 @@ export function AcceptInvitationContent() {
     acceptStarted.current = true;
 
     async function completeAcceptance() {
-      try {
-        const authToken = await getToken();
+      const authToken = await getToken({ skipCache: true });
 
-        if (authToken) {
-          await fetch(`${API_BASE_URL}/invitations/accept`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${authToken}`,
-            },
-          });
-        }
-      } finally {
-        router.replace(dashboardUrl);
+      if (!authToken) {
+        acceptStarted.current = false;
+        setAcceptError(true);
+        return;
       }
+
+      const response = await fetch(`${API_BASE_URL}/invitations/accept`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        acceptStarted.current = false;
+        setAcceptError(true);
+        return;
+      }
+
+      // Full page load so the server receives Clerk session cookies before dashboard RSC runs.
+      window.location.replace(getClerkLocalePath(locale, "/dashboard"));
     }
 
     void completeAcceptance();
   }, [
-    dashboardUrl,
     getToken,
     invitationAccepted,
     isLoaded,
-    router,
+    locale,
   ]);
 
-  if (!token) {
-    if (!isLoaded) {
-      return (
-        <p className="text-center text-sm text-muted-foreground">
-          {t("processing")}
-        </p>
-      );
-    }
+  if (acceptError) {
+    return (
+      <p className="text-center text-sm text-destructive">{t("acceptError")}</p>
+    );
+  }
 
-    if (isSignedIn && orgId) {
-      return (
-        <p className="text-center text-sm text-muted-foreground">
-          {t("completing")}
-        </p>
-      );
-    }
-
+  if (!token && isLoaded && !(isSignedIn && orgId)) {
     return (
       <p className="text-center text-sm text-muted-foreground">{t("noToken")}</p>
     );
   }
 
-  if (invitationAccepted) {
-    return (
-      <p className="text-center text-sm text-muted-foreground">{t("completing")}</p>
-    );
-  }
-
-  if (accountStatus === "sign_in") {
+  if (token && accountStatus === "sign_in" && !invitationAccepted) {
     return (
       <SignIn
         forceRedirectUrl={completionRedirectUrl}
@@ -94,16 +90,18 @@ export function AcceptInvitationContent() {
     );
   }
 
-  if (accountStatus === "sign_up") {
+  if (token && accountStatus === "sign_up" && !invitationAccepted) {
     return (
       <SignUp
+        initialValues={{
+          ...(firstName ? { firstName } : {}),
+          ...(lastName ? { lastName } : {}),
+        }}
         forceRedirectUrl={completionRedirectUrl}
         fallbackRedirectUrl={completionRedirectUrl}
       />
     );
   }
 
-  return (
-    <p className="text-center text-sm text-muted-foreground">{t("processing")}</p>
-  );
+  return <FullPageLoader />;
 }

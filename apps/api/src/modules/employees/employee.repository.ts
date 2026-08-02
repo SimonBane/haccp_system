@@ -1,6 +1,5 @@
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Db, DbClient } from "../../core/db/client.js";
-import { locations } from "../../core/db/schema/locations.js";
 import { organizationMemberLocations } from "../../core/db/schema/organization-member-locations.js";
 import {
   MEMBERSHIP_STATUS,
@@ -120,29 +119,6 @@ export const employeeRepository = {
           eq(organizationMemberships.organizationId, organizationId),
           sql`lower(${users.email}) = lower(${email})`,
           isNull(organizationMemberships.deletedAt),
-        ),
-      )
-      .limit(1);
-
-    return row ?? null;
-  },
-
-  async findByEmailIncludingDeleted(
-    db: Db,
-    organizationId: string,
-    email: string,
-  ) {
-    const [row] = await db
-      .select({
-        membership: organizationMemberships,
-        user: users,
-      })
-      .from(organizationMemberships)
-      .innerJoin(users, eq(organizationMemberships.userId, users.id))
-      .where(
-        and(
-          eq(organizationMemberships.organizationId, organizationId),
-          sql`lower(${users.email}) = lower(${email})`,
         ),
       )
       .limit(1);
@@ -281,6 +257,7 @@ export const employeeRepository = {
   async replaceLocationAssignments(
     db: DbClient,
     membershipId: string,
+    organizationId: string,
     locationIds: string[],
   ) {
     await db
@@ -295,30 +272,9 @@ export const employeeRepository = {
       locationIds.map((locationId) => ({
         membershipId,
         locationId,
+        organizationId,
       })),
     );
-  },
-
-  async assertLocationsBelongToOrg(
-    db: Db,
-    organizationId: string,
-    locationIds: string[],
-  ) {
-    if (locationIds.length === 0) {
-      return true;
-    }
-
-    const rows = await db
-      .select({ id: locations.id })
-      .from(locations)
-      .where(
-        and(
-          eq(locations.organizationId, organizationId),
-          inArray(locations.id, locationIds),
-        ),
-      );
-
-    return rows.length === locationIds.length;
   },
 
   async findMembershipByClerkIds(

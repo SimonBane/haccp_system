@@ -1,5 +1,5 @@
 import { and, eq, isNull } from "drizzle-orm";
-import type { Db } from "../../core/db/client.js";
+import type { Db, DbClient } from "../../core/db/client.js";
 import { organizations } from "../../core/db/schema/organizations.js";
 
 export const organizationRepository = {
@@ -33,7 +33,7 @@ export const organizationRepository = {
     return row ?? null;
   },
 
-  async insert(db: Db, data: typeof organizations.$inferInsert) {
+  async insert(db: DbClient, data: typeof organizations.$inferInsert) {
     const [created] = await db.insert(organizations).values(data).returning();
     return created ?? null;
   },
