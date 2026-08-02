@@ -23,7 +23,6 @@ export const todayRepository = {
   async findCompletionsWithTemperatureLogs(
     db: Db,
     locationId: string,
-    _organizationId: string,
     date: string,
   ): Promise<CompletionWithTemperatureRow[]> {
     return db
@@ -74,29 +73,6 @@ export const todayRepository = {
       .returning();
 
     return row ?? null;
-  },
-
-  async findCompletion(
-    db: DbClient,
-    locationId: string,
-    templateId: string,
-    date: string,
-    scheduledTime: string,
-  ) {
-    const [existing] = await db
-      .select()
-      .from(taskCompletions)
-      .where(
-        and(
-          eq(taskCompletions.locationId, locationId),
-          eq(taskCompletions.taskTemplateId, templateId),
-          eq(taskCompletions.occurrenceDate, date),
-          eq(taskCompletions.scheduledTime, scheduledTime),
-        ),
-      )
-      .limit(1);
-
-    return existing ?? null;
   },
 
   async deleteCompletion(

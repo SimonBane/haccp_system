@@ -43,3 +43,16 @@ export function mapLocations(
     .map((id) => locationMap.get(id))
     .filter((location): location is LocationResponse => Boolean(location));
 }
+
+export function mapLocationResponses(
+  allLocations: LocationResponse[],
+  locationIds: string[],
+): LocationResponse[] {
+  const locationMap = new Map(
+    allLocations.map((location) => [location.id, location]),
+  );
+
+  return locationIds
+    .map((id) => locationMap.get(id))
+    .filter((location): location is LocationResponse => Boolean(location));
+}

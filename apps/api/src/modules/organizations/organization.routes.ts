@@ -10,7 +10,7 @@ import {
   jsonResponse,
 } from "../../core/openapi/route-factory.js";
 import { ValidationError } from "../../core/errors/app-errors.js";
-import { getDb, requireOrgContext } from "../../lib/context.js";
+import { getCurrentOrganization, getDb, getTenant, requireOrgContext } from "../../lib/context.js";
 import { organizationService } from "./organization.service.js";
 import type { AppEnv } from "../../types.js";
 
@@ -44,10 +44,13 @@ const patchCurrentRoute = createRoute({
 
 organizationRoutes.openapi(patchCurrentRoute, async (c) => {
   const { clerkOrgId } = requireOrgContext(c);
+  const tenant = getTenant(c);
   const input = c.req.valid("json");
   const updated = await organizationService.updateSettings(
     getDb(c),
     clerkOrgId,
+    tenant.organization,
+    tenant.locations.length,
     input,
   );
 
@@ -79,10 +82,12 @@ const patchCurrentNameRoute = createRoute({
 
 organizationRoutes.openapi(patchCurrentNameRoute, async (c) => {
   const { clerkOrgId } = requireOrgContext(c);
+  const organization = getCurrentOrganization(c);
   const input = c.req.valid("json");
   const updated = await organizationService.updateName(
     getDb(c),
     clerkOrgId,
+    organization,
     input,
   );
 

@@ -18,8 +18,8 @@ export const requestContextMiddleware = createMiddleware<AppEnv>(
     const orgRole = c.get("orgRole");
     const db = getDb(c);
 
-    const [userDbId, tenant] = await Promise.all([
-      userService.requireUserDbId(db, clerkUserId),
+    const [user, tenant] = await Promise.all([
+      userService.requireUser(db, clerkUserId),
       tenantService.requireTenant(db, clerkOrgId),
     ]);
 
@@ -29,7 +29,7 @@ export const requestContextMiddleware = createMiddleware<AppEnv>(
       assignedLocationIds = await employeeService.getAssignedLocationIdsForUser(
         db,
         tenant.organizationId,
-        userDbId,
+        user.id,
       );
 
       if (assignedLocationIds.length === 0) {
@@ -40,7 +40,7 @@ export const requestContextMiddleware = createMiddleware<AppEnv>(
     }
 
     c.set("tenant", tenant);
-    c.set("userDbId", userDbId);
+    c.set("user", user);
     c.set("assignedLocationIds", assignedLocationIds);
 
     await next();
