@@ -12,10 +12,9 @@ import {
   NotFoundError,
   ValidationError,
 } from "../../core/errors/app-errors.js";
-import { locationRepository } from "../locations/location.repository.js";
+import { tenantCache } from "../tenant/tenant-cache.js";
 import { toOrganizationResponse } from "./organization.mapper.js";
 import { organizationRepository } from "./organization.repository.js";
-import { tenantService } from "../tenant/tenant.service.js";
 
 function assertValidLogoFile(file: { size: number; type: string }): void {
   const validationError = validateOrganizationLogoFile(file);
@@ -35,19 +34,11 @@ export const organizationService = {
   async updateName(
     db: Db,
     clerkOrgId: string,
+    organization: OrganizationResponse,
     input: UpdateOrganizationNameInput,
   ): Promise<OrganizationResponse> {
-    const organization = await organizationRepository.findByClerkOrgId(
-      db,
-      clerkOrgId,
-    );
-
-    if (!organization) {
-      throw new NotFoundError("Organization not found");
-    }
-
     if (input.name === organization.name) {
-      return toOrganizationResponse(organization);
+      return organization;
     }
 
     try {
@@ -65,10 +56,10 @@ export const organizationService = {
     );
 
     if (!updated) {
-      throw new InternalError("Failed to update organization name");
+      throw new NotFoundError("Organization not found");
     }
 
-    await tenantService.warmCache(db, clerkOrgId);
+    await tenantCache.invalidate(clerkOrgId);
 
     return toOrganizationResponse(updated);
   },
@@ -76,36 +67,23 @@ export const organizationService = {
   async updateSettings(
     db: Db,
     clerkOrgId: string,
+    organization: OrganizationResponse,
+    locationCount: number,
     input: UpdateOrganizationInput,
   ): Promise<OrganizationResponse> {
-    const organization = await organizationRepository.findByClerkOrgId(
-      db,
-      clerkOrgId,
-    );
-
-    if (!organization) {
-      throw new NotFoundError("Organization not found");
-    }
-
     if (
       input.multipleLocationsEnabled === false &&
-      organization.multipleLocationsEnabled
+      organization.multipleLocationsEnabled &&
+      locationCount > 1
     ) {
-      const locationCount = await locationRepository.countByOrganizationId(
-        db,
-        organization.id,
+      throw new ConflictError(
+        "Cannot disable multiple locations while more than one site exists",
       );
-
-      if (locationCount > 1) {
-        throw new ConflictError(
-          "Cannot disable multiple locations while more than one site exists",
-        );
-      }
     }
 
-    const updated = await organizationRepository.updateById(
+    const updated = await organizationRepository.updateByClerkOrgId(
       db,
-      organization.id,
+      clerkOrgId,
       {
         ...(input.timezone !== undefined ? { timezone: input.timezone } : {}),
         ...(input.locale !== undefined ? { locale: input.locale } : {}),
@@ -116,10 +94,10 @@ export const organizationService = {
     );
 
     if (!updated) {
-      throw new InternalError("Failed to update organization");
+      throw new NotFoundError("Organization not found");
     }
 
-    await tenantService.warmCache(db, clerkOrgId);
+    await tenantCache.invalidate(clerkOrgId);
 
     return toOrganizationResponse(updated);
   },
@@ -130,15 +108,6 @@ export const organizationService = {
     userId: string,
     file: File,
   ): Promise<OrganizationResponse> {
-    const organization = await organizationRepository.findByClerkOrgId(
-      db,
-      clerkOrgId,
-    );
-
-    if (!organization) {
-      throw new NotFoundError("Organization not found");
-    }
-
     assertValidLogoFile(file);
 
     let clerkOrg;
@@ -154,9 +123,9 @@ export const organizationService = {
       throw new InternalError("Failed to upload organization logo");
     }
 
-    const updated = await organizationRepository.updateById(
+    const updated = await organizationRepository.updateByClerkOrgId(
       db,
-      organization.id,
+      clerkOrgId,
       {
         imageUrl: clerkOrg.imageUrl,
         hasImage: clerkOrg.hasImage,
@@ -164,10 +133,10 @@ export const organizationService = {
     );
 
     if (!updated) {
-      throw new InternalError("Failed to update organization logo");
+      throw new NotFoundError("Organization not found");
     }
 
-    await tenantService.warmCache(db, clerkOrgId);
+    await tenantCache.invalidate(clerkOrgId);
 
     return toOrganizationResponse(updated);
   },
@@ -176,15 +145,6 @@ export const organizationService = {
     db: Db,
     clerkOrgId: string,
   ): Promise<OrganizationResponse> {
-    const organization = await organizationRepository.findByClerkOrgId(
-      db,
-      clerkOrgId,
-    );
-
-    if (!organization) {
-      throw new NotFoundError("Organization not found");
-    }
-
     let clerkOrg;
     try {
       clerkOrg = await clerkClient.organizations.deleteOrganizationLogo(
@@ -194,9 +154,9 @@ export const organizationService = {
       throw new InternalError("Failed to delete organization logo");
     }
 
-    const updated = await organizationRepository.updateById(
+    const updated = await organizationRepository.updateByClerkOrgId(
       db,
-      organization.id,
+      clerkOrgId,
       {
         imageUrl: clerkOrg.imageUrl,
         hasImage: clerkOrg.hasImage,
@@ -204,10 +164,10 @@ export const organizationService = {
     );
 
     if (!updated) {
-      throw new InternalError("Failed to update organization logo");
+      throw new NotFoundError("Organization not found");
     }
 
-    await tenantService.warmCache(db, clerkOrgId);
+    await tenantCache.invalidate(clerkOrgId);
 
     return toOrganizationResponse(updated);
   },

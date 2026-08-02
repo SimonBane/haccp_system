@@ -2,7 +2,11 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Db, DbClient } from "../../core/db/client.js";
 import { locations } from "../../core/db/schema/locations.js";
 import { organizationMemberLocations } from "../../core/db/schema/organization-member-locations.js";
-import { organizationMemberships } from "../../core/db/schema/organization-memberships.js";
+import {
+  MEMBERSHIP_STATUS,
+  organizationMemberships,
+} from "../../core/db/schema/organization-memberships.js";
+import { organizations } from "../../core/db/schema/organizations.js";
 import { users } from "../../core/db/schema/users.js";
 import type { OrganizationMembership } from "../../core/db/schema/organization-memberships.js";
 import type { User } from "../../core/db/schema/users.js";
@@ -315,5 +319,57 @@ export const employeeRepository = {
       );
 
     return rows.length === locationIds.length;
+  },
+
+  async findMembershipByClerkIds(
+    db: Db,
+    clerkOrgId: string,
+    clerkUserId: string,
+  ) {
+    const [row] = await db
+      .select({
+        membership: organizationMemberships,
+        organizationId: organizations.id,
+        userId: users.id,
+      })
+      .from(organizationMemberships)
+      .innerJoin(
+        organizations,
+        eq(organizationMemberships.organizationId, organizations.id),
+      )
+      .innerJoin(users, eq(organizationMemberships.userId, users.id))
+      .where(
+        and(
+          eq(organizations.clerkOrgId, clerkOrgId),
+          eq(users.clerkUserId, clerkUserId),
+          isNull(organizationMemberships.deletedAt),
+          isNull(organizations.deletedAt),
+          isNull(users.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    return row ?? null;
+  },
+
+  async revertInvitationById(db: Db, clerkInvitationId: string) {
+    const [updated] = await db
+      .update(organizationMemberships)
+      .set({
+        status: MEMBERSHIP_STATUS.DRAFT,
+        clerkInvitationId: null,
+        invitedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(organizationMemberships.clerkInvitationId, clerkInvitationId),
+          eq(organizationMemberships.status, MEMBERSHIP_STATUS.INVITED),
+          isNull(organizationMemberships.deletedAt),
+        ),
+      )
+      .returning();
+
+    return updated ?? null;
   },
 };

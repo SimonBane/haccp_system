@@ -39,13 +39,13 @@ export function getTenant(c: Context<AppEnv>): ResolvedTenant {
 export function requireOrgContext(c: Context<AppEnv>) {
   const clerkOrgId = c.get("orgId");
   const tenant = getTenant(c);
-  const userDbId = c.get("userDbId");
+  const user = c.get("user");
 
   if (!clerkOrgId) {
     throw new InternalError("Organization context is not resolved");
   }
 
-  if (!userDbId) {
+  if (!user) {
     throw new NotFoundError("User not found");
   }
 
@@ -53,7 +53,8 @@ export function requireOrgContext(c: Context<AppEnv>) {
     clerkOrgId,
     organizationId: tenant.organizationId,
     userId: c.get("userId")!,
-    userDbId,
+    user,
+    userDbId: user.id,
   };
 }
 

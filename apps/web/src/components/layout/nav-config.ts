@@ -70,7 +70,7 @@ export function getAdminNavItems(
     title: labels.organization,
     url: "/dashboard/organization",
     icon: Building2Icon,
-    isActive: isOrganizationPath(pathname),
+    isActive: pathname === "/dashboard/organization",
     items: [
       {
         title: labels.employees,

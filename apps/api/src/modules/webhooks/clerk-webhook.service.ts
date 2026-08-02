@@ -1,4 +1,5 @@
 import { userService } from "../users/user.service.js";
+import { userRepository } from "../users/user.repository.js";
 import { membershipWebhookService } from "../employees/employee.service.js";
 import { tenantService } from "../tenant/tenant.service.js";
 import { tenantCache } from "../tenant/tenant-cache.js";
@@ -49,7 +50,7 @@ export const clerkWebhookService = {
       return;
     }
 
-    await tenantService.warmCache(db, clerkOrgId);
+    await tenantCache.invalidate(clerkOrgId);
   },
 
   async handleOrganizationDeleted(db: Db, clerkOrgId: string): Promise<void> {
@@ -66,7 +67,6 @@ export const clerkWebhookService = {
   },
 
   async handleUserDeleted(db: Db, clerkUserId: string): Promise<void> {
-    const { userRepository } = await import("../users/user.repository.js");
     await userRepository.softDeleteByClerkUserId(db, clerkUserId);
     await userService.invalidateCache(clerkUserId);
   },
