@@ -82,7 +82,8 @@ mountAuthOnly("/invitations", invitationRoutes);
 mountProtected("/tenant", tenantRoutes);
 mountAdminProtected("/organizations", organizationRoutes);
 mountAdminProtected("/employees", employeeRoutes);
-mountAdminProtected("/locations", locationRoutes);
+// Location-scoped routes must be registered before the admin /locations
+// router. Otherwise Hono runs admin middleware for every /locations/* path.
 mountLocationScoped("/locations/:locationId/equipment", equipmentRoutes, true);
 mountLocationScoped(
   "/locations/:locationId/task-templates",
@@ -90,3 +91,4 @@ mountLocationScoped(
   true,
 );
 mountLocationScoped("/locations/:locationId/today", todayRoutes, false);
+mountAdminProtected("/locations", locationRoutes);

@@ -30,7 +30,8 @@
   "AcceptInvitationPage": {
     "noToken": "No invitation token found. Use the link from your invitation email.",
     "processing": "Processing your invitation…",
-    "completing": "Signing you in…"
+    "completing": "Signing you in…",
+    "acceptError": "We could not finish setting up your account. Refresh the page or try again."
   },
   "DashboardPage": {
     "breadcrumbApp": "HACCP System",

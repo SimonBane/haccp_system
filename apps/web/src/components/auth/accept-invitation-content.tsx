@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useRouter } from "@/i18n/navigation";
 import { type Locale } from "@/i18n/routing";
 import { getClerkLocalePath } from "@/lib/clerk-localization";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { API_BASE_URL } from "@/lib/api/api-utils";
 
 export function AcceptInvitationContent() {
@@ -16,9 +16,9 @@ export function AcceptInvitationContent() {
   const searchParams = useSearchParams();
   const { getToken, isLoaded, isSignedIn, orgId } = useAuth();
   const acceptStarted = useRef(false);
+  const [acceptError, setAcceptError] = useState(false);
   const token = searchParams.get("__clerk_ticket");
   const accountStatus = searchParams.get("__clerk_status");
-  const dashboardUrl = getClerkLocalePath(locale, "/dashboard");
   const acceptPageUrl = getClerkLocalePath(locale, "/accept-invitation");
   const completionRedirectUrl = `${acceptPageUrl}?__clerk_status=complete`;
   const invitationAccepted =
@@ -32,30 +32,39 @@ export function AcceptInvitationContent() {
     acceptStarted.current = true;
 
     async function completeAcceptance() {
-      try {
-        const authToken = await getToken();
+      const authToken = await getToken();
 
-        if (authToken) {
-          await fetch(`${API_BASE_URL}/invitations/accept`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${authToken}`,
-            },
-          });
+      if (authToken) {
+        const response = await fetch(`${API_BASE_URL}/invitations/accept`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        });
+
+        if (!response.ok) {
+          acceptStarted.current = false;
+          setAcceptError(true);
+          return;
         }
-      } finally {
-        router.replace(dashboardUrl);
       }
+
+      router.replace("/dashboard");
     }
 
     void completeAcceptance();
   }, [
-    dashboardUrl,
     getToken,
     invitationAccepted,
     isLoaded,
     router,
   ]);
+
+  if (acceptError) {
+    return (
+      <p className="text-center text-sm text-destructive">{t("acceptError")}</p>
+    );
+  }
 
   if (!token) {
     if (!isLoaded) {
