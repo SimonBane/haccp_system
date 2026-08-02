@@ -7,37 +7,24 @@ import type {
   UpdateEmployeeLocationsInput,
   UpdateEmployeeRoleInput,
 } from "@haccp/shared";
-import { normalizeEmail, normalizeOrgRole, ORG_ROLE } from "@haccp/shared";
+import { normalizeEmail, normalizeOrgRole } from "@haccp/shared";
 import type { Db } from "../../core/db/client.js";
 import { clerkClient } from "../../core/auth/clerk-client.js";
 import { env } from "../../env.js";
 import { MEMBERSHIP_STATUS } from "../../core/db/schema/organization-memberships.js";
-import type { Organization } from "../../core/db/schema/organizations.js";
 import type { OrganizationMembership } from "../../core/db/schema/organization-memberships.js";
 import type { User } from "../../core/db/schema/users.js";
 import {
   ConflictError,
-  InternalError,
   NotFoundError,
   ValidationError,
 } from "../../core/errors/app-errors.js";
-import { logger } from "../../lib/logger.js";
 import { mapDbMutationError } from "../../lib/db-errors.js";
 import { locationRepository } from "../locations/location.repository.js";
-import { organizationRepository } from "../organizations/organization.repository.js";
 import { userService } from "../users/user.service.js";
-import { userRepository } from "../users/user.repository.js";
 import { mapLocationResponses, mapLocations, toEmployeeResponse } from "./employee.mapper.js";
 import { membershipLocationsCache } from "./membership-locations-cache.js";
-import {
-  employeeRepository,
-  type MembershipWithUserRow,
-} from "./employee.repository.js";
-
-type LinkMembershipRow = {
-  membership: OrganizationMembership;
-  user: User;
-};
+import { employeeRepository } from "./employee.repository.js";
 
 type EmployeeDetail = NonNullable<
   Awaited<ReturnType<typeof employeeRepository.findDetailById>>
@@ -63,11 +50,18 @@ function buildEmployeeResponseFromDetail(
   });
 }
 
+function buildInvitationRedirectUrl(firstName: string, lastName: string): string {
+  const params = new URLSearchParams({ firstName, lastName });
+  return `${env.WEB_APP_URL}/accept-invitation?${params.toString()}`;
+}
+
 async function sendClerkInvitation(
   clerkOrgId: string,
   inviterUserId: string,
   email: string,
   role: string,
+  firstName: string,
+  lastName: string,
 ) {
   try {
     return await clerkClient.organizations.createOrganizationInvitation({
@@ -75,7 +69,7 @@ async function sendClerkInvitation(
       inviterUserId,
       emailAddress: email,
       role: normalizeOrgRole(role),
-      redirectUrl: `${env.WEB_APP_URL}/accept-invitation`,
+      redirectUrl: buildInvitationRedirectUrl(firstName, lastName),
     });
   } catch (error) {
     if (
@@ -103,68 +97,6 @@ async function sendClerkInvitation(
 
     throw error;
   }
-}
-
-async function ensureMembershipHasLocations(
-  db: Db,
-  organizationId: string,
-  membershipId: string,
-): Promise<void> {
-  const existing = await employeeRepository.getLocationIdsForMembership(
-    db,
-    membershipId,
-  );
-
-  if (existing.length > 0) {
-    return;
-  }
-
-  const defaultLocation = await locationRepository.findDefaultByOrganizationId(
-    db,
-    organizationId,
-  );
-
-  if (!defaultLocation) {
-    throw new InternalError("Organization has no default location");
-  }
-
-  await employeeRepository.replaceLocationAssignments(
-    db,
-    membershipId,
-    organizationId,
-    [defaultLocation.id],
-  );
-}
-
-type ClerkLinkProfile = {
-  firstName: string;
-  lastName: string;
-  email: string;
-  imageUrl: string;
-  hasImage: boolean;
-};
-
-async function activateMembership(
-  db: Db,
-  organizationId: string,
-  membershipId: string,
-  userId: string,
-  updates: {
-    role: string;
-    clerkInvitationId?: string | null;
-    invitedAt?: Date | null;
-  },
-): Promise<void> {
-  await employeeRepository.updateById(db, membershipId, {
-    userId,
-    role: updates.role,
-    status: MEMBERSHIP_STATUS.ACTIVE,
-    clerkInvitationId: updates.clerkInvitationId,
-    invitedAt: updates.invitedAt ?? new Date(),
-  });
-
-  await ensureMembershipHasLocations(db, organizationId, membershipId);
-  await membershipLocationsCache.invalidate(organizationId, userId);
 }
 
 export const employeeService = {
@@ -248,6 +180,8 @@ export const employeeService = {
         inviterUserId,
         created.email,
         created.role,
+        created.user.firstName,
+        created.user.lastName,
       );
 
       const invited = await employeeRepository.updateById(db, membership.id, {
@@ -366,6 +300,8 @@ export const employeeService = {
       inviterUserId,
       detail.user.email,
       detail.membership.role,
+      detail.user.firstName,
+      detail.user.lastName,
     );
 
     const updatedMembership = await employeeRepository.updateById(
@@ -573,165 +509,5 @@ export const employeeService = {
     await membershipLocationsCache.set(organizationId, userDbId, locationIds);
 
     return locationIds;
-  },
-};
-
-export const membershipWebhookService = {
-  async linkMembershipFromClerk(
-    db: Db,
-    clerkOrgId: string,
-    clerkUserId: string,
-    email: string,
-    role: string,
-    clerkInvitationId?: string | null,
-    profile?: ClerkLinkProfile,
-    options?: {
-      organization?: Organization;
-      membershipRow?: LinkMembershipRow | MembershipWithUserRow | null;
-    },
-  ) {
-    const organization =
-      options?.organization ??
-      (await organizationRepository.findByClerkOrgId(db, clerkOrgId));
-
-    if (!organization) {
-      return;
-    }
-
-    const normalizedEmail = normalizeEmail(email);
-    const normalizedRole = normalizeOrgRole(role);
-    const membershipRow =
-      options?.membershipRow !== undefined
-        ? options.membershipRow
-        : ((clerkInvitationId
-            ? await employeeRepository.findByInvitationId(db, clerkInvitationId)
-            : null) ??
-          (await employeeRepository.findByEmail(
-            db,
-            organization.id,
-            normalizedEmail,
-          )));
-
-    const clerkProfile = profile ?? {
-      firstName: "",
-      lastName: "",
-      email: normalizedEmail,
-      imageUrl: "",
-      hasImage: false,
-    };
-
-    if (membershipRow) {
-      if (
-        membershipRow.membership.status === MEMBERSHIP_STATUS.ACTIVE &&
-        membershipRow.user.clerkUserId === clerkUserId
-      ) {
-        return;
-      }
-
-      let linkedUserId: string;
-      const existingClerkUser = await userRepository.findByClerkUserId(
-        db,
-        clerkUserId,
-      );
-
-      if (
-        existingClerkUser &&
-        existingClerkUser.id !== membershipRow.user.id
-      ) {
-        linkedUserId = existingClerkUser.id;
-      } else if (membershipRow.user.clerkUserId) {
-        const user = await userService.syncUserFromClerk(
-          db,
-          clerkUserId,
-          clerkProfile,
-        );
-
-        if (!user) {
-          return;
-        }
-
-        linkedUserId = user.id;
-      } else {
-        const user = await userService.linkClerkProfileToDraftUser(
-          db,
-          membershipRow.user.id,
-          clerkUserId,
-          clerkProfile,
-        );
-
-        if (!user) {
-          return;
-        }
-
-        linkedUserId = user.id;
-      }
-
-      await activateMembership(
-        db,
-        organization.id,
-        membershipRow.membership.id,
-        linkedUserId,
-        {
-          role: normalizedRole,
-          clerkInvitationId:
-            clerkInvitationId ?? membershipRow.membership.clerkInvitationId,
-          invitedAt: membershipRow.membership.invitedAt,
-        },
-      );
-      return;
-    }
-
-    if (normalizedRole !== ORG_ROLE.ADMIN) {
-      logger.warn(
-        { clerkOrgId, email: normalizedEmail, role: normalizedRole },
-        "Ignoring Clerk invitation without local draft for non-admin user",
-      );
-      return;
-    }
-
-    const user = await userService.syncUserFromClerk(
-      db,
-      clerkUserId,
-      clerkProfile,
-    );
-
-    if (!user) {
-      return;
-    }
-
-    const membership = await employeeRepository.insert(db, {
-      organizationId: organization.id,
-      userId: user.id,
-      role: normalizedRole,
-      status: MEMBERSHIP_STATUS.ACTIVE,
-      clerkInvitationId: clerkInvitationId ?? null,
-      invitedAt: new Date(),
-    });
-
-    if (!membership) {
-      return;
-    }
-
-    await ensureMembershipHasLocations(db, organization.id, membership.id);
-    await membershipLocationsCache.invalidate(organization.id, user.id);
-  },
-
-  async removeMembership(db: Db, clerkOrgId: string, clerkUserId: string) {
-    const row = await employeeRepository.findMembershipByClerkIds(
-      db,
-      clerkOrgId,
-      clerkUserId,
-    );
-
-    if (!row) {
-      return;
-    }
-
-    await employeeRepository.softDeleteById(db, row.membership.id);
-    await membershipLocationsCache.invalidate(row.organizationId, row.userId);
-  },
-
-  async handleInvitationRevoked(db: Db, clerkInvitationId: string) {
-    await employeeRepository.revertInvitationById(db, clerkInvitationId);
   },
 };
