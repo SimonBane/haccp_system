@@ -16,6 +16,7 @@ import { taskTemplateRoutes } from "../modules/task-templates/task-template.rout
 import { tenantRoutes } from "../modules/tenant/tenant.routes.js";
 import { todayRoutes } from "../modules/today/today.routes.js";
 import { invitationRoutes } from "../modules/invitations/invitation.routes.js";
+import { clerkWebhookRoutes } from "../modules/webhooks/clerk-webhook.routes.js";
 import type { AppEnv } from "../types.js";
 
 export const routes = new OpenAPIHono<AppEnv>();
@@ -28,6 +29,7 @@ if (env.NODE_ENV === "development") {
 }
 
 routes.route("/health", healthRoutes);
+routes.route("/webhooks", clerkWebhookRoutes);
 
 function mountAuthOnly(
   path: string,
@@ -82,7 +84,8 @@ mountAuthOnly("/invitations", invitationRoutes);
 mountProtected("/tenant", tenantRoutes);
 mountAdminProtected("/organizations", organizationRoutes);
 mountAdminProtected("/employees", employeeRoutes);
-mountAdminProtected("/locations", locationRoutes);
+// Location-scoped routes must be registered before the admin /locations
+// router. Otherwise Hono runs admin middleware for every /locations/* path.
 mountLocationScoped("/locations/:locationId/equipment", equipmentRoutes, true);
 mountLocationScoped(
   "/locations/:locationId/task-templates",
@@ -90,3 +93,4 @@ mountLocationScoped(
   true,
 );
 mountLocationScoped("/locations/:locationId/today", todayRoutes, false);
+mountAdminProtected("/locations", locationRoutes);

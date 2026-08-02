@@ -5,7 +5,7 @@ import { redirect } from "@/i18n/navigation";
 import { type Locale } from "@/i18n/routing";
 
 export async function requireOrgAdmin() {
-  const { orgRole } = await auth();
+  const { orgRole } = await auth.protect();
 
   if (orgRole !== ORG_ROLE.ADMIN) {
     const locale = (await getLocale()) as Locale;

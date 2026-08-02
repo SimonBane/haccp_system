@@ -1,5 +1,5 @@
 import { and, asc, eq, sql } from "drizzle-orm";
-import type { Db } from "../../core/db/client.js";
+import type { Db, DbClient } from "../../core/db/client.js";
 import { locations } from "../../core/db/schema/locations.js";
 
 export const DEFAULT_LOCATION_NAME = "Main site";
@@ -56,7 +56,7 @@ export const locationRepository = {
     return row?.count ?? 0;
   },
 
-  async insert(db: Db, data: typeof locations.$inferInsert) {
+  async insert(db: DbClient, data: typeof locations.$inferInsert) {
     const [created] = await db.insert(locations).values(data).returning();
     return created ?? null;
   },

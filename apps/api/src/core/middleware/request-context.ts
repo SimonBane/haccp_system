@@ -19,9 +19,13 @@ export const requestContextMiddleware = createMiddleware<AppEnv>(
     const db = getDb(c);
 
     const [user, tenant] = await Promise.all([
-      userService.requireUser(db, clerkUserId),
+      userService.resolveUser(db, clerkUserId),
       tenantService.requireTenant(db, clerkOrgId),
     ]);
+
+    if (!user) {
+      throw new ForbiddenError("User not found");
+    }
 
     let assignedLocationIds: string[] | null = null;
 
