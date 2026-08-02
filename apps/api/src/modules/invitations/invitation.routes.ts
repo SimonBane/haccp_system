@@ -46,7 +46,12 @@ invitationRoutes.openapi(acceptRoute, async (c) => {
     throw new ForbiddenError("Organization membership required");
   }
 
-  await invitationService.accept(getDb(c), clerkOrgId, clerkUserId, orgRole);
+  await invitationService.accept(
+    getDb(c),
+    clerkOrgId,
+    clerkUserId,
+    orgRole,
+  );
 
   return c.json({ success: true as const }, 200);
 });

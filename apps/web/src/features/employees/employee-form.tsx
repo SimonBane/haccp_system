@@ -4,7 +4,7 @@ import { ORG_ROLE, type EmployeeResponse, type LocationResponse } from "@haccp/s
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SaveIcon, SendIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Controller, useForm, useFormState } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,7 @@ type EmployeeFormProps = {
 };
 
 type EmployeeRole = typeof ORG_ROLE.ADMIN | typeof ORG_ROLE.EMPLOYEE;
+type SubmitAction = "save" | "invite";
 
 export type EmployeeFormInput = {
   email: string;
@@ -76,6 +77,7 @@ export function EmployeeForm({
   }, [tenantLocations, locationId]);
   const isEditing = Boolean(employee);
   const isActive = employee?.status === "active";
+  const [pendingAction, setPendingAction] = useState<SubmitAction | null>(null);
 
   const roleItems = useMemo(
     () => [
@@ -147,23 +149,32 @@ export function EmployeeForm({
         role: employee?.role ?? "",
         locationIds: resolveLocationIds(employee?.locationIds),
       });
+    } else {
+      setPendingAction(null);
     }
   }, [open, employee, form, resolveLocationIds]);
 
-  const { isSubmitting, isDirty } = useFormState({ control: form.control });
+  const { isDirty } = useFormState({ control: form.control });
   const hasChanges = !isEditing || !employee || isDirty;
 
   const submit = async (inviteNow: boolean) => {
-    await form.handleSubmit(async (values) => {
-      await onSave(
-        {
-          ...values,
-          locationIds: resolveLocationIds(values.locationIds),
-        },
-        inviteNow,
-      );
-      onOpenChange(false);
-    })();
+    const action: SubmitAction = inviteNow ? "invite" : "save";
+    setPendingAction(action);
+
+    try {
+      await form.handleSubmit(async (values) => {
+        await onSave(
+          {
+            ...values,
+            locationIds: resolveLocationIds(values.locationIds),
+          },
+          inviteNow,
+        );
+        onOpenChange(false);
+      })();
+    } finally {
+      setPendingAction(null);
+    }
   };
 
   return (
@@ -329,7 +340,8 @@ export function EmployeeForm({
                 <Button
                   type="button"
                   variant="outline"
-                  isLoading={isSubmitting}
+                  isLoading={pendingAction === "save"}
+                  disabled={pendingAction !== null && pendingAction !== "save"}
                   onClick={() => void submit(false)}
                 >
                   <SaveIcon data-icon="inline-start" />
@@ -337,7 +349,8 @@ export function EmployeeForm({
                 </Button>
                 <Button
                   type="button"
-                  isLoading={isSubmitting}
+                  isLoading={pendingAction === "invite"}
+                  disabled={pendingAction !== null && pendingAction !== "invite"}
                   onClick={() => void submit(true)}
                 >
                   <SendIcon data-icon="inline-start" />
@@ -347,8 +360,11 @@ export function EmployeeForm({
             ) : (
               <Button
                 type="button"
-                isLoading={isSubmitting}
-                disabled={!hasChanges}
+                isLoading={pendingAction === "save"}
+                disabled={
+                  !hasChanges ||
+                  (pendingAction !== null && pendingAction !== "save")
+                }
                 onClick={() => void submit(false)}
               >
                 <SaveIcon data-icon="inline-start" />

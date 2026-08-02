@@ -1,7 +1,8 @@
 import { Suspense } from "react";
 import { type Locale } from "@/i18n/routing";
-import { getTranslations, setRequestLocale } from "next-intl/server";
+import { setRequestLocale } from "next-intl/server";
 import { AcceptInvitationContent } from "@/components/auth/accept-invitation-content";
+import { FullPageLoader } from "@/components/layout/full-page-loader";
 
 export default async function AcceptInvitationPage({
   params,
@@ -10,17 +11,10 @@ export default async function AcceptInvitationPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale as Locale);
-  const t = await getTranslations("AcceptInvitationPage");
 
   return (
-    <div className="flex min-h-full flex-1 flex-col items-center justify-center px-6 py-16">
-      <Suspense
-        fallback={
-          <p className="text-sm text-muted-foreground">{t("processing")}</p>
-        }
-      >
-        <AcceptInvitationContent />
-      </Suspense>
-    </div>
+    <Suspense fallback={<FullPageLoader />}>
+      <AcceptInvitationContent />
+    </Suspense>
   );
 }

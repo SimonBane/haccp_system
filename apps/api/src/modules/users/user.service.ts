@@ -2,17 +2,41 @@ import type { UserResponse } from "@haccp/shared";
 import { normalizeEmail } from "@haccp/shared";
 import type { Db, DbClient } from "../../core/db/client.js";
 import type { User } from "../../core/db/schema/users.js";
-import { ConflictError, NotFoundError } from "../../core/errors/app-errors.js";
+import { ConflictError, InternalError, NotFoundError } from "../../core/errors/app-errors.js";
 import { mapDbMutationError } from "../../lib/db-errors.js";
 import { buildUserCacheBlob, userCache } from "./user-cache.js";
 import {
+  buildClerkProfileData,
   toUserResponse,
+  type ClerkProfileData,
   type ClerkUserProfile,
 } from "./user.mapper.js";
 import { userRepository } from "./user.repository.js";
 
 function normalizeName(value: string | undefined | null): string {
   return value?.trim() ?? "";
+}
+
+async function persistUserAndCache(
+  db: DbClient,
+  profileData: ClerkProfileData,
+  existingUserId?: string,
+): Promise<User> {
+  const user = existingUserId
+    ? await userRepository.updateById(db, existingUserId, profileData)
+    : await userRepository.insert(db, profileData);
+
+  if (!user) {
+    throw existingUserId
+      ? new NotFoundError("User not found")
+      : new InternalError("Failed to create user");
+  }
+
+  await userCache.set(
+    profileData.clerkUserId,
+    buildUserCacheBlob(toUserResponse(user)),
+  );
+  return user;
 }
 
 export const userService = {
@@ -69,14 +93,7 @@ export const userService = {
         return null;
       }
 
-      const profileData = {
-        clerkUserId,
-        firstName: normalizeName(profile.firstName),
-        lastName: normalizeName(profile.lastName),
-        email: normalizeEmail(profile.email),
-        imageUrl: profile.imageUrl,
-        hasImage: profile.hasImage,
-      };
+      const profileData = buildClerkProfileData(clerkUserId, profile);
 
       const user = existing
         ? await userRepository.updateById(db, existing.id, profileData)
@@ -95,26 +112,31 @@ export const userService = {
   },
 
   async linkClerkProfileToDraftUser(
-    db: Db,
+    db: DbClient,
     userId: string,
-    clerkUserId: string,
-    profile: ClerkUserProfile,
+    profileData: ClerkProfileData,
   ): Promise<User | null> {
     try {
-      const user = await userRepository.updateById(db, userId, {
-        clerkUserId,
-        firstName: normalizeName(profile.firstName),
-        lastName: normalizeName(profile.lastName),
-        email: normalizeEmail(profile.email),
-        imageUrl: profile.imageUrl,
-        hasImage: profile.hasImage,
+      return await persistUserAndCache(db, profileData, userId);
+    } catch (error) {
+      mapDbMutationError(error, {
+        unique: () => new ConflictError("A user with this email already exists"),
       });
+    }
+  },
 
-      if (user) {
-        await userCache.set(clerkUserId, buildUserCacheBlob(toUserResponse(user)));
-      }
+  async upsertUserFromClerk(
+    db: DbClient,
+    profileData: ClerkProfileData,
+  ): Promise<User> {
+    try {
+      const existing = await userRepository.findByClerkUserIdOrEmail(
+        db,
+        profileData.clerkUserId,
+        profileData.email,
+      );
 
-      return user;
+      return persistUserAndCache(db, profileData, existing?.id);
     } catch (error) {
       mapDbMutationError(error, {
         unique: () => new ConflictError("A user with this email already exists"),

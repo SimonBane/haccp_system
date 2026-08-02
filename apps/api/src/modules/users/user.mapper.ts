@@ -1,5 +1,10 @@
 import type { UserResponse } from "@haccp/shared";
+import { normalizeEmail } from "@haccp/shared";
 import type { User } from "../../core/db/schema/users.js";
+
+function normalizeName(value: string | undefined | null): string {
+  return value?.trim() ?? "";
+}
 
 export function toUserResponse(user: User): UserResponse {
   return {
@@ -36,6 +41,29 @@ export type ClerkUserProfile = {
   imageUrl: string;
   hasImage: boolean;
 };
+
+export type ClerkProfileData = {
+  clerkUserId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  imageUrl: string;
+  hasImage: boolean;
+};
+
+export function buildClerkProfileData(
+  clerkUserId: string,
+  profile: ClerkUserProfile,
+): ClerkProfileData {
+  return {
+    clerkUserId,
+    firstName: normalizeName(profile.firstName),
+    lastName: normalizeName(profile.lastName),
+    email: normalizeEmail(profile.email),
+    imageUrl: profile.imageUrl,
+    hasImage: profile.hasImage,
+  };
+}
 
 export function extractClerkProfile(data: {
   first_name?: string | null;
@@ -78,4 +106,11 @@ export function mapClerkApiUserToProfile(user: {
     imageUrl: user.imageUrl ?? "",
     hasImage: user.hasImage ?? false,
   };
+}
+
+export function mapClerkApiUserToProfileData(
+  clerkUserId: string,
+  user: Parameters<typeof mapClerkApiUserToProfile>[0],
+): ClerkProfileData {
+  return buildClerkProfileData(clerkUserId, mapClerkApiUserToProfile(user));
 }

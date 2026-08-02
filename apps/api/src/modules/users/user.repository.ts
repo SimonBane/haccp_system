@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import type { Db, DbClient } from "../../core/db/client.js";
 import { users } from "../../core/db/schema/users.js";
 
@@ -15,7 +15,7 @@ export const userRepository = {
     return row ?? null;
   },
 
-  async findAnyByClerkUserId(db: Db, clerkUserId: string) {
+  async findAnyByClerkUserId(db: DbClient, clerkUserId: string) {
     const [row] = await db
       .select()
       .from(users)
@@ -80,6 +80,26 @@ export const userRepository = {
       .select()
       .from(users)
       .where(and(eq(users.email, email)))
+      .limit(1);
+
+    return row ?? null;
+  },
+
+  async findByClerkUserIdOrEmail(
+    db: DbClient,
+    clerkUserId: string,
+    email: string,
+  ) {
+    const [row] = await db
+      .select()
+      .from(users)
+      .where(
+        or(
+          eq(users.clerkUserId, clerkUserId),
+          sql`lower(${users.email}) = lower(${email})`,
+        ),
+      )
+      .orderBy(sql`(${users.clerkUserId} = ${clerkUserId}) desc`)
       .limit(1);
 
     return row ?? null;

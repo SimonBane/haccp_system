@@ -79,44 +79,6 @@ clerkWebhookRoutes.post("/clerk", async (c) => {
       }
       break;
     }
-    case "organizationInvitation.accepted": {
-      const data = event.data;
-      const clerkOrgId = data.organization_id;
-      const clerkUserId = data.user_id;
-      const email = data.email_address;
-      const role = data.role;
-      const invitationId = data.id;
-
-      if (clerkOrgId && clerkUserId && email && role && invitationId) {
-        await clerkWebhookService.handleInvitationAccepted(
-          db,
-          clerkOrgId,
-          clerkUserId,
-          email,
-          role,
-          invitationId,
-          {
-            first_name: null,
-            last_name: null,
-            email_addresses: [
-              {
-                id: "primary",
-                email_address: email,
-              },
-            ],
-            primary_email_address_id: "primary",
-          },
-        );
-      }
-      break;
-    }
-    case "organizationInvitation.revoked": {
-      const invitationId = event.data.id;
-      if (invitationId) {
-        await clerkWebhookService.handleInvitationRevoked(db, invitationId);
-      }
-      break;
-    }
     default:
       break;
   }
