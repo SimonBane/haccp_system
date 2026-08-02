@@ -74,4 +74,14 @@ export const userRepository = {
 
     return updated ?? null;
   },
+
+  async findByEmail(db: DbClient, email: string) {
+    const [row] = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.email, email)))
+      .limit(1);
+
+    return row ?? null;
+  },
 };

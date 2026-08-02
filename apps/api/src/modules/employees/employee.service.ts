@@ -22,6 +22,7 @@ import {
   ValidationError,
 } from "../../core/errors/app-errors.js";
 import { logger } from "../../lib/logger.js";
+import { mapDbMutationError } from "../../lib/db-errors.js";
 import { locationRepository } from "../locations/location.repository.js";
 import { organizationRepository } from "../organizations/organization.repository.js";
 import { userService } from "../users/user.service.js";
@@ -60,17 +61,6 @@ function buildEmployeeResponseFromDetail(
       overrides?.locationIds ?? detail.locationIds,
     ),
   });
-}
-
-function assertLocationIdsInTenant(
-  locationIds: string[],
-  tenantLocations: LocationResponse[],
-): void {
-  const validIds = new Set(tenantLocations.map((location) => location.id));
-
-  if (!locationIds.every((locationId) => validIds.has(locationId))) {
-    throw new ValidationError("One or more locations are invalid");
-  }
 }
 
 async function sendClerkInvitation(
@@ -115,13 +105,6 @@ async function sendClerkInvitation(
   }
 }
 
-async function invalidateMembershipLocationsCache(
-  organizationId: string,
-  userId: string,
-): Promise<void> {
-  await membershipLocationsCache.invalidate(organizationId, userId);
-}
-
 async function ensureMembershipHasLocations(
   db: Db,
   organizationId: string,
@@ -145,9 +128,12 @@ async function ensureMembershipHasLocations(
     throw new InternalError("Organization has no default location");
   }
 
-  await employeeRepository.replaceLocationAssignments(db, membershipId, [
-    defaultLocation.id,
-  ]);
+  await employeeRepository.replaceLocationAssignments(
+    db,
+    membershipId,
+    organizationId,
+    [defaultLocation.id],
+  );
 }
 
 type ClerkLinkProfile = {
@@ -178,7 +164,7 @@ async function activateMembership(
   });
 
   await ensureMembershipHasLocations(db, organizationId, membershipId);
-  await invalidateMembershipLocationsCache(organizationId, userId);
+  await membershipLocationsCache.invalidate(organizationId, userId);
 }
 
 export const employeeService = {
@@ -209,35 +195,13 @@ export const employeeService = {
     tenantLocations: LocationResponse[],
   ): Promise<EmployeeResponse> {
     const email = normalizeEmail(input.email);
-    const existing = await employeeRepository.findByEmailIncludingDeleted(
-      db,
-      organizationId,
-      email,
-    );
-
-    if (existing && !existing.membership.deletedAt) {
-      throw new ConflictError("An employee with this email already exists");
-    }
-
-    assertLocationIdsInTenant(input.locationIds, tenantLocations);
-
     const role = normalizeOrgRole(input.role);
 
-    const created = await db.transaction(async (tx) => {
-      let user: User | null | undefined = existing?.user;
+    let created: { employee: OrganizationMembership; user: User; email: string; role: string };
 
-      if (existing?.membership.deletedAt) {
-        user = await userService.updateProfile(tx, existing.user.id, {
-          email,
-          firstName: input.firstName,
-          lastName: input.lastName,
-        });
-
-        if (!user) {
-          throw new ValidationError("Failed to restore employee user");
-        }
-      } else if (!user) {
-        user = await userService.createDraftUser(tx, {
+    try {
+      created = await db.transaction(async (tx) => {
+        const user = await userService.ensureDraftUser(tx, {
           email,
           firstName: input.firstName,
           lastName: input.lastName,
@@ -246,37 +210,35 @@ export const employeeService = {
         if (!user) {
           throw new ValidationError("Failed to create employee user");
         }
-      }
 
-      const employee =
-        existing?.membership.deletedAt
-          ? await employeeRepository.updateById(tx, existing.membership.id, {
-              userId: user.id,
-              role,
-              status: MEMBERSHIP_STATUS.DRAFT,
-              clerkInvitationId: null,
-              invitedAt: null,
-              deletedAt: null,
-            })
-          : await employeeRepository.insert(tx, {
-              organizationId,
-              userId: user.id,
-              role,
-              status: MEMBERSHIP_STATUS.DRAFT,
-            });
+        const employee = await employeeRepository.insert(tx, {
+          organizationId,
+          userId: user.id,
+          role,
+          status: MEMBERSHIP_STATUS.DRAFT,
+        });
 
-      if (!employee) {
-        throw new ValidationError("Failed to create employee");
-      }
+        if (!employee) {
+          throw new ValidationError("Failed to create employee");
+        }
 
-      await employeeRepository.replaceLocationAssignments(
-        tx,
-        employee.id,
-        input.locationIds,
-      );
+        await employeeRepository.replaceLocationAssignments(
+          tx,
+          employee.id,
+          organizationId,
+          input.locationIds,
+        );
 
-      return { employee, user, email, role };
-    });
+        return { employee, user, email, role };
+      });
+    } catch (error) {
+      mapDbMutationError(error, {
+        unique: () =>
+          new ConflictError("An employee with this email already exists"),
+        foreignKey: () =>
+          new ValidationError("One or more locations are invalid"),
+      });
+    }
 
     let membership = created.employee;
 
@@ -297,7 +259,7 @@ export const employeeService = {
       membership = invited ?? membership;
     }
 
-    await invalidateMembershipLocationsCache(organizationId, membership.userId);
+    await membershipLocationsCache.invalidate(organizationId, membership.userId);
 
     return buildEmployeeResponseFromDetail(
       {
@@ -332,32 +294,26 @@ export const employeeService = {
 
     let updatedUser = detail.user;
 
-    if (input.email) {
-      const email = normalizeEmail(input.email);
-      const existing = await employeeRepository.findByEmail(
-        db,
-        organizationId,
-        email,
-      );
-
-      if (existing && existing.membership.id !== membershipId) {
-        throw new ConflictError("An employee with this email already exists");
-      }
-    }
-
     if (
       input.email !== undefined ||
       input.firstName !== undefined ||
       input.lastName !== undefined
     ) {
-      const user = await userService.updateProfile(db, detail.user.id, {
-        email: input.email ? normalizeEmail(input.email) : undefined,
-        firstName: input.firstName,
-        lastName: input.lastName,
-      });
+      try {
+        const user = await userService.updateProfile(db, detail.user.id, {
+          email: input.email ? normalizeEmail(input.email) : undefined,
+          firstName: input.firstName,
+          lastName: input.lastName,
+        });
 
-      if (user) {
-        updatedUser = user;
+        if (user) {
+          updatedUser = user;
+        }
+      } catch (error) {
+        mapDbMutationError(error, {
+          unique: () =>
+            new ConflictError("An employee with this email already exists"),
+        });
       }
     }
 
@@ -530,15 +486,21 @@ export const employeeService = {
       throw new NotFoundError("Employee not found");
     }
 
-    assertLocationIdsInTenant(input.locationIds, tenantLocations);
+    try {
+      await employeeRepository.replaceLocationAssignments(
+        db,
+        membershipId,
+        organizationId,
+        input.locationIds,
+      );
+    } catch (error) {
+      mapDbMutationError(error, {
+        foreignKey: () =>
+          new ValidationError("One or more locations are invalid"),
+      });
+    }
 
-    await employeeRepository.replaceLocationAssignments(
-      db,
-      membershipId,
-      input.locationIds,
-    );
-
-    await invalidateMembershipLocationsCache(
+    await membershipLocationsCache.invalidate(
       organizationId,
       detail.membership.userId,
     );
@@ -585,7 +547,7 @@ export const employeeService = {
     }
 
     await employeeRepository.softDeleteById(db, membershipId);
-    await invalidateMembershipLocationsCache(
+    await membershipLocationsCache.invalidate(
       organizationId,
       detail.membership.userId,
     );
@@ -751,7 +713,7 @@ export const membershipWebhookService = {
     }
 
     await ensureMembershipHasLocations(db, organization.id, membership.id);
-    await invalidateMembershipLocationsCache(organization.id, user.id);
+    await membershipLocationsCache.invalidate(organization.id, user.id);
   },
 
   async removeMembership(db: Db, clerkOrgId: string, clerkUserId: string) {

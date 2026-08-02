@@ -30,9 +30,7 @@ export const users = pgTable(
     uniqueIndex("users_clerk_user_id_unique")
       .on(table.clerkUserId)
       .where(sql`${table.clerkUserId} is not null`),
-    uniqueIndex("users_email_unique")
-      .on(sql`lower(${table.email})`)
-      .where(sql`${table.deletedAt} is null`),
+    uniqueIndex("users_email_unique").on(sql`lower(${table.email})`),
   ],
 );
 

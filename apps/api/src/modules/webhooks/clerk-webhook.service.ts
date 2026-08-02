@@ -63,7 +63,7 @@ export const clerkWebhookService = {
     clerkUserId: string,
     data: Parameters<typeof extractClerkProfile>[0],
   ): Promise<void> {
-    await userService.syncUserFromClerkWebhook(db, clerkUserId, data);
+    await userService.syncUserFromClerk(db, clerkUserId, extractClerkProfile(data));
   },
 
   async handleUserDeleted(db: Db, clerkUserId: string): Promise<void> {
