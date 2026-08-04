@@ -1,6 +1,6 @@
 import {
+  TASK_TEMPLATE_ALL_WEEKDAYS,
   TASK_TEMPLATE_WEEKDAYS,
-  TASK_TEMPLATE_WEEKDAYS_MON_FRI,
   type TaskTemplateWeekday,
 } from "@haccp/shared";
 
@@ -10,13 +10,16 @@ function arraysEqual<T>(left: T[], right: T[]): boolean {
 }
 
 export function isEveryDayWeekdays(weekdays: TaskTemplateWeekday[]): boolean {
-  return arraysEqual([...weekdays].sort(), [...TASK_TEMPLATE_WEEKDAYS].sort());
-}
-
-export function isMonFriWeekdays(weekdays: TaskTemplateWeekday[]): boolean {
   return arraysEqual(
     [...weekdays].sort(),
-    [...TASK_TEMPLATE_WEEKDAYS_MON_FRI].sort(),
+    [...TASK_TEMPLATE_ALL_WEEKDAYS].sort(),
+  );
+}
+
+export function isWeekdaysPreset(weekdays: TaskTemplateWeekday[]): boolean {
+  return arraysEqual(
+    [...weekdays].sort(),
+    [...TASK_TEMPLATE_WEEKDAYS].sort(),
   );
 }
 
@@ -24,7 +27,7 @@ export function formatWeekdaysLabel(
   weekdays: TaskTemplateWeekday[],
   labels: {
     everyDay: string;
-    monFri: string;
+    weekdays: string;
     formatShort: (weekday: TaskTemplateWeekday) => string;
   },
 ): string {
@@ -32,12 +35,12 @@ export function formatWeekdaysLabel(
     return labels.everyDay;
   }
 
-  if (isMonFriWeekdays(weekdays)) {
-    return labels.monFri;
+  if (isWeekdaysPreset(weekdays)) {
+    return labels.weekdays;
   }
 
   const order = new Map(
-    TASK_TEMPLATE_WEEKDAYS.map((weekday, index) => [weekday, index]),
+    TASK_TEMPLATE_ALL_WEEKDAYS.map((weekday, index) => [weekday, index]),
   );
 
   return [...weekdays]
@@ -51,7 +54,7 @@ export function formatScheduleSummary(
   scheduledTimes: string[],
   labels: {
     everyDay: string;
-    monFri: string;
+    weekdays: string;
     formatShort: (weekday: TaskTemplateWeekday) => string;
   },
 ): string {

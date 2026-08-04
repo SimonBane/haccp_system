@@ -301,6 +301,12 @@
     "equipmentLabel": "Хладилна техника",
     "equipmentPlaceholder": "Изберете хладилна техника",
     "weekdaysLabel": "График",
+    "daysOfWeekLabel": "Дни от седмицата",
+    "schedulePlaceholder": "Изберете график",
+    "weekdaysPlaceholder": "Изберете дни",
+    "moreSelected": "+ още {count}",
+    "overflowRemoveLabel": "Премахни още {count} дни",
+    "weekdaysEmpty": "Няма намерени дни.",
     "timesLabel": "Часове",
     "removeTime": "Премахни час",
     "save": "Запази",
@@ -325,7 +331,7 @@
     },
     "presets": {
       "everyDay": "Всеки ден",
-      "monFri": "Понеделник–Петък",
+      "weekdays": "Делнични дни",
       "custom": "По избор"
     },
     "weekdaysShort": {
@@ -474,6 +480,8 @@
     "locationsLabel": "Локации",
     "locationsDescription": "Изберете до кои локации има достъп този служител.",
     "locationsPlaceholder": "Изберете локации",
+    "moreSelected": "+ още {count}",
+    "overflowRemoveLabel": "Премахни още {count} локации",
     "locationsEmpty": "Няма намерени локации.",
     "noLocationsAvailable": "Все още няма налични локации.",
     "noLocations": "Няма локации",

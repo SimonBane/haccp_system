@@ -438,6 +438,10 @@ export function EmployeeForm({
                       placeholder={t("locationsPlaceholder")}
                       emptyMessage={t("locationsEmpty")}
                       noLocationsMessage={t("noLocationsAvailable")}
+                      moreSelectedLabel={(count) => t("moreSelected", { count })}
+                      overflowRemoveLabel={(count) =>
+                        t("overflowRemoveLabel", { count })
+                      }
                     />
                     {fieldState.error ? (
                       <FieldError errors={[fieldState.error]} />
