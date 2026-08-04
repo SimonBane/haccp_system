@@ -6,7 +6,7 @@ import {
   taskTemplateTimeSlotSchema,
   taskTemplateTypeSchema,
   taskTemplateWeekdaySchema,
-  TASK_TEMPLATE_WEEKDAYS,
+  TASK_TEMPLATE_ALL_WEEKDAYS,
 } from "./task-template.js";
 import { userSummarySchema } from "./user.js";
 
@@ -116,7 +116,7 @@ export function getWeekdayFromDate(
   const utcDate = new Date(Date.UTC(year, month - 1, day));
   const weekday = jsDayToWeekday(utcDate.getUTCDay());
 
-  if (!TASK_TEMPLATE_WEEKDAYS.includes(weekday)) {
+  if (!TASK_TEMPLATE_ALL_WEEKDAYS.includes(weekday)) {
     throw new Error(`Invalid weekday derived from ${date}`);
   }
 

@@ -28,6 +28,7 @@ type NavItem = {
   url: string;
   icon: ReactNode;
   isActive?: boolean;
+  defaultExpanded?: boolean;
   items?: {
     title: string;
     url: string;
@@ -39,7 +40,9 @@ function NavMainItem({ item }: { item: NavItem }) {
   const t = useTranslations("Sidebar");
   const { isMobile, setOpenMobile } = useSidebar();
   const hasActiveChild = item.items?.some((subItem) => subItem.isActive) ?? false;
-  const [open, setOpen] = useState(item.isActive || hasActiveChild);
+  const [open, setOpen] = useState(
+    item.defaultExpanded || item.isActive || hasActiveChild,
+  );
 
   const closeMobileSidebar = () => {
     if (isMobile) {

@@ -18,6 +18,7 @@ export type NavItem = {
   url: string;
   icon: LucideIcon;
   isActive: boolean;
+  defaultExpanded?: boolean;
   items?: NavSubItem[];
 };
 
@@ -71,6 +72,7 @@ export function getAdminNavItems(
     url: "/dashboard/organization",
     icon: Building2Icon,
     isActive: pathname === "/dashboard/organization",
+    defaultExpanded: true,
     items: [
       {
         title: labels.employees,

@@ -54,7 +54,7 @@ export function TaskTemplatesData({
   const scheduleLabels = useMemo(
     () => ({
       everyDay: t("presets.everyDay"),
-      monFri: t("presets.monFri"),
+      weekdays: t("presets.weekdays"),
       formatShort: (weekday: import("@haccp/shared").TaskTemplateWeekday) =>
         t(`weekdaysShort.${weekday}`),
     }),

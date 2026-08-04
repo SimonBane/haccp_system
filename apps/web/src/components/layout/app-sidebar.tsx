@@ -31,6 +31,7 @@ function toNavMainItems(
     url: item.url,
     icon: <item.icon />,
     isActive: item.isActive,
+    defaultExpanded: item.defaultExpanded,
     items: item.items,
   }));
 }

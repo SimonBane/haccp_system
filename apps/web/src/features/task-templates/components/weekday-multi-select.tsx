@@ -1,6 +1,9 @@
 "use client";
 
-import type { LocationResponse } from "@haccp/shared";
+import {
+  TASK_TEMPLATE_ALL_WEEKDAYS,
+  type TaskTemplateWeekday,
+} from "@haccp/shared";
 import { useMemo } from "react";
 import {
   Combobox,
@@ -17,80 +20,65 @@ import {
 } from "@/components/ui/combobox";
 import { cn } from "@/lib/utils";
 
-type LocationMultiSelectProps = {
+type WeekdayMultiSelectProps = {
   id?: string;
-  locations: LocationResponse[];
-  value: string[];
-  onValueChange: (value: string[]) => void;
+  value: TaskTemplateWeekday[];
+  onValueChange: (value: TaskTemplateWeekday[]) => void;
+  onBlur?: () => void;
+  labels: Record<TaskTemplateWeekday, string>;
   disabled?: boolean;
   invalid?: boolean;
   placeholder?: string;
   emptyMessage?: string;
-  noLocationsMessage?: string;
   maxVisibleChips?: number;
   moreSelectedLabel: (count: number) => string;
   overflowRemoveLabel?: (count: number) => string;
   selectOnly?: boolean;
 };
 
-export function LocationMultiSelect({
+export function WeekdayMultiSelect({
   id,
-  locations,
   value,
   onValueChange,
+  onBlur,
+  labels,
   disabled = false,
   invalid = false,
   placeholder,
   emptyMessage,
-  noLocationsMessage,
-  maxVisibleChips = 3,
+  maxVisibleChips = 5,
   moreSelectedLabel,
   overflowRemoveLabel,
   selectOnly = false,
-}: LocationMultiSelectProps) {
+}: WeekdayMultiSelectProps) {
   const anchor = useComboboxAnchor();
 
-  const locationById = useMemo(
-    () => new Map(locations.map((location) => [location.id, location])),
-    [locations],
-  );
-
-  const selectedLocations = useMemo(
+  const selectedWeekdays = useMemo(
     () =>
-      value
-        .map((locationId) => locationById.get(locationId))
-        .filter((location): location is LocationResponse => location !== undefined),
-    [locationById, value],
+      value.filter((weekday): weekday is TaskTemplateWeekday =>
+        TASK_TEMPLATE_ALL_WEEKDAYS.includes(weekday),
+      ),
+    [value],
   );
 
-  const handleValueChange = (nextLocations: LocationResponse[]) => {
-    onValueChange(nextLocations.map((location) => location.id));
+  const handleValueChange = (nextWeekdays: TaskTemplateWeekday[]) => {
+    onValueChange(nextWeekdays);
   };
 
   const showRemove = !selectOnly;
 
-  if (locations.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        {noLocationsMessage}
-      </p>
-    );
-  }
-
   return (
     <Combobox
-      items={locations}
+      items={TASK_TEMPLATE_ALL_WEEKDAYS}
       multiple
       disabled={disabled}
-      value={selectedLocations}
+      value={selectedWeekdays}
       onValueChange={(nextValue) => {
-        const nextLocations = Array.isArray(nextValue) ? nextValue : [];
-        handleValueChange(nextLocations);
+        const nextWeekdays = Array.isArray(nextValue) ? nextValue : [];
+        handleValueChange(nextWeekdays);
       }}
-      itemToStringLabel={(item) => item.name}
-      isItemEqualToValue={(item, selectedValue) =>
-        item.id === selectedValue?.id
-      }
+      itemToStringLabel={(weekday) => labels[weekday]}
+      isItemEqualToValue={(item, selectedValue) => item === selectedValue}
     >
       <ComboboxChips
         ref={anchor}
@@ -102,18 +90,18 @@ export function LocationMultiSelect({
         aria-invalid={invalid}
       >
         <ComboboxValue>
-          {(values: LocationResponse[]) => (
+          {(weekdays: TaskTemplateWeekday[]) => (
             <ComboboxTruncatedChips
-              items={values}
+              items={weekdays}
               maxVisible={maxVisibleChips}
-              getItemKey={(location) => location.id}
-              getItemLabel={(location) => location.name}
+              getItemKey={(weekday) => weekday}
+              getItemLabel={(weekday) => labels[weekday]}
               moreLabel={moreSelectedLabel}
               showRemove={showRemove}
               overflowRemoveLabel={overflowRemoveLabel}
               onRemoveOverflow={
                 showRemove
-                  ? () => handleValueChange(values.slice(0, maxVisibleChips))
+                  ? () => handleValueChange(weekdays.slice(0, maxVisibleChips))
                   : undefined
               }
             />
@@ -123,6 +111,7 @@ export function LocationMultiSelect({
           id={id}
           placeholder={placeholder}
           selectOnly={selectOnly}
+          onBlur={onBlur}
         />
         {selectOnly ? (
           <ComboboxTrigger
@@ -134,9 +123,9 @@ export function LocationMultiSelect({
       <ComboboxContent anchor={anchor}>
         <ComboboxEmpty>{emptyMessage}</ComboboxEmpty>
         <ComboboxList>
-          {(location: LocationResponse) => (
-            <ComboboxItem key={location.id} value={location}>
-              {location.name}
+          {(weekday: TaskTemplateWeekday) => (
+            <ComboboxItem key={weekday} value={weekday}>
+              {labels[weekday]}
             </ComboboxItem>
           )}
         </ComboboxList>
