@@ -2,8 +2,8 @@
 
 import {
   TASK_TEMPLATE_MAX_SCHEDULED_TIMES,
+  TASK_TEMPLATE_ALL_WEEKDAYS,
   TASK_TEMPLATE_WEEKDAYS,
-  TASK_TEMPLATE_WEEKDAYS_MON_FRI,
   scheduledTimeSchema,
   taskTemplateTypeSchema,
   taskTemplateWeekdaySchema,
@@ -16,7 +16,7 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CopyPlusIcon, PlusIcon, SaveIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Controller,
   useFieldArray,
@@ -41,7 +41,6 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Select,
   SelectContent,
@@ -52,12 +51,13 @@ import {
 } from "@/components/ui/select";
 import {
   isEveryDayWeekdays,
-  isMonFriWeekdays,
+  isWeekdaysPreset,
 } from "@/features/task-templates/lib/format-schedule";
 import { ScheduledTimeRow } from "@/features/task-templates/components/scheduled-time-row";
+import { WeekdayMultiSelect } from "@/features/task-templates/components/weekday-multi-select";
 import { cn } from "@/lib/utils";
 
-type WeekdayPreset = "everyDay" | "monFri" | "custom" | "none";
+type WeekdayPreset = "everyDay" | "weekdays" | "custom" | "none";
 
 function getWeekdayPreset(weekdays: TaskTemplateWeekday[]): WeekdayPreset {
   if (weekdays.length === 0) {
@@ -68,8 +68,8 @@ function getWeekdayPreset(weekdays: TaskTemplateWeekday[]): WeekdayPreset {
     return "everyDay";
   }
 
-  if (isMonFriWeekdays(weekdays)) {
-    return "monFri";
+  if (isWeekdaysPreset(weekdays)) {
+    return "weekdays";
   }
 
   return "custom";
@@ -85,14 +85,11 @@ const REQUIRED_LABEL_CLASS =
 const SCHEDULED_TIME_SLOT_CLASS =
   "w-full min-w-0 sm:w-[calc((100%-1.5rem)/3)] md:w-[calc((100%-1.5rem)/4)]";
 
-const WEEKDAY_TOGGLE_GROUP_CLASS =
-  "w-full flex flex-wrap gap-1.5";
-
-const WEEKDAY_PRESET_ITEM_CLASS =
-  "min-h-10 min-w-[calc(33%-0.375rem)] flex-1 cursor-pointer aria-pressed:!border-primary aria-pressed:!bg-primary aria-pressed:!text-primary-foreground aria-pressed:hover:!bg-primary/80";
-
-const WEEKDAY_TOGGLE_ITEM_CLASS =
-  "min-h-10 cursor-pointer aria-pressed:!border-primary aria-pressed:!bg-primary aria-pressed:!text-primary-foreground aria-pressed:hover:!bg-primary/80";
+const WEEKDAY_PRESET_OPTIONS: Array<Exclude<WeekdayPreset, "none">> = [
+  "everyDay",
+  "weekdays",
+  "custom",
+];
 
 function hasDuplicateScheduledTimes(times: string[]): boolean {
   const filledTimes = times.filter(Boolean);
@@ -302,6 +299,7 @@ export function TaskTemplatesForm({
   const [duplicateTimesError, setDuplicateTimesError] = useState<string | null>(
     null,
   );
+  const skipWeekdaysBlurRef = useRef(false);
 
   useEffect(() => {
     if (!open) return;
@@ -611,103 +609,130 @@ export function TaskTemplatesForm({
               name="weekdays"
               control={form.control}
               render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel className={REQUIRED_LABEL_CLASS}>
-                    {t("weekdaysLabel")}
-                  </FieldLabel>
-                  <ToggleGroup
-                    spacing={0}
-                    variant="outline"
-                    className={WEEKDAY_TOGGLE_GROUP_CLASS}
-                    value={
-                      weekdayPreset === "none" ? [] : [weekdayPreset]
+                <>
+                  <Field
+                    data-invalid={
+                      fieldState.invalid && weekdayPreset !== "custom"
                     }
-                    onValueChange={(values) => {
-                      const nextPreset = values[values.length - 1] as
-                        | WeekdayPreset
-                        | undefined;
-
-                      if (!nextPreset || nextPreset === "none") return;
-
-                      if (nextPreset === "everyDay") {
-                        setWeekdayPreset("everyDay");
-                        field.onChange([...TASK_TEMPLATE_WEEKDAYS]);
-                        field.onBlur();
-                        return;
-                      }
-
-                      if (nextPreset === "monFri") {
-                        setWeekdayPreset("monFri");
-                        field.onChange([...TASK_TEMPLATE_WEEKDAYS_MON_FRI]);
-                        field.onBlur();
-                        return;
-                      }
-
-                      setWeekdayPreset("custom");
-                      form.setValue("weekdays", [], {
-                        shouldValidate: false,
-                        shouldDirty: true,
-                      });
-                      form.clearErrors("weekdays");
-                    }}
                   >
-                    <ToggleGroupItem
-                      value="everyDay"
-                      className={WEEKDAY_PRESET_ITEM_CLASS}
+                    <FieldLabel
+                      htmlFor={`${TASK_TEMPLATES_FORM_ID}-schedule`}
+                      className={REQUIRED_LABEL_CLASS}
                     >
-                      {t("presets.everyDay")}
-                    </ToggleGroupItem>
-                    <ToggleGroupItem
-                      value="monFri"
-                      className={WEEKDAY_PRESET_ITEM_CLASS}
-                    >
-                      {t("presets.monFri")}
-                    </ToggleGroupItem>
-                    <ToggleGroupItem
-                      value="custom"
-                      className={WEEKDAY_PRESET_ITEM_CLASS}
-                    >
-                      {t("presets.custom")}
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                  {weekdayPreset === "custom" ? (
-                    <ToggleGroup
-                      multiple
-                      spacing={0}
-                      variant="outline"
-                      className={WEEKDAY_TOGGLE_GROUP_CLASS}
-                      value={field.value}
-                      onValueChange={(values) => {
-                        const nextValue = values as TaskTemplateWeekday[];
+                      {t("weekdaysLabel")}
+                    </FieldLabel>
+                    <Select
+                      items={WEEKDAY_PRESET_OPTIONS.map((preset) => ({
+                        label: t(`presets.${preset}`),
+                        value: preset,
+                      }))}
+                      value={weekdayPreset === "none" ? null : weekdayPreset}
+                      onValueChange={(value: unknown) => {
+                        const nextPreset = value as
+                          | Exclude<WeekdayPreset, "none">
+                          | null;
 
-                        form.setValue("weekdays", nextValue, {
-                          shouldValidate: false,
-                          shouldDirty: true,
+                        if (!nextPreset) return;
+
+                        if (nextPreset === "everyDay") {
+                          setWeekdayPreset("everyDay");
+                          field.onChange([...TASK_TEMPLATE_ALL_WEEKDAYS]);
+                          field.onBlur();
+                          return;
+                        }
+
+                        if (nextPreset === "weekdays") {
+                          setWeekdayPreset("weekdays");
+                          field.onChange([...TASK_TEMPLATE_WEEKDAYS]);
+                          field.onBlur();
+                          return;
+                        }
+
+                        setWeekdayPreset("custom");
+                        skipWeekdaysBlurRef.current = true;
+                        form.resetField("weekdays", {
+                          defaultValue: [],
+                          keepDirty: true,
+                          keepTouched: false,
+                          keepError: false,
                         });
-                        if (nextValue.length > 0) {
-                          form.clearErrors("weekdays");
+                      }}
+                      onOpenChange={(nextOpen) => {
+                        if (!nextOpen) {
+                          if (skipWeekdaysBlurRef.current) {
+                            skipWeekdaysBlurRef.current = false;
+                            return;
+                          }
+                          field.onBlur();
                         }
                       }}
                     >
-                      {TASK_TEMPLATE_WEEKDAYS.map((weekday) => (
-                        <ToggleGroupItem
-                          key={weekday}
-                          value={weekday}
-                          className={cn(
-                            "min-w-[calc(14%-0.25rem)] flex-1 px-1",
-                            WEEKDAY_TOGGLE_ITEM_CLASS,
-                          )}
-                          aria-label={weekdayShortLabels[weekday]}
-                        >
-                          {weekdayShortLabels[weekday]}
-                        </ToggleGroupItem>
-                      ))}
-                    </ToggleGroup>
+                      <SelectTrigger
+                        id={`${TASK_TEMPLATES_FORM_ID}-schedule`}
+                        aria-invalid={
+                          fieldState.invalid && weekdayPreset !== "custom"
+                        }
+                        className="w-full"
+                      >
+                        <SelectValue placeholder={t("schedulePlaceholder")} />
+                      </SelectTrigger>
+                      <SelectContent alignItemWithTrigger={false}>
+                        <SelectGroup>
+                          {WEEKDAY_PRESET_OPTIONS.map((preset) => (
+                            <SelectItem key={preset} value={preset}>
+                              {t(`presets.${preset}`)}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    {fieldState.invalid && weekdayPreset !== "custom" ? (
+                      <FieldError errors={[fieldState.error]} />
+                    ) : null}
+                  </Field>
+                  {weekdayPreset === "custom" ? (
+                    <Field
+                      data-invalid={
+                        fieldState.invalid &&
+                        (fieldState.isTouched || form.formState.isSubmitted)
+                      }
+                    >
+                      <FieldLabel
+                        htmlFor={`${TASK_TEMPLATES_FORM_ID}-weekdays`}
+                        className={REQUIRED_LABEL_CLASS}
+                      >
+                        {t("daysOfWeekLabel")}
+                      </FieldLabel>
+                      <WeekdayMultiSelect
+                        id={`${TASK_TEMPLATES_FORM_ID}-weekdays`}
+                        selectOnly
+                        value={field.value}
+                        labels={weekdayShortLabels}
+                        invalid={
+                          fieldState.invalid &&
+                          (fieldState.isTouched || form.formState.isSubmitted)
+                        }
+                        placeholder={t("weekdaysPlaceholder")}
+                        emptyMessage={t("weekdaysEmpty")}
+                        moreSelectedLabel={(count) => t("moreSelected", { count })}
+                        overflowRemoveLabel={(count) =>
+                          t("overflowRemoveLabel", { count })
+                        }
+                        onValueChange={(nextValue) => {
+                          field.onChange(nextValue);
+                          if (nextValue.length > 0) {
+                            form.clearErrors("weekdays");
+                          }
+                        }}
+                        onBlur={field.onBlur}
+                      />
+                      {fieldState.invalid &&
+                      (fieldState.isTouched || form.formState.isSubmitted) ? (
+                        <FieldError errors={[fieldState.error]} />
+                      ) : null}
+                    </Field>
                   ) : null}
-                  {fieldState.invalid && (
-                    <FieldError errors={[fieldState.error]} />
-                  )}
-                </Field>
+                </>
               )}
             />
           </FieldGroup>

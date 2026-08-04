@@ -301,6 +301,12 @@
     "equipmentLabel": "Cold storage",
     "equipmentPlaceholder": "Select cold storage",
     "weekdaysLabel": "Schedule",
+    "daysOfWeekLabel": "Days of the week",
+    "schedulePlaceholder": "Select schedule",
+    "weekdaysPlaceholder": "Select days",
+    "moreSelected": "+ {count} more",
+    "overflowRemoveLabel": "Remove {count} more days",
+    "weekdaysEmpty": "No days found.",
     "timesLabel": "Scheduled times",
     "removeTime": "Remove time",
     "save": "Save",
@@ -325,7 +331,7 @@
     },
     "presets": {
       "everyDay": "Every day",
-      "monFri": "Monday–Friday",
+      "weekdays": "Weekdays",
       "custom": "Custom"
     },
     "weekdaysShort": {
@@ -474,6 +480,8 @@
     "locationsLabel": "Locations",
     "locationsDescription": "Assign which locations this employee can access.",
     "locationsPlaceholder": "Select locations",
+    "moreSelected": "+ {count} more",
+    "overflowRemoveLabel": "Remove {count} more locations",
     "locationsEmpty": "No locations found.",
     "noLocationsAvailable": "No locations available yet.",
     "noLocations": "No locations",

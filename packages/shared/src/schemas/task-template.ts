@@ -28,7 +28,7 @@ export const taskTemplateTimeSlotSchema = z.enum([
 
 export type TaskTemplateTimeSlot = z.infer<typeof taskTemplateTimeSlotSchema>;
 
-export const TASK_TEMPLATE_WEEKDAYS: TaskTemplateWeekday[] = [
+export const TASK_TEMPLATE_ALL_WEEKDAYS: TaskTemplateWeekday[] = [
   "monday",
   "tuesday",
   "wednesday",
@@ -38,7 +38,7 @@ export const TASK_TEMPLATE_WEEKDAYS: TaskTemplateWeekday[] = [
   "sunday",
 ];
 
-export const TASK_TEMPLATE_WEEKDAYS_MON_FRI: TaskTemplateWeekday[] = [
+export const TASK_TEMPLATE_WEEKDAYS: TaskTemplateWeekday[] = [
   "monday",
   "tuesday",
   "wednesday",
@@ -124,7 +124,7 @@ export function sortWeekdays(
   weekdays: TaskTemplateWeekday[],
 ): TaskTemplateWeekday[] {
   const order = new Map(
-    TASK_TEMPLATE_WEEKDAYS.map((weekday, index) => [weekday, index]),
+    TASK_TEMPLATE_ALL_WEEKDAYS.map((weekday, index) => [weekday, index]),
   );
 
   return [...weekdays].sort(

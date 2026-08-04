@@ -19,7 +19,7 @@ type TaskTemplatesMobileCardProps = {
   typeLabels: Record<TaskTemplateType, string>;
   scheduleLabels: {
     everyDay: string;
-    monFri: string;
+    weekdays: string;
     formatShort: (
       weekday: import("@haccp/shared").TaskTemplateWeekday,
     ) => string;

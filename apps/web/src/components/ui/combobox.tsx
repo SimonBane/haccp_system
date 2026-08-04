@@ -221,7 +221,7 @@ function ComboboxChips({
     <ComboboxPrimitive.Chips
       data-slot="combobox-chips"
       className={cn(
-        "flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border border-input bg-transparent bg-clip-padding px-2.5 py-1.5 text-sm shadow-xs transition-[color,box-shadow] focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 has-aria-invalid:border-destructive has-aria-invalid:ring-3 has-aria-invalid:ring-destructive/20 has-data-[slot=combobox-chip]:px-1.5 dark:bg-input/30 dark:has-aria-invalid:border-destructive/50 dark:has-aria-invalid:ring-destructive/40",
+        "flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border border-input bg-transparent bg-clip-padding px-2.5 py-1.5 text-sm shadow-xs transition-[color,box-shadow] focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 has-aria-invalid:border-destructive has-aria-invalid:ring-3 has-aria-invalid:ring-destructive/20 has-data-[slot=combobox-chip]:px-1.5 has-data-[slot=combobox-chip]:[&_[data-slot=combobox-chip-input]]:placeholder:opacity-0 dark:bg-input/30 dark:has-aria-invalid:border-destructive/50 dark:has-aria-invalid:ring-destructive/40",
         className
       )}
       {...props}
@@ -262,14 +262,85 @@ function ComboboxChip({
 
 function ComboboxChipsInput({
   className,
+  selectOnly = false,
+  readOnly,
   ...props
-}: ComboboxPrimitive.Input.Props) {
+}: ComboboxPrimitive.Input.Props & {
+  selectOnly?: boolean
+}) {
   return (
     <ComboboxPrimitive.Input
       data-slot="combobox-chip-input"
-      className={cn("min-w-16 flex-1 outline-none", className)}
+      readOnly={selectOnly || readOnly}
+      className={cn(
+        "min-w-16 flex-1 outline-none",
+        selectOnly && "cursor-pointer caret-transparent",
+        className,
+      )}
       {...props}
     />
+  )
+}
+
+const comboboxChipSurfaceClass =
+  "flex h-[calc(--spacing(5.5))] w-fit items-center justify-center gap-1 rounded-sm bg-muted px-1.5 text-xs font-medium whitespace-nowrap text-foreground"
+
+type ComboboxTruncatedChipsProps<T> = {
+  items: T[]
+  maxVisible?: number
+  getItemKey: (item: T) => string
+  getItemLabel: (item: T) => string
+  moreLabel: (hiddenCount: number) => string
+  showRemove?: boolean
+  onRemoveOverflow?: () => void
+  overflowRemoveLabel?: (hiddenCount: number) => string
+}
+
+function ComboboxTruncatedChips<T>({
+  items,
+  maxVisible = 3,
+  getItemKey,
+  getItemLabel,
+  moreLabel,
+  showRemove = true,
+  onRemoveOverflow,
+  overflowRemoveLabel,
+}: ComboboxTruncatedChipsProps<T>) {
+  const visible = items.slice(0, maxVisible)
+  const hiddenCount = items.length - visible.length
+
+  return (
+    <>
+      {visible.map((item) => (
+        <ComboboxChip key={getItemKey(item)} showRemove={showRemove}>
+          {getItemLabel(item)}
+        </ComboboxChip>
+      ))}
+      {hiddenCount > 0 ? (
+        <span
+          data-slot="combobox-overflow-chip"
+          className={cn(comboboxChipSurfaceClass, showRemove && "pr-0")}
+        >
+          {moreLabel(hiddenCount)}
+          {showRemove ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              className="-ml-1 opacity-50 hover:opacity-100"
+              data-slot="combobox-overflow-chip-remove"
+              aria-label={overflowRemoveLabel?.(hiddenCount)}
+              onClick={(e) => {
+                e.stopPropagation()
+                onRemoveOverflow?.()
+              }}
+            >
+              <XIcon className="pointer-events-none" />
+            </Button>
+          ) : null}
+        </span>
+      ) : null}
+    </>
   )
 }
 
@@ -291,6 +362,7 @@ export {
   ComboboxChips,
   ComboboxChip,
   ComboboxChipsInput,
+  ComboboxTruncatedChips,
   ComboboxTrigger,
   ComboboxValue,
   useComboboxAnchor,
