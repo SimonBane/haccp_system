@@ -13,30 +13,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EmployeesTableRowActions } from "@/features/employees/data-table/row-actions";
+import { displayName, initials, statusVariant } from "@/features/employees/utils";
 
 type EmployeesTranslations = ReturnType<
   typeof useTranslations<"EmployeesPage">
 >;
-
-function displayName(employee: EmployeeResponse): string {
-  const parts = [employee.firstName, employee.lastName].filter(Boolean);
-  return parts.length > 0 ? parts.join(" ") : employee.email;
-}
-
-function initials(employee: EmployeeResponse): string {
-  const name = displayName(employee);
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-
-  if (parts.length === 0) {
-    return "?";
-  }
-
-  if (parts.length === 1) {
-    return parts[0].slice(0, 2).toUpperCase();
-  }
-
-  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
-}
 
 type EmployeesMobileCardProps = {
   row: Row<EmployeeResponse>;
@@ -81,7 +62,9 @@ export function EmployeesMobileCard({
         </div>
       </CardHeader>
       <CardContent className="flex flex-wrap gap-2">
-        <Badge variant="secondary">{t(`status.${employee.status}`)}</Badge>
+        <Badge variant={statusVariant(employee.status)}>
+          {t(`status.${employee.status}`)}
+        </Badge>
         <Badge variant="outline">
           {employee.role === ORG_ROLE.ADMIN
             ? t("roles.admin")

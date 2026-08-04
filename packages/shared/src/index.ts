@@ -25,16 +25,12 @@ export {
   employeeListResponseSchema,
   createEmployeeSchema,
   updateEmployeeSchema,
-  updateEmployeeRoleSchema,
-  updateEmployeeLocationsSchema,
   type MembershipStatus,
   type OrgRole,
   type EmployeeResponse,
   type EmployeeListResponse,
   type CreateEmployeeInput,
   type UpdateEmployeeInput,
-  type UpdateEmployeeRoleInput,
-  type UpdateEmployeeLocationsInput,
 } from "./schemas/employee.js";
 export { healthResponseSchema, type HealthResponseSchema } from "./schemas/health.js";
 export {

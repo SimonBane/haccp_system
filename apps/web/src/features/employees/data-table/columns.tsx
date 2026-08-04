@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 import { EmployeesTableRowActions } from "@/features/employees/data-table/row-actions";
+import { displayName, initials, statusVariant } from "@/features/employees/utils";
 
 type EmployeesTranslations = ReturnType<
   typeof useTranslations<"EmployeesPage">
@@ -21,39 +22,6 @@ type GetColumnsParams = {
   onRevokeInvitation: (employee: EmployeeResponse) => void;
   onDelete: (employee: EmployeeResponse) => void;
 };
-
-function displayName(employee: EmployeeResponse): string {
-  const parts = [employee.firstName, employee.lastName].filter(Boolean);
-  return parts.length > 0 ? parts.join(" ") : employee.email;
-}
-
-function initials(employee: EmployeeResponse): string {
-  const name = displayName(employee);
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-
-  if (parts.length === 0) {
-    return "?";
-  }
-
-  if (parts.length === 1) {
-    return parts[0].slice(0, 2).toUpperCase();
-  }
-
-  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
-}
-
-function statusVariant(
-  status: EmployeeResponse["status"],
-): "default" | "secondary" | "outline" {
-  switch (status) {
-    case "active":
-      return "default";
-    case "invited":
-      return "secondary";
-    default:
-      return "outline";
-  }
-}
 
 export function getColumns({
   t,
