@@ -1,40 +1,36 @@
 "use client";
 
 import type { TodayTaskItem } from "@haccp/shared";
-import type { LucideIcon } from "lucide-react";
 import { Clock3Icon, ThermometerIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { TodayUiBucket } from "../lib/today-grouping";
 
-type BadgeVariant = "default" | "destructive" | "outline" | "secondary";
+export type TaskMetaSegment = {
+  key: string;
+  node: ReactNode;
+  /** Allowed to shrink and truncate when the row runs out of space. */
+  shrink?: boolean;
+  /** Dropped on narrow screens, where the row has little space next to the action button. */
+  hideOnMobile?: boolean;
+};
 
 type Props = {
   task: TodayTaskItem;
   bucket: TodayUiBucket;
-  statusLabel: string;
-  timeBadgeVariant: BadgeVariant;
-  subtitle: string;
+  meta: TaskMetaSegment[];
+  exception?: ReactNode;
   actionLabel: string;
   actionVariant: "default" | "outline";
   isPending: boolean;
   onAction: () => void;
-  secondary?: ReactNode;
 };
-
-function taskIcon(task: TodayTaskItem): LucideIcon {
-  return task.type === "temperature" ? ThermometerIcon : Clock3Icon;
-}
 
 function iconBoxClass(bucket: TodayUiBucket): string {
   if (bucket === "attention" || bucket === "overdue") {
     return "bg-destructive/10 text-destructive";
-  }
-  if (bucket === "dueNow") {
-    return "bg-primary/10 text-primary";
   }
   return "bg-primary/10 text-primary";
 }
@@ -42,66 +38,71 @@ function iconBoxClass(bucket: TodayUiBucket): string {
 export function TodayTaskRow({
   task,
   bucket,
-  statusLabel,
-  timeBadgeVariant,
-  subtitle,
+  meta,
+  exception,
   actionLabel,
   actionVariant,
   isPending,
   onAction,
-  secondary,
 }: Props) {
-  const Icon = taskIcon(task);
-
   return (
     <Card
       className={cn(
-        "gap-0 px-3.5 py-3 shadow-xs transition-transform active:scale-[0.99]",
+        "gap-0 px-3.5 py-3 shadow-xs transition-all hover:bg-muted/20 active:scale-[0.99] sm:px-4 sm:py-3.5",
         bucket === "completed" && "bg-muted/10",
       )}
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="flex min-w-0 flex-1 items-start gap-3">
+      <div className="flex items-center gap-3 sm:gap-3.5">
+        <div
+          className={cn(
+            "flex size-11 shrink-0 items-center justify-center rounded-xl",
+            iconBoxClass(bucket),
+          )}
+        >
+          {task.type === "temperature" ? (
+            <ThermometerIcon className="size-5" aria-hidden />
+          ) : (
+            <Clock3Icon className="size-5" aria-hidden />
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
           <div
             className={cn(
-              "flex size-8 shrink-0 items-center justify-center rounded-lg",
-              iconBoxClass(bucket),
+              "truncate text-sm font-medium",
+              bucket === "completed" && "text-foreground/80",
             )}
           >
-            <Icon className="size-4" aria-hidden />
+            {task.title}
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between gap-3">
-              <div className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {statusLabel}
-              </div>
-              <Badge
-                variant={timeBadgeVariant}
-                className="shrink-0 tabular-nums"
+          <div className="mt-0.5 flex min-w-0 items-center gap-1.5 overflow-hidden text-xs text-muted-foreground">
+            {meta.map((segment, index) => (
+              <span
+                key={segment.key}
+                className={cn(
+                  "flex items-center gap-1.5",
+                  segment.shrink ? "min-w-0" : "shrink-0",
+                  segment.hideOnMobile && "hidden sm:flex",
+                )}
               >
-                {task.scheduledTime}
-              </Badge>
-            </div>
-            <div
-              className={cn(
-                "mt-1 truncate text-sm font-medium",
-                bucket === "completed" && "text-foreground/80",
-              )}
-            >
-              {task.title}
-            </div>
-            <div className="mt-0.5 truncate text-xs text-muted-foreground">
-              {subtitle}
-            </div>
-            {secondary ? <div className="mt-1.5 space-y-1.5">{secondary}</div> : null}
+                {index > 0 && (
+                  <span aria-hidden className="text-muted-foreground/40">
+                    ·
+                  </span>
+                )}
+                {segment.node}
+              </span>
+            ))}
           </div>
+          {exception ? <div className="mt-1.5">{exception}</div> : null}
         </div>
+
         <Button
           type="button"
           variant={actionVariant}
           size="sm"
           className={cn(
-            "h-11 w-full sm:h-9 sm:w-auto sm:min-w-28",
+            "h-10 shrink-0 self-center px-3 sm:h-9 sm:min-w-28",
             actionVariant === "outline" &&
               "text-muted-foreground hover:text-foreground",
           )}

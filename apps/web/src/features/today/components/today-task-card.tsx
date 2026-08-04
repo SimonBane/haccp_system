@@ -2,14 +2,13 @@
 
 import type { TodayTaskItem } from "@haccp/shared";
 import { computeTodayTaskStatus } from "@haccp/shared";
-import { CircleAlertIcon, Clock3Icon } from "lucide-react";
+import { CircleAlertIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { memo } from "react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { minutesUntilScheduled, type TodayUiBucket } from "../lib/today-grouping";
-import { TodayTaskRow } from "./today-task-row";
+import { TodayTaskRow, type TaskMetaSegment } from "./today-task-row";
 
 type Props = {
   task: TodayTaskItem;
@@ -138,11 +137,10 @@ export const TodayTaskCard = memo(function TodayTaskCard({
       : t("status.pending");
   })();
 
-  const timeBadgeVariant = (() => {
-    if (isAttention || isOverdue) return "destructive" as const;
-    if (isDueNow) return "default" as const;
-    if (isCompleted) return "secondary" as const;
-    return "outline" as const;
+  const statusToneClass = (() => {
+    if (isAttention || isOverdue) return "text-destructive";
+    if (isDueNow) return "text-primary";
+    return "text-muted-foreground";
   })();
 
   const resultBadge = (() => {
@@ -163,7 +161,6 @@ export const TodayTaskCard = memo(function TodayTaskCard({
   })();
 
   const typeLabel = taskTypeLabel(task.type, t);
-  const subtitle = [task.equipmentName, typeLabel].filter(Boolean).join(" · ");
 
   const auditLabel =
     task.completedAt && task.completedBy
@@ -188,60 +185,98 @@ export const TodayTaskCard = memo(function TodayTaskCard({
     onComplete(task);
   }
 
-  const secondary = (
-    <>
-      {resultBadge && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span
-            className={cn(
-              "text-xs font-semibold tabular-nums",
-              resultBadge.outOfRange
-                ? "text-destructive"
-                : "text-muted-foreground",
-            )}
-          >
-            {resultBadge.recordedC}°C
-          </span>
-          <Badge variant={resultBadge.variant}>{resultBadge.label}</Badge>
-        </div>
-      )}
-      {resultBadge?.correctiveAction && (
-        <Alert
-          variant="destructive"
-          className="bg-destructive/5 px-2.5 py-2"
+  const metaSegments: TaskMetaSegment[] = [
+    {
+      key: "time",
+      node: (
+        <time
+          dateTime={task.scheduledTime}
+          className="font-medium tabular-nums text-foreground"
         >
-          <CircleAlertIcon className="size-3.5" aria-hidden />
-          <AlertDescription className="text-xs leading-relaxed text-foreground!">
-            <span className="font-medium">{t("audit.correctiveAction")}:</span>{" "}
-            {resultBadge.correctiveAction}
-          </AlertDescription>
-        </Alert>
-      )}
-      {auditLabel && (
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Clock3Icon className="size-3" aria-hidden />
-          <span>{auditLabel}</span>
-        </div>
-      )}
-    </>
-  );
+          {task.scheduledTime}
+        </time>
+      ),
+    },
+  ];
 
-  const hasSecondary = resultBadge !== null || auditLabel !== null;
+  if (!auditLabel) {
+    metaSegments.push({
+      key: "status",
+      node: (
+        <span className={cn("font-medium", statusToneClass)}>
+          {statusLabel}
+        </span>
+      ),
+    });
+  }
+
+  if (resultBadge) {
+    metaSegments.push({
+      key: "temperature",
+      node: (
+        <span
+          className={cn(
+            "font-semibold tabular-nums",
+            resultBadge.outOfRange ? "text-destructive" : "text-foreground",
+          )}
+        >
+          {resultBadge.recordedC}°C
+        </span>
+      ),
+    });
+    metaSegments.push({
+      key: "temperature-result",
+      node: <Badge variant={resultBadge.variant}>{resultBadge.label}</Badge>,
+    });
+  }
+
+  if (task.equipmentName) {
+    metaSegments.push({
+      key: "equipment",
+      node: <span className="truncate">{task.equipmentName}</span>,
+      shrink: true,
+      hideOnMobile: true,
+    });
+  }
+
+  metaSegments.push({
+    key: "type",
+    node: <span>{typeLabel}</span>,
+    hideOnMobile: true,
+  });
+
+  if (auditLabel) {
+    metaSegments.push({
+      key: "audit",
+      node: <span className="truncate">{auditLabel}</span>,
+      shrink: true,
+    });
+  }
+
+  const exception = resultBadge?.correctiveAction ? (
+    <div className="flex items-center gap-1.5 rounded-lg bg-destructive/5 px-2 py-1 text-xs text-muted-foreground">
+      <CircleAlertIcon className="size-3.5 shrink-0 text-destructive" aria-hidden />
+      <span className="truncate">
+        <span className="font-medium text-foreground">
+          {t("audit.correctiveAction")}:
+        </span>{" "}
+        {resultBadge.correctiveAction}
+      </span>
+    </div>
+  ) : null;
 
   return (
     <TodayTaskRow
       task={task}
       bucket={bucket}
-      statusLabel={statusLabel}
-      timeBadgeVariant={timeBadgeVariant}
-      subtitle={subtitle}
+      meta={metaSegments}
+      exception={exception}
       actionLabel={
         isRecorded ? t("actions.undo") : primaryActionLabel(task, bucket, t)
       }
       actionVariant={isRecorded ? "outline" : "default"}
       isPending={isPending}
       onAction={handlePrimaryAction}
-      secondary={hasSecondary ? secondary : undefined}
     />
   );
 }, areTodayTaskCardPropsEqual);
