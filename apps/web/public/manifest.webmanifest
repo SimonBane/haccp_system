@@ -1,7 +1,7 @@
 {
-  "name": "HACCP System",
-  "short_name": "HACCP",
-  "description": "Hazard Analysis and Critical Control Points management",
+  "name": "SafeCheck",
+  "short_name": "SafeCheck",
+  "description": "HACCP management, monitoring and compliance",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -10,18 +10,25 @@
   "background_color": "#ffffff",
   "icons": [
     {
-      "src": "/icons/icon-192.png",
+      "src": "/icons/icon-192x192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "/icons/icon-maskable-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-maskable-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

@@ -1,11 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { usePathname } from "@/i18n/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { ShieldCheckIcon } from "lucide-react";
 import { useMemo } from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { NavMain } from "@/components/layout/nav-main";
 import { NavUser } from "@/components/layout/nav-user";
 import {
@@ -43,20 +42,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { organization } = useTenant();
 
   const isAdmin = orgRole === "org:admin";
-
-  const organizationInitials = useMemo(() => {
-    const parts = organization.name.trim().split(/\s+/).filter(Boolean);
-
-    if (parts.length === 0) {
-      return "?";
-    }
-
-    if (parts.length === 1) {
-      return parts[0].slice(0, 2).toUpperCase();
-    }
-
-    return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
-  }, [organization.name]);
 
   const navLabels = useMemo(
     () => ({
@@ -97,21 +82,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               size="lg"
               className="pointer-events-none cursor-default hover:bg-transparent active:bg-transparent"
             >
-              <div className="flex aspect-square size-8 items-center justify-center overflow-hidden rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                {organization.hasImage ? (
-                  <Avatar className="size-8 rounded-lg after:rounded-lg">
-                    <AvatarImage
-                      src={organization.imageUrl}
-                      alt={organization.name}
-                      className="rounded-lg"
-                    />
-                    <AvatarFallback className="rounded-lg text-xs">
-                      {organizationInitials}
-                    </AvatarFallback>
-                  </Avatar>
-                ) : (
-                  <ShieldCheckIcon className="size-4" />
-                )}
+              <div className="relative size-8 shrink-0 overflow-hidden rounded-lg">
+                <Image
+                  src="/icons/icon-192x192.png"
+                  alt={t("brandName")}
+                  width={60}
+                  height={60}
+                  className="absolute left-1/2 top-1/2 size-[60px] max-w-none -translate-x-1/2 -translate-y-1/2"
+                />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{t("brandName")}</span>
