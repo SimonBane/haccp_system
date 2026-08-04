@@ -1,10 +1,10 @@
 {
   "Metadata": {
-    "title": "HACCP Система",
-    "description": "Управление на анализ на опасностите и критичните контролни точки"
+    "title": "SafeCheck",
+    "description": "Управление, мониторинг и съответствие с HACCP"
   },
   "HomePage": {
-    "badge": "HACCP Система",
+    "badge": "SafeCheck",
     "title": "Скелет на монорепото",
     "description": "Next.js уеб приложение, свързано със самостоятелното Hono API.",
     "apiHealth": "Състояние на API",
@@ -34,7 +34,7 @@
     "acceptError": "Не успяхме да завършим настройката на акаунта ви. Презаредете страницата или опитайте отново."
   },
   "DashboardPage": {
-    "breadcrumbApp": "HACCP Система",
+    "breadcrumbApp": "SafeCheck",
     "breadcrumbDashboard": "Табло",
     "placeholder": "Примерно съдържание на таблото"
   },
@@ -369,7 +369,7 @@
     }
   },
   "Sidebar": {
-    "brandName": "HACCP Система",
+    "brandName": "SafeCheck",
     "brandPlan": "Предприятие",
     "platform": "Платформа",
     "admin": "Управление",
