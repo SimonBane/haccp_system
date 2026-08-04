@@ -4,13 +4,14 @@ import type { LocationResponse } from "@haccp/shared";
 import { useMemo } from "react";
 import {
   Combobox,
-  ComboboxChip,
   ComboboxChips,
   ComboboxChipsInput,
   ComboboxContent,
   ComboboxEmpty,
   ComboboxItem,
   ComboboxList,
+  ComboboxTruncatedChips,
+  ComboboxTrigger,
   ComboboxValue,
   useComboboxAnchor,
 } from "@/components/ui/combobox";
@@ -26,6 +27,10 @@ type LocationMultiSelectProps = {
   placeholder?: string;
   emptyMessage?: string;
   noLocationsMessage?: string;
+  maxVisibleChips?: number;
+  moreSelectedLabel: (count: number) => string;
+  overflowRemoveLabel?: (count: number) => string;
+  selectOnly?: boolean;
 };
 
 export function LocationMultiSelect({
@@ -38,6 +43,10 @@ export function LocationMultiSelect({
   placeholder,
   emptyMessage,
   noLocationsMessage,
+  maxVisibleChips = 3,
+  moreSelectedLabel,
+  overflowRemoveLabel,
+  selectOnly = false,
 }: LocationMultiSelectProps) {
   const anchor = useComboboxAnchor();
 
@@ -53,6 +62,12 @@ export function LocationMultiSelect({
         .filter((location): location is LocationResponse => location !== undefined),
     [locationById, value],
   );
+
+  const handleValueChange = (nextLocations: LocationResponse[]) => {
+    onValueChange(nextLocations.map((location) => location.id));
+  };
+
+  const showRemove = !selectOnly;
 
   if (locations.length === 0) {
     return (
@@ -70,7 +85,7 @@ export function LocationMultiSelect({
       value={selectedLocations}
       onValueChange={(nextValue) => {
         const nextLocations = Array.isArray(nextValue) ? nextValue : [];
-        onValueChange(nextLocations.map((location) => location.id));
+        handleValueChange(nextLocations);
       }}
       itemToStringLabel={(item) => item.name}
       isItemEqualToValue={(item, selectedValue) =>
@@ -81,20 +96,40 @@ export function LocationMultiSelect({
         ref={anchor}
         className={cn(
           "w-full",
+          selectOnly && "cursor-pointer",
           invalid && "border-destructive ring-destructive/20",
         )}
         aria-invalid={invalid}
       >
         <ComboboxValue>
           {(values: LocationResponse[]) => (
-            <>
-              {values.map((location) => (
-                <ComboboxChip key={location.id}>{location.name}</ComboboxChip>
-              ))}
-            </>
+            <ComboboxTruncatedChips
+              items={values}
+              maxVisible={maxVisibleChips}
+              getItemKey={(location) => location.id}
+              getItemLabel={(location) => location.name}
+              moreLabel={moreSelectedLabel}
+              showRemove={showRemove}
+              overflowRemoveLabel={overflowRemoveLabel}
+              onRemoveOverflow={
+                showRemove
+                  ? () => handleValueChange(values.slice(0, maxVisibleChips))
+                  : undefined
+              }
+            />
           )}
         </ComboboxValue>
-        <ComboboxChipsInput id={id} placeholder={placeholder} />
+        <ComboboxChipsInput
+          id={id}
+          placeholder={placeholder}
+          selectOnly={selectOnly}
+        />
+        {selectOnly ? (
+          <ComboboxTrigger
+            className="shrink-0 text-muted-foreground"
+            disabled={disabled}
+          />
+        ) : null}
       </ComboboxChips>
       <ComboboxContent anchor={anchor}>
         <ComboboxEmpty>{emptyMessage}</ComboboxEmpty>

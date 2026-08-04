@@ -9,7 +9,7 @@ import {
 } from "@haccp/shared";
 import { Loader2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -31,6 +31,18 @@ import { getErrorMessage } from "@/lib/api/get-error-message";
 type OrganizationLogoUploadProps = {
   organization: OrganizationResponse;
 };
+
+function waitForImageLoad(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error("Failed to load image"));
+    img.src = src;
+    if (img.complete) {
+      resolve();
+    }
+  });
+}
 
 function getOrganizationInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -57,10 +69,33 @@ export function OrganizationLogoUpload({
   const [isRemoving, setIsRemoving] = useState(false);
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const awaitingDisplayedLogoRef = useRef(false);
 
   const displayImageUrl =
     previewUrl ?? (organization.hasImage ? organization.imageUrl : null);
   const isBusy = isUploading || isRemoving;
+
+  function finishLogoUpload() {
+    if (!awaitingDisplayedLogoRef.current) {
+      return;
+    }
+
+    awaitingDisplayedLogoRef.current = false;
+    setIsUploading(false);
+    setPreviewUrl(null);
+  }
+
+  useEffect(() => {
+    if (!awaitingDisplayedLogoRef.current || !displayImageUrl) {
+      return;
+    }
+
+    const img = new Image();
+    img.src = displayImageUrl;
+    if (img.complete) {
+      finishLogoUpload();
+    }
+  }, [displayImageUrl]);
 
   async function refreshOrganizationContext() {
     const tenant = await fetchJson("/tenant/current", tenantContextResponseSchema);
@@ -113,16 +148,23 @@ export function OrganizationLogoUpload({
       }
 
       const body: unknown = await response.json();
-      organizationResponseSchema.parse(body);
+      const updated = organizationResponseSchema.parse(body);
+      if (updated.hasImage) {
+        await waitForImageLoad(updated.imageUrl);
+      }
       await refreshOrganizationContext();
-      setPreviewUrl(null);
+      awaitingDisplayedLogoRef.current = true;
+      setPreviewUrl(updated.hasImage ? updated.imageUrl : null);
       toast.success(t("toast.logoSaved"));
     } catch (err) {
+      awaitingDisplayedLogoRef.current = false;
       setPreviewUrl(null);
       toast.error(getErrorMessage(err, t("errors.generic")));
     } finally {
       URL.revokeObjectURL(objectUrl);
-      setIsUploading(false);
+      if (!awaitingDisplayedLogoRef.current) {
+        setIsUploading(false);
+      }
     }
   }
 
@@ -171,6 +213,7 @@ export function OrganizationLogoUpload({
                 src={displayImageUrl}
                 alt={organization.name}
                 className="rounded-lg"
+                onLoad={() => finishLogoUpload()}
               />
             ) : null}
             <AvatarFallback className="rounded-lg text-base">
