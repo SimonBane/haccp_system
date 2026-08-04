@@ -1,10 +1,8 @@
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Db, DbClient } from "../../core/db/client.js";
 import { organizationMemberLocations } from "../../core/db/schema/organization-member-locations.js";
-import {
-  MEMBERSHIP_STATUS,
-  organizationMemberships,
-} from "../../core/db/schema/organization-memberships.js";
+import { organizationMemberships } from "../../core/db/schema/organization-memberships.js";
+import type { MembershipStatus } from "../../core/db/schema/organization-memberships.js";
 import { organizations } from "../../core/db/schema/organizations.js";
 import { users } from "../../core/db/schema/users.js";
 import type { OrganizationMembership } from "../../core/db/schema/organization-memberships.js";
@@ -15,6 +13,17 @@ export type MembershipWithUserRow = {
   user: User;
   locationIds: string[];
 };
+
+export type MembershipWithUser = {
+  membership: OrganizationMembership;
+  user: User;
+};
+
+const locationIdsAgg = sql<string[]>`coalesce(
+  array_agg(${organizationMemberLocations.locationId})
+  filter (where ${organizationMemberLocations.locationId} is not null),
+  array[]::uuid[]
+)`.mapWith((value) => (Array.isArray(value) ? value : []));
 
 export const employeeRepository = {
   async findManyWithUsersByOrganizationId(
@@ -66,9 +75,14 @@ export const employeeRepository = {
       .select({
         membership: organizationMemberships,
         user: users,
+        locationIds: locationIdsAgg,
       })
       .from(organizationMemberships)
       .innerJoin(users, eq(organizationMemberships.userId, users.id))
+      .leftJoin(
+        organizationMemberLocations,
+        eq(organizationMemberLocations.membershipId, organizationMemberships.id),
+      )
       .where(
         and(
           eq(organizationMemberships.id, membershipId),
@@ -76,24 +90,32 @@ export const employeeRepository = {
           isNull(organizationMemberships.deletedAt),
         ),
       )
+      .groupBy(organizationMemberships.id, users.id)
       .limit(1);
 
     if (!row) {
       return null;
     }
 
-    const locationIds = await this.getLocationIdsForMembership(db, membershipId);
-
     return {
-      ...row,
-      locationIds,
+      membership: row.membership,
+      user: row.user,
+      locationIds: row.locationIds,
     };
   },
 
-  async findById(db: Db, organizationId: string, membershipId: string) {
+  async findMembershipWithUserById(
+    db: Db,
+    organizationId: string,
+    membershipId: string,
+  ): Promise<MembershipWithUser | null> {
     const [row] = await db
-      .select()
+      .select({
+        membership: organizationMemberships,
+        user: users,
+      })
       .from(organizationMemberships)
+      .innerJoin(users, eq(organizationMemberships.userId, users.id))
       .where(
         and(
           eq(organizationMemberships.id, membershipId),
@@ -124,71 +146,6 @@ export const employeeRepository = {
       .limit(1);
 
     return row ?? null;
-  },
-
-  async findByInvitationId(db: Db, clerkInvitationId: string) {
-    const [row] = await db
-      .select({
-        membership: organizationMemberships,
-        user: users,
-      })
-      .from(organizationMemberships)
-      .innerJoin(users, eq(organizationMemberships.userId, users.id))
-      .where(
-        and(
-          eq(organizationMemberships.clerkInvitationId, clerkInvitationId),
-          isNull(organizationMemberships.deletedAt),
-        ),
-      )
-      .limit(1);
-
-    return row ?? null;
-  },
-
-  async findActiveByUserAndOrg(
-    db: Db,
-    organizationId: string,
-    userId: string,
-  ) {
-    const [row] = await db
-      .select()
-      .from(organizationMemberships)
-      .where(
-        and(
-          eq(organizationMemberships.organizationId, organizationId),
-          eq(organizationMemberships.userId, userId),
-          eq(organizationMemberships.status, "active"),
-          isNull(organizationMemberships.deletedAt),
-        ),
-      )
-      .limit(1);
-
-    return row ?? null;
-  },
-
-  async findByUserAndOrg(db: Db, organizationId: string, userId: string) {
-    const [row] = await db
-      .select()
-      .from(organizationMemberships)
-      .where(
-        and(
-          eq(organizationMemberships.organizationId, organizationId),
-          eq(organizationMemberships.userId, userId),
-          isNull(organizationMemberships.deletedAt),
-        ),
-      )
-      .limit(1);
-
-    return row ?? null;
-  },
-
-  async getLocationIdsForMembership(db: Db, membershipId: string) {
-    const rows = await db
-      .select({ locationId: organizationMemberLocations.locationId })
-      .from(organizationMemberLocations)
-      .where(eq(organizationMemberLocations.membershipId, membershipId));
-
-    return rows.map((row) => row.locationId);
   },
 
   async getAssignedLocationIdsForUser(
@@ -244,11 +201,75 @@ export const employeeRepository = {
     return updated ?? null;
   },
 
+  async updateByIdAndOrganization(
+    db: DbClient,
+    organizationId: string,
+    membershipId: string,
+    updates: Partial<typeof organizationMemberships.$inferInsert>,
+  ) {
+    const [updated] = await db
+      .update(organizationMemberships)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(
+        and(
+          eq(organizationMemberships.id, membershipId),
+          eq(organizationMemberships.organizationId, organizationId),
+          isNull(organizationMemberships.deletedAt),
+        ),
+      )
+      .returning();
+
+    return updated ?? null;
+  },
+
+  async updateStatusByIdAndOrganization(
+    db: DbClient,
+    organizationId: string,
+    membershipId: string,
+    expectedStatus: MembershipStatus,
+    updates: Partial<typeof organizationMemberships.$inferInsert>,
+  ) {
+    const [updated] = await db
+      .update(organizationMemberships)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(
+        and(
+          eq(organizationMemberships.id, membershipId),
+          eq(organizationMemberships.organizationId, organizationId),
+          eq(organizationMemberships.status, expectedStatus),
+          isNull(organizationMemberships.deletedAt),
+        ),
+      )
+      .returning();
+
+    return updated ?? null;
+  },
+
   async softDeleteById(db: DbClient, membershipId: string) {
     const [updated] = await db
       .update(organizationMemberships)
       .set({ deletedAt: new Date(), updatedAt: new Date() })
       .where(eq(organizationMemberships.id, membershipId))
+      .returning();
+
+    return updated ?? null;
+  },
+
+  async softDeleteByIdAndOrganization(
+    db: DbClient,
+    organizationId: string,
+    membershipId: string,
+  ) {
+    const [updated] = await db
+      .update(organizationMemberships)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(
+        and(
+          eq(organizationMemberships.id, membershipId),
+          eq(organizationMemberships.organizationId, organizationId),
+          isNull(organizationMemberships.deletedAt),
+        ),
+      )
       .returning();
 
     return updated ?? null;
@@ -306,26 +327,5 @@ export const employeeRepository = {
       .limit(1);
 
     return row ?? null;
-  },
-
-  async revertInvitationById(db: Db, clerkInvitationId: string) {
-    const [updated] = await db
-      .update(organizationMemberships)
-      .set({
-        status: MEMBERSHIP_STATUS.DRAFT,
-        clerkInvitationId: null,
-        invitedAt: null,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(organizationMemberships.clerkInvitationId, clerkInvitationId),
-          eq(organizationMemberships.status, MEMBERSHIP_STATUS.INVITED),
-          isNull(organizationMemberships.deletedAt),
-        ),
-      )
-      .returning();
-
-    return updated ?? null;
   },
 };

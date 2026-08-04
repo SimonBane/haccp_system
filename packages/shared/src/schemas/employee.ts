@@ -69,6 +69,7 @@ export const updateEmployeeSchema = z
     firstName: z.string().trim().max(100).nullable().optional(),
     lastName: z.string().trim().max(100).nullable().optional(),
     role: orgRoleSchema.optional(),
+    locationIds: employeeLocationIdsSchema.optional(),
   })
   .refine(
     (data) => Object.values(data).some((value) => value !== undefined),
@@ -76,17 +77,3 @@ export const updateEmployeeSchema = z
   );
 
 export type UpdateEmployeeInput = z.infer<typeof updateEmployeeSchema>;
-
-export const updateEmployeeRoleSchema = z.object({
-  role: orgRoleSchema,
-});
-
-export type UpdateEmployeeRoleInput = z.infer<typeof updateEmployeeRoleSchema>;
-
-export const updateEmployeeLocationsSchema = z.object({
-  locationIds: employeeLocationIdsSchema,
-});
-
-export type UpdateEmployeeLocationsInput = z.infer<
-  typeof updateEmployeeLocationsSchema
->;

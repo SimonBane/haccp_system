@@ -4,114 +4,207 @@ import type {
   EmployeeResponse,
   LocationResponse,
   UpdateEmployeeInput,
-  UpdateEmployeeLocationsInput,
-  UpdateEmployeeRoleInput,
 } from "@haccp/shared";
 import { normalizeEmail, normalizeOrgRole } from "@haccp/shared";
 import type { Db } from "../../core/db/client.js";
-import { clerkClient } from "../../core/auth/clerk-client.js";
-import { env } from "../../env.js";
 import { MEMBERSHIP_STATUS } from "../../core/db/schema/organization-memberships.js";
 import type { OrganizationMembership } from "../../core/db/schema/organization-memberships.js";
 import type { User } from "../../core/db/schema/users.js";
 import {
   ConflictError,
+  ForbiddenError,
   NotFoundError,
   ValidationError,
 } from "../../core/errors/app-errors.js";
 import { mapDbMutationError } from "../../lib/db-errors.js";
-import { locationRepository } from "../locations/location.repository.js";
 import { userService } from "../users/user.service.js";
-import { mapLocationResponses, mapLocations, toEmployeeResponse } from "./employee.mapper.js";
+import type { EmployeeChanges } from "./employee.changes.js";
+import {
+  diffEmployeeChanges,
+  hasInviteMetadataChanges,
+  hasProfileChanges,
+  isEmptyChangeSet,
+} from "./employee.changes.js";
+import {
+  applyActiveEmployeeUpdate,
+  revokeClerkInvitation,
+  syncClerkMembershipRemoval,
+} from "./employee.clerk.js";
+import type { EmployeeDetail } from "./employee.mapper.js";
+import {
+  buildEmployeeResponseFromDetail,
+  mapLocationResponses,
+  toEmployeeResponse,
+} from "./employee.mapper.js";
+import { issueMembershipInvitation } from "./employee.invitations.js";
 import { membershipLocationsCache } from "./membership-locations-cache.js";
 import { employeeRepository } from "./employee.repository.js";
 
-type EmployeeDetail = NonNullable<
-  Awaited<ReturnType<typeof employeeRepository.findDetailById>>
->;
+async function requireEmployeeDetail(
+  db: Db,
+  organizationId: string,
+  membershipId: string,
+): Promise<EmployeeDetail> {
+  const detail = await employeeRepository.findDetailById(
+    db,
+    organizationId,
+    membershipId,
+  );
 
-function buildEmployeeResponseFromDetail(
+  if (!detail) {
+    throw new NotFoundError("Employee not found");
+  }
+
+  return detail;
+}
+
+function assertLocationIdsBelongToTenant(
+  locationIds: string[],
+  tenantLocations: LocationResponse[],
+): void {
+  const tenantLocationIds = new Set(tenantLocations.map((location) => location.id));
+  const hasInvalidLocation = locationIds.some(
+    (locationId) => !tenantLocationIds.has(locationId),
+  );
+
+  if (hasInvalidLocation) {
+    throw new ValidationError("One or more locations are invalid");
+  }
+}
+
+function assertUpdateAllowed(
   detail: EmployeeDetail,
-  allLocations: LocationResponse[],
-  overrides?: {
-    membership?: Partial<EmployeeDetail["membership"]>;
-    user?: Partial<EmployeeDetail["user"]>;
-    locationIds?: string[];
-  },
-): EmployeeResponse {
-  return toEmployeeResponse({
-    membership: { ...detail.membership, ...overrides?.membership },
-    user: { ...detail.user, ...overrides?.user },
-    locationIds: overrides?.locationIds ?? detail.locationIds,
-    locations: mapLocationResponses(
-      allLocations,
-      overrides?.locationIds ?? detail.locationIds,
-    ),
-  });
+  input: UpdateEmployeeInput,
+  changes: EmployeeChanges,
+  actorUserDbId: string,
+  tenantLocations: LocationResponse[],
+): void {
+  if (
+    detail.membership.status === MEMBERSHIP_STATUS.ACTIVE &&
+    changes.email !== undefined
+  ) {
+    throw new ValidationError("Email cannot be changed for active employees");
+  }
+
+  if (input.locationIds !== undefined) {
+    assertLocationIdsBelongToTenant(input.locationIds, tenantLocations);
+  }
+
+  if (changes.role !== undefined && detail.membership.userId === actorUserDbId) {
+    throw new ForbiddenError("You cannot change your own role");
+  }
 }
 
-function buildInvitationRedirectUrl(firstName: string, lastName: string): string {
-  const params = new URLSearchParams({ firstName, lastName });
-  return `${env.WEB_APP_URL}/accept-invitation?${params.toString()}`;
-}
-
-async function sendClerkInvitation(
-  clerkOrgId: string,
-  inviterUserId: string,
-  email: string,
-  role: string,
-  firstName: string,
-  lastName: string,
-) {
+async function createDraftEmployee(
+  db: Db,
+  organizationId: string,
+  input: CreateEmployeeInput,
+): Promise<{ membership: OrganizationMembership; user: User }> {
   try {
-    return await clerkClient.organizations.createOrganizationInvitation({
-      organizationId: clerkOrgId,
-      inviterUserId,
-      emailAddress: email,
-      role: normalizeOrgRole(role),
-      redirectUrl: buildInvitationRedirectUrl(firstName, lastName),
-    });
-  } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "clerkError" in error &&
-      Array.isArray((error as { errors?: unknown[] }).errors)
-    ) {
-      const clerkErrors = (error as unknown as {
-        errors: Array<{
-          meta?: { paramName?: string };
-          longMessage?: string;
-        }>;
-      }).errors;
-      const roleError = clerkErrors.find(
-        (entry) => entry.meta?.paramName === "role",
+    return await db.transaction(async (tx) => {
+      const user = await userService.ensureDraftUser(tx, {
+        email: normalizeEmail(input.email),
+        firstName: input.firstName,
+        lastName: input.lastName,
+      });
+
+      if (!user) {
+        throw new ValidationError("Failed to create employee user");
+      }
+
+      const membership = await employeeRepository.insert(tx, {
+        organizationId,
+        userId: user.id,
+        role: normalizeOrgRole(input.role),
+        status: MEMBERSHIP_STATUS.DRAFT,
+      });
+
+      if (!membership) {
+        throw new ValidationError("Failed to create employee");
+      }
+
+      await employeeRepository.replaceLocationAssignments(
+        tx,
+        membership.id,
+        organizationId,
+        input.locationIds,
       );
 
-      if (roleError) {
-        throw new ValidationError(
-          roleError.longMessage ?? "The selected organization role is not available",
+      return { membership, user };
+    });
+  } catch (error) {
+    mapDbMutationError(error, {
+      unique: () => new ConflictError("An employee with this email already exists"),
+      foreignKey: () => new ValidationError("One or more locations are invalid"),
+    });
+  }
+}
+
+async function persistEmployeeChanges(
+  db: Db,
+  organizationId: string,
+  detail: EmployeeDetail,
+  changes: EmployeeChanges,
+): Promise<EmployeeDetail> {
+  try {
+    return await db.transaction(async (tx) => {
+      const user = hasProfileChanges(changes)
+        ? await userService.updateProfile(tx, detail.user.id, {
+            email: changes.email,
+            firstName: changes.firstName,
+            lastName: changes.lastName,
+          })
+        : null;
+
+      const membership = changes.role
+        ? await employeeRepository.updateByIdAndOrganization(
+            tx,
+            organizationId,
+            detail.membership.id,
+            { role: changes.role },
+          )
+        : null;
+
+      if (changes.locationIds) {
+        await employeeRepository.replaceLocationAssignments(
+          tx,
+          detail.membership.id,
+          organizationId,
+          changes.locationIds,
         );
       }
-    }
 
-    throw error;
+      return {
+        user: user ?? detail.user,
+        membership: membership ?? detail.membership,
+        locationIds: changes.locationIds ?? detail.locationIds,
+      };
+    });
+  } catch (error) {
+    mapDbMutationError(error, {
+      unique: () => new ConflictError("An employee with this email already exists"),
+      foreignKey: () => new ValidationError("One or more locations are invalid"),
+    });
   }
 }
 
 export const employeeService = {
-  async list(db: Db, organizationId: string): Promise<EmployeeListResponse> {
-    const [rows, allLocations] = await Promise.all([
-      employeeRepository.findManyWithUsersByOrganizationId(db, organizationId),
-      locationRepository.findByOrganizationId(db, organizationId),
-    ]);
+  async list(
+    db: Db,
+    organizationId: string,
+    tenantLocations: LocationResponse[],
+  ): Promise<EmployeeListResponse> {
+    const rows = await employeeRepository.findManyWithUsersByOrganizationId(
+      db,
+      organizationId,
+    );
 
     const items = rows.map((row) =>
       toEmployeeResponse({
         membership: row.membership,
         user: row.user,
         locationIds: row.locationIds,
-        locations: mapLocations(allLocations, row.locationIds),
+        locations: mapLocationResponses(tenantLocations, row.locationIds),
       }),
     );
 
@@ -126,81 +219,29 @@ export const employeeService = {
     input: CreateEmployeeInput,
     tenantLocations: LocationResponse[],
   ): Promise<EmployeeResponse> {
-    const email = normalizeEmail(input.email);
-    const role = normalizeOrgRole(input.role);
+    assertLocationIdsBelongToTenant(input.locationIds, tenantLocations);
 
-    let created: { employee: OrganizationMembership; user: User; email: string; role: string };
+    const { membership: draft, user } = await createDraftEmployee(
+      db,
+      organizationId,
+      input,
+    );
 
-    try {
-      created = await db.transaction(async (tx) => {
-        const user = await userService.ensureDraftUser(tx, {
-          email,
-          firstName: input.firstName,
-          lastName: input.lastName,
-        });
-
-        if (!user) {
-          throw new ValidationError("Failed to create employee user");
-        }
-
-        const employee = await employeeRepository.insert(tx, {
-          organizationId,
-          userId: user.id,
-          role,
-          status: MEMBERSHIP_STATUS.DRAFT,
-        });
-
-        if (!employee) {
-          throw new ValidationError("Failed to create employee");
-        }
-
-        await employeeRepository.replaceLocationAssignments(
-          tx,
-          employee.id,
-          organizationId,
-          input.locationIds,
-        );
-
-        return { employee, user, email, role };
-      });
-    } catch (error) {
-      mapDbMutationError(error, {
-        unique: () =>
-          new ConflictError("An employee with this email already exists"),
-        foreignKey: () =>
-          new ValidationError("One or more locations are invalid"),
-      });
-    }
-
-    let membership = created.employee;
-
-    if (input.inviteNow) {
-      const invitation = await sendClerkInvitation(
-        clerkOrgId,
-        inviterUserId,
-        created.email,
-        created.role,
-        created.user.firstName,
-        created.user.lastName,
-      );
-
-      const invited = await employeeRepository.updateById(db, membership.id, {
-        status: MEMBERSHIP_STATUS.INVITED,
-        clerkInvitationId: invitation.id,
-        invitedAt: new Date(),
-      });
-
-      membership = invited ?? membership;
-    }
+    const membership = input.inviteNow
+      ? await issueMembershipInvitation(db, organizationId, draft.id, {
+          clerkOrgId,
+          inviterUserId,
+          email: user.email,
+          role: draft.role,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        })
+      : draft;
 
     await membershipLocationsCache.invalidate(organizationId, membership.userId);
 
     return buildEmployeeResponseFromDetail(
-      {
-        membership,
-        user: created.user,
-        locationIds: input.locationIds,
-      },
+      { membership, user, locationIds: input.locationIds },
       tenantLocations,
     );
   },
@@ -208,69 +249,72 @@ export const employeeService = {
   async update(
     db: Db,
     organizationId: string,
+    clerkOrgId: string,
+    inviterClerkUserId: string,
+    actorUserDbId: string,
     membershipId: string,
     input: UpdateEmployeeInput,
     tenantLocations: LocationResponse[],
   ): Promise<EmployeeResponse> {
-    const detail = await employeeRepository.findDetailById(
+    const detail = await requireEmployeeDetail(db, organizationId, membershipId);
+    const changes = diffEmployeeChanges(detail, input);
+
+    assertUpdateAllowed(detail, input, changes, actorUserDbId, tenantLocations);
+
+    if (isEmptyChangeSet(changes)) {
+      return buildEmployeeResponseFromDetail(detail, tenantLocations);
+    }
+
+    const next = await persistEmployeeChanges(
       db,
       organizationId,
-      membershipId,
-    );
-
-    if (!detail) {
-      throw new NotFoundError("Employee not found");
-    }
-
-    if (detail.membership.status === MEMBERSHIP_STATUS.ACTIVE) {
-      throw new ValidationError("Active employees cannot be edited this way");
-    }
-
-    let updatedUser = detail.user;
-
-    if (
-      input.email !== undefined ||
-      input.firstName !== undefined ||
-      input.lastName !== undefined
-    ) {
-      try {
-        const user = await userService.updateProfile(db, detail.user.id, {
-          email: input.email ? normalizeEmail(input.email) : undefined,
-          firstName: input.firstName,
-          lastName: input.lastName,
-        });
-
-        if (user) {
-          updatedUser = user;
-        }
-      } catch (error) {
-        mapDbMutationError(error, {
-          unique: () =>
-            new ConflictError("An employee with this email already exists"),
-        });
-      }
-    }
-
-    let updatedMembership = detail.membership;
-
-    if (input.role) {
-      const membership = await employeeRepository.updateById(db, membershipId, {
-        role: normalizeOrgRole(input.role),
-      });
-
-      if (membership) {
-        updatedMembership = membership;
-      }
-    }
-
-    return buildEmployeeResponseFromDetail(
       detail,
-      tenantLocations,
-      {
-        membership: updatedMembership,
-        user: updatedUser,
-      },
+      changes,
     );
+
+    const { clerkInvitationId, status } = detail.membership;
+
+    if (status === MEMBERSHIP_STATUS.ACTIVE && detail.user.clerkUserId) {
+      await applyActiveEmployeeUpdate(
+        clerkOrgId,
+        detail.user.clerkUserId,
+        changes,
+        next.user,
+      );
+    }
+
+    const membership =
+      status === MEMBERSHIP_STATUS.INVITED &&
+      clerkInvitationId &&
+      hasInviteMetadataChanges(changes)
+        ? await issueMembershipInvitation(
+            db,
+            organizationId,
+            membershipId,
+            {
+              clerkOrgId,
+              inviterUserId: inviterClerkUserId,
+              email: next.user.email,
+              role: next.membership.role,
+              firstName: next.user.firstName,
+              lastName: next.user.lastName,
+            },
+            { previousInvitationId: clerkInvitationId },
+          )
+        : next.membership;
+
+    if (changes.locationIds) {
+      await membershipLocationsCache.invalidate(
+        organizationId,
+        detail.membership.userId,
+      );
+    }
+
+    return buildEmployeeResponseFromDetail(detail, tenantLocations, {
+      membership,
+      user: next.user,
+      locationIds: next.locationIds,
+    });
   },
 
   async invite(
@@ -281,41 +325,28 @@ export const employeeService = {
     membershipId: string,
     tenantLocations: LocationResponse[],
   ): Promise<EmployeeResponse> {
-    const detail = await employeeRepository.findDetailById(
-      db,
-      organizationId,
-      membershipId,
-    );
-
-    if (!detail) {
-      throw new NotFoundError("Employee not found");
-    }
+    const detail = await requireEmployeeDetail(db, organizationId, membershipId);
 
     if (detail.membership.status !== MEMBERSHIP_STATUS.DRAFT) {
       throw new ValidationError("Only draft employees can be invited");
     }
 
-    const invitation = await sendClerkInvitation(
-      clerkOrgId,
-      inviterUserId,
-      detail.user.email,
-      detail.membership.role,
-      detail.user.firstName,
-      detail.user.lastName,
-    );
-
-    const updatedMembership = await employeeRepository.updateById(
+    const membership = await issueMembershipInvitation(
       db,
+      organizationId,
       membershipId,
       {
-        status: MEMBERSHIP_STATUS.INVITED,
-        clerkInvitationId: invitation.id,
-        invitedAt: new Date(),
+        clerkOrgId,
+        inviterUserId,
+        email: detail.user.email,
+        role: detail.membership.role,
+        firstName: detail.user.firstName,
+        lastName: detail.user.lastName,
       },
     );
 
     return buildEmployeeResponseFromDetail(detail, tenantLocations, {
-      membership: updatedMembership ?? detail.membership,
+      membership,
     });
   },
 
@@ -326,15 +357,7 @@ export const employeeService = {
     membershipId: string,
     tenantLocations: LocationResponse[],
   ): Promise<EmployeeResponse> {
-    const detail = await employeeRepository.findDetailById(
-      db,
-      organizationId,
-      membershipId,
-    );
-
-    if (!detail) {
-      throw new NotFoundError("Employee not found");
-    }
+    const detail = await requireEmployeeDetail(db, organizationId, membershipId);
 
     if (
       detail.membership.status !== MEMBERSHIP_STATUS.INVITED ||
@@ -343,106 +366,27 @@ export const employeeService = {
       throw new ValidationError("Employee does not have a pending invitation");
     }
 
-    await clerkClient.organizations.revokeOrganizationInvitation({
-      organizationId: clerkOrgId,
-      invitationId: detail.membership.clerkInvitationId,
-    });
+    await revokeClerkInvitation(clerkOrgId, detail.membership.clerkInvitationId);
 
-    const updatedMembership = await employeeRepository.updateById(
-      db,
-      membershipId,
-      {
-        status: MEMBERSHIP_STATUS.DRAFT,
-        clerkInvitationId: null,
-        invitedAt: null,
-      },
-    );
-
-    return buildEmployeeResponseFromDetail(detail, tenantLocations, {
-      membership: updatedMembership ?? detail.membership,
-    });
-  },
-
-  async updateRole(
-    db: Db,
-    organizationId: string,
-    clerkOrgId: string,
-    membershipId: string,
-    input: UpdateEmployeeRoleInput,
-    tenantLocations: LocationResponse[],
-  ): Promise<EmployeeResponse> {
-    const detail = await employeeRepository.findDetailById(
-      db,
-      organizationId,
-      membershipId,
-    );
-
-    if (!detail) {
-      throw new NotFoundError("Employee not found");
-    }
-
-    const role = normalizeOrgRole(input.role);
-
-    if (
-      detail.membership.status === MEMBERSHIP_STATUS.ACTIVE &&
-      detail.user.clerkUserId
-    ) {
-      await clerkClient.organizations.updateOrganizationMembership({
-        organizationId: clerkOrgId,
-        userId: detail.user.clerkUserId,
-        role,
-      });
-    }
-
-    const updatedMembership = await employeeRepository.updateById(
-      db,
-      membershipId,
-      { role },
-    );
-
-    return buildEmployeeResponseFromDetail(detail, tenantLocations, {
-      membership: updatedMembership ?? detail.membership,
-    });
-  },
-
-  async updateLocations(
-    db: Db,
-    organizationId: string,
-    membershipId: string,
-    input: UpdateEmployeeLocationsInput,
-    tenantLocations: LocationResponse[],
-  ): Promise<EmployeeResponse> {
-    const detail = await employeeRepository.findDetailById(
-      db,
-      organizationId,
-      membershipId,
-    );
-
-    if (!detail) {
-      throw new NotFoundError("Employee not found");
-    }
-
-    try {
-      await employeeRepository.replaceLocationAssignments(
+    const membership =
+      await employeeRepository.updateStatusByIdAndOrganization(
         db,
-        membershipId,
         organizationId,
-        input.locationIds,
+        membershipId,
+        MEMBERSHIP_STATUS.INVITED,
+        {
+          status: MEMBERSHIP_STATUS.DRAFT,
+          clerkInvitationId: null,
+          invitedAt: null,
+        },
       );
-    } catch (error) {
-      mapDbMutationError(error, {
-        foreignKey: () =>
-          new ValidationError("One or more locations are invalid"),
-      });
+
+    if (!membership) {
+      throw new ValidationError("Employee does not have a pending invitation");
     }
 
-    await membershipLocationsCache.invalidate(
-      organizationId,
-      detail.membership.userId,
-    );
-
     return buildEmployeeResponseFromDetail(detail, tenantLocations, {
-      locationIds: input.locationIds,
+      membership,
     });
   },
 
@@ -452,41 +396,24 @@ export const employeeService = {
     clerkOrgId: string,
     membershipId: string,
   ): Promise<void> {
-    const detail = await employeeRepository.findDetailById(
+    const row = await employeeRepository.findMembershipWithUserById(
       db,
       organizationId,
       membershipId,
     );
 
-    if (!detail) {
+    if (!row) {
       throw new NotFoundError("Employee not found");
     }
 
-    if (
-      detail.membership.status === MEMBERSHIP_STATUS.INVITED &&
-      detail.membership.clerkInvitationId
-    ) {
-      await clerkClient.organizations.revokeOrganizationInvitation({
-        organizationId: clerkOrgId,
-        invitationId: detail.membership.clerkInvitationId,
-      });
-    }
+    await syncClerkMembershipRemoval(clerkOrgId, row);
 
-    if (
-      detail.membership.status === MEMBERSHIP_STATUS.ACTIVE &&
-      detail.user.clerkUserId
-    ) {
-      await clerkClient.organizations.deleteOrganizationMembership({
-        organizationId: clerkOrgId,
-        userId: detail.user.clerkUserId,
-      });
-    }
-
-    await employeeRepository.softDeleteById(db, membershipId);
-    await membershipLocationsCache.invalidate(
+    await employeeRepository.softDeleteByIdAndOrganization(
+      db,
       organizationId,
-      detail.membership.userId,
+      membershipId,
     );
+    await membershipLocationsCache.invalidate(organizationId, row.membership.userId);
   },
 
   async getAssignedLocationIdsForUser(
@@ -495,7 +422,6 @@ export const employeeService = {
     userDbId: string,
   ): Promise<string[]> {
     const cached = await membershipLocationsCache.get(organizationId, userDbId);
-
     if (cached) {
       return cached;
     }
@@ -505,9 +431,7 @@ export const employeeService = {
       organizationId,
       userDbId,
     );
-
     await membershipLocationsCache.set(organizationId, userDbId, locationIds);
-
     return locationIds;
   },
 };

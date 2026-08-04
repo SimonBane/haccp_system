@@ -481,6 +481,7 @@
     "save": "Запази",
     "saveAndInvite": "Запази и покани",
     "cancel": "Отказ",
+    "roleLockedSelf": "Не можете да промените собствената си роля.",
     "edit": "Редактирай",
     "delete": "Изтрий",
     "sendInvitation": "Изпрати покана",
@@ -508,10 +509,17 @@
       "cancel": "Отказ",
       "confirmAction": "Изтрий"
     },
+    "resendDialog": {
+      "title": "Изпрати поканата отново?",
+      "confirm": "Текущата покана ще бъде отменена.",
+      "cancel": "Отказ",
+      "confirmAction": "Изпрати"
+    },
     "toast": {
       "createSuccess": "Служителят беше запазен.",
       "createInviteSuccess": "Служителят беше запазен и поканата беше изпратена.",
       "updateSuccess": "Служителят беше обновен.",
+      "updateResendSuccess": "Служителят беше обновен и поканата беше изпратена отново.",
       "inviteSuccess": "Поканата беше изпратена.",
       "revokeSuccess": "Поканата беше отменена.",
       "deleteSuccess": "Служителят беше изтрит."

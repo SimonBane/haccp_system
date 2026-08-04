@@ -3,14 +3,12 @@
 import {
   createEmployeeSchema,
   employeeResponseSchema,
-  updateEmployeeLocationsSchema,
-  updateEmployeeRoleSchema,
   updateEmployeeSchema,
   type CreateEmployeeInput,
+  type EmployeeResponse,
   type UpdateEmployeeInput,
-  type UpdateEmployeeLocationsInput,
-  type UpdateEmployeeRoleInput,
 } from "@haccp/shared";
+import { useAuth, useUser } from "@clerk/nextjs";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ApiRequestError, parseApiError } from "@/lib/api-utils";
 import { useAuthenticatedFetch } from "@/lib/api/client";
@@ -19,11 +17,23 @@ import { queryKeys } from "@/lib/api/query-keys";
 export function useEmployeesMutations() {
   const { fetchJson, fetchApi } = useAuthenticatedFetch();
   const queryClient = useQueryClient();
+  const { userId: clerkUserId } = useAuth();
+  const { user } = useUser();
 
   const invalidateEmployees = () => {
     void queryClient.invalidateQueries({
       queryKey: queryKeys.employees(),
     });
+  };
+
+  const reloadClerkUserIfSelf = async (employee: EmployeeResponse) => {
+    if (
+      employee.user.clerkUserId &&
+      employee.user.clerkUserId === clerkUserId &&
+      user
+    ) {
+      await user.reload();
+    }
   };
 
   const create = useMutation({
@@ -46,14 +56,17 @@ export function useEmployeesMutations() {
       id: string;
       input: UpdateEmployeeInput;
     }) => {
-      updateEmployeeSchema.parse(input);
+      const payload = updateEmployeeSchema.parse(input);
       return fetchJson(`/employees/${id}`, employeeResponseSchema, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
+        body: JSON.stringify(payload),
       });
     },
-    onSuccess: invalidateEmployees,
+    onSuccess: async (employee) => {
+      invalidateEmployees();
+      await reloadClerkUserIfSelf(employee);
+    },
   });
 
   const invite = useMutation({
@@ -69,42 +82,6 @@ export function useEmployeesMutations() {
     mutationFn: async (id: string) => {
       return fetchJson(`/employees/${id}/invitation`, employeeResponseSchema, {
         method: "DELETE",
-      });
-    },
-    onSuccess: invalidateEmployees,
-  });
-
-  const updateRole = useMutation({
-    mutationFn: async ({
-      id,
-      input,
-    }: {
-      id: string;
-      input: UpdateEmployeeRoleInput;
-    }) => {
-      updateEmployeeRoleSchema.parse(input);
-      return fetchJson(`/employees/${id}/role`, employeeResponseSchema, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      });
-    },
-    onSuccess: invalidateEmployees,
-  });
-
-  const updateLocations = useMutation({
-    mutationFn: async ({
-      id,
-      input,
-    }: {
-      id: string;
-      input: UpdateEmployeeLocationsInput;
-    }) => {
-      updateEmployeeLocationsSchema.parse(input);
-      return fetchJson(`/employees/${id}/locations`, employeeResponseSchema, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
       });
     },
     onSuccess: invalidateEmployees,
@@ -132,8 +109,6 @@ export function useEmployeesMutations() {
     update,
     invite,
     revokeInvitation,
-    updateRole,
-    updateLocations,
     remove,
   };
 }
