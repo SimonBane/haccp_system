@@ -15,10 +15,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { EmployeesData } from "@/features/employees/data-table/data";
-import { EmployeeForm, type EmployeeFormValues } from "@/features/employees/employee-form";
+import {
+  EmployeeForm,
+  type EmployeeFormValues,
+} from "@/features/employees/employee-form";
 import { useEmployeesMutations } from "@/features/employees/hooks/use-employees-mutations";
 import { useEmployeesQuery } from "@/features/employees/hooks/use-employees-query";
-import { useLocationsQuery } from "@/features/locations/hooks/use-locations-query";
+import {
+  hasInviteMetadataChanges,
+  resolveEmployeeLocationIds,
+} from "@/features/employees/utils";
 import { useTenant } from "@/features/tenant/tenant-provider";
 import { getErrorMessage } from "@/lib/api/get-error-message";
 
@@ -36,18 +42,11 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
   const multipleLocationsEnabled = organization.multipleLocationsEnabled;
   const defaultLocationId =
     tenantLocations.find((location) => location.isDefault)?.id ?? locationId;
-  const { data: items = [], refetch } = useEmployeesQuery({
+  const { data: items = [] } = useEmployeesQuery({
     initialData: initialItems,
   });
-  const { data: locations = [] } = useLocationsQuery();
-  const {
-    create,
-    update,
-    invite,
-    revokeInvitation,
-    updateLocations,
-    remove,
-  } = useEmployeesMutations();
+  const { create, update, invite, revokeInvitation, remove } =
+    useEmployeesMutations();
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] =
@@ -79,12 +78,11 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
       try {
         await invite.mutateAsync(employee.id);
         toast.success(t("toast.inviteSuccess"));
-        await refetch();
       } catch (error) {
         toast.error(getErrorMessage(error, t("errors.generic")));
       }
     },
-    [invite, refetch, t],
+    [invite, t],
   );
 
   const handleRevokeInvitation = useCallback(
@@ -92,49 +90,42 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
       try {
         await revokeInvitation.mutateAsync(employee.id);
         toast.success(t("toast.revokeSuccess"));
-        await refetch();
       } catch (error) {
         toast.error(getErrorMessage(error, t("errors.generic")));
       }
     },
-    [refetch, revokeInvitation, t],
+    [revokeInvitation, t],
   );
 
   const handleSave = useCallback(
-    async (values: EmployeeFormValues, inviteNow: boolean) => {
-      const locationIds = multipleLocationsEnabled
-        ? values.locationIds
-        : values.locationIds.length > 0
-          ? values.locationIds
-          : [defaultLocationId];
+    async (values: EmployeeFormValues, inviteNow: boolean): Promise<boolean> => {
+      const locationIds = resolveEmployeeLocationIds(values.locationIds, {
+        multipleLocationsEnabled,
+        defaultLocationId,
+      });
 
       try {
         if (editingEmployee) {
-          if (editingEmployee.status === "active") {
-            if (!multipleLocationsEnabled) {
-              return;
-            }
+          const metadataChanged =
+            editingEmployee.status === "invited" &&
+            hasInviteMetadataChanges(editingEmployee, values);
 
-            await updateLocations.mutateAsync({
-              id: editingEmployee.id,
-              input: { locationIds },
-            });
-          } else {
-            await update.mutateAsync({
-              id: editingEmployee.id,
-              input: {
-                email: values.email,
-                firstName: values.firstName,
-                lastName: values.lastName,
-                role: values.role,
-              },
-            });
-            await updateLocations.mutateAsync({
-              id: editingEmployee.id,
-              input: { locationIds },
-            });
-          }
-          toast.success(t("toast.updateSuccess"));
+          await update.mutateAsync({
+            id: editingEmployee.id,
+            input: {
+              ...(editingEmployee.status !== "active" && { email: values.email }),
+              firstName: values.firstName,
+              lastName: values.lastName,
+              role: values.role,
+              locationIds,
+            },
+          });
+
+          toast.success(
+            metadataChanged
+              ? t("toast.updateResendSuccess")
+              : t("toast.updateSuccess"),
+          );
         } else {
           await create.mutateAsync({
             email: values.email,
@@ -149,7 +140,7 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
           );
         }
 
-        await refetch();
+        return true;
       } catch (error) {
         toast.error(getErrorMessage(error, t("errors.generic")));
         throw error;
@@ -160,10 +151,8 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
       defaultLocationId,
       editingEmployee,
       multipleLocationsEnabled,
-      refetch,
       t,
       update,
-      updateLocations,
     ],
   );
 
@@ -178,13 +167,12 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
       await remove.mutateAsync(deleteTarget.id);
       toast.success(t("toast.deleteSuccess"));
       setDeleteTarget(null);
-      await refetch();
     } catch (error) {
       toast.error(getErrorMessage(error, t("errors.generic")));
     } finally {
       setIsDeleting(false);
     }
-  }, [deleteTarget, refetch, remove, t]);
+  }, [deleteTarget, remove, t]);
 
   return (
     <div className="space-y-6">
@@ -206,7 +194,7 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
         open={formOpen}
         onOpenChange={setFormOpen}
         employee={editingEmployee}
-        locations={locations}
+        locations={tenantLocations}
         onSave={handleSave}
       />
 
