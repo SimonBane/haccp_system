@@ -1,10 +1,10 @@
 {
   "Metadata": {
-    "title": "HACCP System",
-    "description": "Hazard Analysis and Critical Control Points management"
+    "title": "SafeCheck",
+    "description": "HACCP management, monitoring and compliance"
   },
   "HomePage": {
-    "badge": "HACCP System",
+    "badge": "SafeCheck",
     "title": "Monorepo skeleton",
     "description": "Next.js web app connected to the standalone Hono API.",
     "apiHealth": "API health",
@@ -34,7 +34,7 @@
     "acceptError": "We could not finish setting up your account. Refresh the page or try again."
   },
   "DashboardPage": {
-    "breadcrumbApp": "HACCP System",
+    "breadcrumbApp": "SafeCheck",
     "breadcrumbDashboard": "Dashboard",
     "placeholder": "Sample dashboard content"
   },
@@ -369,7 +369,7 @@
     }
   },
   "Sidebar": {
-    "brandName": "HACCP System",
+    "brandName": "SafeCheck",
     "brandPlan": "Enterprise",
     "platform": "Platform",
     "admin": "Management",
