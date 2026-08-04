@@ -1,11 +1,13 @@
 "use client";
 
 import { ORG_ROLE, type EmployeeResponse, type LocationResponse } from "@haccp/shared";
+import { useAuth } from "@clerk/nextjs";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SaveIcon, SendIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Controller, useForm, useFormState } from "react-hook-form";
+import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
@@ -19,21 +21,39 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { LocationMultiSelect } from "@/features/employees/location-multi-select";
+import {
+  hasInviteMetadataChanges,
+  resolveEmployeeLocationIds,
+} from "@/features/employees/utils";
 import { useTenant } from "@/features/tenant/tenant-provider";
+import { getErrorMessage } from "@/lib/api/get-error-message";
 
 type EmployeeFormProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   employee?: EmployeeResponse | null;
   locations: LocationResponse[];
-  onSave: (values: EmployeeFormValues, inviteNow: boolean) => Promise<void>;
+  onSave: (values: EmployeeFormValues, inviteNow: boolean) => Promise<boolean>;
 };
 
 type EmployeeRole = typeof ORG_ROLE.ADMIN | typeof ORG_ROLE.EMPLOYEE;
@@ -68,6 +88,7 @@ export function EmployeeForm({
   onSave,
 }: EmployeeFormProps) {
   const t = useTranslations("EmployeesPage");
+  const { userId: clerkUserId } = useAuth();
   const { organization, locations: tenantLocations, locationId } =
     useTenant();
   const multipleLocationsEnabled = organization.multipleLocationsEnabled;
@@ -77,7 +98,16 @@ export function EmployeeForm({
   }, [tenantLocations, locationId]);
   const isEditing = Boolean(employee);
   const isActive = employee?.status === "active";
+  const isEditingSelf =
+    Boolean(employee?.user.clerkUserId) &&
+    employee?.user.clerkUserId === clerkUserId;
+  const isRoleLocked = isEditingSelf;
   const [pendingAction, setPendingAction] = useState<SubmitAction | null>(null);
+  const [resendConfirmOpen, setResendConfirmOpen] = useState(false);
+  const [pendingValues, setPendingValues] = useState<EmployeeFormValues | null>(
+    null,
+  );
+  const [isResending, setIsResending] = useState(false);
 
   const roleItems = useMemo(
     () => [
@@ -117,15 +147,11 @@ export function EmployeeForm({
   );
 
   const resolveLocationIds = useCallback(
-    (locationIds: string[] | undefined) => {
-      if (multipleLocationsEnabled) {
-        return locationIds ?? [];
-      }
-
-      return locationIds && locationIds.length > 0
-        ? locationIds
-        : [defaultLocationId];
-    },
+    (locationIds: string[] | undefined) =>
+      resolveEmployeeLocationIds(locationIds ?? [], {
+        multipleLocationsEnabled,
+        defaultLocationId,
+      }),
     [defaultLocationId, multipleLocationsEnabled],
   );
 
@@ -151,6 +177,9 @@ export function EmployeeForm({
       });
     } else {
       setPendingAction(null);
+      setResendConfirmOpen(false);
+      setPendingValues(null);
+      setIsResending(false);
     }
   }, [open, employee, form, resolveLocationIds]);
 
@@ -163,17 +192,85 @@ export function EmployeeForm({
 
     try {
       await form.handleSubmit(async (values) => {
-        await onSave(
+        const completed = await onSave(
           {
             ...values,
             locationIds: resolveLocationIds(values.locationIds),
           },
           inviteNow,
         );
-        onOpenChange(false);
+        if (completed) {
+          onOpenChange(false);
+        }
       })();
     } finally {
       setPendingAction(null);
+    }
+  };
+
+  const submitEdit = async () => {
+    setPendingAction("save");
+
+    try {
+      await form.handleSubmit(async (values) => {
+        const resolved = {
+          ...values,
+          locationIds: resolveLocationIds(values.locationIds),
+        };
+
+        if (
+          employee?.status === "invited" &&
+          hasInviteMetadataChanges(employee, resolved)
+        ) {
+          setPendingValues(resolved);
+          setResendConfirmOpen(true);
+          return;
+        }
+
+        const completed = await onSave(resolved, false);
+        if (completed) {
+          onOpenChange(false);
+        }
+      })();
+    } finally {
+      setPendingAction(null);
+    }
+  };
+
+  const confirmResend = async () => {
+    if (!pendingValues) {
+      return;
+    }
+
+    setIsResending(true);
+
+    try {
+      const completed = await onSave(pendingValues, false);
+      if (completed) {
+        setResendConfirmOpen(false);
+        setPendingValues(null);
+        onOpenChange(false);
+      }
+    } catch (error) {
+      toast.error(getErrorMessage(error, t("errors.generic")));
+    } finally {
+      setIsResending(false);
+    }
+  };
+
+  const handleResendConfirmOpenChange = (nextOpen: boolean) => {
+    if (isResending) {
+      return;
+    }
+
+    if (nextOpen && !pendingValues) {
+      return;
+    }
+
+    setResendConfirmOpen(nextOpen);
+
+    if (!nextOpen) {
+      setPendingValues(null);
     }
   };
 
@@ -225,7 +322,6 @@ export function EmployeeForm({
                       {...field}
                       id="employee-first-name"
                       autoComplete="off"
-                      disabled={isActive}
                       placeholder={t("firstNamePlaceholder")}
                     />
                     {fieldState.error ? (
@@ -250,7 +346,6 @@ export function EmployeeForm({
                       {...field}
                       id="employee-last-name"
                       autoComplete="off"
-                      disabled={isActive}
                       placeholder={t("lastNamePlaceholder")}
                     />
                     {fieldState.error ? (
@@ -264,11 +359,8 @@ export function EmployeeForm({
             <Controller
               control={form.control}
               name="role"
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel className={REQUIRED_LABEL_CLASS}>
-                    {t("roleLabel")}
-                  </FieldLabel>
+              render={({ field, fieldState }) => {
+                const roleSelect = (
                   <Select
                     name={field.name}
                     items={roleItems}
@@ -281,7 +373,7 @@ export function EmployeeForm({
                         field.onBlur();
                       }
                     }}
-                    disabled={isActive}
+                    disabled={isRoleLocked}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder={t("rolePlaceholder")} />
@@ -295,11 +387,33 @@ export function EmployeeForm({
                       </SelectItem>
                     </SelectContent>
                   </Select>
-                  {fieldState.error ? (
-                    <FieldError errors={[fieldState.error]} />
-                  ) : null}
-                </Field>
-              )}
+                );
+
+                return (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel className={REQUIRED_LABEL_CLASS}>
+                      {t("roleLabel")}
+                    </FieldLabel>
+                    {isRoleLocked ? (
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <span className="block w-full">{roleSelect}</span>
+                          }
+                        />
+                        <TooltipContent side="bottom">
+                          {t("roleLockedSelf")}
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      roleSelect
+                    )}
+                    {fieldState.error ? (
+                      <FieldError errors={[fieldState.error]} />
+                    ) : null}
+                  </Field>
+                );
+              }}
             />
 
             {multipleLocationsEnabled ? (
@@ -358,18 +472,55 @@ export function EmployeeForm({
                 </Button>
               </div>
             ) : (
-              <Button
-                type="button"
-                isLoading={pendingAction === "save"}
-                disabled={
-                  !hasChanges ||
-                  (pendingAction !== null && pendingAction !== "save")
-                }
-                onClick={() => void submit(false)}
+              <Popover
+                open={resendConfirmOpen}
+                onOpenChange={handleResendConfirmOpenChange}
               >
-                <SaveIcon data-icon="inline-start" />
-                {t("save")}
-              </Button>
+                <PopoverTrigger
+                  render={
+                    <Button
+                      type="button"
+                      isLoading={pendingAction === "save"}
+                      disabled={
+                        !hasChanges ||
+                        (pendingAction !== null && pendingAction !== "save")
+                      }
+                      onClick={() => void submitEdit()}
+                    />
+                  }
+                >
+                  <SaveIcon data-icon="inline-start" />
+                  {t("save")}
+                </PopoverTrigger>
+                <PopoverContent side="bottom" align="center">
+                  <PopoverHeader>
+                    <PopoverTitle>{t("resendDialog.title")}</PopoverTitle>
+                    <PopoverDescription>
+                      {t("resendDialog.confirm")}
+                    </PopoverDescription>
+                  </PopoverHeader>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isResending}
+                      onClick={() => setResendConfirmOpen(false)}
+                    >
+                      {t("resendDialog.cancel")}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      isLoading={isResending}
+                      disabled={isResending}
+                      onClick={() => void confirmResend()}
+                    >
+                      {t("resendDialog.confirmAction")}
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
             )}
           </DialogFooter>
         </form>

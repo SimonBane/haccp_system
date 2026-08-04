@@ -481,6 +481,7 @@
     "save": "Save",
     "saveAndInvite": "Save and Invite",
     "cancel": "Cancel",
+    "roleLockedSelf": "You cannot change your own role.",
     "edit": "Edit",
     "delete": "Delete",
     "sendInvitation": "Send invitation",
@@ -508,10 +509,17 @@
       "cancel": "Cancel",
       "confirmAction": "Delete"
     },
+    "resendDialog": {
+      "title": "Resend invitation?",
+      "confirm": "The current invitation will be revoked.",
+      "cancel": "Cancel",
+      "confirmAction": "Resend"
+    },
     "toast": {
       "createSuccess": "Employee was saved.",
       "createInviteSuccess": "Employee was saved and invitation sent.",
       "updateSuccess": "Employee was updated.",
+      "updateResendSuccess": "Employee was updated and invitation resent.",
       "inviteSuccess": "Invitation was sent.",
       "revokeSuccess": "Invitation was revoked.",
       "deleteSuccess": "Employee was deleted."

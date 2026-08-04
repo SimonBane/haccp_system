@@ -12,6 +12,7 @@ import {
   ComboboxItem,
   ComboboxList,
   ComboboxValue,
+  useComboboxAnchor,
 } from "@/components/ui/combobox";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +39,8 @@ export function LocationMultiSelect({
   emptyMessage,
   noLocationsMessage,
 }: LocationMultiSelectProps) {
+  const anchor = useComboboxAnchor();
+
   const locationById = useMemo(
     () => new Map(locations.map((location) => [location.id, location])),
     [locations],
@@ -75,17 +78,25 @@ export function LocationMultiSelect({
       }
     >
       <ComboboxChips
-        className={cn(invalid && "border-destructive ring-destructive/20")}
+        ref={anchor}
+        className={cn(
+          "w-full",
+          invalid && "border-destructive ring-destructive/20",
+        )}
         aria-invalid={invalid}
       >
         <ComboboxValue>
-          {selectedLocations.map((location) => (
-            <ComboboxChip key={location.id}>{location.name}</ComboboxChip>
-          ))}
+          {(values: LocationResponse[]) => (
+            <>
+              {values.map((location) => (
+                <ComboboxChip key={location.id}>{location.name}</ComboboxChip>
+              ))}
+            </>
+          )}
         </ComboboxValue>
         <ComboboxChipsInput id={id} placeholder={placeholder} />
       </ComboboxChips>
-      <ComboboxContent>
+      <ComboboxContent anchor={anchor}>
         <ComboboxEmpty>{emptyMessage}</ComboboxEmpty>
         <ComboboxList>
           {(location: LocationResponse) => (

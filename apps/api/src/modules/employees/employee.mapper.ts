@@ -2,9 +2,13 @@ import type { EmployeeResponse, LocationResponse } from "@haccp/shared";
 import { normalizeOrgRole } from "@haccp/shared";
 import type { OrganizationMembership } from "../../core/db/schema/organization-memberships.js";
 import type { User } from "../../core/db/schema/users.js";
-import { toLocationResponse } from "../locations/location.mapper.js";
-import type { Location } from "../../core/db/schema/locations.js";
 import { toUserResponse } from "../users/user.mapper.js";
+
+export type EmployeeDetail = {
+  membership: OrganizationMembership;
+  user: User;
+  locationIds: string[];
+};
 
 export function toEmployeeResponse(params: {
   membership: OrganizationMembership;
@@ -31,19 +35,6 @@ export function toEmployeeResponse(params: {
   };
 }
 
-export function mapLocations(
-  allLocations: Location[],
-  locationIds: string[],
-): LocationResponse[] {
-  const locationMap = new Map(
-    allLocations.map((location) => [location.id, toLocationResponse(location)]),
-  );
-
-  return locationIds
-    .map((id) => locationMap.get(id))
-    .filter((location): location is LocationResponse => Boolean(location));
-}
-
 export function mapLocationResponses(
   allLocations: LocationResponse[],
   locationIds: string[],
@@ -55,4 +46,24 @@ export function mapLocationResponses(
   return locationIds
     .map((id) => locationMap.get(id))
     .filter((location): location is LocationResponse => Boolean(location));
+}
+
+export function buildEmployeeResponseFromDetail(
+  detail: EmployeeDetail,
+  allLocations: LocationResponse[],
+  overrides?: {
+    membership?: Partial<EmployeeDetail["membership"]>;
+    user?: Partial<EmployeeDetail["user"]>;
+    locationIds?: string[];
+  },
+): EmployeeResponse {
+  return toEmployeeResponse({
+    membership: { ...detail.membership, ...overrides?.membership },
+    user: { ...detail.user, ...overrides?.user },
+    locationIds: overrides?.locationIds ?? detail.locationIds,
+    locations: mapLocationResponses(
+      allLocations,
+      overrides?.locationIds ?? detail.locationIds,
+    ),
+  });
 }

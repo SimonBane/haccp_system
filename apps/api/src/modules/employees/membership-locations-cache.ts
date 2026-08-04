@@ -70,11 +70,4 @@ export const membershipLocationsCache = {
       );
     }
   },
-
-  async invalidateForMembership(
-    organizationId: string,
-    userDbId: string,
-  ): Promise<void> {
-    await this.invalidate(organizationId, userDbId);
-  },
 };
