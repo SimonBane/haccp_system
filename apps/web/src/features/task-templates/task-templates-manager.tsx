@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
+import { MobileHeaderAddButton } from "@/components/layout/mobile-header-add-button";
 import { useEquipmentOptions } from "@/features/equipment/hooks/use-equipment-query";
 import { TaskTemplatesData } from "@/features/task-templates/data-table/data";
 import { useTaskTemplatesMutations } from "@/features/task-templates/hooks/use-task-templates-mutations";
@@ -114,13 +115,13 @@ export function TaskTemplatesManager({
 
   return (
     <div className="space-y-6">
-      <div>
+      <MobileHeaderAddButton label={t("add")} onClick={openCreateForm} />
+
+      <div className="hidden md:block">
         <h1 className="text-xl font-semibold tracking-tight md:text-2xl">
           {t("title")}
         </h1>
-        <p className="hidden text-sm text-muted-foreground md:block">
-          {t("description")}
-        </p>
+        <p className="text-sm text-muted-foreground">{t("description")}</p>
       </div>
 
       <TaskTemplatesData

@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
@@ -48,6 +47,9 @@ type OrganizationSettingsFormProps = {
 
 const settingsCardFooterClassName =
   "justify-end border-t bg-muted/40 px-(--card-spacing) py-3 [.border-t]:pt-3";
+
+const settingsCardHeaderClassName =
+  "px-(--card-spacing) pt-(--card-spacing) pb-4";
 
 export function OrganizationSettingsForm({
   initialOrganization,
@@ -147,11 +149,10 @@ export function OrganizationSettingsForm({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pt-4 pb-16 sm:px-6">
       <Card className="gap-0 p-0">
-        <CardHeader className="px-(--card-spacing) pt-(--card-spacing)">
+        <CardHeader className={settingsCardHeaderClassName}>
           <CardTitle>{t("sections.general.title")}</CardTitle>
-          <CardDescription>{t("sections.general.description")}</CardDescription>
         </CardHeader>
         <CardContent className="px-(--card-spacing) pb-(--card-spacing)">
           <FieldGroup>
@@ -184,9 +185,8 @@ export function OrganizationSettingsForm({
       </Card>
 
       <Card className="gap-0 p-0">
-        <CardHeader className="px-(--card-spacing) pt-(--card-spacing)">
+        <CardHeader className={settingsCardHeaderClassName}>
           <CardTitle>{t("sections.regional.title")}</CardTitle>
-          <CardDescription>{t("sections.regional.description")}</CardDescription>
         </CardHeader>
         <CardContent className="px-(--card-spacing) pb-(--card-spacing)">
           <FieldGroup>

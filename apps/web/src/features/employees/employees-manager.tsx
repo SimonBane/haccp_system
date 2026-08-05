@@ -14,6 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { MobileHeaderAddButton } from "@/components/layout/mobile-header-add-button";
 import { EmployeesData } from "@/features/employees/data-table/data";
 import {
   EmployeeForm,
@@ -176,7 +177,9 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
 
   return (
     <div className="space-y-6">
-      <div>
+      <MobileHeaderAddButton label={t("add")} onClick={openCreateForm} />
+
+      <div className="hidden md:block">
         <h1 className="text-2xl font-semibold tracking-tight">{t("title")}</h1>
         <p className="text-sm text-muted-foreground">{t("description")}</p>
       </div>

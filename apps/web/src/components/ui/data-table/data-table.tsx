@@ -193,10 +193,10 @@ export function DataTable<TData, TValue>({
   const isFiltered = columnFilters.length > 0;
   const displayEmptyMessage = isFiltered ? noResultsMessage : emptyMessage;
   const showColumnVisibility = enableColumnVisibility && !useCardList;
+  const showInlineToolbar = Boolean(Toolbar) || Boolean(toolbar);
   const showToolbar =
     enableSearch ||
-    Boolean(Toolbar) ||
-    Boolean(toolbar) ||
+    (showInlineToolbar && !useCardList) ||
     showColumnVisibility;
   const shouldShowSelectionCount = showSelectionCount ?? enableRowSelection;
 
@@ -234,14 +234,8 @@ export function DataTable<TData, TValue>({
             </div>
             {Toolbar ? (
               <Toolbar table={table} />
-            ) : toolbar ? (
-              <div
-                className={cn(
-                  useCardList && "w-full [&_[data-slot=button]]:w-full",
-                )}
-              >
-                {toolbar}
-              </div>
+            ) : toolbar && !useCardList ? (
+              <div>{toolbar}</div>
             ) : null}
           </div>
         </div>
@@ -254,7 +248,7 @@ export function DataTable<TData, TValue>({
           onRowClick={onRowClick}
           emptyMessage={displayEmptyMessage}
           emptyDescription={isFiltered ? undefined : emptyDescription}
-          emptyAction={isFiltered ? undefined : emptyAction}
+          emptyAction={isFiltered || useCardList ? undefined : emptyAction}
           className={className}
         />
       ) : (
