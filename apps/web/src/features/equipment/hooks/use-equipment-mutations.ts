@@ -24,6 +24,11 @@ export function useEquipmentMutations() {
     void queryClient.invalidateQueries({
       queryKey: queryKeys.equipment(locationId),
     });
+    // Today denormalises equipment name and min/max temps onto every task, so
+    // an equipment edit changes what the timeline shows too.
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.todayByLocation(locationId),
+    });
   };
 
   const create = useMutation({

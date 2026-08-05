@@ -11,6 +11,10 @@ import {
   getAdminNavItems,
   getPlatformNavItems,
 } from "@/components/layout/nav-config";
+import {
+  LocationSwitcherSidebarItem,
+  useHasLocationSwitcher,
+} from "@/features/tenant/location-picker";
 import { useTenant } from "@/features/tenant/tenant-provider";
 import {
   Sidebar,
@@ -40,6 +44,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
   const { orgRole } = useAuth();
   const { organization } = useTenant();
+  const hasLocationSwitcher = useHasLocationSwitcher();
 
   const isAdmin = orgRole === "org:admin";
 
@@ -51,7 +56,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       equipment: t("nav.equipment"),
       locations: t("nav.locations"),
       employees: t("nav.employees"),
-      more: t("nav.more"),
     }),
     [t],
   );
@@ -77,26 +81,30 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>
         <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              size="lg"
-              className="pointer-events-none cursor-default hover:bg-transparent active:bg-transparent"
-            >
-              <div className="relative size-8 shrink-0 overflow-hidden rounded-lg">
-                <Image
-                  src="/icons/icon-192x192.png"
-                  alt={t("brandName")}
-                  width={60}
-                  height={60}
-                  className="absolute left-1/2 top-1/2 size-[60px] max-w-none -translate-x-1/2 -translate-y-1/2"
-                />
-              </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{t("brandName")}</span>
-                <span className="truncate text-xs">{organization.name}</span>
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          {hasLocationSwitcher ? (
+            <LocationSwitcherSidebarItem />
+          ) : (
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                size="lg"
+                className="pointer-events-none cursor-default hover:bg-transparent active:bg-transparent"
+              >
+                <div className="relative size-8 shrink-0 overflow-hidden rounded-lg">
+                  <Image
+                    src="/icons/icon-192x192.png"
+                    alt={t("brandName")}
+                    width={60}
+                    height={60}
+                    className="absolute top-1/2 left-1/2 size-[60px] max-w-none -translate-x-1/2 -translate-y-1/2"
+                  />
+                </div>
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-medium">{t("brandName")}</span>
+                  <span className="truncate text-xs">{organization.name}</span>
+                </div>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>

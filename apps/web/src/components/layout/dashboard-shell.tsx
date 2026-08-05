@@ -1,21 +1,39 @@
 "use client";
 
-import { ORG_ROLE } from "@haccp/shared";
 import { useAuth } from "@clerk/nextjs";
-import type { ReactNode } from "react";
+import { useCallback, type ReactNode } from "react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { FullPageLoader } from "@/components/layout/full-page-loader";
-import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { MobileHeaderSlotProvider } from "@/components/layout/mobile-header-slot";
+import { MobileTopBar } from "@/components/layout/mobile-top-bar";
+import {
+  SidebarInset,
+  SidebarProvider,
+  useSidebar,
+} from "@/components/ui/sidebar";
 import { LocationQuerySync } from "@/features/tenant/location-query-sync";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { cn } from "@/lib/utils";
+import { useEdgeSwipeOpen } from "@/hooks/use-drawer-swipe";
+
+function DashboardLayout({ children }: { children: ReactNode }) {
+  const { isMobile, openMobile, setOpenMobile } = useSidebar();
+  const openDrawer = useCallback(() => setOpenMobile(true), [setOpenMobile]);
+
+  useEdgeSwipeOpen({ enabled: isMobile && !openMobile, onOpen: openDrawer });
+
+  return (
+    <MobileHeaderSlotProvider>
+      <LocationQuerySync />
+      <AppSidebar />
+      <SidebarInset>
+        <MobileTopBar />
+        {children}
+      </SidebarInset>
+    </MobileHeaderSlotProvider>
+  );
+}
 
 export function DashboardShell({ children }: { children: ReactNode }) {
-  const { isLoaded, orgRole } = useAuth();
-  const isMobile = useIsMobile();
-  const isAdmin = orgRole === ORG_ROLE.ADMIN;
-  const showBottomNav = isMobile && isAdmin;
+  const { isLoaded } = useAuth();
 
   if (!isLoaded) {
     return <FullPageLoader />;
@@ -23,17 +41,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
 
   return (
     <SidebarProvider>
-      <LocationQuerySync />
-      {!isMobile ? <AppSidebar /> : null}
-      <SidebarInset
-        className={cn(
-          showBottomNav &&
-            "pb-[calc(4rem+env(safe-area-inset-bottom))]",
-        )}
-      >
-        {children}
-      </SidebarInset>
-      <MobileBottomNav />
+      <DashboardLayout>{children}</DashboardLayout>
     </SidebarProvider>
   );
 }

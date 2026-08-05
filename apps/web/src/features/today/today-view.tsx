@@ -2,30 +2,35 @@
 
 import type { TodayResponse, TodayTaskItem } from "@haccp/shared";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { useNow } from "@/hooks/use-now";
 import { getErrorMessage } from "@/lib/api/get-error-message";
 import { formatLocalDate, localTodayDate, shiftLocalDate } from "@/lib/date";
-import { useNow } from "@/hooks/use-now";
 import { TemperatureCheckDialog } from "./components/temperature-check-dialog";
+import { TodayAllDone } from "./components/today-all-done";
 import { TodayEmptyState } from "./components/today-empty-state";
-import {
-  flatTodayTasks,
-  groupTodayTasks,
-  nextActionableTask,
-  occurrenceKey,
-} from "./lib/today-grouping";
-import { TodayHeader } from "./components/today-header";
-import { TodayOverview } from "./components/today-overview";
-import { TodayProgressStrip } from "./components/today-progress-strip";
-import { TodaySummary } from "./components/today-summary";
-import { TodayTaskWorkspace } from "./components/today-task-workspace";
-import { TodayWorkspace } from "./components/today-workspace";
+import { TodayRecordSheet } from "./components/today-record-sheet";
+import { TodayStickyHeader } from "./components/today-sticky-header";
+import { TodayTimeline } from "./components/today-timeline";
 import { useTodayMutations } from "./hooks/use-today-mutations";
 import { useTodayQuery } from "./hooks/use-today-query";
+import { flatTodayTasks, occurrenceKey } from "./lib/today-grouping";
+import {
+  buildTodayTimeline,
+  type TodayTimelineItem,
+} from "./lib/today-timeline";
+
+const UNDO_TOAST_DURATION_MS = 5000;
+
+function tapFeedback() {
+  if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+    navigator.vibrate(10);
+  }
+}
 
 export function TodayView({
   initialData,
@@ -42,12 +47,14 @@ export function TodayView({
 
   const todayDate = useMemo(() => localTodayDate(), []);
   const [selectedDate, setSelectedDate] = useState(initialDate);
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
-  const pendingAwaitingResponseRef = useRef(false);
-  const [tempDialogOpen, setTempDialogOpen] = useState(false);
-  const [tempDialogTask, setTempDialogTask] = useState<TodayTaskItem | null>(
+  const [syncingKeys, setSyncingKeys] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const [temperatureTask, setTemperatureTask] = useState<TodayTaskItem | null>(
     null,
   );
+  const [recordKey, setRecordKey] = useState<string | null>(null);
+  const [announcement, setAnnouncement] = useState("");
 
   const {
     data: response,
@@ -60,261 +67,271 @@ export function TodayView({
     initialLocationId,
   });
 
+  const currentUserId = response?.currentUserId ?? initialData.currentUserId;
   const { completeTask, uncompleteTask, completeTemperatureTask } =
-    useTodayMutations();
+    useTodayMutations(currentUserId);
 
-  const allTasks = useMemo(
-    () => (response ? flatTodayTasks(response) : []),
-    [response],
+  // useMutation hands back a fresh result object every render, but the mutate
+  // functions themselves are stable. Depending on those keeps the handlers —
+  // and therefore the memoized rows — from re-creating on every tick.
+  const runComplete = completeTask.mutateAsync;
+  const runUncomplete = uncompleteTask.mutateAsync;
+  const runCompleteTemperature = completeTemperatureTask.mutateAsync;
+
+  const timeline = useMemo(
+    () =>
+      buildTodayTimeline(
+        response ? flatTodayTasks(response) : [],
+        now,
+        selectedDate,
+      ),
+    [response, now, selectedDate],
   );
 
-  useEffect(() => {
-    if (!pendingKey || !pendingAwaitingResponseRef.current) return;
-    pendingAwaitingResponseRef.current = false;
-    setPendingKey(null);
-  }, [pendingKey, response]);
+  const recordItem = useMemo(() => {
+    if (!recordKey) return null;
+    return (
+      timeline.groups
+        .flatMap((group) => group.items)
+        .find((item) => occurrenceKey(item.task) === recordKey) ?? null
+    );
+  }, [recordKey, timeline]);
 
-  const groupedAll = useMemo(
-    () => groupTodayTasks(allTasks, now),
-    [allTasks, now],
-  );
-
-  const nextTask = useMemo(
-    () => nextActionableTask(groupedAll),
-    [groupedAll],
-  );
-
-  const completedCount = groupedAll.completed.length;
-  const attentionCount =
-    groupedAll.attention.length + groupedAll.overdue.length;
-  const remainingCount =
-    groupedAll.overdue.length +
-    groupedAll.dueNow.length +
-    groupedAll.upcoming.length;
-  const totalCount = allTasks.length;
-
-  const handlePreviousDay = useCallback(() => {
-    setSelectedDate((date) => shiftLocalDate(date, -1));
+  const markSyncing = useCallback((key: string, syncing: boolean) => {
+    setSyncingKeys((previous) => {
+      const next = new Set(previous);
+      if (syncing) next.add(key);
+      else next.delete(key);
+      return next;
+    });
   }, []);
-
-  const handleToday = useCallback(() => {
-    setSelectedDate(todayDate);
-  }, [todayDate]);
-
-  const handleNextDay = useCallback(() => {
-    setSelectedDate((date) => shiftLocalDate(date, 1));
-  }, []);
-
-  const openTemperatureDialog = useCallback(
-    (task: TodayTaskItem) => {
-      if (
-        task.minTempC === null ||
-        task.maxTempC === null ||
-        !task.equipmentId
-      ) {
-        toast.error(t("toasts.missingEquipment"));
-        return;
-      }
-
-      setTempDialogTask(task);
-      setTempDialogOpen(true);
-    },
-    [t],
-  );
 
   const handleUndo = useCallback(
-    async (task: TodayTaskItem) => {
+    async function undo(task: TodayTaskItem): Promise<void> {
       const key = occurrenceKey(task);
-      setPendingKey(key);
+      markSyncing(key, true);
       try {
-        await uncompleteTask.mutateAsync({
+        await runUncomplete({
           templateId: task.templateId,
           date: task.date,
           scheduledTime: task.scheduledTime,
         });
-        pendingAwaitingResponseRef.current = true;
-        await refetch();
+        setRecordKey(null);
+        setAnnouncement(t("a11y.undone", { title: task.title }));
       } catch (error) {
-        setPendingKey(null);
-        toast.error(getErrorMessage(error, t("toasts.undoError")));
+        toast.error(getErrorMessage(error, t("toasts.undoError")), {
+          action: {
+            label: t("error.retry"),
+            onClick: () => void undo(task),
+          },
+        });
+      } finally {
+        markSyncing(key, false);
       }
     },
-    [refetch, t, uncompleteTask],
+    [markSyncing, runUncomplete, t],
   );
 
   const handleComplete = useCallback(
-    async (task: TodayTaskItem) => {
+    async function complete(task: TodayTaskItem): Promise<void> {
       const key = occurrenceKey(task);
-      setPendingKey(key);
+      markSyncing(key, true);
+      tapFeedback();
       try {
-        await completeTask.mutateAsync({
+        await runComplete({
           templateId: task.templateId,
           date: task.date,
           scheduledTime: task.scheduledTime,
         });
-        pendingAwaitingResponseRef.current = true;
-        await refetch();
+        setAnnouncement(t("a11y.completed", { title: task.title }));
+        toast.success(t("toasts.completed", { title: task.title }), {
+          duration: UNDO_TOAST_DURATION_MS,
+          action: {
+            label: t("actions.undo"),
+            onClick: () => void handleUndo(task),
+          },
+        });
       } catch (error) {
-        setPendingKey(null);
-        toast.error(getErrorMessage(error, t("toasts.doneError")));
+        toast.error(getErrorMessage(error, t("toasts.doneError")), {
+          action: {
+            label: t("error.retry"),
+            onClick: () => void complete(task),
+          },
+        });
+      } finally {
+        markSyncing(key, false);
       }
     },
-    [completeTask, refetch, t],
+    [handleUndo, markSyncing, runComplete, t],
   );
 
-  const handleTemperatureDone = useCallback(
+  const handleTemperatureConfirm = useCallback(
     async (recordedC: number, correctiveAction?: string) => {
-      if (!tempDialogTask) return;
+      if (!temperatureTask) return;
 
-      const key = occurrenceKey(tempDialogTask);
-      setPendingKey(key);
+      const task = temperatureTask;
+      const key = occurrenceKey(task);
+      markSyncing(key, true);
+      tapFeedback();
       try {
-        await completeTemperatureTask.mutateAsync({
-          templateId: tempDialogTask.templateId,
-          date: tempDialogTask.date,
-          scheduledTime: tempDialogTask.scheduledTime,
+        await runCompleteTemperature({
+          templateId: task.templateId,
+          date: task.date,
+          scheduledTime: task.scheduledTime,
           recordedC,
           correctiveAction,
         });
-        pendingAwaitingResponseRef.current = true;
-        await refetch();
-        setTempDialogOpen(false);
-        setTempDialogTask(null);
+        setTemperatureTask(null);
+        setAnnouncement(t("a11y.recorded", { title: task.title }));
+        toast.success(t("toasts.recorded", { title: task.title }), {
+          duration: UNDO_TOAST_DURATION_MS,
+          action: {
+            label: t("actions.undo"),
+            onClick: () => void handleUndo(task),
+          },
+        });
       } catch (error) {
-        setPendingKey(null);
+        // The sheet stays open so the reading is not lost.
         toast.error(getErrorMessage(error, t("toasts.doneError")));
+      } finally {
+        markSyncing(key, false);
       }
     },
-    [completeTemperatureTask, refetch, tempDialogTask, t],
+    [handleUndo, markSyncing, runCompleteTemperature, t, temperatureTask],
   );
 
-  const dateLabel = formatLocalDate(
-    response?.date ?? selectedDate,
-    locale,
+  const handleActivate = useCallback(
+    (item: TodayTimelineItem) => {
+      if (item.isCompleted) {
+        setRecordKey(occurrenceKey(item.task));
+        return;
+      }
+
+      if (item.task.type === "temperature") {
+        if (
+          item.task.minTempC === null ||
+          item.task.maxTempC === null ||
+          !item.task.equipmentId
+        ) {
+          toast.error(t("toasts.missingEquipment"));
+          return;
+        }
+        setTemperatureTask(item.task);
+        return;
+      }
+
+      void handleComplete(item.task);
+    },
+    [handleComplete, t],
+  );
+
+  const isToday = selectedDate === todayDate;
+  const dateLabel = formatLocalDate(response?.date ?? selectedDate, locale);
+
+  const header = (
+    <TodayStickyHeader
+      timeline={timeline}
+      selectedDate={selectedDate}
+      dateLabel={dateLabel}
+      isToday={isToday}
+      onPreviousDay={() => setSelectedDate((date) => shiftLocalDate(date, -1))}
+      onToday={() => setSelectedDate(todayDate)}
+      onNextDay={() => setSelectedDate((date) => shiftLocalDate(date, 1))}
+    />
   );
 
   if (isLoading && !response) {
     return (
-      <TodayWorkspace>
+      <div className="flex flex-1 flex-col">
+        {header}
         <div className="flex items-center justify-center py-24">
           <Spinner className="size-8" />
         </div>
-      </TodayWorkspace>
+      </div>
     );
   }
 
   if (isError || !response) {
     return (
-      <TodayWorkspace>
-        <TodayHeader
-          title={t("title")}
-          dateLabel={formatLocalDate(selectedDate, locale)}
-          isToday={selectedDate === todayDate}
-          onPreviousDay={handlePreviousDay}
-          onToday={handleToday}
-          onNextDay={handleNextDay}
-        />
-        <Alert>
-          <AlertTitle>{t("error.title")}</AlertTitle>
-          <AlertDescription>{t("error.description")}</AlertDescription>
-          <Button
-            type="button"
-            className="mt-4"
-            onClick={() => {
-              void refetch();
-            }}
-          >
-            {t("error.retry")}
-          </Button>
-        </Alert>
-      </TodayWorkspace>
+      <div className="flex flex-1 flex-col">
+        {header}
+        <div className="mx-auto w-full max-w-3xl px-4 pt-6 sm:px-6">
+          <Alert>
+            <AlertTitle>{t("error.title")}</AlertTitle>
+            <AlertDescription>{t("error.description")}</AlertDescription>
+            <Button className="mt-4" onClick={() => void refetch()}>
+              {t("error.retry")}
+            </Button>
+          </Alert>
+        </div>
+      </div>
     );
   }
 
   return (
-    <TodayWorkspace>
-      <TodayHeader
-        title={
-          selectedDate === todayDate ? t("title") : t("selectedDayTitle")
-        }
-        dateLabel={dateLabel}
-        isToday={selectedDate === todayDate}
-        onPreviousDay={handlePreviousDay}
-        onToday={handleToday}
-        onNextDay={handleNextDay}
-      />
+    <div className="flex flex-1 flex-col">
+      {header}
 
-      {totalCount === 0 ? (
-        <TodayEmptyState />
-      ) : (
-        <>
-          <TodayProgressStrip
-            completed={completedCount}
-            total={totalCount}
-          />
-
-          <TodaySummary
-            completed={completedCount}
-            total={totalCount}
-            remaining={remainingCount}
-            attention={attentionCount}
-            nextTask={nextTask}
-            now={now}
-          />
-
-          <div className="relative grid items-start gap-6 min-[1400px]:grid-cols-[minmax(0,11fr)_minmax(0,9fr)]">
-            {isFetching && response.date !== selectedDate ? (
-              <div className="absolute inset-x-0 top-0 z-10 flex justify-center pt-2">
-                <Spinner className="size-5" />
-              </div>
-            ) : null}
-            <main className="min-w-0">
-              <TodayTaskWorkspace
-                grouped={groupedAll}
-                totalCount={totalCount}
-                completedCount={completedCount}
-                now={now}
-                pendingKey={pendingKey}
-                currentUserId={
-                  response?.currentUserId ?? initialData.currentUserId
-                }
-                onComplete={handleComplete}
-                onUndo={handleUndo}
-                onRecordTemperature={openTemperatureDialog}
-              />
-            </main>
-            <aside
-              className="hidden min-w-0 lg:block"
-              aria-label={t("overview.ariaLabel")}
-            >
-              <TodayOverview grouped={groupedAll} />
-            </aside>
+      <div className="relative mx-auto w-full max-w-3xl px-4 pt-4 pb-16 sm:px-6">
+        {isFetching && response.date !== selectedDate ? (
+          <div className="absolute inset-x-0 top-1 z-10 flex justify-center">
+            <Spinner className="size-5" />
           </div>
-        </>
-      )}
+        ) : null}
 
-      {tempDialogTask &&
-        tempDialogTask.minTempC !== null &&
-        tempDialogTask.maxTempC !== null && (
-          <TemperatureCheckDialog
-            open={tempDialogOpen}
-            onOpenChange={(open) => {
-              if (
-                !open &&
-                (pendingKey === occurrenceKey(tempDialogTask) ||
-                  completeTemperatureTask.isPending)
-              ) {
-                return;
-              }
-              setTempDialogOpen(open);
-              if (!open) setTempDialogTask(null);
-            }}
-            task={tempDialogTask}
-            minTempC={tempDialogTask.minTempC}
-            maxTempC={tempDialogTask.maxTempC}
-            onConfirm={handleTemperatureDone}
-          />
+        {timeline.total === 0 ? (
+          <TodayEmptyState />
+        ) : (
+          <div className="space-y-4">
+            {timeline.isAllDone ? (
+              <TodayAllDone
+                total={timeline.total}
+                deviationCount={timeline.deviationCount}
+              />
+            ) : null}
+
+            <TodayTimeline
+              timeline={timeline}
+              scrollKey={selectedDate}
+              syncingKeys={syncingKeys}
+              currentUserId={currentUserId}
+              onActivate={handleActivate}
+            />
+          </div>
         )}
-    </TodayWorkspace>
+      </div>
+
+      <span aria-live="polite" className="sr-only">
+        {announcement}
+      </span>
+
+      {temperatureTask &&
+      temperatureTask.minTempC !== null &&
+      temperatureTask.maxTempC !== null ? (
+        <TemperatureCheckDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setTemperatureTask(null);
+          }}
+          task={temperatureTask}
+          minTempC={temperatureTask.minTempC}
+          maxTempC={temperatureTask.maxTempC}
+          onConfirm={handleTemperatureConfirm}
+        />
+      ) : null}
+
+      {recordItem ? (
+        <TodayRecordSheet
+          open
+          onOpenChange={(open) => {
+            if (!open) setRecordKey(null);
+          }}
+          item={recordItem}
+          currentUserId={currentUserId}
+          isUndoing={syncingKeys.has(occurrenceKey(recordItem.task))}
+          onUndo={(item) => void handleUndo(item.task)}
+        />
+      ) : null}
+    </div>
   );
 }

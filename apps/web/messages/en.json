@@ -42,77 +42,52 @@
     "breadcrumb": "Today",
     "title": "Today",
     "loading": "Loading",
-    "selectedDayTitle": "Daily plan",
-    "sections": {
-      "attention": "Needs attention",
-      "overdue": "Overdue",
-      "now": "Now",
-      "next": "Next",
-      "completed": "Completed",
-      "morning": "Morning",
-      "afternoon": "Afternoon",
-      "evening": "Evening"
-    },
-    "filters": {
-      "todo": "To do",
-      "attention": "Attention",
-      "completed": "Completed",
-      "all": "All",
-      "ariaLabel": "Filter tasks"
-    },
-    "filtersShort": {
-      "todo": "To do",
-      "attention": "Attention",
-      "completed": "Done",
-      "all": "All"
-    },
-    "status": {
-      "pending": "Pending",
-      "completed": "Completed",
-      "overdue": "Overdue",
-      "now": "Now",
-      "attention": "Needs attention"
-    },
     "actions": {
       "complete": "Complete",
-      "completeNow": "Complete now",
-      "completeLate": "Complete",
       "record": "Record",
-      "recordNow": "Record now",
-      "recordLate": "Record",
-      "undo": "Undo"
+      "undo": "Undo",
+      "viewRecord": "View record"
     },
     "taskTypes": {
       "cleaning": "Cleaning",
       "temperature": "Temperature",
       "other": "Other"
     },
+    "timeline": {
+      "now": "Now",
+      "overdue": "Overdue",
+      "remaining": "{count, plural, one {# left} other {# left}}",
+      "doneCount": "{count, plural, one {# done} other {# done}}",
+      "deviations": "{count, plural, one {# out of range} other {# out of range}}",
+      "jumpToOverdue": "Go to overdue tasks ({count})",
+      "jumpToDeviation": "Go to out-of-range readings ({count})"
+    },
+    "row": {
+      "targetRange": "{min} … {max} °C",
+      "priorReading": "{time}: {value} °C"
+    },
+    "record": {
+      "close": "Close",
+      "completedAt": "Completed at",
+      "completedBy": "Completed by",
+      "taskType": "Type"
+    },
+    "keypad": {
+      "toggleSign": "Toggle sign",
+      "decimal": "Decimal separator",
+      "backspace": "Backspace"
+    },
+    "allDone": {
+      "title": "All done",
+      "description": "{count, plural, one {# task today} other {# tasks today}}",
+      "withDeviations": "{count, plural, one {# reading needs attention} other {# readings need attention}}"
+    },
     "progress": {
-      "summary": "{completed} of {total} completed",
-      "label": "Daily progress",
-      "allCompletedTitle": "All tasks are completed",
-      "allCompletedSummary": "{completed} of {total} tasks completed"
-    },
-    "metrics": {
-      "attention": "Attention",
-      "remaining": "Remaining",
-      "completed": "Completed"
-    },
-    "summary": {
-      "ariaLabel": "Daily task summary",
-      "requiresAction": "Requires action",
-      "tasksLeft": "Tasks left today",
-      "nextDeadline": "Next deadline",
-      "noDeadline": "No tasks remaining"
-    },
-    "workspace": {
-      "title": "Today's work",
-      "description": "Complete required checks and review exceptions for the selected day."
+      "summary": "{completed} of {total} completed"
     },
     "dateNavigation": {
       "ariaLabel": "Choose a day",
       "previous": "Previous day",
-      "today": "Today",
       "next": "Next day",
       "jumpToToday": "Jump to today"
     },
@@ -124,29 +99,9 @@
       "lateByHours": "+{count}h",
       "lateByHoursMinutes": "+{hours}h {minutes}m"
     },
-    "allowedRange": "Allowed range: {min}°C to {max}°C",
-    "allowedRangeCompact": "{min}…{max}°C",
     "audit": {
-      "completed": "Completed at {time} · {user}",
       "you": "You",
-      "employee": "employee ···{id}",
       "correctiveAction": "Corrective action"
-    },
-    "overview": {
-      "ariaLabel": "Day overview",
-      "title": "Day overview",
-      "description": "Compliance context for the selected day",
-      "needsAttention": "Attention",
-      "onTrack": "On track",
-      "nextPriority": "Priority now",
-      "exceptions": "Needs attention",
-      "noExceptions": "No open exceptions.",
-      "temperatureChecks": "Temperature checks",
-      "temperatureDue": "Due",
-      "temperatureRecorded": "Recorded",
-      "temperatureIssues": "Issues",
-      "latestActivity": "Recent activity",
-      "noRecentActivity": "No tasks have been completed yet."
     },
     "temperatureDialog": {
       "title": "Temperature check",
@@ -161,14 +116,25 @@
       "correctiveActionLabel": "Corrective action taken",
       "correctiveActionPlaceholder": "For example, moved the products and notified the manager…",
       "correctiveActionHint": "Describe exactly what you did after the deviation.",
+      "presets": {
+        "movedProduct": "Moved product",
+        "adjustedThermostat": "Adjusted thermostat",
+        "notifiedManager": "Notified manager",
+        "calledService": "Called service"
+      },
       "cancel": "Cancel",
-      "confirm": "Confirm",
+      "confirm": "Save reading",
       "validation": {
         "required": "Enter a temperature reading",
         "invalid": "Enter a valid number",
         "correctiveActionRequired": "Describe the corrective action taken",
         "correctiveActionMax": "Corrective action can be up to 1000 characters"
       }
+    },
+    "a11y": {
+      "completed": "{title} completed",
+      "recorded": "{title} recorded",
+      "undone": "{title} undone"
     },
     "empty": {
       "title": "No tasks for today",
@@ -180,7 +146,8 @@
       "retry": "Retry"
     },
     "toasts": {
-      "loadError": "Failed to load Today",
+      "completed": "Completed · {title}",
+      "recorded": "Recorded · {title}",
       "missingEquipment": "Unable to find the equipment temperature range",
       "undoError": "Could not undo task",
       "doneError": "Could not complete task"
@@ -374,14 +341,14 @@
     "platform": "Platform",
     "admin": "Management",
     "toggle": "Toggle",
+    "openNav": "Open navigation",
     "nav": {
       "today": "Today",
       "organization": "Organization",
       "tasks": "Tasks",
       "equipment": "Cold storage",
       "locations": "Locations",
-      "employees": "Employees",
-      "more": "More"
+      "employees": "Employees"
     },
     "userMenu": {
       "account": "Account",
@@ -401,8 +368,7 @@
   },
   "LocationPicker": {
     "label": "Location",
-    "placeholder": "Select location",
-    "default": "default"
+    "placeholder": "Select location"
   },
   "LocationsPage": {
     "breadcrumbOrganization": "Organization",
