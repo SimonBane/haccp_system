@@ -27,6 +27,12 @@ type ResponsiveFormDialogProps = {
   footer?: ReactNode;
   className?: string;
   initialFocus?: boolean;
+  /**
+   * "full" keeps the tall sheet long admin forms rely on. "content" lets the
+   * sheet size itself, which matters when the body replaces the OS keyboard
+   * with its own controls.
+   */
+  mobileHeight?: "full" | "content";
 };
 
 export function ResponsiveFormDialog({
@@ -38,6 +44,7 @@ export function ResponsiveFormDialog({
   footer,
   className,
   initialFocus,
+  mobileHeight = "full",
 }: ResponsiveFormDialogProps) {
   const isMobile = useIsMobile();
 
@@ -46,7 +53,10 @@ export function ResponsiveFormDialog({
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent
           side="bottom"
-          className="flex h-[90dvh] flex-col gap-0 overflow-hidden rounded-t-xl p-0 pb-0"
+          className={cn(
+            "flex flex-col gap-0 overflow-hidden rounded-t-xl p-0 pb-0",
+            mobileHeight === "full" ? "h-[90dvh]" : "max-h-[94dvh]",
+          )}
         >
           <SheetHeader className="shrink-0 px-4 pt-4 text-left">
             <SheetTitle>{title}</SheetTitle>

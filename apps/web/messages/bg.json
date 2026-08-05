@@ -42,77 +42,52 @@
     "breadcrumb": "Днес",
     "title": "Днес",
     "loading": "Зареждане",
-    "selectedDayTitle": "Дневен план",
-    "sections": {
-      "attention": "Изискват внимание",
-      "overdue": "Просрочени",
-      "now": "Сега",
-      "next": "Следващи",
-      "completed": "Изпълнени",
-      "morning": "Сутрин",
-      "afternoon": "Следобед",
-      "evening": "Вечер"
-    },
-    "filters": {
-      "todo": "За изпълнение",
-      "attention": "Внимание",
-      "completed": "Изпълнени",
-      "all": "Всички",
-      "ariaLabel": "Филтриране на задачи"
-    },
-    "filtersShort": {
-      "todo": "Задачи",
-      "attention": "Внимание",
-      "completed": "Готови",
-      "all": "Всички"
-    },
-    "status": {
-      "pending": "Предстоящо",
-      "completed": "Изпълнена",
-      "overdue": "Просрочена",
-      "now": "Сега",
-      "attention": "Изисква внимание"
-    },
     "actions": {
       "complete": "Изпълни",
-      "completeNow": "Изпълни сега",
-      "completeLate": "Изпълни",
       "record": "Запиши",
-      "recordNow": "Запиши сега",
-      "recordLate": "Запиши",
-      "undo": "Отмени"
+      "undo": "Отмени",
+      "viewRecord": "Виж записа"
     },
     "taskTypes": {
       "cleaning": "Почистване",
       "temperature": "Температура",
       "other": "Друго"
     },
+    "timeline": {
+      "now": "Сега",
+      "overdue": "Просрочени",
+      "remaining": "{count, plural, one {остава #} other {остават #}}",
+      "doneCount": "{count, plural, one {# изпълнена} other {# изпълнени}}",
+      "deviations": "{count, plural, one {# извън диапазона} other {# извън диапазона}}",
+      "jumpToOverdue": "Към просрочените задачи ({count})",
+      "jumpToDeviation": "Към отчитанията извън диапазона ({count})"
+    },
+    "row": {
+      "targetRange": "{min} … {max} °C",
+      "priorReading": "{time}: {value} °C"
+    },
+    "record": {
+      "close": "Затвори",
+      "completedAt": "Изпълнено в",
+      "completedBy": "Изпълнено от",
+      "taskType": "Тип"
+    },
+    "keypad": {
+      "toggleSign": "Смени знака",
+      "decimal": "Десетичен знак",
+      "backspace": "Изтрий"
+    },
+    "allDone": {
+      "title": "Всичко е изпълнено",
+      "description": "{count, plural, one {# задача за деня} other {# задачи за деня}}",
+      "withDeviations": "{count, plural, one {# отчитане изисква внимание} other {# отчитания изискват внимание}}"
+    },
     "progress": {
-      "summary": "{completed} от {total} изпълнени",
-      "label": "Дневен напредък",
-      "allCompletedTitle": "Всички задачи са изпълнени",
-      "allCompletedSummary": "{completed} от {total} задачи изпълнени"
-    },
-    "metrics": {
-      "attention": "Внимание",
-      "remaining": "Остават",
-      "completed": "Изпълнени"
-    },
-    "summary": {
-      "ariaLabel": "Обобщение на задачите за деня",
-      "requiresAction": "Изисква действие",
-      "tasksLeft": "Задачи за деня",
-      "nextDeadline": "Следващ срок",
-      "noDeadline": "Няма оставащи задачи"
-    },
-    "workspace": {
-      "title": "Работа за деня",
-      "description": "Изпълнете необходимите проверки и прегледайте отклоненията за избрания ден."
+      "summary": "{completed} от {total} изпълнени"
     },
     "dateNavigation": {
       "ariaLabel": "Избор на ден",
       "previous": "Предишен ден",
-      "today": "Днес",
       "next": "Следващ ден",
       "jumpToToday": "Към днес"
     },
@@ -124,29 +99,9 @@
       "lateByHours": "+{count} ч",
       "lateByHoursMinutes": "+{hours} ч {minutes} мин"
     },
-    "allowedRange": "Допустим диапазон: {min}°C до {max}°C",
-    "allowedRangeCompact": "{min}…{max}°C",
     "audit": {
-      "completed": "Изпълнено в {time} · {user}",
       "you": "Вие",
-      "employee": "служител ···{id}",
       "correctiveAction": "Коригиращо действие"
-    },
-    "overview": {
-      "ariaLabel": "Преглед на деня",
-      "title": "Преглед на деня",
-      "description": "Контекст за съответствието през избрания ден",
-      "needsAttention": "Внимание",
-      "onTrack": "По план",
-      "nextPriority": "Текущ приоритет",
-      "exceptions": "Изискват внимание",
-      "noExceptions": "Няма отворени отклонения.",
-      "temperatureChecks": "Температурни проверки",
-      "temperatureDue": "Предстоят",
-      "temperatureRecorded": "Записани",
-      "temperatureIssues": "Проблеми",
-      "latestActivity": "Последна активност",
-      "noRecentActivity": "Все още няма изпълнени задачи."
     },
     "temperatureDialog": {
       "title": "Температурна проверка",
@@ -161,14 +116,25 @@
       "correctiveActionLabel": "Предприето коригиращо действие",
       "correctiveActionPlaceholder": "Напр. преместих продуктите и уведомих отговорника…",
       "correctiveActionHint": "Опишете конкретно какво направихте след отклонението.",
+      "presets": {
+        "movedProduct": "Преместих продуктите",
+        "adjustedThermostat": "Настроих термостата",
+        "notifiedManager": "Уведомих отговорника",
+        "calledService": "Извиках сервиз"
+      },
       "cancel": "Отказ",
-      "confirm": "Потвърди",
+      "confirm": "Запиши",
       "validation": {
         "required": "Въведете измерена температура",
         "invalid": "Въведете валидно число",
         "correctiveActionRequired": "Опишете предприетото коригиращо действие",
         "correctiveActionMax": "Коригиращото действие може да е до 1000 знака"
       }
+    },
+    "a11y": {
+      "completed": "{title} е изпълнена",
+      "recorded": "{title} е записана",
+      "undone": "{title} е отменена"
     },
     "empty": {
       "title": "Няма задачи за днес",
@@ -180,7 +146,8 @@
       "retry": "Опитай отново"
     },
     "toasts": {
-      "loadError": "Неуспешно зареждане на Днес",
+      "completed": "Изпълнено · {title}",
+      "recorded": "Записано · {title}",
       "missingEquipment": "Липсва диапазон за оборудването",
       "undoError": "Неуспешно връщане назад",
       "doneError": "Неуспешно приключване"
@@ -374,14 +341,14 @@
     "platform": "Платформа",
     "admin": "Управление",
     "toggle": "Превключване",
+    "openNav": "Отвори навигацията",
     "nav": {
       "today": "Днес",
       "organization": "Организация",
       "tasks": "Задачи",
       "equipment": "Хладилна техника",
       "locations": "Локации",
-      "employees": "Служители",
-      "more": "Още"
+      "employees": "Служители"
     },
     "userMenu": {
       "account": "Акаунт",
@@ -401,8 +368,7 @@
   },
   "LocationPicker": {
     "label": "Локация",
-    "placeholder": "Изберете локация",
-    "default": "основна"
+    "placeholder": "Изберете локация"
   },
   "LocationsPage": {
     "breadcrumbOrganization": "Организация",

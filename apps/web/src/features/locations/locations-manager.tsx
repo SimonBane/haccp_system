@@ -16,6 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { MobileHeaderAddButton } from "@/components/layout/mobile-header-add-button";
 import { LocationsData } from "@/features/locations/data-table/data";
 import { useLocationsMutations } from "@/features/locations/hooks/use-locations-mutations";
 import { useLocationsQuery } from "@/features/locations/hooks/use-locations-query";
@@ -147,7 +148,9 @@ export function LocationsManager({ initialItems }: LocationsManagerProps) {
 
   return (
     <div className="space-y-6">
-      <div>
+      <MobileHeaderAddButton label={t("add")} onClick={openCreateForm} />
+
+      <div className="hidden md:block">
         <h1 className="text-2xl font-semibold tracking-tight">{t("title")}</h1>
         <p className="text-sm text-muted-foreground">{t("description")}</p>
       </div>
