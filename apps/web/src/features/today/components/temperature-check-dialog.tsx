@@ -1,18 +1,18 @@
 "use client";
 
 import type { TodayTaskItem } from "@haccp/shared";
+import { classifyTemperatureResult } from "@haccp/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo } from "react";
-import { Controller, useForm, useWatch } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
-import { Textarea } from "@/components/ui/textarea";
+import { formatTemperature } from "../lib/format";
+import { parseLocalizedTemperature } from "../lib/temperature";
+import { TemperatureReadingStep } from "./temperature-reading-step";
 
 const TEMPERATURE_FORM_ID = "temperature-check-form";
 
@@ -25,19 +25,6 @@ type Props = {
   onConfirm: (recordedC: number, correctiveAction?: string) => Promise<void>;
 };
 
-function parseLocalizedTemperature(value: string): number {
-  const normalized = value.trim().replace(/\s/g, "").replace(",", ".");
-  return normalized.length > 0 ? Number(normalized) : Number.NaN;
-}
-
-function classify(
-  recordedC: number,
-  min: number,
-  max: number,
-): "ok" | "out_of_range" {
-  return recordedC >= min && recordedC <= max ? "ok" : "out_of_range";
-}
-
 export function TemperatureCheckDialog({
   open,
   onOpenChange,
@@ -47,6 +34,7 @@ export function TemperatureCheckDialog({
   onConfirm,
 }: Props) {
   const t = useTranslations("TodayPage");
+  const locale = useLocale();
 
   const formSchema = useMemo(
     () =>
@@ -60,9 +48,7 @@ export function TemperatureCheckDialog({
               (value) =>
                 value.length > 0 &&
                 Number.isFinite(parseLocalizedTemperature(value)),
-              {
-                message: t("temperatureDialog.validation.invalid"),
-              },
+              { message: t("temperatureDialog.validation.invalid") },
             ),
           correctiveAction: z
             .string()
@@ -70,10 +56,11 @@ export function TemperatureCheckDialog({
             .max(1000, t("temperatureDialog.validation.correctiveActionMax")),
         })
         .superRefine((values, context) => {
-          const value = parseLocalizedTemperature(values.recordedC);
+          const recordedC = parseLocalizedTemperature(values.recordedC);
           if (
-            Number.isFinite(value) &&
-            classify(value, minTempC, maxTempC) === "out_of_range" &&
+            Number.isFinite(recordedC) &&
+            classifyTemperatureResult({ recordedC, minTempC, maxTempC }) ===
+              "out_of_range" &&
             !values.correctiveAction
           ) {
             context.addIssue({
@@ -96,22 +83,12 @@ export function TemperatureCheckDialog({
     mode: "onTouched",
   });
 
-  const recordedCText = useWatch({
+  const recordedC = useWatch({ control: form.control, name: "recordedC" });
+  const correctiveAction = useWatch({
     control: form.control,
-    name: "recordedC",
+    name: "correctiveAction",
   });
-
-  const recordedC = useMemo(() => {
-    const value = parseLocalizedTemperature(recordedCText);
-    return Number.isFinite(value) ? value : Number.NaN;
-  }, [recordedCText]);
-
-  const result = useMemo(() => {
-    if (!Number.isFinite(recordedC)) return null;
-    return classify(recordedC, minTempC, maxTempC);
-  }, [recordedC, minTempC, maxTempC]);
-
-  const rangeLabel = `${minTempC}°C – ${maxTempC}°C`;
+  const { errors, isSubmitting, isSubmitted } = form.formState;
 
   useEffect(() => {
     if (!open) {
@@ -132,38 +109,35 @@ export function TemperatureCheckDialog({
     form.reset({ recordedC: "", correctiveAction: "" });
   }
 
-  const { isSubmitting } = form.formState;
-
-  const description = (
-    <>
-      {task.equipmentName ? `${task.equipmentName} · ` : ""}
-      {task.scheduledTime} · {t("temperatureDialog.allowedRange")}: {rangeLabel}
-    </>
-  );
-
   return (
     <ResponsiveFormDialog
       open={open}
       onOpenChange={handleOpenChange}
+      mobileHeight="content"
       title={task.title}
-      description={description}
+      description={
+        <>
+          {task.equipmentName ? `${task.equipmentName} · ` : ""}
+          {task.scheduledTime} · {t("temperatureDialog.allowedRange")}:{" "}
+          {formatTemperature(minTempC, locale)} –{" "}
+          {formatTemperature(maxTempC, locale)} °C
+        </>
+      }
       footer={
         <DialogFooter className="gap-2 sm:gap-2">
           <Button
-            type="button"
             variant="outline"
             className="min-h-11 sm:min-h-9"
-            onClick={() => handleOpenChange(false)}
             disabled={isSubmitting}
+            onClick={() => handleOpenChange(false)}
           >
             {t("temperatureDialog.cancel")}
           </Button>
           <Button
             type="submit"
             form={TEMPERATURE_FORM_ID}
-            className="min-h-11 sm:min-h-9"
+            className="min-h-12 sm:min-h-9"
             isLoading={isSubmitting}
-            disabled={isSubmitting}
           >
             {t("temperatureDialog.confirm")}
           </Button>
@@ -173,83 +147,26 @@ export function TemperatureCheckDialog({
       <form
         id={TEMPERATURE_FORM_ID}
         onSubmit={form.handleSubmit(handleValidSubmit)}
-        className="space-y-3"
       >
-        <Controller
-          name="recordedC"
-          control={form.control}
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor={`${TEMPERATURE_FORM_ID}-recorded-c`}>
-                {t("temperatureDialog.recordedCLabel")} (
-                {t("temperatureDialog.celsius")})
-              </FieldLabel>
-              <Input
-                {...field}
-                id={`${TEMPERATURE_FORM_ID}-recorded-c`}
-                inputMode="decimal"
-                autoComplete="off"
-                autoFocus
-                aria-invalid={fieldState.invalid}
-                aria-describedby={result ? "temperature-result" : undefined}
-                className="h-12 text-center text-2xl font-semibold tabular-nums"
-                placeholder={t("temperatureDialog.recordedCPlaceholder")}
-              />
-              {fieldState.invalid && (
-                <FieldError errors={[fieldState.error]} />
-              )}
-            </Field>
-          )}
+        <TemperatureReadingStep
+          idPrefix={TEMPERATURE_FORM_ID}
+          minTempC={minTempC}
+          maxTempC={maxTempC}
+          value={recordedC}
+          onValueChange={(next) =>
+            form.setValue("recordedC", next, { shouldValidate: isSubmitted })
+          }
+          valueError={errors.recordedC?.message}
+          correctiveAction={correctiveAction}
+          onCorrectiveActionChange={(next) =>
+            form.setValue("correctiveAction", next, {
+              shouldValidate: isSubmitted,
+            })
+          }
+          correctiveActionError={errors.correctiveAction?.message}
+          onValueBlur={() => void form.trigger("recordedC")}
+          onCorrectiveActionBlur={() => void form.trigger("correctiveAction")}
         />
-
-        {result && (
-          <div
-            id="temperature-result"
-            className="flex flex-wrap items-center gap-2"
-          >
-            <Badge variant={result === "ok" ? "secondary" : "destructive"}>
-              {result === "ok"
-                ? t("temperatureDialog.ok")
-                : t("temperatureDialog.outOfRange")}
-            </Badge>
-            <span className="text-sm text-muted-foreground">
-              {result === "ok"
-                ? t("temperatureDialog.okHint")
-                : t("temperatureDialog.outOfRangeHint")}
-            </span>
-          </div>
-        )}
-
-        {result === "out_of_range" && (
-          <Controller
-            name="correctiveAction"
-            control={form.control}
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel
-                  htmlFor={`${TEMPERATURE_FORM_ID}-corrective-action`}
-                >
-                  {t("temperatureDialog.correctiveActionLabel")}
-                </FieldLabel>
-                <Textarea
-                  {...field}
-                  id={`${TEMPERATURE_FORM_ID}-corrective-action`}
-                  aria-invalid={fieldState.invalid}
-                  placeholder={t(
-                    "temperatureDialog.correctiveActionPlaceholder",
-                  )}
-                  className="min-h-24 resize-y"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {t("temperatureDialog.correctiveActionHint")}
-                </p>
-                {fieldState.invalid && (
-                  <FieldError errors={[fieldState.error]} />
-                )}
-              </Field>
-            )}
-          />
-        )}
       </form>
     </ResponsiveFormDialog>
   );

@@ -1,0 +1,141 @@
+"use client";
+
+import { CheckIcon, CircleAlertIcon, RotateCcwIcon } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { DialogFooter } from "@/components/ui/dialog";
+import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
+import { cn } from "@/lib/utils";
+import { formatTemperature, formatTimeOfDay } from "../lib/format";
+import type { TodayTimelineItem } from "../lib/today-timeline";
+
+type Props = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  item: TodayTimelineItem;
+  currentUserId: string | null;
+  isUndoing: boolean;
+  onUndo: (item: TodayTimelineItem) => void;
+};
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 py-2">
+      <span className="shrink-0 text-sm text-muted-foreground">{label}</span>
+      <span className="truncate text-sm font-medium">{value}</span>
+    </div>
+  );
+}
+
+/**
+ * Opened by tapping a completed row. Undo lives here rather than on the row
+ * itself so a mis-tap can never delete a compliance record.
+ */
+export function TodayRecordSheet({
+  open,
+  onOpenChange,
+  item,
+  currentUserId,
+  isUndoing,
+  onUndo,
+}: Props) {
+  const t = useTranslations("TodayPage");
+  const locale = useLocale();
+  const { task, isDeviation } = item;
+  const reading = task.temperatureReading;
+
+  const userLabel = task.completedBy
+    ? task.completedBy.id === currentUserId
+      ? t("audit.you")
+      : [task.completedBy.firstName, task.completedBy.lastName]
+          .filter(Boolean)
+          .join(" ") || task.completedBy.id.slice(-6)
+    : "—";
+
+  return (
+    <ResponsiveFormDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={task.title}
+      description={
+        <>
+          {task.equipmentName ? `${task.equipmentName} · ` : ""}
+          {task.scheduledTime}
+        </>
+      }
+      footer={
+        <DialogFooter className="gap-2 sm:gap-2">
+          <Button
+            variant="outline"
+            className="min-h-11 sm:min-h-9"
+            onClick={() => onOpenChange(false)}
+          >
+            {t("record.close")}
+          </Button>
+          <Button
+            variant="destructive"
+            className="min-h-11 sm:min-h-9"
+            isLoading={isUndoing}
+            onClick={() => onUndo(item)}
+          >
+            <RotateCcwIcon />
+            {t("actions.undo")}
+          </Button>
+        </DialogFooter>
+      }
+    >
+      <div className="space-y-4">
+        {reading ? (
+          <div
+            className={cn(
+              "flex flex-col items-center gap-2 rounded-xl px-4 py-5 text-center ring-1",
+              isDeviation
+                ? "bg-destructive/[0.06] ring-destructive/20"
+                : "bg-success/[0.06] ring-success/20",
+            )}
+          >
+            <div className="text-4xl font-semibold tabular-nums">
+              {formatTemperature(reading.recordedC, locale)}
+              <span className="ml-1 text-2xl text-muted-foreground">°C</span>
+            </div>
+            <Badge variant={isDeviation ? "destructive" : "success"}>
+              {isDeviation ? <CircleAlertIcon /> : <CheckIcon />}
+              {isDeviation
+                ? t("temperatureDialog.outOfRange")
+                : t("temperatureDialog.ok")}
+            </Badge>
+            <p className="text-xs text-muted-foreground">
+              {t("temperatureDialog.allowedRange")}:{" "}
+              {formatTemperature(reading.minTempC, locale)} –{" "}
+              {formatTemperature(reading.maxTempC, locale)} °C
+            </p>
+          </div>
+        ) : null}
+
+        <div className="divide-y">
+          <DetailRow
+            label={t("record.completedAt")}
+            value={
+              task.completedAt ? formatTimeOfDay(task.completedAt, locale) : "—"
+            }
+          />
+          <DetailRow label={t("record.completedBy")} value={userLabel} />
+          <DetailRow
+            label={t("record.taskType")}
+            value={t(`taskTypes.${task.type}`)}
+          />
+        </div>
+
+        {reading?.correctiveAction ? (
+          <div className="rounded-lg bg-destructive/[0.06] p-3">
+            <p className="text-sm font-medium">{t("audit.correctiveAction")}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {reading.correctiveAction}
+            </p>
+          </div>
+        ) : null}
+      </div>
+    </ResponsiveFormDialog>
+  );
+}
