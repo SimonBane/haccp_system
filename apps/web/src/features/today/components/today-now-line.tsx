@@ -51,11 +51,13 @@ export function TodayNowLine({
           UPCOMING_RAIL_CLASSNAME,
         )}
       />
+      {/* A smaller dot than a round's, but the ring is widened to the same 22px
+          outer circle so the rail above and below lands on it the same way. */}
       <span
         aria-hidden
         className={cn(
           RAIL_DOT_CLASSNAME,
-          "size-2.5 rounded-full bg-primary ring-[3px] ring-background",
+          "size-2.5 rounded-full bg-primary ring-[6px] ring-primary/20",
         )}
       />
       <span className="text-[11px] leading-3 font-semibold tabular-nums text-primary">
