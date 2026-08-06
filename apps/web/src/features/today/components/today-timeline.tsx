@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef } from "react";
 import { scrollToTimeGroup } from "../lib/scroll";
 import type { TodayTimeline as Timeline, TodayTimelineItem } from "../lib/today-timeline";
+import { TodayNowLine } from "./today-now-line";
 import { TodayTimeGroup } from "./today-time-group";
 
 type Props = {
@@ -39,15 +40,26 @@ export function TodayTimeline({
   return (
     <div className="relative">
       {groups.map((group, index) => (
-        <TodayTimeGroup
-          key={group.id}
-          group={group}
-          isLast={index === groups.length - 1}
-          syncingKeys={syncingKeys}
-          currentUserId={currentUserId}
-          onActivate={onActivate}
-        />
+        <Fragment key={group.id}>
+          {timeline.nowLineIndex === index ? (
+            <TodayNowLine minutes={timeline.nowMinutes} />
+          ) : null}
+          <TodayTimeGroup
+            group={group}
+            previousGroup={index > 0 ? groups[index - 1] : null}
+            isAfterNowLine={timeline.nowLineIndex === index}
+            isLast={index === groups.length - 1}
+            syncingKeys={syncingKeys}
+            currentUserId={currentUserId}
+            onActivate={onActivate}
+          />
+        </Fragment>
       ))}
+
+      {/* Every round has already passed, so the marker closes out the day. */}
+      {timeline.nowLineIndex === groups.length ? (
+        <TodayNowLine minutes={timeline.nowMinutes} />
+      ) : null}
     </div>
   );
 }

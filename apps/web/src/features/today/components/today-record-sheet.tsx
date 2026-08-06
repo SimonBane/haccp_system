@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
+import { useOrgTimeZone } from "@/features/tenant/use-org-timezone";
 import { cn } from "@/lib/utils";
 import { formatTemperature, formatTimeOfDay } from "../lib/format";
 import type { TodayTimelineItem } from "../lib/today-timeline";
@@ -42,6 +43,7 @@ export function TodayRecordSheet({
 }: Props) {
   const t = useTranslations("TodayPage");
   const locale = useLocale();
+  const timeZone = useOrgTimeZone();
   const { task, isDeviation } = item;
   const reading = task.temperatureReading;
 
@@ -117,7 +119,7 @@ export function TodayRecordSheet({
           <DetailRow
             label={t("record.completedAt")}
             value={
-              task.completedAt ? formatTimeOfDay(task.completedAt, locale) : "—"
+              task.completedAt ? formatTimeOfDay(task.completedAt, locale, timeZone) : "—"
             }
           />
           <DetailRow label={t("record.completedBy")} value={userLabel} />

@@ -1,4 +1,5 @@
 import type {
+  AppLocale,
   CreateEmployeeInput,
   EmployeeListResponse,
   EmployeeResponse,
@@ -216,6 +217,7 @@ export const employeeService = {
     organizationId: string,
     clerkOrgId: string,
     inviterUserId: string,
+    orgLocale: AppLocale,
     input: CreateEmployeeInput,
     tenantLocations: LocationResponse[],
   ): Promise<EmployeeResponse> {
@@ -229,6 +231,7 @@ export const employeeService = {
 
     const membership = input.inviteNow
       ? await issueMembershipInvitation(db, organizationId, draft.id, {
+          locale: orgLocale,
           clerkOrgId,
           inviterUserId,
           email: user.email,
@@ -252,6 +255,7 @@ export const employeeService = {
     clerkOrgId: string,
     inviterClerkUserId: string,
     actorUserDbId: string,
+    orgLocale: AppLocale,
     membershipId: string,
     input: UpdateEmployeeInput,
     tenantLocations: LocationResponse[],
@@ -292,6 +296,7 @@ export const employeeService = {
             organizationId,
             membershipId,
             {
+              locale: orgLocale,
               clerkOrgId,
               inviterUserId: inviterClerkUserId,
               email: next.user.email,
@@ -322,6 +327,7 @@ export const employeeService = {
     organizationId: string,
     clerkOrgId: string,
     inviterUserId: string,
+    orgLocale: AppLocale,
     membershipId: string,
     tenantLocations: LocationResponse[],
   ): Promise<EmployeeResponse> {
@@ -336,6 +342,7 @@ export const employeeService = {
       organizationId,
       membershipId,
       {
+        locale: orgLocale,
         clerkOrgId,
         inviterUserId,
         email: detail.user.email,

@@ -60,7 +60,9 @@
       "doneCount": "{count, plural, one {# изпълнена} other {# изпълнени}}",
       "deviations": "{count, plural, one {# извън диапазона} other {# извън диапазона}}",
       "jumpToOverdue": "Към просрочените задачи ({count})",
-      "jumpToDeviation": "Към отчитанията извън диапазона ({count})"
+      "jumpToDeviation": "Към отчитанията извън диапазона ({count})",
+      "nowLine": "Сега, {time}",
+      "jumpToNow": "Към сега"
     },
     "row": {
       "targetRange": "{min} … {max} °C",

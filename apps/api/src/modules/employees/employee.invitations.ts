@@ -1,3 +1,4 @@
+import type { AppLocale } from "@haccp/shared";
 import type { Db, DbClient } from "../../core/db/client.js";
 import { MEMBERSHIP_STATUS } from "../../core/db/schema/organization-memberships.js";
 import type { OrganizationMembership } from "../../core/db/schema/organization-memberships.js";
@@ -6,6 +7,7 @@ import { revokeClerkInvitation, sendClerkInvitation } from "./employee.clerk.js"
 import { employeeRepository } from "./employee.repository.js";
 
 export type InviteEmployeeParams = {
+  locale: AppLocale;
   clerkOrgId: string;
   inviterUserId: string;
   email: string;
@@ -33,6 +35,7 @@ export async function issueMembershipInvitation(
   }
 
   const invitation = await sendClerkInvitation(
+    params.locale,
     params.clerkOrgId,
     params.inviterUserId,
     params.email,

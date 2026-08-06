@@ -1,7 +1,11 @@
 import type { TodayTaskItem } from "@haccp/shared";
 import {
+  wallClockToInstant,
+  zonedDateString,
+  zonedMinutesOfDay,
+} from "@haccp/shared";
+import {
   isDueNow,
-  localIsoDate,
   minutesUntilScheduled,
   parseScheduledTimeToMinutes,
 } from "./today-grouping";
@@ -53,6 +57,17 @@ export type TodayTimeline = {
   firstOverdueGroupId: string | null;
   firstDeviationGroupId: string | null;
   isAllDone: boolean;
+  /**
+   * Where the live "now" marker sits: render it before `groups[nowLineIndex]`,
+   * or after every group when it equals `groups.length`. Null on any day that
+   * is not today, where a now marker would be meaningless.
+   *
+   * Placing it *between* groups rather than inside one keeps it out of the
+   * middle of a round that is still live work at 15:12.
+   */
+  nowLineIndex: number | null;
+  /** Minutes since midnight in the org zone, for the marker's label. */
+  nowMinutes: number;
 };
 
 export function timeGroupId(scheduledTime: string): string {
@@ -112,10 +127,9 @@ function minutesUntilOccurrence(
   date: string,
   scheduledTime: string,
   now: Date,
+  timeZone: string,
 ): number {
-  const [year, month, day] = date.split("-").map(Number);
-  const [hours, minutes] = scheduledTime.split(":").map(Number);
-  const target = new Date(year, month - 1, day, hours, minutes, 0, 0);
+  const target = wallClockToInstant(date, scheduledTime, timeZone);
   return Math.round((target.getTime() - now.getTime()) / 60_000);
 }
 
@@ -124,23 +138,27 @@ function deriveGroupState(params: {
   scheduledTime: string;
   now: Date;
   selectedDate: string;
+  timeZone: string;
 }): TimeGroupState {
-  const { remainingCount, scheduledTime, now, selectedDate } = params;
+  const { remainingCount, scheduledTime, now, selectedDate, timeZone } = params;
 
   if (remainingCount === 0) return "done";
 
-  const todayDate = localIsoDate(now);
+  const todayDate = zonedDateString(now, timeZone);
   if (selectedDate < todayDate) return "overdue";
   if (selectedDate > todayDate) return "upcoming";
 
-  if (isDueNow(scheduledTime, now)) return "now";
-  return minutesUntilScheduled(scheduledTime, now) < 0 ? "overdue" : "upcoming";
+  if (isDueNow(scheduledTime, now, timeZone)) return "now";
+  return minutesUntilScheduled(scheduledTime, now, timeZone) < 0
+    ? "overdue"
+    : "upcoming";
 }
 
 export function buildTodayTimeline(
   tasks: TodayTaskItem[],
   now: Date,
   selectedDate: string,
+  timeZone: string,
 ): TodayTimeline {
   const inTimeOrder = [...tasks].sort(
     (a, b) =>
@@ -176,13 +194,19 @@ export function buildTodayTimeline(
           scheduledTime,
           now,
           selectedDate,
+          timeZone,
         }),
         items,
         total: items.length,
         completedCount,
         remainingCount,
         deviationCount,
-        minutesUntil: minutesUntilOccurrence(selectedDate, scheduledTime, now),
+        minutesUntil: minutesUntilOccurrence(
+          selectedDate,
+          scheduledTime,
+          now,
+          timeZone,
+        ),
       };
     },
   );
@@ -193,6 +217,14 @@ export function buildTodayTimeline(
   const overdueCount = groups
     .filter((group) => group.state === "overdue")
     .reduce((sum, group) => sum + group.remainingCount, 0);
+
+  // The marker belongs before the first round still ahead of the clock. When
+  // findIndex comes back empty every round has passed, so it goes at the end.
+  const nowMinutes = zonedMinutesOfDay(now, timeZone);
+  const isToday = selectedDate === zonedDateString(now, timeZone);
+  const upcomingIndex = groups.findIndex(
+    (group) => parseScheduledTimeToMinutes(group.scheduledTime) > nowMinutes,
+  );
 
   return {
     groups,
@@ -207,5 +239,11 @@ export function buildTodayTimeline(
     firstDeviationGroupId:
       groups.find((group) => group.deviationCount > 0)?.id ?? null,
     isAllDone: total > 0 && completedCount === total,
+    nowLineIndex: isToday
+      ? upcomingIndex === -1
+        ? groups.length
+        : upcomingIndex
+      : null,
+    nowMinutes,
   };
 }

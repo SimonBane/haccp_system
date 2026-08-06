@@ -30,7 +30,7 @@ type OptimisticContext = {
  * Every mutation patches the cache before the request goes out, so a tap lands
  * instantly and the row reverts only if the server rejects it.
  */
-export function useTodayMutations(currentUserId: string) {
+export function useTodayMutations(currentUserId: string, timeZone: string) {
   const { locationId } = useLocation();
   const { fetchJson } = useAuthenticatedFetch();
   const queryClient = useQueryClient();
@@ -85,7 +85,7 @@ export function useTodayMutations(currentUserId: string) {
     },
     onMutate: (input) =>
       beginOptimistic(input.date, (previous) =>
-        applyOptimisticUncompletion(previous, input),
+        applyOptimisticUncompletion(previous, input, timeZone),
       ),
     onError: (_error, _input, context) => rollback(context),
     onSettled: (_data, _error, _input, context) => settle(context),
