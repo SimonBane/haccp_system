@@ -59,6 +59,28 @@ function getRailClassName(state: TimeGroupState, deviationCount: number): string
   }
 }
 
+/**
+ * The ring is the dot's own colour at a fraction of its strength, so the
+ * marker reads as one object rather than a dot with a halo bolted on. Every
+ * ring is 4px on a 14px dot — a 22px outer circle, the width the rail's
+ * segments are cut to land on.
+ */
+function getDotRingClassName(
+  state: TimeGroupState,
+  deviationCount: number,
+): string {
+  switch (state) {
+    case "now":
+      return "ring-primary/20";
+    case "overdue":
+      return "ring-destructive/20";
+    case "done":
+      return deviationCount > 0 ? "ring-destructive/20" : "ring-success/20";
+    case "upcoming":
+      return "ring-muted-foreground/15";
+  }
+}
+
 function useDurationLabel() {
   const t = useTranslations("TodayPage");
 
@@ -140,7 +162,8 @@ export function TodayTimeGroup({
           ) : null}
           <span
             className={cn(
-              "relative size-3.5 rounded-full ring-4 ring-background",
+              "relative size-3.5 rounded-full ring-4",
+              getDotRingClassName(group.state, group.deviationCount),
               group.state === "now" && "bg-primary",
               group.state === "overdue" && "bg-destructive",
               group.state === "done" &&

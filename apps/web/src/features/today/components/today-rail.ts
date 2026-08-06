@@ -1,25 +1,29 @@
 /**
  * Shared geometry for the timeline's vertical rail.
  *
- * Every marker on the axis — a round's dot and the live now-line dot — sits on
- * the same 22px axis point measured from the top of its own block, and every
- * block draws exactly one segment: from its own dot down to the next block's
- * dot (hence the 22px overhang past its own bottom edge). One element per gap
- * is what keeps the dashes reading as a single rail — a segment split at a
- * block boundary restarts its pattern mid-gap, which shows up as a double-length
- * dash just above each dot.
+ * Every marker on the axis — a round's dot and the live now-line dot — is a
+ * ringed dot centred on the same 22px axis point measured from the top of its
+ * own block, and every ring has the same 22px outer diameter (11px radius) so
+ * a segment can end on the ring without knowing which kind of marker it is
+ * running into.
+ *
+ * Each block draws exactly one segment, from the edge of its own ring down to
+ * the edge of the next block's ring: 22 + 11 = 33px below its top, ending 11px
+ * past its own bottom edge (the next dot sits 22px below that, less its 11px
+ * ring). One element per gap is what keeps the dashes reading as a single
+ * rail — a segment split at a block boundary restarts its pattern mid-gap,
+ * which shows up as a double-length dash just above each dot.
  */
 const RAIL_AXIS_CLASSNAME = "left-[13px] -translate-x-1/2 sm:left-[15px]";
 
-export const RAIL_SEGMENT_CLASSNAME = `absolute top-[22px] -bottom-[22px] ${RAIL_AXIS_CLASSNAME}`;
+export const RAIL_SEGMENT_CLASSNAME = `absolute top-[33px] -bottom-[11px] ${RAIL_AXIS_CLASSNAME}`;
 
 /**
- * The last segment on the axis has no dot to reach, so it stops at its own
- * edge and fades out. The mask fades whatever the segment is — colour or
- * dashes — rather than replacing its background, so the final block still
- * reads as itself.
+ * The last segment on the axis has no ring to land on, so it fades out. The
+ * mask fades whatever the segment is — colour or dashes — rather than
+ * replacing its background, so the final block still reads as itself.
  */
-export const RAIL_TAIL_SEGMENT_CLASSNAME = `absolute top-[22px] bottom-0 ${RAIL_AXIS_CLASSNAME} [mask-image:linear-gradient(to_bottom,black_55%,transparent_100%)]`;
+export const RAIL_TAIL_SEGMENT_CLASSNAME = `${RAIL_SEGMENT_CLASSNAME} [mask-image:linear-gradient(to_bottom,black_55%,transparent_100%)]`;
 
 /** Centres a marker of any size on the axis point. */
 export const RAIL_DOT_CLASSNAME = `absolute top-[22px] -translate-y-1/2 ${RAIL_AXIS_CLASSNAME}`;
