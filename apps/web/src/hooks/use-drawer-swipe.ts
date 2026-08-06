@@ -2,7 +2,6 @@
 
 import * as React from "react";
 
-const EDGE_ZONE_PX = 24;
 const OPEN_THRESHOLD_PX = 56;
 const AXIS_LOCK_PX = 8;
 const DIRECTION_RATIO = 1.5;
@@ -16,10 +15,10 @@ function startsInNoSwipeZone(target: EventTarget | null): boolean {
 }
 
 /**
- * Opens the mobile drawer on a rightward swipe that starts at the left screen
- * edge, the way the ChatGPT app does.
+ * Opens the mobile drawer on a rightward swipe from anywhere on screen and
+ * blocks the browser's horizontal swipe-to-go-back gesture.
  */
-export function useEdgeSwipeOpen({
+export function useSwipeOpen({
   enabled,
   onOpen,
 }: {
@@ -41,7 +40,7 @@ export function useEdgeSwipeOpen({
         tracking = false;
         return;
       }
-      if (touch.clientX > EDGE_ZONE_PX || startsInNoSwipeZone(event.target)) {
+      if (startsInNoSwipeZone(event.target)) {
         return;
       }
       tracking = true;
@@ -57,10 +56,22 @@ export function useEdgeSwipeOpen({
       const deltaX = touch.clientX - startX;
       const deltaY = touch.clientY - startY;
 
-      if (Math.abs(deltaY) > Math.abs(deltaX)) {
+      if (
+        Math.abs(deltaX) < AXIS_LOCK_PX &&
+        Math.abs(deltaY) < AXIS_LOCK_PX
+      ) {
+        return;
+      }
+      if (Math.abs(deltaY) >= Math.abs(deltaX)) {
         tracking = false;
         return;
       }
+
+      // Claim horizontal right swipes so the browser does not navigate back.
+      if (deltaX > 0) {
+        event.preventDefault();
+      }
+
       if (
         deltaX > OPEN_THRESHOLD_PX &&
         deltaX > Math.abs(deltaY) * DIRECTION_RATIO
@@ -75,7 +86,7 @@ export function useEdgeSwipeOpen({
     };
 
     window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("touchmove", onTouchMove, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
     window.addEventListener("touchend", stop, { passive: true });
     window.addEventListener("touchcancel", stop, { passive: true });
 

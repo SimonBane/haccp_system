@@ -65,8 +65,7 @@
       "jumpToNow": "Jump to now"
     },
     "row": {
-      "targetRange": "{min} … {max} °C",
-      "priorReading": "{time}: {value} °C"
+      "lastReadingAt": "Last {time}"
     },
     "record": {
       "close": "Close",
