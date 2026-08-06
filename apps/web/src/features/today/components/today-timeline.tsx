@@ -1,9 +1,14 @@
 "use client";
 
 import { Fragment, useEffect, useRef } from "react";
+import { cn } from "@/lib/utils";
 import { scrollToTimeGroup } from "../lib/scroll";
 import type { TodayTimeline as Timeline, TodayTimelineItem } from "../lib/today-timeline";
 import { TodayNowLine } from "./today-now-line";
+import {
+  getRailLeadInClassName,
+  RAIL_LEAD_IN_SPACING_CLASSNAME,
+} from "./today-rail";
 import { TodayTimeGroup } from "./today-time-group";
 
 type Props = {
@@ -40,9 +45,16 @@ export function TodayTimeline({
   // The now marker is a dot on the same axis as the rounds, so whichever of
   // the two comes last owns the rail's fade-out.
   const nowLineIsTail = timeline.nowLineIndex === groups.length;
+  const hasBlocks = groups.length > 0 || timeline.nowLineIndex !== null;
 
   return (
-    <div className="relative">
+    <div className={cn("relative", hasBlocks && RAIL_LEAD_IN_SPACING_CLASSNAME)}>
+      {/* The day does not begin at its first check, so the axis runs in from
+          above rather than starting on a bare dot. */}
+      {hasBlocks ? (
+        <span aria-hidden className={getRailLeadInClassName()} />
+      ) : null}
+
       {groups.map((group, index) => (
         <Fragment key={group.id}>
           {timeline.nowLineIndex === index ? (
