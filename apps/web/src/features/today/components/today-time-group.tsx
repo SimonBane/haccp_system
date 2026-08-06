@@ -11,16 +11,75 @@ import {
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { occurrenceKey } from "../lib/today-grouping";
-import type { TodayTimeGroup, TodayTimelineItem } from "../lib/today-timeline";
+import type {
+  TimeGroupState,
+  TodayTimeGroup,
+  TodayTimelineItem,
+} from "../lib/today-timeline";
+import {
+  RAIL_DOT_CLASSNAME,
+  RAIL_SEGMENT_CLASSNAME,
+  RAIL_TAIL_SEGMENT_CLASSNAME,
+  UPCOMING_RAIL_CLASSNAME,
+} from "./today-rail";
 import { TodayTaskRow } from "./today-task-row";
 
 type Props = {
   group: TodayTimeGroup;
-  isLast: boolean;
+  /** Last completed round before the live now marker — stays expanded. */
+  isLastBeforeNowLine: boolean;
+  /** Last block on the axis, so its rail fades out instead of reaching for a
+   * dot below that does not exist. */
+  isTail: boolean;
   syncingKeys: ReadonlySet<string>;
   currentUserId: string | null;
   onActivate: (item: TodayTimelineItem) => void;
 };
+
+/**
+ * Dashes are keyed off "upcoming" rather than a past/future flag: a round
+ * completed early is still solid green, because completion is the stronger
+ * signal than where the clock happens to be.
+ *
+ * Done and overdue match the "now" rail's width so the whole rail reads at a
+ * glance — only "upcoming" stays a thin dashed hint of what's ahead.
+ */
+function getRailClassName(state: TimeGroupState, deviationCount: number): string {
+  switch (state) {
+    case "now":
+      return "w-0.5 bg-primary/70";
+    case "overdue":
+      return "w-0.5 bg-destructive/40";
+    case "done":
+      return deviationCount > 0
+        ? "w-0.5 bg-destructive/40"
+        : "w-0.5 bg-success/40";
+    case "upcoming":
+      return UPCOMING_RAIL_CLASSNAME;
+  }
+}
+
+/**
+ * The ring is the dot's own colour at a fraction of its strength, so the
+ * marker reads as one object rather than a dot with a halo bolted on. Every
+ * ring is 4px on a 14px dot — a 22px outer circle, the width the rail's
+ * segments are cut to land on.
+ */
+function getDotRingClassName(
+  state: TimeGroupState,
+  deviationCount: number,
+): string {
+  switch (state) {
+    case "now":
+      return "ring-primary/20";
+    case "overdue":
+      return "ring-destructive/20";
+    case "done":
+      return deviationCount > 0 ? "ring-destructive/20" : "ring-success/20";
+    case "upcoming":
+      return "ring-muted-foreground/15";
+  }
+}
 
 function useDurationLabel() {
   const t = useTranslations("TodayPage");
@@ -39,7 +98,8 @@ function useDurationLabel() {
 
 export function TodayTimeGroup({
   group,
-  isLast,
+  isLastBeforeNowLine,
+  isTail,
   syncingKeys,
   currentUserId,
   onActivate,
@@ -47,12 +107,16 @@ export function TodayTimeGroup({
   const t = useTranslations("TodayPage");
   const durationLabel = useDurationLabel();
 
-  // A finished group folds away, unless it hides a deviation worth seeing.
+  // A finished group folds away, unless it hides a deviation worth seeing or
+  // it is the anchor round directly above the live now marker.
   const [open, setOpen] = useState(
-    group.state !== "done" || group.deviationCount > 0,
+    group.state !== "done" ||
+      group.deviationCount > 0 ||
+      isLastBeforeNowLine,
   );
 
   const headingId = `${group.id}-heading`;
+  const railClassName = getRailClassName(group.state, group.deviationCount);
 
   const summaryText = (() => {
     switch (group.state) {
@@ -73,31 +137,33 @@ export function TodayTimeGroup({
         aria-labelledby={headingId}
         className="relative scroll-mt-28 pb-2 pl-9 sm:pl-11"
       >
-        {/* Rail segment — consecutive groups join into one continuous line. */}
+        {/* Rail from this round's own dot down to the next one, carrying this
+            round's state — a colour never starts before the dot that earned
+            it, and the whole axis still reads as one line reporting how the
+            day went at a glance. */}
         <span
           aria-hidden
           className={cn(
-            "absolute top-0 bottom-0 left-[13px] -translate-x-1/2 sm:left-[15px]",
-            group.state === "now"
-              ? "w-0.5 bg-primary/70"
-              : group.state === "overdue"
-                ? "w-px bg-destructive/35"
-                : "w-px bg-border",
-            isLast && "bg-gradient-to-b from-border to-transparent",
+            isTail ? RAIL_TAIL_SEGMENT_CLASSNAME : RAIL_SEGMENT_CLASSNAME,
+            railClassName,
           )}
         />
 
         {/* Marker */}
         <span
           aria-hidden
-          className="absolute top-[15px] left-[13px] flex size-3.5 -translate-x-1/2 items-center justify-center sm:left-[15px]"
+          className={cn(
+            RAIL_DOT_CLASSNAME,
+            "flex size-3.5 items-center justify-center",
+          )}
         >
           {group.state === "now" ? (
             <span className="absolute inline-flex size-full rounded-full bg-primary opacity-60 motion-safe:animate-ping" />
           ) : null}
           <span
             className={cn(
-              "relative size-3.5 rounded-full ring-4 ring-background",
+              "relative size-3.5 rounded-full ring-4",
+              getDotRingClassName(group.state, group.deviationCount),
               group.state === "now" && "bg-primary",
               group.state === "overdue" && "bg-destructive",
               group.state === "done" &&
@@ -143,10 +209,16 @@ export function TodayTimeGroup({
             </Badge>
           ) : null}
 
-          {/* The deviation badge already states the headline for a finished
-              group, so the count would only crowd it out on narrow screens. */}
+          {/* A deviation badge alongside a state badge already fills a 375px
+              header, and the count is the least important of the three — it
+              stays in the trigger's aria-label either way. */}
           {group.state === "done" && group.deviationCount > 0 ? null : (
-            <span className="truncate text-[13px] text-muted-foreground">
+            <span
+              className={cn(
+                "truncate text-[13px] text-muted-foreground",
+                group.deviationCount > 0 && "hidden sm:inline",
+              )}
+            >
               {summaryText}
             </span>
           )}

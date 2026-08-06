@@ -11,7 +11,12 @@ import {
   errorResponse,
   jsonResponse,
 } from "../../core/openapi/route-factory.js";
-import { getDb, getCurrentLocation, requireOrgContext } from "../../lib/context.js";
+import {
+  getDb,
+  getCurrentLocation,
+  getCurrentOrganization,
+  requireOrgContext,
+} from "../../lib/context.js";
 import type { AppEnv } from "../../types.js";
 import { todayCompletionService } from "./today-completion.service.js";
 import { todayService } from "./today.service.js";
@@ -120,6 +125,7 @@ todayRoutes.openapi(getTodayRoute, async (c) => {
     locationId,
     date,
     user.id,
+    getCurrentOrganization(c).timezone,
   );
   return c.json(result, 200);
 });
@@ -133,6 +139,7 @@ todayRoutes.openapi(completeTaskRoute, async (c) => {
     locationId,
     { id: user.id, firstName: user.firstName, lastName: user.lastName },
     input,
+    getCurrentOrganization(c).timezone,
   );
   return c.json(result, 200);
 });
@@ -146,6 +153,7 @@ todayRoutes.openapi(completeTemperatureRoute, async (c) => {
     locationId,
     { id: user.id, firstName: user.firstName, lastName: user.lastName },
     input,
+    getCurrentOrganization(c).timezone,
   );
   return c.json(result, 200);
 });
@@ -157,6 +165,7 @@ todayRoutes.openapi(uncompleteTaskRoute, async (c) => {
     getDb(c),
     locationId,
     input,
+    getCurrentOrganization(c).timezone,
   );
   return c.json(result, 200);
 });

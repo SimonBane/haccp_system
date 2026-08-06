@@ -16,7 +16,7 @@ import {
 } from "@haccp/shared";
 import { auth } from "@clerk/nextjs/server";
 import { cookies } from "next/headers";
-import { localTodayDate } from "@/lib/date";
+
 import { LOCATION_COOKIE, resolveLocationId } from "@/lib/location-preference";
 import { locationScopedPath } from "./paths";
 import { API_BASE_URL, ApiRequestError, parseApiError } from "./api-utils";
@@ -98,13 +98,17 @@ export async function listTaskTemplates(
   );
 }
 
+/**
+ * `date` is required: this runs in the deploy region's zone (UTC on Vercel), so
+ * a local-zone default would silently disagree with the browser and discard the
+ * SSR payload. The caller resolves "today" in the organisation's zone.
+ */
 export async function getToday(
   locationId: string,
-  date?: string,
+  date: string,
 ): Promise<TodayResponse> {
-  const occurrenceDate = date ?? localTodayDate();
   return fetchJson(
-    `${locationScopedPath(locationId, "today")}?date=${encodeURIComponent(occurrenceDate)}`,
+    `${locationScopedPath(locationId, "today")}?date=${encodeURIComponent(date)}`,
     todayResponseSchema,
   );
 }

@@ -19,6 +19,7 @@ export const todayService = {
     locationId: string,
     date: string,
     currentUserId: string,
+    timeZone: string,
   ): Promise<TodayResponse> {
     const weekday = getWeekdayFromDate(date);
     const now = new Date();
@@ -82,6 +83,7 @@ export const todayService = {
           completedBy: completion?.completedBy ?? null,
           temperatureReading,
           now,
+          timeZone,
         });
 
         sections[item.timeSlot].push(item);

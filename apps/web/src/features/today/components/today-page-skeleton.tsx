@@ -11,7 +11,9 @@ function RowSkeleton() {
         <Skeleton className="size-10 shrink-0 rounded-full sm:size-11" />
         <div className="min-w-0 flex-1 space-y-2">
           <Skeleton className="h-3.5 w-40 max-w-full" />
-          <Skeleton className="h-3 w-24" />
+          {/* Chip row: a badge is 20px tall and pill-shaped, so the placeholder
+              matches or the card visibly grows when data lands. */}
+          <Skeleton className="h-5 w-32 rounded-4xl" />
         </div>
         <Skeleton className="hidden h-6 w-20 rounded-md sm:block" />
       </div>

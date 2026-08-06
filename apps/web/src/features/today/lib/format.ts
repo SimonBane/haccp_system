@@ -5,11 +5,33 @@
  * meant temperatures rendered with a dot separator even in Bulgarian.
  */
 
-export function formatTimeOfDay(timestamp: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(timestamp));
+/**
+ * `completedAt` is a real UTC instant, so it must be rendered in the site's zone
+ * — otherwise a reading taken at 08:00 in Sofia reads "06:00" to a UTC browser.
+ */
+export function formatTimeOfDay(
+  timestamp: string,
+  locale: string,
+  timeZone: string,
+): string {
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone,
+    }).format(new Date(timestamp));
+  } catch {
+    return new Intl.DateTimeFormat(locale, {
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(timestamp));
+  }
+}
+
+/** Wall-clock label, "15:12", for minutes since midnight. */
+export function formatMinutesOfDay(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  return `${String(hours).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 }
 
 export function formatTemperature(value: number, locale: string): string {
