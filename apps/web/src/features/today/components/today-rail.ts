@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+
 /**
  * Shared geometry for the timeline's vertical rail.
  *
@@ -36,3 +38,25 @@ export const RAIL_DOT_CLASSNAME = `absolute top-[22px] -translate-y-1/2 ${RAIL_A
  */
 export const UPCOMING_RAIL_CLASSNAME =
   "w-0.5 bg-[repeating-linear-gradient(to_bottom,var(--color-muted-foreground)_0px_4px,transparent_4px_8px)] opacity-30";
+
+/** Room above the first block for the run-in below. */
+export const RAIL_LEAD_IN_SPACING_CLASSNAME = "pt-3";
+
+/** 12px of room, plus 22px to the first axis point, less its own ring radius. */
+const RAIL_LEAD_IN_HEIGHT_CLASSNAME = "h-[23px]";
+
+/**
+ * A short run-in above the first marker, fading up into nothing, so the axis
+ * reads as arriving into the day rather than starting from a bare dot. Muted
+ * dashes whatever that first marker turns out to be: nothing is being reported
+ * about the stretch before the day's first check.
+ */
+export function getRailLeadInClassName(): string {
+  return cn(
+    "absolute top-0",
+    RAIL_LEAD_IN_HEIGHT_CLASSNAME,
+    RAIL_AXIS_CLASSNAME,
+    UPCOMING_RAIL_CLASSNAME,
+    "[mask-image:linear-gradient(to_bottom,transparent_0%,black_100%)]",
+  );
+}

@@ -283,7 +283,7 @@ export function TodayView({
     <div className="flex flex-1 flex-col">
       {header}
 
-      <div className="relative mx-auto w-full max-w-3xl px-4 pt-4 pb-16 sm:px-6">
+      <div className="relative mx-auto w-full max-w-3xl px-4 pb-16 sm:px-6">
         {isFetching && response.date !== selectedDate ? (
           <div className="absolute inset-x-0 top-1 z-10 flex justify-center">
             <Spinner className="size-5" />
