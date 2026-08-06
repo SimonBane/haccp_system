@@ -12,19 +12,19 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { LocationQuerySync } from "@/features/tenant/location-query-sync";
-import { useEdgeSwipeOpen } from "@/hooks/use-drawer-swipe";
+import { useSwipeOpen } from "@/hooks/use-drawer-swipe";
 
 function DashboardLayout({ children }: { children: ReactNode }) {
   const { isMobile, openMobile, setOpenMobile } = useSidebar();
   const openDrawer = useCallback(() => setOpenMobile(true), [setOpenMobile]);
 
-  useEdgeSwipeOpen({ enabled: isMobile && !openMobile, onOpen: openDrawer });
+  useSwipeOpen({ enabled: isMobile && !openMobile, onOpen: openDrawer });
 
   return (
     <MobileHeaderSlotProvider>
       <LocationQuerySync />
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="max-md:touch-pan-y max-md:overscroll-x-none">
         <MobileTopBar />
         {children}
       </SidebarInset>

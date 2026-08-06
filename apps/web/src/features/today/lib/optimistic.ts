@@ -66,6 +66,7 @@ export function applyOptimisticCompletion(
 export function applyOptimisticUncompletion(
   response: TodayResponse | undefined,
   input: CompleteTodayTaskInput,
+  timeZone: string,
   now: Date = new Date(),
 ): TodayResponse | undefined {
   return patchOccurrence(response, input, (task) => ({
@@ -75,6 +76,7 @@ export function applyOptimisticUncompletion(
       scheduledTime: task.scheduledTime,
       now,
       completedAt: null,
+      timeZone,
     }),
     completedAt: null,
     completedBy: null,

@@ -1,6 +1,7 @@
 "use client";
 
 import type { TodayResponse, TodayTaskItem } from "@haccp/shared";
+import { zonedDateString } from "@haccp/shared";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -8,11 +9,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useNow } from "@/hooks/use-now";
+import { useOrgTimeZone } from "@/features/tenant/use-org-timezone";
 import { getErrorMessage } from "@/lib/api/get-error-message";
-import { formatLocalDate, localTodayDate, shiftLocalDate } from "@/lib/date";
+import { formatLocalDate, shiftLocalDate } from "@/lib/date";
 import { TemperatureCheckDialog } from "./components/temperature-check-dialog";
 import { TodayAllDone } from "./components/today-all-done";
 import { TodayEmptyState } from "./components/today-empty-state";
+import { TodayJumpToNow } from "./components/today-jump-to-now";
 import { TodayRecordSheet } from "./components/today-record-sheet";
 import { TodayStickyHeader } from "./components/today-sticky-header";
 import { TodayTimeline } from "./components/today-timeline";
@@ -44,8 +47,15 @@ export function TodayView({
   const t = useTranslations("TodayPage");
   const locale = useLocale();
   const now = useNow();
+  const timeZone = useOrgTimeZone();
 
-  const todayDate = useMemo(() => localTodayDate(), []);
+  // Derived from the ticking clock, not memoised once: a wall-mounted tablet
+  // left open overnight used to keep reporting yesterday while the groups
+  // around it rolled over to overdue. Also picks up a timezone change live.
+  const todayDate = useMemo(
+    () => zonedDateString(now, timeZone),
+    [now, timeZone],
+  );
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [syncingKeys, setSyncingKeys] = useState<ReadonlySet<string>>(
     () => new Set(),
@@ -69,7 +79,7 @@ export function TodayView({
 
   const currentUserId = response?.currentUserId ?? initialData.currentUserId;
   const { completeTask, uncompleteTask, completeTemperatureTask } =
-    useTodayMutations(currentUserId);
+    useTodayMutations(currentUserId, timeZone);
 
   // useMutation hands back a fresh result object every render, but the mutate
   // functions themselves are stable. Depending on those keeps the handlers —
@@ -84,8 +94,9 @@ export function TodayView({
         response ? flatTodayTasks(response) : [],
         now,
         selectedDate,
+        timeZone,
       ),
-    [response, now, selectedDate],
+    [response, now, selectedDate, timeZone],
   );
 
   const recordItem = useMemo(() => {
@@ -272,7 +283,7 @@ export function TodayView({
     <div className="flex flex-1 flex-col">
       {header}
 
-      <div className="relative mx-auto w-full max-w-3xl px-4 pt-4 pb-16 sm:px-6">
+      <div className="relative mx-auto w-full max-w-3xl px-4 pb-16 sm:px-6">
         {isFetching && response.date !== selectedDate ? (
           <div className="absolute inset-x-0 top-1 z-10 flex justify-center">
             <Spinner className="size-5" />
@@ -297,6 +308,8 @@ export function TodayView({
               currentUserId={currentUserId}
               onActivate={handleActivate}
             />
+
+            <TodayJumpToNow nowLineIndex={timeline.nowLineIndex} />
           </div>
         )}
       </div>

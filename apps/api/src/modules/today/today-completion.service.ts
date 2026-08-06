@@ -30,6 +30,8 @@ type CompletionContext = {
   template: TemplateRow;
   weekday: string;
   now: Date;
+  /** The organisation's zone — scheduled times are wall clocks at the site. */
+  timeZone: string;
 };
 
 function assertTemplateScheduled(
@@ -53,6 +55,7 @@ function buildTaskItemFromTemplate(
   completedBy: UserSummary | null,
   temperatureReading: TodayTaskItem["temperatureReading"],
   now: Date,
+  timeZone: string,
 ): TodayTaskItem {
   return buildTodayTaskItem({
     templateId: template.id,
@@ -68,6 +71,7 @@ function buildTaskItemFromTemplate(
     completedBy,
     temperatureReading,
     now,
+    timeZone,
   });
 }
 
@@ -93,6 +97,7 @@ async function withCompletionContext<T>(
   db: Db,
   locationId: string,
   input: CompletionContextInput,
+  timeZone: string,
   handler: (context: CompletionContext) => Promise<T>,
 ): Promise<T> {
   const weekday = getWeekdayFromDate(input.date);
@@ -106,7 +111,7 @@ async function withCompletionContext<T>(
 
   assertTemplateScheduled(template, weekday, input.scheduledTime);
 
-  return handler({ locationId, template, weekday, now });
+  return handler({ locationId, template, weekday, now, timeZone });
 }
 
 async function createOrFetchCompletion(
@@ -138,11 +143,13 @@ export const todayCompletionService = {
     locationId: string,
     completedBy: UserSummary,
     input: CompleteTodayTaskInput,
+    timeZone: string,
   ): Promise<TodayTaskItem> {
     return withCompletionContext(
       db,
       locationId,
       input,
+      timeZone,
       async ({ locationId: resolvedLocationId, template, now }) => {
         if (template.type === "temperature") {
           throw new ValidationError("This task requires a temperature reading");
@@ -163,6 +170,7 @@ export const todayCompletionService = {
           completedBy,
           null,
           now,
+          timeZone,
         );
       },
     );
@@ -172,11 +180,13 @@ export const todayCompletionService = {
     db: Db,
     locationId: string,
     input: CompleteTodayTaskInput,
+    timeZone: string,
   ): Promise<TodayTaskItem> {
     return withCompletionContext(
       db,
       locationId,
       input,
+      timeZone,
       async ({ locationId: resolvedLocationId, template, now }) => {
         const deleted = await todayRepository.deleteCompletion(
           db,
@@ -197,6 +207,7 @@ export const todayCompletionService = {
           null,
           null,
           now,
+          timeZone,
         );
       },
     );
@@ -207,11 +218,13 @@ export const todayCompletionService = {
     locationId: string,
     completedBy: UserSummary,
     input: CompleteTodayTemperatureTaskInput,
+    timeZone: string,
   ): Promise<TodayTaskItem> {
     return withCompletionContext(
       db,
       locationId,
       input,
+      timeZone,
       async ({ locationId: resolvedLocationId, template, now }) => {
         const recordedC = Number(input.recordedC);
 
@@ -295,6 +308,7 @@ export const todayCompletionService = {
                 result === "out_of_range" ? correctiveAction : null,
             },
             now,
+            timeZone,
           );
         });
       },

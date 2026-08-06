@@ -141,20 +141,23 @@ employeeRoutes.openapi(listRoute, async (c) => {
 
 employeeRoutes.openapi(createRouteDef, async (c) => {
   const { clerkOrgId, organizationId, userId } = requireOrgContext(c);
+  const tenant = getTenant(c);
   const input = c.req.valid("json");
   const created = await employeeService.create(
     getDb(c),
     organizationId,
     clerkOrgId,
     userId,
+    tenant.organization.locale,
     input,
-    getTenant(c).locations,
+    tenant.locations,
   );
   return c.json(created, 201);
 });
 
 employeeRoutes.openapi(updateRouteDef, async (c) => {
   const { clerkOrgId, organizationId, userDbId, userId } = requireOrgContext(c);
+  const tenant = getTenant(c);
   const { id } = c.req.valid("param");
   const input = c.req.valid("json");
   const updated = await employeeService.update(
@@ -163,23 +166,26 @@ employeeRoutes.openapi(updateRouteDef, async (c) => {
     clerkOrgId,
     userId,
     userDbId,
+    tenant.organization.locale,
     id,
     input,
-    getTenant(c).locations,
+    tenant.locations,
   );
   return c.json(updated, 200);
 });
 
 employeeRoutes.openapi(inviteRoute, async (c) => {
   const { clerkOrgId, organizationId, userId } = requireOrgContext(c);
+  const tenant = getTenant(c);
   const { id } = c.req.valid("param");
   const updated = await employeeService.invite(
     getDb(c),
     organizationId,
     clerkOrgId,
     userId,
+    tenant.organization.locale,
     id,
-    getTenant(c).locations,
+    tenant.locations,
   );
   return c.json(updated, 200);
 });

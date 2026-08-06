@@ -60,11 +60,12 @@
       "doneCount": "{count, plural, one {# done} other {# done}}",
       "deviations": "{count, plural, one {# out of range} other {# out of range}}",
       "jumpToOverdue": "Go to overdue tasks ({count})",
-      "jumpToDeviation": "Go to out-of-range readings ({count})"
+      "jumpToDeviation": "Go to out-of-range readings ({count})",
+      "nowLine": "Now, {time}",
+      "jumpToNow": "Jump to now"
     },
     "row": {
-      "targetRange": "{min} … {max} °C",
-      "priorReading": "{time}: {value} °C"
+      "lastReadingAt": "Last {time}"
     },
     "record": {
       "close": "Close",
