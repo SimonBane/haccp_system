@@ -65,8 +65,7 @@
       "jumpToNow": "Към сега"
     },
     "row": {
-      "targetRange": "{min} … {max} °C",
-      "priorReading": "{time}: {value} °C"
+      "lastReadingAt": "Последно {time}"
     },
     "record": {
       "close": "Затвори",

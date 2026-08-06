@@ -7,6 +7,7 @@ import {
   Clock3Icon,
   SparklesIcon,
   ThermometerIcon,
+  ThermometerSnowflakeIcon,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { memo } from "react";
@@ -52,6 +53,11 @@ function formatUserName(
  * The whole row is the target: one interactive element, a 56px tap area, and a
  * single rule the worker learns once — tap a row to do the thing it describes.
  * The overlay button keeps that promise without nesting controls inside it.
+ *
+ * Three zones, left to right: status disc, title with its metadata chips, and a
+ * right-aligned data column. The column is what the eye scans down — readings
+ * line up across cards instead of trailing off the end of a sentence — and it
+ * is also what fills the dead space a wide card used to leave in the middle.
  */
 export const TodayTaskRow = memo(function TodayTaskRow({
   item,
@@ -66,6 +72,7 @@ export const TodayTaskRow = memo(function TodayTaskRow({
   const { task, isCompleted, isDeviation, priorReading } = item;
 
   const isTemperature = task.type === "temperature";
+  const isCleaning = task.type === "cleaning";
   const reading = task.temperatureReading;
   const TypeIcon = typeIcon(task.type);
 
@@ -75,37 +82,38 @@ export const TodayTaskRow = memo(function TodayTaskRow({
       ? t("actions.record")
       : t("actions.complete");
 
-  const showEquipment =
-    task.equipmentName &&
-    !task.title.toLowerCase().includes(task.equipmentName.toLowerCase());
+  const recordedLabel =
+    isCompleted && reading ? formatTemperature(reading.recordedC, locale) : null;
+  const readingLabel =
+    recordedLabel ??
+    (!isCompleted && priorReading
+      ? formatTemperature(priorReading.recordedC, locale)
+      : null);
+  const completedTime =
+    isCompleted && task.completedAt
+      ? formatTimeOfDay(task.completedAt, locale, timeZone)
+      : null;
+  const completedByLabel =
+    isCompleted && task.completedBy
+      ? formatUserName(task.completedBy, t("audit.you"), currentUserId)
+      : null;
 
-  const meta: string[] = [];
-  if (isCompleted) {
-    if (reading) meta.push(`${formatTemperature(reading.recordedC, locale)} °C`);
-    if (task.completedAt) meta.push(formatTimeOfDay(task.completedAt, locale, timeZone));
-    if (task.completedBy) {
-      meta.push(formatUserName(task.completedBy, t("audit.you"), currentUserId));
-    }
-  } else {
-    if (isTemperature && task.minTempC !== null && task.maxTempC !== null) {
-      meta.push(
-        t("row.targetRange", {
-          min: formatTemperature(task.minTempC, locale),
-          max: formatTemperature(task.maxTempC, locale),
-        }),
-      );
-    } else {
-      meta.push(t(`taskTypes.${task.type}`));
-    }
-    if (priorReading) {
-      meta.push(
-        t("row.priorReading", {
-          time: priorReading.scheduledTime,
-          value: formatTemperature(priorReading.recordedC, locale),
-        }),
-      );
-    }
-  }
+  // The equipment chip is the only chip that survives on a phone, so the chip
+  // row collapses entirely when there is none — a cleaning task stays a single
+  // dense line rather than reserving space for a desktop-only badge.
+  const hasChipRow = Boolean(task.equipmentName);
+  const hasAuditLine = Boolean(completedTime) || Boolean(completedByLabel);
+  const hasDataColumn = Boolean(readingLabel) || hasAuditLine;
+
+  const ariaLabel = [
+    task.title,
+    task.equipmentName,
+    task.scheduledTime,
+    recordedLabel ? `${recordedLabel} °C` : null,
+    actionLabel,
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   return (
     <Card
@@ -152,29 +160,142 @@ export const TodayTaskRow = memo(function TodayTaskRow({
           >
             {task.title}
           </div>
-          <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[13px] leading-tight text-muted-foreground">
-            <span className="truncate">
-              {showEquipment ? (
-                <span className="hidden sm:inline">
-                  {task.equipmentName}
-                  <span className="px-1.5 text-muted-foreground/40">·</span>
-                </span>
-              ) : null}
-              {meta.join(" · ")}
-            </span>
-            {/* On mobile the tinted card, the alert disc and the corrective
-                action strip already carry this without stealing the meta line. */}
-            {isDeviation ? (
+
+          <div
+            className={cn(
+              "mt-1.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1",
+              // Nothing here renders on a phone without equipment.
+              !hasChipRow && "hidden sm:flex",
+            )}
+          >
+            {/* Category on every type, not just cleaning — the disc icon is the
+                only type cue left on mobile, so desktop spells it out.
+                Temperature tasks put equipment first so the cold-storage chip
+                leads on the shop floor. */}
+            {!isTemperature ? (
               <Badge
-                variant="destructive"
-                className="hidden shrink-0 sm:inline-flex"
+                variant="outline"
+                className="hidden font-normal text-muted-foreground sm:inline-flex"
               >
+                {t(`taskTypes.${task.type}`)}
+              </Badge>
+            ) : null}
+
+            {task.equipmentName ? (
+              <Badge
+                variant="secondary"
+                className="max-w-[11rem] sm:max-w-[16rem]"
+              >
+                <ThermometerSnowflakeIcon />
+                <span className="truncate">{task.equipmentName}</span>
+              </Badge>
+            ) : null}
+
+            {isTemperature ? (
+              <Badge
+                variant="outline"
+                className="hidden font-normal text-muted-foreground sm:inline-flex"
+              >
+                {t(`taskTypes.${task.type}`)}
+              </Badge>
+            ) : null}
+
+            {/* On mobile the tinted card, the alert disc, the red reading and
+                the corrective action strip already carry this. */}
+            {isDeviation ? (
+              <Badge variant="destructive" className="hidden sm:inline-flex">
                 <CircleAlertIcon />
                 {t("temperatureDialog.outOfRange")}
               </Badge>
             ) : null}
           </div>
         </div>
+
+        {/* One column for numbers, whatever the card's state: a recorded value
+            when there is one, otherwise the round before it. Readings line up
+            down the list, and a wide card stops ending in dead space. */}
+        {hasDataColumn ? (
+          <div
+            className={cn(
+              // Capped on mobile so a long name can never crowd out the title.
+              "max-w-[42%] shrink-0 flex-col items-end gap-0.5 text-right sm:flex sm:w-44 sm:max-w-none",
+              // A prior reading is context, not the task — desktop only.
+              isCompleted ? "flex" : "hidden",
+            )}
+          >
+            {readingLabel ? (
+              <div
+                className={cn(
+                  "text-[15px] leading-tight font-semibold tabular-nums",
+                  isDeviation && "text-destructive",
+                  !isCompleted && "text-muted-foreground",
+                )}
+              >
+                {readingLabel}
+                <span className="ml-0.5 text-xs font-normal text-muted-foreground">
+                  °C
+                </span>
+              </div>
+            ) : null}
+            {hasAuditLine ? (
+              isCleaning ? (
+                <div
+                  className={cn(
+                    "flex flex-col items-end gap-0.5 text-[13px] leading-tight text-muted-foreground",
+                    !completedTime && completedByLabel && "hidden sm:flex",
+                  )}
+                >
+                  {completedTime ? (
+                    <span className="whitespace-nowrap tabular-nums">
+                      {completedTime}
+                    </span>
+                  ) : null}
+                  {completedByLabel ? (
+                    <span className="hidden max-w-full truncate sm:inline">
+                      {completedByLabel}
+                    </span>
+                  ) : null}
+                </div>
+              ) : (
+                <div
+                  className={cn(
+                    "flex min-w-0 max-w-full items-center gap-1 text-[13px] leading-tight text-muted-foreground",
+                    !completedTime && completedByLabel && "hidden sm:flex",
+                  )}
+                >
+                  {completedTime ? (
+                    <span
+                      className={cn(
+                        "whitespace-nowrap tabular-nums",
+                        !isTemperature && "hidden sm:inline",
+                      )}
+                    >
+                      {completedTime}
+                    </span>
+                  ) : null}
+                  {completedTime && completedByLabel ? (
+                    <span
+                      aria-hidden
+                      className="hidden text-muted-foreground/40 sm:inline"
+                    >
+                      ·
+                    </span>
+                  ) : null}
+                  {completedByLabel ? (
+                    <span className="hidden truncate sm:inline">
+                      {completedByLabel}
+                    </span>
+                  ) : null}
+                </div>
+              )
+            ) : null}
+            {!isCompleted && priorReading ? (
+              <div className="whitespace-nowrap text-[13px] leading-tight text-muted-foreground/80">
+                {t("row.lastReadingAt", { time: priorReading.scheduledTime })}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         {isSyncing ? (
           <Spinner className="size-4 shrink-0 text-muted-foreground" />
@@ -216,7 +337,7 @@ export const TodayTaskRow = memo(function TodayTaskRow({
       <Button
         variant="ghost"
         className="absolute inset-0 h-auto w-full rounded-xl p-0 hover:bg-transparent active:translate-y-0 dark:hover:bg-transparent"
-        aria-label={`${task.title}, ${task.scheduledTime}, ${actionLabel}`}
+        aria-label={ariaLabel}
         disabled={isSyncing}
         onClick={() => onActivate(item)}
       />
