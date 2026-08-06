@@ -16,28 +16,25 @@ import type {
   TodayTimeGroup,
   TodayTimelineItem,
 } from "../lib/today-timeline";
+import {
+  RAIL_DOT_CLASSNAME,
+  RAIL_SEGMENT_CLASSNAME,
+  RAIL_TAIL_SEGMENT_CLASSNAME,
+  UPCOMING_RAIL_CLASSNAME,
+} from "./today-rail";
 import { TodayTaskRow } from "./today-task-row";
 
 type Props = {
   group: TodayTimeGroup;
-  /** The group immediately above this one, so the rail leading up to this
-   * dot can carry its state instead of this group's own. */
-  previousGroup: TodayTimeGroup | null;
-  /** True for the group the live now-line sits directly above: the rail
-   * leading down to it is future, not a continuation of whatever came before
-   * the now-line, so it stays dashed regardless of the previous group's state. */
-  isAfterNowLine: boolean;
-  isLast: boolean;
+  /** Last completed round before the live now marker — stays expanded. */
+  isLastBeforeNowLine: boolean;
+  /** Last block on the axis, so its rail fades out instead of reaching for a
+   * dot below that does not exist. */
+  isTail: boolean;
   syncingKeys: ReadonlySet<string>;
   currentUserId: string | null;
   onActivate: (item: TodayTimelineItem) => void;
 };
-
-// A bit heavier than Tailwind's default 1px dashed border, whose dashes all
-// but disappear against the muted border color — still clearly a hint of
-// what's ahead, not a full rail.
-const UPCOMING_RAIL_CLASSNAME =
-  "w-0 border-l-2 border-dashed border-muted-foreground/30";
 
 /**
  * Dashes are keyed off "upcoming" rather than a past/future flag: a round
@@ -79,9 +76,8 @@ function useDurationLabel() {
 
 export function TodayTimeGroup({
   group,
-  previousGroup,
-  isAfterNowLine,
-  isLast,
+  isLastBeforeNowLine,
+  isTail,
   syncingKeys,
   currentUserId,
   onActivate,
@@ -89,18 +85,16 @@ export function TodayTimeGroup({
   const t = useTranslations("TodayPage");
   const durationLabel = useDurationLabel();
 
-  // A finished group folds away, unless it hides a deviation worth seeing.
+  // A finished group folds away, unless it hides a deviation worth seeing or
+  // it is the anchor round directly above the live now marker.
   const [open, setOpen] = useState(
-    group.state !== "done" || group.deviationCount > 0,
+    group.state !== "done" ||
+      group.deviationCount > 0 ||
+      isLastBeforeNowLine,
   );
 
   const headingId = `${group.id}-heading`;
   const railClassName = getRailClassName(group.state, group.deviationCount);
-  const incomingRailClassName = previousGroup
-    ? isAfterNowLine
-      ? UPCOMING_RAIL_CLASSNAME
-      : getRailClassName(previousGroup.state, previousGroup.deviationCount)
-    : null;
 
   const summaryText = (() => {
     switch (group.state) {
@@ -121,36 +115,25 @@ export function TodayTimeGroup({
         aria-labelledby={headingId}
         className="relative scroll-mt-28 pb-2 pl-9 sm:pl-11"
       >
-        {/* Rail, split at the dot's own centre (22px — the marker starts at
-            15px and is 14px tall) so a colour never starts before its dot: the
-            segment above carries the state of the round that just ended, the
-            segment below carries this one's. Together they still read as one
-            continuous line, colour reporting how the day went at a glance. */}
-        {incomingRailClassName ? (
-          <span
-            aria-hidden
-            className={cn(
-              "absolute top-0 left-[13px] h-[22px] -translate-x-1/2 sm:left-[15px]",
-              incomingRailClassName,
-            )}
-          />
-        ) : null}
+        {/* Rail from this round's own dot down to the next one, carrying this
+            round's state — a colour never starts before the dot that earned
+            it, and the whole axis still reads as one line reporting how the
+            day went at a glance. */}
         <span
           aria-hidden
           className={cn(
-            "absolute top-[22px] bottom-0 left-[13px] -translate-x-1/2 sm:left-[15px]",
+            isTail ? RAIL_TAIL_SEGMENT_CLASSNAME : RAIL_SEGMENT_CLASSNAME,
             railClassName,
-            // Fades whatever the segment is — colour or dashes — rather than
-            // replacing its background, so the last round still reads as itself.
-            isLast &&
-              "[mask-image:linear-gradient(to_bottom,black_55%,transparent_100%)]",
           )}
         />
 
         {/* Marker */}
         <span
           aria-hidden
-          className="absolute top-[15px] left-[13px] flex size-3.5 -translate-x-1/2 items-center justify-center sm:left-[15px]"
+          className={cn(
+            RAIL_DOT_CLASSNAME,
+            "flex size-3.5 items-center justify-center",
+          )}
         >
           {group.state === "now" ? (
             <span className="absolute inline-flex size-full rounded-full bg-primary opacity-60 motion-safe:animate-ping" />

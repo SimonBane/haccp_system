@@ -1,7 +1,14 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { cn } from "@/lib/utils";
 import { formatMinutesOfDay } from "../lib/format";
+import {
+  RAIL_DOT_CLASSNAME,
+  RAIL_SEGMENT_CLASSNAME,
+  RAIL_TAIL_SEGMENT_CLASSNAME,
+  UPCOMING_RAIL_CLASSNAME,
+} from "./today-rail";
 
 /** Anchor for the jump-to-now pill and for scrolling back to the live moment. */
 export const NOW_LINE_ID = "today-now-line";
@@ -12,7 +19,15 @@ export const NOW_LINE_ID = "today-now-line";
  * a full-strength line here reads as a divider, which is the mistake the old
  * header progress bar made.
  */
-export function TodayNowLine({ minutes }: { minutes: number }) {
+export function TodayNowLine({
+  minutes,
+  isTail,
+}: {
+  minutes: number;
+  /** Every round has already passed, so nothing follows this marker on the
+   * axis and its rail fades out instead of running down to another dot. */
+  isTail?: boolean;
+}) {
   const t = useTranslations("TodayPage");
   const label = formatMinutesOfDay(minutes);
 
@@ -21,16 +36,29 @@ export function TodayNowLine({ minutes }: { minutes: number }) {
       id={NOW_LINE_ID}
       role="separator"
       aria-label={t("timeline.nowLine", { time: label })}
-      // Extra bottom space versus the row's own top padding: packed tight
-      // against the next hour, the marker's dot was easy to miss against the
-      // rail passing right by it.
-      className="relative flex scroll-mt-28 items-center gap-2 pt-1.5 pb-4 pl-9 sm:pl-11"
+      // py-4 around a 12px line puts this dot on the same 22px axis point as
+      // every round's dot, which is what lets the rail run dot to dot without
+      // a seam. Equal padding also keeps the marker from crowding the hour
+      // below it, where its dot used to get lost against the passing rail.
+      className="relative flex scroll-mt-28 items-center gap-2 py-4 pl-9 sm:pl-11"
     >
+      {/* The rest of the day is ahead of this marker, so the rail leaving it
+          is dashed whatever the round below turns out to be. */}
       <span
         aria-hidden
-        className="absolute left-[13px] size-2.5 -translate-x-1/2 rounded-full bg-primary ring-[3px] ring-background sm:left-[15px]"
+        className={cn(
+          isTail ? RAIL_TAIL_SEGMENT_CLASSNAME : RAIL_SEGMENT_CLASSNAME,
+          UPCOMING_RAIL_CLASSNAME,
+        )}
       />
-      <span className="text-[11px] leading-none font-semibold tabular-nums text-primary">
+      <span
+        aria-hidden
+        className={cn(
+          RAIL_DOT_CLASSNAME,
+          "size-2.5 rounded-full bg-primary ring-[3px] ring-background",
+        )}
+      />
+      <span className="text-[11px] leading-3 font-semibold tabular-nums text-primary">
         {label}
       </span>
       <span
