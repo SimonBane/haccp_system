@@ -37,6 +37,10 @@ export function TodayTimeline({
     scrollToTimeGroup(focusGroupId);
   }, [scrollKey, focusGroupId, groups]);
 
+  // The now marker is a dot on the same axis as the rounds, so whichever of
+  // the two comes last owns the rail's fade-out.
+  const nowLineIsTail = timeline.nowLineIndex === groups.length;
+
   return (
     <div className="relative">
       {groups.map((group, index) => (
@@ -46,9 +50,12 @@ export function TodayTimeline({
           ) : null}
           <TodayTimeGroup
             group={group}
-            previousGroup={index > 0 ? groups[index - 1] : null}
-            isAfterNowLine={timeline.nowLineIndex === index}
-            isLast={index === groups.length - 1}
+            isLastBeforeNowLine={
+              timeline.nowLineIndex !== null &&
+              timeline.nowLineIndex > 0 &&
+              index === timeline.nowLineIndex - 1
+            }
+            isTail={index === groups.length - 1 && !nowLineIsTail}
             syncingKeys={syncingKeys}
             currentUserId={currentUserId}
             onActivate={onActivate}
@@ -57,8 +64,8 @@ export function TodayTimeline({
       ))}
 
       {/* Every round has already passed, so the marker closes out the day. */}
-      {timeline.nowLineIndex === groups.length ? (
-        <TodayNowLine minutes={timeline.nowMinutes} />
+      {nowLineIsTail ? (
+        <TodayNowLine minutes={timeline.nowMinutes} isTail />
       ) : null}
     </div>
   );
