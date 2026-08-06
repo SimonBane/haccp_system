@@ -35,3 +35,6 @@ Thumbs.db
 coverage/
 .vercel
 .env*
+
+# .claude
+.claude/
