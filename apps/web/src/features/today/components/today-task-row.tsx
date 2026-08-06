@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import { useOrgTimeZone } from "@/features/tenant/use-org-timezone";
 import { cn } from "@/lib/utils";
 import { formatTemperature, formatTimeOfDay } from "../lib/format";
 import type { TimeGroupState, TodayTimelineItem } from "../lib/today-timeline";
@@ -61,6 +62,7 @@ export const TodayTaskRow = memo(function TodayTaskRow({
 }: Props) {
   const t = useTranslations("TodayPage");
   const locale = useLocale();
+  const timeZone = useOrgTimeZone();
   const { task, isCompleted, isDeviation, priorReading } = item;
 
   const isTemperature = task.type === "temperature";
@@ -80,7 +82,7 @@ export const TodayTaskRow = memo(function TodayTaskRow({
   const meta: string[] = [];
   if (isCompleted) {
     if (reading) meta.push(`${formatTemperature(reading.recordedC, locale)} °C`);
-    if (task.completedAt) meta.push(formatTimeOfDay(task.completedAt, locale));
+    if (task.completedAt) meta.push(formatTimeOfDay(task.completedAt, locale, timeZone));
     if (task.completedBy) {
       meta.push(formatUserName(task.completedBy, t("audit.you"), currentUserId));
     }

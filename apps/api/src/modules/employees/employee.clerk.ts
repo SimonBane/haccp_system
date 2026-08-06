@@ -1,4 +1,4 @@
-import { normalizeOrgRole } from "@haccp/shared";
+import { getLocalizedPath, normalizeOrgRole, type AppLocale } from "@haccp/shared";
 import { clerkClient } from "../../core/auth/clerk-client.js";
 import { env } from "../../env.js";
 import { MEMBERSHIP_STATUS } from "../../core/db/schema/organization-memberships.js";
@@ -7,12 +7,18 @@ import type { User } from "../../core/db/schema/users.js";
 import { ValidationError } from "../../core/errors/app-errors.js";
 import type { EmployeeChanges } from "./employee.changes.js";
 
-function buildInvitationRedirectUrl(firstName: string, lastName: string): string {
+function buildInvitationRedirectUrl(
+  locale: AppLocale,
+  firstName: string,
+  lastName: string,
+): string {
   const params = new URLSearchParams({ firstName, lastName });
-  return `${env.WEB_APP_URL}/accept-invitation?${params.toString()}`;
+  const path = getLocalizedPath(locale, "/accept-invitation");
+  return `${env.WEB_APP_URL}${path}?${params.toString()}`;
 }
 
 export async function sendClerkInvitation(
+  locale: AppLocale,
   clerkOrgId: string,
   inviterUserId: string,
   email: string,
@@ -26,7 +32,7 @@ export async function sendClerkInvitation(
       inviterUserId,
       emailAddress: email,
       role: normalizeOrgRole(role),
-      redirectUrl: buildInvitationRedirectUrl(firstName, lastName),
+      redirectUrl: buildInvitationRedirectUrl(locale, firstName, lastName),
     });
   } catch (error) {
     if (

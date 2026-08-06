@@ -1,3 +1,4 @@
+import { zonedDateString } from "@haccp/shared";
 import { type Locale } from "@/i18n/routing";
 import {
   getTenantContext,
@@ -21,7 +22,10 @@ export default async function DashboardPage({
 
   const tenant = await getTenantContext();
   const locationId = await resolveActiveLocationId(tenant);
-  const today = await getToday(locationId);
+  const today = await getToday(
+    locationId,
+    zonedDateString(new Date(), tenant.organization.timezone),
+  );
 
   return (
     <>

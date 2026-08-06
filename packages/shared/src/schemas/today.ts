@@ -9,6 +9,7 @@ import {
   TASK_TEMPLATE_ALL_WEEKDAYS,
 } from "./task-template.js";
 import { userSummarySchema } from "./user.js";
+import { zonedDateString, zonedMinutesOfDay } from "../lib/timezone.js";
 
 export const todayTaskStatusSchema = z.enum([
   "pending",
@@ -123,25 +124,29 @@ export function getWeekdayFromDate(
   return weekday;
 }
 
+/**
+ * `timeZone` is the organisation's zone, and it is required on purpose: a
+ * scheduled time is a wall clock at the site, so reading `now` in the server's
+ * or the phone's zone silently mis-reports status for anyone not sitting in it.
+ * Making the parameter mandatory lets the compiler find every caller.
+ */
 export function computeTodayTaskStatus(params: {
   date: string;
   scheduledTime: string;
   now: Date;
   completedAt: string | null;
+  timeZone: string;
 }): TodayTaskStatus {
-  const { date, scheduledTime, now, completedAt } = params;
+  const { date, scheduledTime, now, completedAt, timeZone } = params;
 
   if (completedAt) return "completed";
 
-  const nowDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(
-    2,
-    "0",
-  )}-${String(now.getDate()).padStart(2, "0")}`;
+  const nowDate = zonedDateString(now, timeZone);
 
   if (date < nowDate) return "overdue";
   if (date > nowDate) return "pending";
 
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const nowMinutes = zonedMinutesOfDay(now, timeZone);
   const scheduledMinutes = parseScheduledTimeToMinutes(scheduledTime);
 
   if (nowMinutes > scheduledMinutes) return "overdue";
@@ -170,6 +175,7 @@ export function buildTodayTaskItem(params: {
   completedAt: string | null;
   completedBy: z.infer<typeof userSummarySchema> | null;
   now: Date;
+  timeZone: string;
   temperatureReading?: TodayTaskItem["temperatureReading"];
 }): TodayTaskItem {
   const timeSlot = deriveTimeSlotFromTime(params.scheduledTime);
@@ -190,6 +196,7 @@ export function buildTodayTaskItem(params: {
       scheduledTime: params.scheduledTime,
       now: params.now,
       completedAt: params.completedAt,
+      timeZone: params.timeZone,
     }),
     completedAt: params.completedAt,
     completedBy: params.completedBy,

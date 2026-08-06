@@ -26,7 +26,7 @@ export function MobileHeaderAddButton({
         type="button"
         variant="outline"
         size="icon-lg"
-        className="shrink-0 rounded-lg border-sidebar-border bg-sidebar text-sidebar-foreground shadow-xs hover:bg-sidebar-accent"
+        className="shrink-0 rounded-lg border-sidebar-border bg-transparent text-foreground shadow-none hover:bg-transparent"
         aria-label={label}
         onClick={onClick}
       >

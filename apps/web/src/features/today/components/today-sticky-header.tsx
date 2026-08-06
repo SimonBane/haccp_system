@@ -232,7 +232,7 @@ export function TodayStickyHeader({
     <header className="sticky top-2 z-30 rounded-t-xl bg-background backdrop-blur-xl supports-[backdrop-filter]:bg-background/85">
       <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-2.5">
-          <h1 className="truncate text-lg font-semibold tracking-tight sm:text-xl">
+          <h1 className="min-w-0 truncate text-lg font-semibold tracking-tight sm:text-xl">
             {title}
           </h1>
 
