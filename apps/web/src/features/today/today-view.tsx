@@ -1,7 +1,7 @@
 "use client";
 
 import type { TodayResponse, TodayTaskItem } from "@haccp/shared";
-import { zonedDateString } from "@haccp/shared";
+import { classifyTemperatureResult, zonedDateString } from "@haccp/shared";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -12,28 +12,28 @@ import { useNow } from "@/hooks/use-now";
 import { useOrgTimeZone } from "@/features/tenant/use-org-timezone";
 import { getErrorMessage } from "@/lib/api/get-error-message";
 import { formatLocalDate, shiftLocalDate } from "@/lib/date";
-import { TemperatureCheckDialog } from "./components/temperature-check-dialog";
+import { TemperatureRoundFlow } from "./components/temperature-round-flow";
 import { TodayAllDone } from "./components/today-all-done";
 import { TodayEmptyState } from "./components/today-empty-state";
 import { TodayJumpToNow } from "./components/today-jump-to-now";
 import { TodayRecordSheet } from "./components/today-record-sheet";
 import { TodayStickyHeader } from "./components/today-sticky-header";
 import { TodayTimeline } from "./components/today-timeline";
+import {
+  useTemperatureRound,
+  type RoundTally,
+} from "./hooks/use-temperature-round";
 import { useTodayMutations } from "./hooks/use-today-mutations";
 import { useTodayQuery } from "./hooks/use-today-query";
+import { tapFeedback } from "./lib/haptics";
 import { flatTodayTasks, occurrenceKey } from "./lib/today-grouping";
 import {
   buildTodayTimeline,
+  findTimelineItem,
   type TodayTimelineItem,
 } from "./lib/today-timeline";
 
 const UNDO_TOAST_DURATION_MS = 5000;
-
-function tapFeedback() {
-  if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-    navigator.vibrate(10);
-  }
-}
 
 export function TodayView({
   initialData,
@@ -59,9 +59,6 @@ export function TodayView({
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [syncingKeys, setSyncingKeys] = useState<ReadonlySet<string>>(
     () => new Set(),
-  );
-  const [temperatureTask, setTemperatureTask] = useState<TodayTaskItem | null>(
-    null,
   );
   const [recordKey, setRecordKey] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
@@ -99,14 +96,22 @@ export function TodayView({
     [response, now, selectedDate, timeZone],
   );
 
-  const recordItem = useMemo(() => {
-    if (!recordKey) return null;
-    return (
-      timeline.groups
-        .flatMap((group) => group.items)
-        .find((item) => occurrenceKey(item.task) === recordKey) ?? null
-    );
-  }, [recordKey, timeline]);
+  // Both surfaces hold a key rather than the item itself: the clock tick
+  // rebuilds the timeline every minute, and a captured item would keep serving
+  // the prior reading it happened to see when it was opened.
+  const recordItem = useMemo(
+    () => findTimelineItem(timeline, recordKey),
+    [timeline, recordKey],
+  );
+
+  const round = useTemperatureRound(timeline);
+  const {
+    open: openRound,
+    recordSaved,
+    advance: advanceRound,
+    skip: skipRound,
+    close: closeRound,
+  } = round;
 
   const markSyncing = useCallback((key: string, syncing: boolean) => {
     setSyncingKeys((previous) => {
@@ -176,12 +181,33 @@ export function TodayView({
     [handleUndo, markSyncing, runComplete, t],
   );
 
-  const handleTemperatureConfirm = useCallback(
-    async (recordedC: number, correctiveAction?: string) => {
-      if (!temperatureTask) return;
+  /**
+   * One toast for a finished round, instead of leaving the worker to count the
+   * five per-save toasts that scrolled past while they were walking.
+   */
+  const summariseRound = useCallback(
+    (tally: RoundTally, roundSize: number) => {
+      if (roundSize <= 1 || tally.saved === 0) return;
+      toast.success(
+        tally.deviations > 0
+          ? t("temperatureDialog.roundSummaryDeviations", {
+              saved: tally.saved,
+              deviations: tally.deviations,
+            })
+          : t("temperatureDialog.roundSummary", { count: tally.saved }),
+      );
+    },
+    [t],
+  );
 
-      const task = temperatureTask;
+  const handleTemperatureConfirm = useCallback(
+    async (recordedC: number, correctiveAction?: string): Promise<boolean> => {
+      const task = round.item?.task;
+      if (!task) return false;
+
       const key = occurrenceKey(task);
+      // Captured before advancing, which clears the round it describes.
+      const roundSize = round.size;
       markSyncing(key, true);
       tapFeedback();
       try {
@@ -192,7 +218,6 @@ export function TodayView({
           recordedC,
           correctiveAction,
         });
-        setTemperatureTask(null);
         setAnnouncement(t("a11y.recorded", { title: task.title }));
         toast.success(t("toasts.recorded", { title: task.title }), {
           duration: UNDO_TOAST_DURATION_MS,
@@ -201,15 +226,51 @@ export function TodayView({
             onClick: () => void handleUndo(task),
           },
         });
+
+        recordSaved(
+          task.minTempC !== null && task.maxTempC !== null
+            ? classifyTemperatureResult({
+                recordedC,
+                minTempC: task.minTempC,
+                maxTempC: task.maxTempC,
+              })
+            : "ok",
+        );
+
+        const result = advanceRound();
+        if (result.done) summariseRound(result, roundSize);
+        return true;
       } catch (error) {
-        // The sheet stays open so the reading is not lost.
+        // The surface stays open on the same reading so it is not lost.
         toast.error(getErrorMessage(error, t("toasts.doneError")));
+        return false;
       } finally {
         markSyncing(key, false);
       }
     },
-    [handleUndo, markSyncing, runCompleteTemperature, t, temperatureTask],
+    [
+      advanceRound,
+      handleUndo,
+      markSyncing,
+      recordSaved,
+      round.item,
+      round.size,
+      runCompleteTemperature,
+      summariseRound,
+      t,
+    ],
   );
+
+  const handleTemperatureSkip = useCallback(() => {
+    const roundSize = round.size;
+    const result = skipRound();
+    if (result.done) summariseRound(result, roundSize);
+  }, [round.size, skipRound, summariseRound]);
+
+  const handleTemperatureClose = useCallback(() => {
+    const roundSize = round.size;
+    summariseRound(closeRound(), roundSize);
+  }, [closeRound, round.size, summariseRound]);
 
   const handleActivate = useCallback(
     (item: TodayTimelineItem) => {
@@ -227,13 +288,15 @@ export function TodayView({
           toast.error(t("toasts.missingEquipment"));
           return;
         }
-        setTemperatureTask(item.task);
+        // Also what the time group's Record button calls, so the header can
+        // never start a round the flow would refuse.
+        openRound(item);
         return;
       }
 
       void handleComplete(item.task);
     },
-    [handleComplete, t],
+    [handleComplete, openRound, t],
   );
 
   const isToday = selectedDate === todayDate;
@@ -318,18 +381,20 @@ export function TodayView({
         {announcement}
       </span>
 
-      {temperatureTask &&
-      temperatureTask.minTempC !== null &&
-      temperatureTask.maxTempC !== null ? (
-        <TemperatureCheckDialog
-          open
-          onOpenChange={(open) => {
-            if (!open) setTemperatureTask(null);
-          }}
-          task={temperatureTask}
-          minTempC={temperatureTask.minTempC}
-          maxTempC={temperatureTask.maxTempC}
-          onConfirm={handleTemperatureConfirm}
+      {round.item &&
+      round.currentKey &&
+      round.item.task.minTempC !== null &&
+      round.item.task.maxTempC !== null ? (
+        <TemperatureRoundFlow
+          item={round.item}
+          occurrenceKey={round.currentKey}
+          minTempC={round.item.task.minTempC}
+          maxTempC={round.item.task.maxTempC}
+          position={round.position}
+          size={round.size}
+          onSubmit={handleTemperatureConfirm}
+          onSkip={handleTemperatureSkip}
+          onClose={handleTemperatureClose}
         />
       ) : null}
 
