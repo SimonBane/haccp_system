@@ -37,7 +37,9 @@ export async function generateMetadata({
     manifest: "/manifest.webmanifest",
     appleWebApp: {
       capable: true,
-      statusBarStyle: "default",
+      // Transparent status bar so the PWA paints behind the notch/Dynamic Island
+      // (ChatGPT-style). Content must use safe-area insets — headers already do.
+      statusBarStyle: "black-translucent",
       title: t("title"),
     },
     icons: {
@@ -61,7 +63,7 @@ export async function generateMetadata({
 
 export function generateViewport() {
   return {
-    colorScheme: "light dark",
+    // Match the painted canvas so splash / chrome blend with the app surface.
     themeColor: [
       { media: "(prefers-color-scheme: light)", color: "#ffffff" },
       { media: "(prefers-color-scheme: dark)", color: "#252525" },
