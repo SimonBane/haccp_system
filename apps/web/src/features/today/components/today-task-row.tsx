@@ -36,8 +36,6 @@ function typeIcon(type: TodayTimelineItem["task"]["type"]) {
       return SparklesIcon;
     case "other":
       return Clock3Icon;
-    default:
-      return Clock3Icon;
   }
 }
 
