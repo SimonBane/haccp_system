@@ -10,10 +10,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="bg"
-      className={cn("h-full antialiased", "font-sans", inter.variable)}
+      className={cn("min-h-svh antialiased", "font-sans", inter.variable)}
       suppressHydrationWarning
     >
-      <body className="flex min-h-full flex-col font-sans">
+      <body className="flex min-h-svh flex-col font-sans">
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
