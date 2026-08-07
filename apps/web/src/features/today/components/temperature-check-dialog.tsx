@@ -48,7 +48,7 @@ export function TemperatureCheckDialog({
               (value) =>
                 value.length > 0 &&
                 Number.isFinite(parseLocalizedTemperature(value)),
-              { message: t("temperatureDialog.validation.invalid") },
+              { error: t("temperatureDialog.validation.invalid") },
             ),
           correctiveAction: z
             .string()
@@ -64,7 +64,7 @@ export function TemperatureCheckDialog({
             !values.correctiveAction
           ) {
             context.addIssue({
-              code: z.ZodIssueCode.custom,
+              code: "custom",
               path: ["correctiveAction"],
               message: t(
                 "temperatureDialog.validation.correctiveActionRequired",

@@ -57,7 +57,7 @@ export function LocationForm({
     [t],
   );
 
-  const form = useForm<z.infer<typeof locationFormSchema>>({
+  const form = useForm({
     resolver: zodResolver(locationFormSchema),
     defaultValues: {
       name: location?.name ?? "",
