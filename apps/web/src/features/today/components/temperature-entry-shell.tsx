@@ -122,7 +122,7 @@ export function TemperatureEntryShell({
           {/* The height has to include the inset. Tailwind's preflight makes
               every box border-box, so a bare h-14 with a safe-area top padding
               leaves a notched iPhone about 9px of actual app bar. */}
-          <header className="grid h-[calc(3.5rem+env(safe-area-inset-top))] shrink-0 grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-2 px-2 pt-[env(safe-area-inset-top)]">
+          <header className="grid h-[calc(3.5rem+env(safe-area-inset-top))] shrink-0 grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-2 bg-popover px-2 pt-[env(safe-area-inset-top)]">
             <Button
               variant="ghost"
               size="icon"
