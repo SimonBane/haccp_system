@@ -1,8 +1,6 @@
-import type { Context } from "hono";
 import {
   createRoute,
   type OpenAPIHono,
-  type RouteHandler,
 } from "@hono/zod-openapi";
 import { locationResourceParamSchema } from "@haccp/shared";
 import type { z } from "zod";
@@ -12,9 +10,9 @@ import {
   getCurrentLocation,
 } from "../../lib/context.js";
 import type { AppEnv } from "../../types.js";
-import { errorResponse, jsonResponse } from "./responses.js";
+import { errorResponse, jsonResponse, defineRouteHandler } from "./responses.js";
 
-export { errorResponse, jsonResponse } from "./responses.js";
+export { errorResponse, jsonResponse, defineRouteHandler } from "./responses.js";
 
 const bearerSecurity = [{ Bearer: [] }];
 
@@ -133,26 +131,26 @@ export function registerAdminCrudRoutes<
 
   options.router.openapi(
     listRoute,
-    (async (c: Context<AppEnv>) => {
+    defineRouteHandler(listRoute, async (c) => {
       const { id: locationId } = getCurrentLocation(c);
       const result = await options.service.list(getDb(c), locationId);
       return c.json(result, 200);
-    }) as unknown as RouteHandler<typeof listRoute, AppEnv>,
+    }),
   );
 
   options.router.openapi(
     createRouteDef,
-    (async (c: Context<AppEnv>) => {
+    defineRouteHandler(createRouteDef, async (c) => {
       const { id: locationId } = getCurrentLocation(c);
       const input = options.schemas.create.parse(await c.req.json());
       const created = await options.service.create(getDb(c), locationId, input);
       return c.json(created, 201);
-    }) as unknown as RouteHandler<typeof createRouteDef, AppEnv>,
+    }),
   );
 
   options.router.openapi(
     updateRouteDef,
-    (async (c: Context<AppEnv>) => {
+    defineRouteHandler(updateRouteDef, async (c) => {
       const { id: locationId } = getCurrentLocation(c);
       const { id } = locationResourceParamSchema.parse(c.req.param());
       const input = options.schemas.update.parse(await c.req.json());
@@ -163,16 +161,16 @@ export function registerAdminCrudRoutes<
         input,
       );
       return c.json(updated, 200);
-    }) as unknown as RouteHandler<typeof updateRouteDef, AppEnv>,
+    }),
   );
 
   options.router.openapi(
     deleteRouteDef,
-    (async (c: Context<AppEnv>) => {
+    defineRouteHandler(deleteRouteDef, async (c) => {
       const { id: locationId } = getCurrentLocation(c);
       const { id } = locationResourceParamSchema.parse(c.req.param());
       await options.service.delete(getDb(c), locationId, id);
       return c.body(null, 204);
-    }) as unknown as RouteHandler<typeof deleteRouteDef, AppEnv>,
+    }),
   );
 }
