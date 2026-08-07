@@ -61,11 +61,7 @@ export async function generateMetadata({
 
 export function generateViewport() {
   return {
-    colorScheme: "light dark",
-    themeColor: [
-      { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-      { media: "(prefers-color-scheme: dark)", color: "#252525" },
-    ],
+    themeColor: "#1d6fa8",
     viewportFit: "cover",
   };
 }
@@ -104,15 +100,8 @@ export default async function LocaleLayout({
         <ServiceWorkerRegistration />
         <QueryProvider>
           <TooltipProvider>
-            <div className="flex min-h-svh flex-col bg-background">
-              {children}
-            </div>
-            <Toaster
-              position="top-center"
-              style={{
-                top: "max(0.5rem, var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))",
-              }}
-            />
+            {children}
+            <Toaster position="top-center" />
           </TooltipProvider>
         </QueryProvider>
       </NextIntlClientProvider>
