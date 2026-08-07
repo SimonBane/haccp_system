@@ -211,7 +211,7 @@ export function TaskTemplatesForm({
         type: z
           .union([taskTemplateTypeSchema, z.literal("")])
           .refine((value): value is TaskTemplateType => value !== "", {
-            message: t("validation.typeRequired"),
+            error: t("validation.typeRequired"),
           }),
         weekdays: z
           .array(taskTemplateWeekdaySchema)
@@ -224,7 +224,7 @@ export function TaskTemplatesForm({
                 .superRefine((value, ctx) => {
                   if (value === "") {
                     ctx.addIssue({
-                      code: z.ZodIssueCode.custom,
+                      code: "custom",
                       message: t("validation.timeRequired"),
                     });
                     return;
@@ -233,7 +233,7 @@ export function TaskTemplatesForm({
                   const result = scheduledTimeSchema.safeParse(value);
                   if (!result.success) {
                     ctx.addIssue({
-                      code: z.ZodIssueCode.custom,
+                      code: "custom",
                       message: t("validation.timeInvalid"),
                     });
                   }
@@ -242,12 +242,12 @@ export function TaskTemplatesForm({
           )
           .min(1, t("validation.timesRequired"))
           .max(TASK_TEMPLATE_MAX_SCHEDULED_TIMES, t("validation.timesMax")),
-        equipmentId: z.string().uuid().nullable(),
+        equipmentId: z.uuid().nullable(),
       })
       .superRefine((data, ctx) => {
         if (data.type === "temperature" && !data.equipmentId) {
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: "custom",
             message: t("validation.equipmentRequired"),
             path: ["equipmentId"],
           });
@@ -301,13 +301,15 @@ export function TaskTemplatesForm({
   );
   const skipWeekdaysBlurRef = useRef(false);
 
-  useEffect(() => {
-    if (!open) return;
-    form.reset(defaultValues);
-    setWeekdayPreset(getWeekdayPreset(defaultValues.weekdays));
-    setAutoFocusTimeIndex(null);
-    setDuplicateTimesError(null);
-  }, [open, defaultValues, form]);
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) {
+      form.reset(defaultValues);
+      setWeekdayPreset(getWeekdayPreset(defaultValues.weekdays));
+      setAutoFocusTimeIndex(null);
+      setDuplicateTimesError(null);
+    }
+    onOpenChange(nextOpen);
+  };
 
   useEffect(() => {
     if (!open || !duplicateSource || task) return;
@@ -447,7 +449,7 @@ export function TaskTemplatesForm({
   return (
     <ResponsiveFormDialog
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={handleDialogOpenChange}
       title={
         isEditing
           ? t("editTitle")

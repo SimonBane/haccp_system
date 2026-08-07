@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -40,21 +40,17 @@ function NavMainItem({ item }: { item: NavItem }) {
   const t = useTranslations("Sidebar");
   const { isMobile, setOpenMobile } = useSidebar();
   const hasActiveChild = item.items?.some((subItem) => subItem.isActive) ?? false;
+  const forceOpen = Boolean(item.isActive || hasActiveChild);
   const [open, setOpen] = useState(
-    item.defaultExpanded || item.isActive || hasActiveChild,
+    item.defaultExpanded || forceOpen,
   );
+  const effectiveOpen = forceOpen || open;
 
   const closeMobileSidebar = () => {
     if (isMobile) {
       setOpenMobile(false);
     }
   };
-
-  useEffect(() => {
-    if (item.isActive || hasActiveChild) {
-      setOpen(true);
-    }
-  }, [hasActiveChild, item.isActive]);
 
   if (!item.items?.length) {
     return (
@@ -74,7 +70,7 @@ function NavMainItem({ item }: { item: NavItem }) {
 
   return (
     <Collapsible
-      open={open}
+      open={effectiveOpen}
       onOpenChange={setOpen}
     >
       <SidebarMenuItem>

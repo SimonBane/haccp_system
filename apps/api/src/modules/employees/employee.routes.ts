@@ -1,4 +1,3 @@
-// @ts-nocheck — Vercel Hono preset per-file TS cannot infer OpenAPI handler types reliably.
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import {
   createEmployeeSchema,
@@ -8,6 +7,7 @@ import {
   uuidParamSchema,
 } from "@haccp/shared";
 import {
+  defineRouteHandler,
   errorResponse,
   jsonResponse,
 } from "../../core/openapi/route-factory.js";
@@ -129,79 +129,94 @@ const deleteRouteDef = createRoute({
   },
 });
 
-employeeRoutes.openapi(listRoute, async (c) => {
-  const { organizationId } = requireOrgContext(c);
-  const result = await employeeService.list(
-    getDb(c),
-    organizationId,
-    getTenant(c).locations,
-  );
-  return c.json(result, 200);
-});
+employeeRoutes.openapi(
+  listRoute,
+  defineRouteHandler(listRoute, async (c) => {
+    const { organizationId } = requireOrgContext(c);
+    const result = await employeeService.list(
+      getDb(c),
+      organizationId,
+      getTenant(c).locations,
+    );
+    return c.json(result, 200);
+  }),
+);
 
-employeeRoutes.openapi(createRouteDef, async (c) => {
-  const { clerkOrgId, organizationId, userId } = requireOrgContext(c);
-  const tenant = getTenant(c);
-  const input = c.req.valid("json");
-  const created = await employeeService.create(
-    getDb(c),
-    organizationId,
-    clerkOrgId,
-    userId,
-    tenant.organization.locale,
-    input,
-    tenant.locations,
-  );
-  return c.json(created, 201);
-});
+employeeRoutes.openapi(
+  createRouteDef,
+  defineRouteHandler(createRouteDef, async (c) => {
+    const { clerkOrgId, organizationId, userId } = requireOrgContext(c);
+    const tenant = getTenant(c);
+    const input = c.req.valid("json");
+    const created = await employeeService.create(
+      getDb(c),
+      organizationId,
+      clerkOrgId,
+      userId,
+      tenant.organization.locale,
+      input,
+      tenant.locations,
+    );
+    return c.json(created, 201);
+  }),
+);
 
-employeeRoutes.openapi(updateRouteDef, async (c) => {
-  const { clerkOrgId, organizationId, userDbId, userId } = requireOrgContext(c);
-  const tenant = getTenant(c);
-  const { id } = c.req.valid("param");
-  const input = c.req.valid("json");
-  const updated = await employeeService.update(
-    getDb(c),
-    organizationId,
-    clerkOrgId,
-    userId,
-    userDbId,
-    tenant.organization.locale,
-    id,
-    input,
-    tenant.locations,
-  );
-  return c.json(updated, 200);
-});
+employeeRoutes.openapi(
+  updateRouteDef,
+  defineRouteHandler(updateRouteDef, async (c) => {
+    const { clerkOrgId, organizationId, userDbId, userId } = requireOrgContext(c);
+    const tenant = getTenant(c);
+    const { id } = c.req.valid("param");
+    const input = c.req.valid("json");
+    const updated = await employeeService.update(
+      getDb(c),
+      organizationId,
+      clerkOrgId,
+      userId,
+      userDbId,
+      tenant.organization.locale,
+      id,
+      input,
+      tenant.locations,
+    );
+    return c.json(updated, 200);
+  }),
+);
 
-employeeRoutes.openapi(inviteRoute, async (c) => {
-  const { clerkOrgId, organizationId, userId } = requireOrgContext(c);
-  const tenant = getTenant(c);
-  const { id } = c.req.valid("param");
-  const updated = await employeeService.invite(
-    getDb(c),
-    organizationId,
-    clerkOrgId,
-    userId,
-    tenant.organization.locale,
-    id,
-    tenant.locations,
-  );
-  return c.json(updated, 200);
-});
+employeeRoutes.openapi(
+  inviteRoute,
+  defineRouteHandler(inviteRoute, async (c) => {
+    const { clerkOrgId, organizationId, userId } = requireOrgContext(c);
+    const tenant = getTenant(c);
+    const { id } = c.req.valid("param");
+    const updated = await employeeService.invite(
+      getDb(c),
+      organizationId,
+      clerkOrgId,
+      userId,
+      tenant.organization.locale,
+      id,
+      tenant.locations,
+    );
+    return c.json(updated, 200);
+  }),
+);
 
-employeeRoutes.openapi(revokeInvitationRoute, async (c) => {
-  const { clerkOrgId, organizationId } = requireOrgContext(c);
-  const { id } = c.req.valid("param");
-  const updated = await employeeService.revokeInvitation(
-    getDb(c),
-    organizationId,
-    clerkOrgId,
-    id,
-    getTenant(c).locations,
-  );
-  return c.json(updated, 200);
-});
+employeeRoutes.openapi(
+  revokeInvitationRoute,
+  defineRouteHandler(revokeInvitationRoute, async (c) => {
+    const { clerkOrgId, organizationId } = requireOrgContext(c);
+    const { id } = c.req.valid("param");
+    const updated = await employeeService.revokeInvitation(
+      getDb(c),
+      organizationId,
+      clerkOrgId,
+      id,
+      getTenant(c).locations,
+    );
+    return c.json(updated, 200);
+  }),
+);
 
 employeeRoutes.openapi(deleteRouteDef, async (c) => {
   const { clerkOrgId, organizationId } = requireOrgContext(c);
