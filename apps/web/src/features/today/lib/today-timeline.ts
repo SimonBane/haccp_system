@@ -19,6 +19,17 @@ import {
  */
 export type TimeGroupState = "done" | "overdue" | "now" | "upcoming";
 
+/**
+ * `completedAt` is when the reading was actually taken; `scheduledTime` is the
+ * round it belonged to. The entry dialog shows the former and falls back to the
+ * latter, which is all a pending row needs.
+ */
+export type TodayPriorReading = {
+  scheduledTime: string;
+  completedAt: string | null;
+  recordedC: number;
+};
+
 export type TodayTimelineItem = {
   task: TodayTaskItem;
   isCompleted: boolean;
@@ -28,7 +39,7 @@ export type TodayTimelineItem = {
    * The most recent reading taken earlier the same day for the same equipment.
    * Derived from the payload we already have — no extra request.
    */
-  priorReading: { scheduledTime: string; recordedC: number } | null;
+  priorReading: TodayPriorReading | null;
 };
 
 export type TodayTimeGroup = {
@@ -87,15 +98,9 @@ function isDeviation(task: TodayTaskItem): boolean {
  */
 function buildPriorReadings(
   tasksInTimeOrder: TodayTaskItem[],
-): Map<string, { scheduledTime: string; recordedC: number }> {
-  const priorByTaskKey = new Map<
-    string,
-    { scheduledTime: string; recordedC: number }
-  >();
-  const lastByEquipment = new Map<
-    string,
-    { scheduledTime: string; recordedC: number }
-  >();
+): Map<string, TodayPriorReading> {
+  const priorByTaskKey = new Map<string, TodayPriorReading>();
+  const lastByEquipment = new Map<string, TodayPriorReading>();
 
   for (const task of tasksInTimeOrder) {
     if (!task.equipmentId) continue;
@@ -111,6 +116,7 @@ function buildPriorReadings(
     if (task.temperatureReading) {
       lastByEquipment.set(task.equipmentId, {
         scheduledTime: task.scheduledTime,
+        completedAt: task.completedAt,
         recordedC: task.temperatureReading.recordedC,
       });
     }
