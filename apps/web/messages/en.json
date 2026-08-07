@@ -74,7 +74,6 @@
       "taskType": "Type"
     },
     "keypad": {
-      "toggleSign": "Toggle sign",
       "decimal": "Decimal separator",
       "backspace": "Backspace"
     },
@@ -105,32 +104,44 @@
       "correctiveAction": "Corrective action"
     },
     "temperatureDialog": {
-      "title": "Temperature check",
       "allowedRange": "Allowed range",
       "recordedCLabel": "Measured temperature",
-      "celsius": "°C",
-      "recordedCPlaceholder": "Enter temperature in °C",
       "ok": "OK",
       "outOfRange": "Out of range",
-      "okHint": "Within the allowed range",
-      "outOfRangeHint": "Outside the allowed range",
-      "correctiveActionLabel": "Corrective action taken",
       "correctiveActionPlaceholder": "For example, moved the products and notified the manager…",
-      "correctiveActionHint": "Describe exactly what you did after the deviation.",
       "presets": {
         "movedProduct": "Moved product",
         "adjustedThermostat": "Adjusted thermostat",
         "notifiedManager": "Notified manager",
         "calledService": "Called service"
       },
-      "cancel": "Cancel",
       "confirm": "Save reading",
       "validation": {
         "required": "Enter a temperature reading",
         "invalid": "Enter a valid number",
-        "correctiveActionRequired": "Describe the corrective action taken",
-        "correctiveActionMax": "Corrective action can be up to 1000 characters"
-      }
+        "correctiveActionRequired": "Select or describe the corrective action taken",
+        "outOfBounds": "Enter a temperature between -99.9 and 99.9 °C",
+        "correctiveActionMax": "Notes can be up to 900 characters"
+      },
+      "close": "Close",
+      "back": "Back",
+      "continueLabel": "Continue",
+      "statusIdle": "Allowed range {min} – {max} °C",
+      "implausibleHint": "Unusual for this equipment — check the thermometer",
+      "lastReading": "Last: {value} °C at {time}",
+      "noPriorReading": "First reading today",
+      "signGroupLabel": "Temperature sign",
+      "signNegative": "Negative",
+      "signPositive": "Positive",
+      "decrement": "Decrease by 0.1 °C",
+      "increment": "Increase by 0.1 °C",
+      "correctiveTitle": "What did you do?",
+      "notesLabel": "Notes",
+      "charactersLeft": "{count, plural, one {# character left} other {# characters left}}",
+      "srVerdictOk": "{value} °C, within the allowed range",
+      "srVerdictOutOfRange": "{value} °C, outside the allowed range",
+      "okHint": "Within the allowed range",
+      "outOfRangeHint": "Outside the allowed range"
     },
     "a11y": {
       "completed": "{title} completed",

@@ -74,7 +74,6 @@
       "taskType": "Тип"
     },
     "keypad": {
-      "toggleSign": "Смени знака",
       "decimal": "Десетичен знак",
       "backspace": "Изтрий"
     },
@@ -105,32 +104,44 @@
       "correctiveAction": "Коригиращо действие"
     },
     "temperatureDialog": {
-      "title": "Температурна проверка",
       "allowedRange": "Допустим диапазон",
       "recordedCLabel": "Отчетена температура",
-      "celsius": "°C",
-      "recordedCPlaceholder": "Въведете температура (°C)",
       "ok": "ОК",
       "outOfRange": "Извън диапазона",
-      "okHint": "В допустимите граници",
-      "outOfRangeHint": "Извън допустимите граници",
-      "correctiveActionLabel": "Предприето коригиращо действие",
       "correctiveActionPlaceholder": "Напр. преместих продуктите и уведомих отговорника…",
-      "correctiveActionHint": "Опишете конкретно какво направихте след отклонението.",
       "presets": {
         "movedProduct": "Преместих продуктите",
         "adjustedThermostat": "Настроих термостата",
         "notifiedManager": "Уведомих отговорника",
         "calledService": "Извиках сервиз"
       },
-      "cancel": "Отказ",
       "confirm": "Запиши",
       "validation": {
         "required": "Въведете измерена температура",
         "invalid": "Въведете валидно число",
-        "correctiveActionRequired": "Опишете предприетото коригиращо действие",
-        "correctiveActionMax": "Коригиращото действие може да е до 1000 знака"
-      }
+        "correctiveActionRequired": "Изберете или опишете предприетото коригиращо действие",
+        "outOfBounds": "Въведете температура между -99,9 и 99,9 °C",
+        "correctiveActionMax": "Бележките може да са до 900 знака"
+      },
+      "close": "Затвори",
+      "back": "Назад",
+      "continueLabel": "Продължи",
+      "statusIdle": "Допустим диапазон {min} – {max} °C",
+      "implausibleHint": "Необичайно за това оборудване — проверете термометъра",
+      "lastReading": "Последно: {value} °C в {time}",
+      "noPriorReading": "Първо измерване днес",
+      "signGroupLabel": "Знак на температурата",
+      "signNegative": "Отрицателна",
+      "signPositive": "Положителна",
+      "decrement": "Намали с 0,1 °C",
+      "increment": "Увеличи с 0,1 °C",
+      "correctiveTitle": "Какво предприехте?",
+      "notesLabel": "Бележки",
+      "charactersLeft": "{count, plural, one {Остава # знак} other {Остават # знака}}",
+      "srVerdictOk": "{value} °C, в допустимите граници",
+      "srVerdictOutOfRange": "{value} °C, извън допустимите граници",
+      "okHint": "В допустимите граници",
+      "outOfRangeHint": "Извън допустимите граници"
     },
     "a11y": {
       "completed": "{title} е изпълнена",

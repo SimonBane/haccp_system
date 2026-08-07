@@ -21,6 +21,7 @@ import { TodayStickyHeader } from "./components/today-sticky-header";
 import { TodayTimeline } from "./components/today-timeline";
 import { useTodayMutations } from "./hooks/use-today-mutations";
 import { useTodayQuery } from "./hooks/use-today-query";
+import { tapFeedback } from "./lib/haptics";
 import { flatTodayTasks, occurrenceKey } from "./lib/today-grouping";
 import {
   buildTodayTimeline,
@@ -28,12 +29,6 @@ import {
 } from "./lib/today-timeline";
 
 const UNDO_TOAST_DURATION_MS = 5000;
-
-function tapFeedback() {
-  if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-    navigator.vibrate(10);
-  }
-}
 
 export function TodayView({
   initialData,
@@ -60,9 +55,7 @@ export function TodayView({
   const [syncingKeys, setSyncingKeys] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
-  const [temperatureTask, setTemperatureTask] = useState<TodayTaskItem | null>(
-    null,
-  );
+  const [temperatureKey, setTemperatureKey] = useState<string | null>(null);
   const [recordKey, setRecordKey] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
 
@@ -99,14 +92,29 @@ export function TodayView({
     [response, now, selectedDate, timeZone],
   );
 
-  const recordItem = useMemo(() => {
-    if (!recordKey) return null;
-    return (
-      timeline.groups
-        .flatMap((group) => group.items)
-        .find((item) => occurrenceKey(item.task) === recordKey) ?? null
-    );
-  }, [recordKey, timeline]);
+  // Both dialogs hold a key rather than the item itself: the clock tick rebuilds
+  // the timeline every minute, and a captured item would keep serving the prior
+  // reading it happened to see when it was opened.
+  const findItem = useCallback(
+    (key: string | null) => {
+      if (!key) return null;
+      return (
+        timeline.groups
+          .flatMap((group) => group.items)
+          .find((item) => occurrenceKey(item.task) === key) ?? null
+      );
+    },
+    [timeline],
+  );
+
+  const recordItem = useMemo(
+    () => findItem(recordKey),
+    [findItem, recordKey],
+  );
+  const temperatureItem = useMemo(
+    () => findItem(temperatureKey),
+    [findItem, temperatureKey],
+  );
 
   const markSyncing = useCallback((key: string, syncing: boolean) => {
     setSyncingKeys((previous) => {
@@ -178,9 +186,9 @@ export function TodayView({
 
   const handleTemperatureConfirm = useCallback(
     async (recordedC: number, correctiveAction?: string) => {
-      if (!temperatureTask) return;
+      const task = temperatureItem?.task;
+      if (!task) return;
 
-      const task = temperatureTask;
       const key = occurrenceKey(task);
       markSyncing(key, true);
       tapFeedback();
@@ -192,7 +200,7 @@ export function TodayView({
           recordedC,
           correctiveAction,
         });
-        setTemperatureTask(null);
+        setTemperatureKey(null);
         setAnnouncement(t("a11y.recorded", { title: task.title }));
         toast.success(t("toasts.recorded", { title: task.title }), {
           duration: UNDO_TOAST_DURATION_MS,
@@ -208,7 +216,7 @@ export function TodayView({
         markSyncing(key, false);
       }
     },
-    [handleUndo, markSyncing, runCompleteTemperature, t, temperatureTask],
+    [handleUndo, markSyncing, runCompleteTemperature, t, temperatureItem],
   );
 
   const handleActivate = useCallback(
@@ -227,7 +235,7 @@ export function TodayView({
           toast.error(t("toasts.missingEquipment"));
           return;
         }
-        setTemperatureTask(item.task);
+        setTemperatureKey(occurrenceKey(item.task));
         return;
       }
 
@@ -318,17 +326,17 @@ export function TodayView({
         {announcement}
       </span>
 
-      {temperatureTask &&
-      temperatureTask.minTempC !== null &&
-      temperatureTask.maxTempC !== null ? (
+      {temperatureItem &&
+      temperatureItem.task.minTempC !== null &&
+      temperatureItem.task.maxTempC !== null ? (
         <TemperatureCheckDialog
           open
           onOpenChange={(open) => {
-            if (!open) setTemperatureTask(null);
+            if (!open) setTemperatureKey(null);
           }}
-          task={temperatureTask}
-          minTempC={temperatureTask.minTempC}
-          maxTempC={temperatureTask.maxTempC}
+          item={temperatureItem}
+          minTempC={temperatureItem.task.minTempC}
+          maxTempC={temperatureItem.task.maxTempC}
           onConfirm={handleTemperatureConfirm}
         />
       ) : null}

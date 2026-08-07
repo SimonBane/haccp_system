@@ -1,40 +1,70 @@
 "use client";
 
-import type { TodayTaskItem } from "@haccp/shared";
 import { classifyTemperatureResult } from "@haccp/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
-import { Button } from "@/components/ui/button";
-import { DialogFooter } from "@/components/ui/dialog";
-import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
-import { formatTemperature } from "../lib/format";
-import { parseLocalizedTemperature } from "../lib/temperature";
+import { useOrgTimeZone } from "@/features/tenant/use-org-timezone";
+import { cn } from "@/lib/utils";
+import { useSettledReading } from "../hooks/use-settled-reading";
+import { decimalSeparator } from "../lib/format";
+import {
+  TEMP_MAX_MAGNITUDE,
+  composeCorrectiveAction,
+  inferTemperatureSign,
+  parseTemperatureDraft,
+} from "../lib/temperature";
+import type { TodayTimelineItem } from "../lib/today-timeline";
+import {
+  CORRECTIVE_PRESET_KEYS,
+  NOTES_MAX_LENGTH,
+  TemperatureCorrectiveStep,
+  type CorrectivePresetKey,
+} from "./temperature-corrective-step";
+import { TemperatureEntryShell } from "./temperature-entry-shell";
 import { TemperatureReadingStep } from "./temperature-reading-step";
 
-const TEMPERATURE_FORM_ID = "temperature-check-form";
+const ID_PREFIX = "temperature-check";
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  task: TodayTaskItem;
+  item: TodayTimelineItem;
   minTempC: number;
   maxTempC: number;
   onConfirm: (recordedC: number, correctiveAction?: string) => Promise<void>;
 };
 
+function isPresetKey(value: string): value is CorrectivePresetKey {
+  return (CORRECTIVE_PRESET_KEYS as readonly string[]).includes(value);
+}
+
 export function TemperatureCheckDialog({
   open,
   onOpenChange,
-  task,
+  item,
   minTempC,
   maxTempC,
   onConfirm,
 }: Props) {
   const t = useTranslations("TodayPage");
   const locale = useLocale();
+  const timeZone = useOrgTimeZone();
+  const separator = useMemo(() => decimalSeparator(locale), [locale]);
+  const desktopInputRef = useRef<HTMLInputElement>(null);
+  const readingStepRef = useRef<HTMLDivElement>(null);
+  const correctiveStepRef = useRef<HTMLDivElement>(null);
+  const hasChangedStep = useRef(false);
+
+  const { task } = item;
+
+  const [step, setStep] = useState<"reading" | "corrective">("reading");
+  // Reopening the dialog remounts it, so inferring once on mount is enough.
+  const [sign, setSign] = useState<1 | -1>(() =>
+    inferTemperatureSign(minTempC, maxTempC),
+  );
 
   const formSchema = useMemo(
     () =>
@@ -42,30 +72,48 @@ export function TemperatureCheckDialog({
         .object({
           recordedC: z
             .string()
-            .trim()
             .min(1, t("temperatureDialog.validation.required"))
-            .refine(
-              (value) =>
-                value.length > 0 &&
-                Number.isFinite(parseLocalizedTemperature(value)),
-              { message: t("temperatureDialog.validation.invalid") },
-            ),
-          correctiveAction: z
+            .superRefine((value, context) => {
+              const parsed = parseTemperatureDraft(value);
+              if (parsed === null) {
+                context.addIssue({
+                  code: z.ZodIssueCode.custom,
+                  message: t("temperatureDialog.validation.invalid"),
+                });
+                return;
+              }
+              if (Math.abs(parsed) > TEMP_MAX_MAGNITUDE) {
+                context.addIssue({
+                  code: z.ZodIssueCode.custom,
+                  message: t("temperatureDialog.validation.outOfBounds"),
+                });
+              }
+            }),
+          presets: z.array(z.string()),
+          notes: z
             .string()
             .trim()
-            .max(1000, t("temperatureDialog.validation.correctiveActionMax")),
+            .max(
+              NOTES_MAX_LENGTH,
+              t("temperatureDialog.validation.correctiveActionMax"),
+            ),
         })
         .superRefine((values, context) => {
-          const recordedC = parseLocalizedTemperature(values.recordedC);
+          const parsed = parseTemperatureDraft(values.recordedC);
+          if (parsed === null) return;
           if (
-            Number.isFinite(recordedC) &&
-            classifyTemperatureResult({ recordedC, minTempC, maxTempC }) ===
-              "out_of_range" &&
-            !values.correctiveAction
+            classifyTemperatureResult({
+              recordedC: parsed,
+              minTempC,
+              maxTempC,
+            }) !== "out_of_range"
           ) {
+            return;
+          }
+          if (values.presets.length === 0 && values.notes.trim().length === 0) {
             context.addIssue({
               code: z.ZodIssueCode.custom,
-              path: ["correctiveAction"],
+              path: ["presets"],
               message: t(
                 "temperatureDialog.validation.correctiveActionRequired",
               ),
@@ -79,22 +127,48 @@ export function TemperatureCheckDialog({
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { recordedC: "", correctiveAction: "" },
+    defaultValues: { recordedC: "", presets: [], notes: "" },
     mode: "onTouched",
   });
 
   const recordedC = useWatch({ control: form.control, name: "recordedC" });
-  const correctiveAction = useWatch({
-    control: form.control,
-    name: "correctiveAction",
-  });
+  const presets = useWatch({ control: form.control, name: "presets" });
+  const notes = useWatch({ control: form.control, name: "notes" });
   const { errors, isSubmitting, isSubmitted } = form.formState;
 
+  const parsed = parseTemperatureDraft(recordedC);
+  const { settled: settledDraft, flush } = useSettledReading(recordedC);
+  const settledValue = parseTemperatureDraft(settledDraft);
+  const verdict =
+    settledValue === null
+      ? null
+      : classifyTemperatureResult({
+          recordedC: settledValue,
+          minTempC,
+          maxTempC,
+        });
+
+  // Marking the outgoing step inert evicts whatever held focus, and the browser
+  // hands it to the next control it finds — the notes textarea, which opens the
+  // phone keyboard over the corrective options nobody asked to skip. Land on the
+  // step itself instead, so the keyboard only appears once notes are tapped.
   useEffect(() => {
-    if (!open) {
-      form.reset({ recordedC: "", correctiveAction: "" });
+    if (!hasChangedStep.current) {
+      hasChangedStep.current = true;
+      return;
     }
-  }, [open, form]);
+    const target =
+      step === "reading" ? readingStepRef.current : correctiveStepRef.current;
+    target?.focus();
+  }, [step]);
+
+  function handleValueChange(next: string) {
+    form.setValue("recordedC", next, { shouldValidate: isSubmitted });
+    // Keeps the mobile sign control honest when a minus arrives from elsewhere,
+    // such as the desktop field or a paste. An empty draft keeps the last sign.
+    if (next.startsWith("-")) setSign(-1);
+    else if (next !== "") setSign(1);
+  }
 
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen && isSubmitting) return;
@@ -102,72 +176,138 @@ export function TemperatureCheckDialog({
   }
 
   async function handleValidSubmit(values: FormValues) {
-    const parsed = parseLocalizedTemperature(values.recordedC);
-    if (!Number.isFinite(parsed)) return;
+    const value = parseTemperatureDraft(values.recordedC);
+    if (value === null) return;
 
-    await onConfirm(parsed, values.correctiveAction || undefined);
-    form.reset({ recordedC: "", correctiveAction: "" });
+    const labels = values.presets
+      .filter(isPresetKey)
+      .map((key) => t(`temperatureDialog.presets.${key}`));
+
+    await onConfirm(
+      // Normalises "-0" to 0.
+      value + 0,
+      composeCorrectiveAction(labels, values.notes) || undefined,
+    );
   }
 
+  async function handlePrimary() {
+    if (!(await form.trigger("recordedC"))) return;
+
+    const value = parseTemperatureDraft(form.getValues("recordedC"));
+    if (value === null) return;
+
+    // Re-derived from the live value rather than the debounced verdict, so a
+    // badge that has not caught up yet can never wave a deviation through.
+    const isDeviation =
+      classifyTemperatureResult({ recordedC: value, minTempC, maxTempC }) ===
+      "out_of_range";
+
+    if (step === "reading" && isDeviation) {
+      flush();
+      setStep("corrective");
+      return;
+    }
+
+    await form.handleSubmit(handleValidSubmit)();
+  }
+
+  const isReading = step === "reading";
+  const primaryIcon =
+    isReading && verdict === "out_of_range" ? "continue" : "confirm";
+  const primaryLabel =
+    primaryIcon === "continue"
+      ? t("temperatureDialog.continueLabel")
+      : t("temperatureDialog.confirm");
+
   return (
-    <ResponsiveFormDialog
+    <TemperatureEntryShell
       open={open}
       onOpenChange={handleOpenChange}
-      mobileHeight="content"
       title={task.title}
-      description={
-        <>
-          {task.equipmentName ? `${task.equipmentName} · ` : ""}
-          {task.scheduledTime} · {t("temperatureDialog.allowedRange")}:{" "}
-          {formatTemperature(minTempC, locale)} –{" "}
-          {formatTemperature(maxTempC, locale)} °C
-        </>
+      subtitle={
+        task.equipmentName
+          ? `${task.equipmentName} · ${task.scheduledTime}`
+          : task.scheduledTime
       }
-      footer={
-        <DialogFooter className="gap-2 sm:gap-2">
-          <Button
-            variant="outline"
-            className="min-h-11 sm:min-h-9"
-            disabled={isSubmitting}
-            onClick={() => handleOpenChange(false)}
-          >
-            {t("temperatureDialog.cancel")}
-          </Button>
-          <Button
-            type="submit"
-            form={TEMPERATURE_FORM_ID}
-            className="min-h-12 sm:min-h-9"
-            isLoading={isSubmitting}
-          >
-            {t("temperatureDialog.confirm")}
-          </Button>
-        </DialogFooter>
+      leading={isReading ? "close" : "back"}
+      leadingLabel={
+        isReading ? t("temperatureDialog.close") : t("temperatureDialog.back")
       }
+      onLeading={() =>
+        isReading ? handleOpenChange(false) : setStep("reading")
+      }
+      primaryIcon={primaryIcon}
+      primaryLabel={primaryLabel}
+      primaryDisabled={parsed === null}
+      primaryLoading={isSubmitting}
+      onPrimary={() => void handlePrimary()}
+      desktopInitialFocus={desktopInputRef}
     >
+      {/* Both steps share one grid cell, so neither can resize the other. On a
+          phone the cell is the viewport minus the app bar; on desktop the row
+          sizes to the taller step and then stays there, so the dialog does not
+          jump when the flow advances. */}
       <form
-        id={TEMPERATURE_FORM_ID}
-        onSubmit={form.handleSubmit(handleValidSubmit)}
+        className="grid min-h-0 flex-1 grid-cols-1 grid-rows-1 md:flex-none"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void handlePrimary();
+        }}
       >
-        <TemperatureReadingStep
-          idPrefix={TEMPERATURE_FORM_ID}
-          minTempC={minTempC}
-          maxTempC={maxTempC}
-          value={recordedC}
-          onValueChange={(next) =>
-            form.setValue("recordedC", next, { shouldValidate: isSubmitted })
-          }
-          valueError={errors.recordedC?.message}
-          correctiveAction={correctiveAction}
-          onCorrectiveActionChange={(next) =>
-            form.setValue("correctiveAction", next, {
-              shouldValidate: isSubmitted,
-            })
-          }
-          correctiveActionError={errors.correctiveAction?.message}
-          onValueBlur={() => void form.trigger("recordedC")}
-          onCorrectiveActionBlur={() => void form.trigger("correctiveAction")}
-        />
+        <div
+          ref={readingStepRef}
+          tabIndex={-1}
+          className={cn(
+            "col-start-1 row-start-1 flex min-h-0 flex-col outline-none transition-opacity duration-150 motion-reduce:transition-none",
+            isReading ? "opacity-100" : "pointer-events-none opacity-0",
+          )}
+          inert={!isReading}
+        >
+          <TemperatureReadingStep
+            idPrefix={ID_PREFIX}
+            minTempC={minTempC}
+            maxTempC={maxTempC}
+            value={recordedC}
+            onValueChange={handleValueChange}
+            valueError={errors.recordedC?.message}
+            onValueBlur={() => void form.trigger("recordedC")}
+            sign={sign}
+            onSignChange={setSign}
+            separator={separator}
+            verdict={verdict}
+            settledValue={settledValue}
+            priorReading={item.priorReading}
+            timeZone={timeZone}
+            desktopInputRef={desktopInputRef}
+          />
+        </div>
+
+        <div
+          ref={correctiveStepRef}
+          tabIndex={-1}
+          className={cn(
+            "col-start-1 row-start-1 flex min-h-0 flex-col overflow-y-auto outline-none transition-opacity duration-150 motion-reduce:transition-none",
+            isReading ? "pointer-events-none opacity-0" : "opacity-100",
+          )}
+          inert={isReading}
+        >
+          <TemperatureCorrectiveStep
+            idPrefix={ID_PREFIX}
+            recordedC={parsed}
+            presets={presets}
+            onPresetsChange={(next) =>
+              form.setValue("presets", next, { shouldValidate: isSubmitted })
+            }
+            presetsError={errors.presets?.message}
+            notes={notes}
+            onNotesChange={(next) =>
+              form.setValue("notes", next, { shouldValidate: isSubmitted })
+            }
+            notesError={errors.notes?.message}
+            onNotesBlur={() => void form.trigger("notes")}
+          />
+        </div>
       </form>
-    </ResponsiveFormDialog>
+    </TemperatureEntryShell>
   );
 }
