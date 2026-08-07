@@ -22,7 +22,7 @@ export function MobileTopBar() {
   }
 
   return (
-    <header className="sticky top-0 z-40 bg-background pt-[var(--safe-area-inset-top,env(safe-area-inset-top))] md:hidden">
+    <header className="sticky top-0 z-40 bg-background pt-[env(safe-area-inset-top)] md:hidden">
       <div className="flex h-14 items-center gap-1 px-2">
         <Button
           variant="outline"
