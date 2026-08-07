@@ -25,7 +25,7 @@ export const updateLocationSchema = z
     (data) =>
       Object.keys(data).length > 0 &&
       Object.values(data).some((value) => value !== undefined),
-    { message: "At least one field must be provided" },
+    { error: "At least one field must be provided" },
   );
 
 export type UpdateLocationInput = z.infer<typeof updateLocationSchema>;

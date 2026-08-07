@@ -11,7 +11,7 @@ Monorepo skeleton for a HACCP (Hazard Analysis and Critical Control Points) mana
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 24+
 - pnpm 10+
 
 ## Getting started

@@ -1,4 +1,3 @@
-// @ts-nocheck — Vercel Hono preset per-file TS cannot infer OpenAPI handler types reliably.
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import {
   errorResponse,

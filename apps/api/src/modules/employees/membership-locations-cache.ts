@@ -5,7 +5,7 @@ import { logger } from "../../lib/logger.js";
 const KEY_PREFIX = "membership-locations:org:";
 const DEFAULT_TTL_SECONDS = 2 * 24 * 60 * 60;
 
-const locationIdsSchema = z.array(z.string().uuid());
+const locationIdsSchema = z.array(z.uuid());
 
 function cacheKey(organizationId: string, userDbId: string): string {
   return `${KEY_PREFIX}${organizationId}:user:${userDbId}`;

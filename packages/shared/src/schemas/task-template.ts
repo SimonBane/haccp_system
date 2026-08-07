@@ -67,7 +67,7 @@ const scheduledTimePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 export const scheduledTimeSchema = z
   .string()
-  .regex(scheduledTimePattern, "Time must be in HH:MM format");
+  .regex(scheduledTimePattern, { error: "Time must be in HH:MM format" });
 
 export function parseScheduledTimeToMinutes(time: string): number {
   const [hourPart, minutePart] = time.split(":");
@@ -147,36 +147,35 @@ const taskTemplateFieldsSchema = z.object({
   type: taskTemplateTypeSchema,
   weekdays: z
     .array(taskTemplateWeekdaySchema)
-    .min(1, "Select at least one weekday")
+    .min(1, { error: "Select at least one weekday" })
     .superRefine((value, ctx) => {
       const unique = new Set(value);
       if (unique.size !== value.length) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           message: "Weekdays must be unique",
         });
       }
     }),
   scheduledTimes: z
     .array(scheduledTimeSchema)
-    .min(1, "Add at least one time")
-    .max(
-      TASK_TEMPLATE_MAX_SCHEDULED_TIMES,
-      `At most ${TASK_TEMPLATE_MAX_SCHEDULED_TIMES} times per task`,
-    )
+    .min(1, { error: "Add at least one time" })
+    .max(TASK_TEMPLATE_MAX_SCHEDULED_TIMES, {
+      error: `At most ${TASK_TEMPLATE_MAX_SCHEDULED_TIMES} times per task`,
+    })
     .superRefine((value, ctx) => {
       const unique = new Set(value);
       if (unique.size !== value.length) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           message: "Times must be unique",
         });
       }
     }),
-  equipmentId: z.string().uuid().nullable().optional(),
+  equipmentId: z.uuid().nullable().optional(),
 });
 
-function withTaskTemplateValidation<T extends z.ZodTypeAny>(schema: T) {
+function withTaskTemplateValidation<T extends z.ZodType>(schema: T) {
   return schema.superRefine((data, ctx) => {
     const value = data as {
       type: TaskTemplateType;
@@ -185,7 +184,7 @@ function withTaskTemplateValidation<T extends z.ZodTypeAny>(schema: T) {
 
     if (value.type === "temperature" && !value.equipmentId) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         message: "Equipment is required for temperature tasks",
         path: ["equipmentId"],
       });
@@ -193,7 +192,7 @@ function withTaskTemplateValidation<T extends z.ZodTypeAny>(schema: T) {
 
     if (value.type !== "temperature" && value.equipmentId) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         message: "Equipment applies only to temperature tasks",
         path: ["equipmentId"],
       });
@@ -214,16 +213,16 @@ export const updateTaskTemplateSchema = createTaskTemplateSchema;
 export type UpdateTaskTemplateInput = CreateTaskTemplateInput;
 
 export const taskTemplateResponseSchema = z.object({
-  id: z.string().uuid(),
-  locationId: z.string().uuid(),
+  id: z.uuid(),
+  locationId: z.uuid(),
   title: z.string(),
   type: taskTemplateTypeSchema,
   weekdays: z.array(taskTemplateWeekdaySchema),
   scheduledTimes: z.array(scheduledTimeSchema),
-  equipmentId: z.string().uuid().nullable(),
+  equipmentId: z.uuid().nullable(),
   equipmentName: z.string().nullable(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
 });
 
 export type TaskTemplateResponse = z.infer<typeof taskTemplateResponseSchema>;
