@@ -14,7 +14,7 @@ function DashboardLayout({ children }: { children: ReactNode }) {
     <MobileHeaderSlotProvider>
       <LocationQuerySync />
       <AppSidebar />
-      <SidebarInset className="max-md:touch-pan-y max-md:overscroll-x-none">
+      <SidebarInset className="max-md:touch-pan-y max-md:overscroll-x-none max-md:pb-[var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px))]">
         <MobileTopBar />
         {children}
       </SidebarInset>

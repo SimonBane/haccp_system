@@ -6,7 +6,7 @@ export default function AcceptInvitationLayout({
   children: ReactNode;
 }) {
   return (
-    <main className="flex min-h-svh flex-1 items-center justify-center px-6 py-16">
+    <main className="flex min-h-svh flex-1 items-center justify-center p-safe">
       {children}
     </main>
   );

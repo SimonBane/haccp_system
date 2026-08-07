@@ -21,7 +21,7 @@ export default async function NoOrganizationPage({
   const t = await getTranslations("NoOrganizationPage");
 
   return (
-    <div className="flex min-h-full flex-col items-center justify-center px-6 py-16">
+    <div className="flex min-h-svh flex-col items-center justify-center p-safe">
       <Card className="w-full max-w-lg">
         <CardHeader>
           <CardTitle>{t("title")}</CardTitle>
