@@ -2,87 +2,196 @@
 
 import * as React from "react";
 
-const OPEN_THRESHOLD_PX = 56;
 const AXIS_LOCK_PX = 8;
-const DIRECTION_RATIO = 1.5;
-const CLOSE_DISTANCE_RATIO = 0.4;
-/** px per ms — a flick this fast closes regardless of distance travelled. */
-const CLOSE_VELOCITY = 0.5;
-const CLOSE_RESET_MS = 300;
+const TAP_MOVE_THRESHOLD_PX = 10;
+const SNAP_DISTANCE_RATIO = 0.4;
+/** px per ms — a flick this fast snaps open/closed regardless of distance. */
+const SNAP_VELOCITY = 0.5;
 
 function startsInNoSwipeZone(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest("[data-no-swipe]") !== null;
 }
 
+function getSidebarWidthPx(): number {
+  if (typeof window === "undefined") {
+    return 256;
+  }
+  const root = parseFloat(getComputedStyle(document.documentElement).fontSize);
+  return root * 16;
+}
+
+type DragState = {
+  startX: number;
+  startY: number;
+  startOffset: number;
+  startTime: number;
+  axis: "none" | "x";
+};
+
 /**
- * Opens the mobile drawer on a rightward swipe from anywhere on screen and
- * blocks the browser's horizontal swipe-to-go-back gesture.
+ * ChatGPT-style mobile sidebar reveal: the inset follows horizontal swipes from
+ * anywhere on screen, with animated snap on release and programmatic open/close.
  */
-export function useSwipeOpen({
+export function useSidebarReveal({
+  open,
+  onOpenChange,
   enabled,
-  onOpen,
+  sidebarWidthPx: sidebarWidthProp,
 }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   enabled: boolean;
-  onOpen: () => void;
+  sidebarWidthPx?: number;
 }) {
+  const [sidebarWidthPx, setSidebarWidthPx] = React.useState(
+    sidebarWidthProp ?? getSidebarWidthPx(),
+  );
+  const [offset, setOffset] = React.useState(0);
+  const [dragging, setDragging] = React.useState(false);
+
+  const openRef = React.useRef(open);
+  const offsetRef = React.useRef(0);
+  const dragRef = React.useRef<DragState | null>(null);
+  const gestureMovedRef = React.useRef(false);
+
+  openRef.current = open;
+  offsetRef.current = offset;
+
+  React.useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+    const update = () => {
+      setSidebarWidthPx(sidebarWidthProp ?? getSidebarWidthPx());
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [enabled, sidebarWidthProp]);
+
+  // Animate to target when open state changes programmatically (hamburger, nav, tap).
+  React.useEffect(() => {
+    if (!enabled || dragging) {
+      return;
+    }
+    const target = open ? sidebarWidthPx : 0;
+    setOffset(target);
+    offsetRef.current = target;
+  }, [open, sidebarWidthPx, dragging, enabled]);
+
+  React.useEffect(() => {
+    if (!enabled) {
+      setOffset(0);
+      offsetRef.current = 0;
+      setDragging(false);
+      dragRef.current = null;
+    }
+  }, [enabled]);
+
   React.useEffect(() => {
     if (!enabled) {
       return;
     }
 
-    let tracking = false;
-    let startX = 0;
-    let startY = 0;
-
     const onTouchStart = (event: TouchEvent) => {
       const touch = event.touches[0];
       if (!touch || event.touches.length > 1) {
-        tracking = false;
+        dragRef.current = null;
         return;
       }
       if (startsInNoSwipeZone(event.target)) {
+        dragRef.current = null;
         return;
       }
-      tracking = true;
-      startX = touch.clientX;
-      startY = touch.clientY;
+      gestureMovedRef.current = false;
+      dragRef.current = {
+        startX: touch.clientX,
+        startY: touch.clientY,
+        startOffset: offsetRef.current,
+        startTime: Date.now(),
+        axis: "none",
+      };
     };
 
     const onTouchMove = (event: TouchEvent) => {
+      const state = dragRef.current;
       const touch = event.touches[0];
-      if (!tracking || !touch) {
+      if (!state || !touch) {
         return;
       }
-      const deltaX = touch.clientX - startX;
-      const deltaY = touch.clientY - startY;
+
+      const deltaX = touch.clientX - state.startX;
+      const deltaY = touch.clientY - state.startY;
+
+      if (state.axis === "none") {
+        if (
+          Math.abs(deltaX) < AXIS_LOCK_PX &&
+          Math.abs(deltaY) < AXIS_LOCK_PX
+        ) {
+          return;
+        }
+        if (Math.abs(deltaY) >= Math.abs(deltaX)) {
+          dragRef.current = null;
+          return;
+        }
+        state.axis = "x";
+        setDragging(true);
+      }
 
       if (
-        Math.abs(deltaX) < AXIS_LOCK_PX &&
-        Math.abs(deltaY) < AXIS_LOCK_PX
+        Math.abs(deltaX) > TAP_MOVE_THRESHOLD_PX ||
+        Math.abs(deltaY) > TAP_MOVE_THRESHOLD_PX
       ) {
-        return;
+        gestureMovedRef.current = true;
       }
-      if (Math.abs(deltaY) >= Math.abs(deltaX)) {
-        tracking = false;
+
+      const nextOffset = Math.max(
+        0,
+        Math.min(sidebarWidthPx, state.startOffset + deltaX),
+      );
+
+      event.preventDefault();
+      setOffset(nextOffset);
+      offsetRef.current = nextOffset;
+    };
+
+    const onTouchEnd = () => {
+      const state = dragRef.current;
+      dragRef.current = null;
+      setDragging(false);
+
+      if (!state || state.axis !== "x") {
         return;
       }
 
-      // Claim horizontal right swipes so the browser does not navigate back.
-      if (deltaX > 0) {
-        event.preventDefault();
+      const currentOffset = offsetRef.current;
+      const deltaFromStart = currentOffset - state.startOffset;
+      const elapsed = Math.max(Date.now() - state.startTime, 1);
+      const velocity = Math.abs(deltaFromStart) / elapsed;
+
+      let shouldOpen: boolean;
+      if (velocity > SNAP_VELOCITY) {
+        shouldOpen = deltaFromStart > 0;
+      } else {
+        shouldOpen = currentOffset > sidebarWidthPx * SNAP_DISTANCE_RATIO;
       }
 
-      if (
-        deltaX > OPEN_THRESHOLD_PX &&
-        deltaX > Math.abs(deltaY) * DIRECTION_RATIO
-      ) {
-        tracking = false;
-        onOpen();
+      const targetOffset = shouldOpen ? sidebarWidthPx : 0;
+      setOffset(targetOffset);
+      offsetRef.current = targetOffset;
+
+      if (shouldOpen !== openRef.current) {
+        onOpenChange(shouldOpen);
       }
     };
 
     const stop = () => {
-      tracking = false;
+      if (dragRef.current?.axis === "x") {
+        onTouchEnd();
+      } else {
+        dragRef.current = null;
+        setDragging(false);
+      }
     };
 
     window.addEventListener("touchstart", onTouchStart, { passive: true });
@@ -96,145 +205,30 @@ export function useSwipeOpen({
       window.removeEventListener("touchend", stop);
       window.removeEventListener("touchcancel", stop);
     };
-  }, [enabled, onOpen]);
-}
+  }, [enabled, sidebarWidthPx, onOpenChange]);
 
-type DragState = {
-  startX: number;
-  startY: number;
-  startTime: number;
-  width: number;
-  axis: "none" | "x";
-  offset: number;
-};
-
-/**
- * Drag-to-close for the open mobile drawer: the panel follows the finger and
- * closes once the gesture passes far or fast enough.
- */
-export function useDrawerDrag({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  const [offset, setOffset] = React.useState(0);
-  const [dragging, setDragging] = React.useState(false);
-  const drag = React.useRef<DragState | null>(null);
-  const resetTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Each fresh open starts from the sheet's own enter transition, even if the
-  // previous close left a drag offset behind.
-  const [wasOpen, setWasOpen] = React.useState(open);
-  if (open !== wasOpen) {
-    setWasOpen(open);
-    if (open) {
-      setOffset(0);
-      setDragging(false);
-    }
-  }
-
-  React.useEffect(
-    () => () => {
-      if (resetTimeout.current) {
-        clearTimeout(resetTimeout.current);
-      }
-    },
-    [],
-  );
-
-  const onTouchStart = React.useCallback(
-    (event: React.TouchEvent<HTMLElement>) => {
-      const touch = event.touches[0];
-      if (!touch || event.touches.length > 1) {
-        drag.current = null;
-        return;
-      }
-      if (startsInNoSwipeZone(event.target)) {
-        return;
-      }
-      drag.current = {
-        startX: touch.clientX,
-        startY: touch.clientY,
-        startTime: Date.now(),
-        width: event.currentTarget.offsetWidth,
-        axis: "none",
-        offset: 0,
-      };
-    },
-    [],
-  );
-
-  const onTouchMove = React.useCallback(
-    (event: React.TouchEvent<HTMLElement>) => {
-      const state = drag.current;
-      const touch = event.touches[0];
-      if (!state || !touch) {
-        return;
-      }
-      const deltaX = touch.clientX - state.startX;
-      const deltaY = touch.clientY - state.startY;
-
-      if (state.axis === "none") {
-        if (
-          Math.abs(deltaX) < AXIS_LOCK_PX &&
-          Math.abs(deltaY) < AXIS_LOCK_PX
-        ) {
-          return;
-        }
-        // A vertical intent belongs to the scrolling nav list, not the drawer.
-        if (Math.abs(deltaY) >= Math.abs(deltaX)) {
-          drag.current = null;
-          return;
-        }
-        state.axis = "x";
-        setDragging(true);
-      }
-
-      state.offset = Math.min(0, deltaX);
-      setOffset(state.offset);
-    },
-    [],
-  );
-
-  const onTouchEnd = React.useCallback(() => {
-    const state = drag.current;
-    drag.current = null;
-    setDragging(false);
-
-    if (!state || state.axis !== "x") {
-      setOffset(0);
+  const onInsetClick = React.useCallback(() => {
+    if (!openRef.current) {
       return;
     }
-
-    const distance = -state.offset;
-    const elapsed = Math.max(Date.now() - state.startTime, 1);
-    const shouldClose =
-      distance > state.width * CLOSE_DISTANCE_RATIO ||
-      distance / elapsed > CLOSE_VELOCITY;
-
-    if (!shouldClose) {
-      setOffset(0);
+    if (gestureMovedRef.current) {
+      gestureMovedRef.current = false;
       return;
     }
+    onOpenChange(false);
+  }, [onOpenChange]);
 
-    // Slide the rest of the way out, then drop the inline transform so the next
-    // open starts from the sheet's own enter transition.
-    setOffset(-state.width);
-    onClose();
-    resetTimeout.current = setTimeout(() => setOffset(0), CLOSE_RESET_MS);
-  }, [onClose]);
+  const insetStyle = React.useMemo(
+    (): React.CSSProperties => ({
+      transform: `translate3d(${offset}px, 0, 0)`,
+    }),
+    [offset],
+  );
 
   return {
+    offset,
     dragging,
-    style:
-      offset !== 0
-        ? ({ transform: `translate3d(${offset}px, 0, 0)` } as React.CSSProperties)
-        : undefined,
-    onTouchStart,
-    onTouchMove,
-    onTouchEnd,
-    onTouchCancel: onTouchEnd,
+    insetStyle,
+    onInsetClick,
   };
 }

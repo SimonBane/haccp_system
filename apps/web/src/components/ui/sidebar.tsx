@@ -5,19 +5,12 @@ import { mergeProps } from "@base-ui/react/merge-props"
 import { useRender } from "@base-ui/react/use-render"
 import { cva, type VariantProps } from "class-variance-authority"
 
-import { useDrawerDrag } from "@/hooks/use-drawer-swipe"
+import { useSidebarReveal } from "@/hooks/use-drawer-swipe"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
@@ -29,9 +22,15 @@ import { PanelLeftIcon } from "lucide-react"
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH = "16rem"
-const SIDEBAR_WIDTH_MOBILE = "20rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+
+type MobileRevealState = {
+  offset: number
+  dragging: boolean
+  insetStyle: React.CSSProperties
+  onInsetClick: () => void
+}
 
 type SidebarContextProps = {
   state: "expanded" | "collapsed"
@@ -41,6 +40,7 @@ type SidebarContextProps = {
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
   toggleSidebar: () => void
+  mobileReveal: MobileRevealState | null
 }
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null)
@@ -114,6 +114,12 @@ function SidebarProvider({
   // This makes it easier to style the sidebar with Tailwind classes.
   const state = open ? "expanded" : "collapsed"
 
+  const mobileReveal = useSidebarReveal({
+    open: openMobile,
+    onOpenChange: setOpenMobile,
+    enabled: isMobile,
+  })
+
   const contextValue = React.useMemo<SidebarContextProps>(
     () => ({
       state,
@@ -123,8 +129,28 @@ function SidebarProvider({
       openMobile,
       setOpenMobile,
       toggleSidebar,
+      mobileReveal: isMobile
+        ? {
+            offset: mobileReveal.offset,
+            dragging: mobileReveal.dragging,
+            insetStyle: mobileReveal.insetStyle,
+            onInsetClick: mobileReveal.onInsetClick,
+          }
+        : null,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+    [
+      state,
+      open,
+      setOpen,
+      isMobile,
+      openMobile,
+      setOpenMobile,
+      toggleSidebar,
+      mobileReveal.offset,
+      mobileReveal.dragging,
+      mobileReveal.insetStyle,
+      mobileReveal.onInsetClick,
+    ]
   )
 
   return (
@@ -139,7 +165,7 @@ function SidebarProvider({
           } as React.CSSProperties
         }
         className={cn(
-          "group/sidebar-wrapper flex min-h-svh w-full has-data-[variant=inset]:bg-sidebar",
+          "group/sidebar-wrapper flex min-h-svh w-full has-data-[variant=inset]:bg-sidebar max-md:overflow-hidden max-md:bg-sidebar",
           className
         )}
         {...props}
@@ -182,7 +208,7 @@ function Sidebar({
 
   if (isMobile) {
     return (
-      <MobileSidebar side={side} dir={dir} {...props}>
+      <MobileSidebar side={side} variant={variant} {...props}>
         {children}
       </MobileSidebar>
     )
@@ -236,53 +262,35 @@ function Sidebar({
 
 function MobileSidebar({
   side = "left",
+  variant = "sidebar",
   className,
   children,
-  dir,
   ...props
-}: React.ComponentProps<"div"> & { side?: "left" | "right" }) {
-  const { openMobile, setOpenMobile } = useSidebar()
-  const closeDrawer = React.useCallback(
-    () => setOpenMobile(false),
-    [setOpenMobile]
-  )
-  const drag = useDrawerDrag({ open: openMobile, onClose: closeDrawer })
-
+}: React.ComponentProps<"div"> & {
+  side?: "left" | "right"
+  variant?: "sidebar" | "floating" | "inset"
+}) {
   return (
-    <Sheet open={openMobile} onOpenChange={setOpenMobile}>
-      <SheetContent
-        dir={dir}
-        data-sidebar="sidebar"
-        data-slot="sidebar"
-        data-mobile="true"
-        data-dragging={drag.dragging ? "true" : undefined}
-        className={cn(
-          "w-(--sidebar-width) max-w-[86vw] bg-sidebar p-0 text-sidebar-foreground shadow-2xl data-[side=left]:rounded-r-2xl data-[side=right]:rounded-l-2xl [&>button]:hidden",
-          drag.dragging && "transition-none",
-          className
-        )}
-        style={
-          {
-            "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
-            ...drag.style,
-          } as React.CSSProperties
-        }
-        side={side}
-        onTouchStart={drag.onTouchStart}
-        onTouchMove={drag.onTouchMove}
-        onTouchEnd={drag.onTouchEnd}
-        onTouchCancel={drag.onTouchCancel}
-        {...props}
+    <div
+      data-sidebar="sidebar"
+      data-slot="sidebar"
+      data-mobile="true"
+      data-variant={variant}
+      data-side={side}
+      className={cn(
+        "fixed inset-y-0 z-10 flex w-(--sidebar-width) flex-col bg-sidebar text-sidebar-foreground md:hidden",
+        side === "left" ? "left-0" : "right-0",
+        className
+      )}
+      {...props}
+    >
+      <div
+        data-slot="sidebar-inner"
+        className="flex size-full flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
       >
-        <SheetHeader className="sr-only">
-          <SheetTitle>Sidebar</SheetTitle>
-          <SheetDescription>Displays the mobile sidebar.</SheetDescription>
-        </SheetHeader>
-        <div className="flex h-full w-full flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-          {children}
-        </div>
-      </SheetContent>
-    </Sheet>
+        {children}
+      </div>
+    </div>
   )
 }
 
@@ -337,14 +345,42 @@ function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
   )
 }
 
-function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
+function SidebarInset({
+  className,
+  style,
+  onClick,
+  ...props
+}: React.ComponentProps<"main">) {
+  const { isMobile, openMobile, mobileReveal } = useSidebar()
+  const isRevealed = isMobile && (mobileReveal?.offset ?? 0) > 0
+
   return (
     <main
       data-slot="sidebar-inset"
+      data-mobile-sidebar-open={
+        isMobile && openMobile ? "true" : undefined
+      }
+      data-revealed={isRevealed ? "true" : undefined}
+      data-dragging={mobileReveal?.dragging ? "true" : undefined}
       className={cn(
-        "relative flex w-full flex-1 flex-col bg-background md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:ring-1 md:peer-data-[variant=inset]:ring-border md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",
+        "relative flex w-full flex-1 flex-col bg-background",
+        "max-md:z-20 max-md:min-h-svh max-md:will-change-transform",
+        "max-md:transition-[transform,border-radius] max-md:duration-200 max-md:ease-out",
+        "max-md:data-[revealed=true]:overflow-hidden max-md:data-[revealed=true]:rounded-tl-xl max-md:data-[revealed=true]:rounded-bl-xl",
+        "max-md:data-[dragging=true]:transition-[transform]",
+        "md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:ring-1 md:peer-data-[variant=inset]:ring-border md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",
         className
       )}
+      style={{
+        ...style,
+        ...(isMobile ? mobileReveal?.insetStyle : undefined),
+      }}
+      onClick={(event) => {
+        onClick?.(event)
+        if (isMobile && openMobile) {
+          mobileReveal?.onInsetClick()
+        }
+      }}
       {...props}
     />
   )
