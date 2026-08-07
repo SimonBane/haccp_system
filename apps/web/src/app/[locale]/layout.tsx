@@ -61,7 +61,6 @@ export async function generateMetadata({
 
 export function generateViewport() {
   return {
-    colorScheme: "light dark",
     themeColor: [
       { media: "(prefers-color-scheme: light)", color: "#ffffff" },
       { media: "(prefers-color-scheme: dark)", color: "#252525" },
@@ -109,8 +108,8 @@ export default async function LocaleLayout({
             </div>
             <Toaster
               position="top-center"
-              style={{
-                top: "max(0.5rem, var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))",
+              offset={{
+                top: "max(0.5rem, env(safe-area-inset-top, 0px))",
               }}
             />
           </TooltipProvider>
