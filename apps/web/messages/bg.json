@@ -45,6 +45,7 @@
     "actions": {
       "complete": "Изпълни",
       "record": "Запиши",
+      "recordAll": "Запиши всички",
       "undo": "Отмени",
       "viewRecord": "Виж записа"
     },
@@ -62,7 +63,8 @@
       "jumpToOverdue": "Към просрочените задачи ({count})",
       "jumpToDeviation": "Към отчитанията извън диапазона ({count})",
       "nowLine": "Сега, {time}",
-      "jumpToNow": "Към сега"
+      "jumpToNow": "Към сега",
+      "recordRound": "Запиши отчитанията за {time} ({count})"
     },
     "row": {
       "lastReadingAt": "Последно {time}"
@@ -74,6 +76,7 @@
       "taskType": "Тип"
     },
     "keypad": {
+      "label": "Цифрова клавиатура",
       "decimal": "Десетичен знак",
       "backspace": "Изтрий"
     },
@@ -126,22 +129,26 @@
       "close": "Затвори",
       "back": "Назад",
       "continueLabel": "Продължи",
-      "statusIdle": "Допустим диапазон {min} – {max} °C",
+      "saveDeviation": "Запиши отклонението",
+      "skip": "Пропусни",
+      "skipLabel": "Пропусни {title}",
+      "roundProgress": "{position} / {total}",
+      "roundProgressLabel": "Отчитане {position} от {total}",
+      "roundSummary": "{count, plural, one {Записано # отчитане} other {Записани # отчитания}}",
+      "roundSummaryDeviations": "{saved} записани · {deviations} извън диапазона",
+      "keyboardHint": "⏎ запиши · ↑↓ ±0,1",
+      "rangeIdle": "Допустим диапазон {min} – {max} °C",
+      "rangeInline": "{min} – {max} °C",
       "implausibleHint": "Необичайно за това оборудване — проверете термометъра",
       "lastReading": "Последно: {value} °C в {time}",
       "noPriorReading": "Първо измерване днес",
-      "signGroupLabel": "Знак на температурата",
-      "signNegative": "Отрицателна",
-      "signPositive": "Положителна",
-      "decrement": "Намали с 0,1 °C",
-      "increment": "Увеличи с 0,1 °C",
+      "signToggleLabel": "Отрицателна температура",
       "correctiveTitle": "Какво предприехте?",
       "notesLabel": "Бележки",
+      "notesCharacterCount": "{current} / {max}",
       "charactersLeft": "{count, plural, one {Остава # знак} other {Остават # знака}}",
       "srVerdictOk": "{value} °C, в допустимите граници",
-      "srVerdictOutOfRange": "{value} °C, извън допустимите граници",
-      "okHint": "В допустимите граници",
-      "outOfRangeHint": "Извън допустимите граници"
+      "srVerdictOutOfRange": "{value} °C, извън допустимите граници"
     },
     "a11y": {
       "completed": "{title} е изпълнена",

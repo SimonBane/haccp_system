@@ -13,12 +13,15 @@ type Props = {
   onDigitsChange: (next: string) => void;
   /** "," in bg, "." in en — matches what the parser accepts. */
   separator: string;
+  /** Sits inside the shared mobile action card — no outer frame of its own. */
+  embedded?: boolean;
   className?: string;
 };
 
 const DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const;
 
-const KEY_CLASS = "h-full min-h-12 rounded-xl text-2xl font-medium hover:bg-muted";
+const KEY_CLASS =
+  "h-full min-h-12 rounded-2xl bg-card text-2xl font-medium shadow-xs active:scale-[0.98] motion-reduce:active:scale-100";
 
 /**
  * Replaces the OS keyboard: the modal keeps its full height, nothing slides over
@@ -32,6 +35,7 @@ export function NumericKeypad({
   digits,
   onDigitsChange,
   separator,
+  embedded = false,
   className,
 }: Props) {
   const t = useTranslations("TodayPage");
@@ -59,11 +63,19 @@ export function NumericKeypad({
   }
 
   return (
-    <div className={cn("grid grid-cols-3 grid-rows-4 gap-2", className)}>
+    <div
+      role="group"
+      aria-label={t("keypad.label")}
+      className={cn(
+        "grid grid-cols-3 grid-rows-4 gap-2",
+        !embedded && "rounded-2xl border border-border bg-muted/25 p-2.5",
+        className,
+      )}
+    >
       {DIGITS.map((digit) => (
         <Button
           key={digit}
-          variant="ghost"
+          variant="outline"
           className={KEY_CLASS}
           onClick={() => append(digit)}
         >
@@ -72,18 +84,18 @@ export function NumericKeypad({
       ))}
 
       <Button
-        variant="ghost"
+        variant="outline"
         className={KEY_CLASS}
         aria-label={t("keypad.decimal")}
         onClick={() => append(separator)}
       >
         {separator}
       </Button>
-      <Button variant="ghost" className={KEY_CLASS} onClick={() => append("0")}>
+      <Button variant="outline" className={KEY_CLASS} onClick={() => append("0")}>
         0
       </Button>
       <Button
-        variant="ghost"
+        variant="outline"
         className={KEY_CLASS}
         aria-label={t("keypad.backspace")}
         disabled={digits.length === 0}

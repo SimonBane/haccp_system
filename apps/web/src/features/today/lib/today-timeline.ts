@@ -7,6 +7,7 @@ import {
 import {
   isDueNow,
   minutesUntilScheduled,
+  occurrenceKey,
   parseScheduledTimeToMinutes,
 } from "./today-grouping";
 
@@ -83,6 +84,43 @@ export type TodayTimeline = {
 
 export function timeGroupId(scheduledTime: string): string {
   return `time-group-${scheduledTime.replace(":", "-")}`;
+}
+
+/**
+ * Resolves an occurrence key against the current timeline.
+ *
+ * Anything holding on to a task across renders holds the key rather than the
+ * item: the clock ticks every minute and rebuilds the timeline, so a captured
+ * item would keep serving the prior reading it happened to see. Null once the
+ * key stops resolving — a day that rolled over, or a template that was removed.
+ */
+export function findTimelineItem(
+  timeline: TodayTimeline,
+  key: string | null,
+): TodayTimelineItem | null {
+  if (!key) return null;
+
+  for (const group of timeline.groups) {
+    for (const item of group.items) {
+      if (occurrenceKey(item.task) === key) return item;
+    }
+  }
+
+  return null;
+}
+
+/** The round an occurrence belongs to, for queueing the rest of its group. */
+export function findTimelineGroup(
+  timeline: TodayTimeline,
+  key: string | null,
+): TodayTimeGroup | null {
+  if (!key) return null;
+
+  return (
+    timeline.groups.find((group) =>
+      group.items.some((item) => occurrenceKey(item.task) === key),
+    ) ?? null
+  );
 }
 
 function isDeviation(task: TodayTaskItem): boolean {
@@ -231,6 +269,7 @@ export function buildTodayTimeline(
   const upcomingIndex = groups.findIndex(
     (group) => parseScheduledTimeToMinutes(group.scheduledTime) > nowMinutes,
   );
+  const isAllDone = total > 0 && completedCount === total;
 
   return {
     groups,
@@ -244,12 +283,13 @@ export function buildTodayTimeline(
       groups.find((group) => group.state === "overdue")?.id ?? null,
     firstDeviationGroupId:
       groups.find((group) => group.deviationCount > 0)?.id ?? null,
-    isAllDone: total > 0 && completedCount === total,
-    nowLineIndex: isToday
-      ? upcomingIndex === -1
-        ? groups.length
-        : upcomingIndex
-      : null,
+    isAllDone,
+    nowLineIndex:
+      isToday && !isAllDone
+        ? upcomingIndex === -1
+          ? groups.length
+          : upcomingIndex
+        : null,
     nowMinutes,
   };
 }
