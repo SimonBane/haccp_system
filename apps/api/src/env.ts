@@ -12,15 +12,17 @@ export function parseCorsOrigins(value: string | undefined): string[] {
 const envSchema = z.object({
   API_PORT: z.coerce.number().default(3001),
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
-  DATABASE_URL: z.string().url(),
-  DIRECT_DATABASE_URL: z.string().url().optional(),
+  DATABASE_URL: z.url(),
+  DIRECT_DATABASE_URL: z.url().optional(),
   CLERK_SECRET_KEY: z.string().min(1),
   CLERK_PUBLISHABLE_KEY: z.string().min(1),
   CLERK_WEBHOOK_SIGNING_SECRET: z.string().min(1).optional(),
-  WEB_APP_URL: z.string().url().default("http://localhost:3000"),
+  WEB_APP_URL: z.url().default("http://localhost:3000"),
   REDIS_URL: z
     .string()
-    .regex(/^rediss?:\/\//, "REDIS_URL must be a redis:// or rediss:// URL"),
+    .regex(/^rediss?:\/\//, {
+      error: "REDIS_URL must be a redis:// or rediss:// URL",
+    }),
   NODE_ENV: z
     .enum(["development", "production", "test"])
     .default("development"),

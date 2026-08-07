@@ -159,7 +159,7 @@ export function EquipmentForm({
       const parsed = parseTempValue(value);
       if (parsed === null) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           message: t("validation.tempRequired"),
         });
         return;
@@ -167,7 +167,7 @@ export function EquipmentForm({
 
       if (parsed < EQUIPMENT_TEMP_MIN_C) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           message: t("validation.minTemp"),
         });
         return;
@@ -175,7 +175,7 @@ export function EquipmentForm({
 
       if (parsed > EQUIPMENT_TEMP_MAX_C) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           message: t("validation.maxTemp"),
         });
       }
@@ -191,7 +191,7 @@ export function EquipmentForm({
         type: z
           .union([equipmentTypeSchema, z.literal("")])
           .refine((value): value is EquipmentType => value !== "", {
-            message: t("validation.typeRequired"),
+            error: t("validation.typeRequired"),
           }),
         minTempC: tempSchema,
         maxTempC: tempSchema,
@@ -205,7 +205,7 @@ export function EquipmentForm({
           minTempC >= maxTempC
         ) {
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: "custom",
             message: t("validation.tempRange"),
             path: ["minTempC"],
           });

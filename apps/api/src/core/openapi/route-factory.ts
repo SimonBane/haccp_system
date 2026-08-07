@@ -1,4 +1,3 @@
-// @ts-nocheck — generic OpenAPI route registration does not infer handler types reliably.
 import {
   createRoute,
   type OpenAPIHono,
@@ -11,9 +10,9 @@ import {
   getCurrentLocation,
 } from "../../lib/context.js";
 import type { AppEnv } from "../../types.js";
-import { errorResponse, jsonResponse } from "./responses.js";
+import { errorResponse, jsonResponse, defineRouteHandler } from "./responses.js";
 
-export { errorResponse, jsonResponse } from "./responses.js";
+export { errorResponse, jsonResponse, defineRouteHandler } from "./responses.js";
 
 const bearerSecurity = [{ Bearer: [] }];
 
@@ -23,18 +22,18 @@ type AdminCrudService<
   TList extends z.ZodType,
   TItem extends z.ZodType,
 > = {
-  list: (db: Db, locationId: string) => Promise<z.infer<TList>>;
+  list: (db: Db, locationId: string) => Promise<z.output<TList>>;
   create: (
     db: Db,
     locationId: string,
-    input: z.infer<TCreate>,
-  ) => Promise<z.infer<TItem>>;
+    input: z.output<TCreate>,
+  ) => Promise<z.output<TItem>>;
   update: (
     db: Db,
     locationId: string,
     id: string,
-    input: z.infer<TUpdate>,
-  ) => Promise<z.infer<TItem>>;
+    input: z.output<TUpdate>,
+  ) => Promise<z.output<TItem>>;
   delete: (db: Db, locationId: string, id: string) => Promise<void>;
 };
 
@@ -132,33 +131,29 @@ export function registerAdminCrudRoutes<
 
   options.router.openapi(
     listRoute,
-    async (c) => {
+    defineRouteHandler(listRoute, async (c) => {
       const { id: locationId } = getCurrentLocation(c);
       const result = await options.service.list(getDb(c), locationId);
       return c.json(result, 200);
-    },
+    }),
   );
 
   options.router.openapi(
     createRouteDef,
-    async (c) => {
+    defineRouteHandler(createRouteDef, async (c) => {
       const { id: locationId } = getCurrentLocation(c);
-      const input = c.req.valid("json");
-      const created = await options.service.create(
-        getDb(c),
-        locationId,
-        input,
-      );
+      const input = options.schemas.create.parse(await c.req.json());
+      const created = await options.service.create(getDb(c), locationId, input);
       return c.json(created, 201);
-    },
+    }),
   );
 
   options.router.openapi(
     updateRouteDef,
-    async (c) => {
+    defineRouteHandler(updateRouteDef, async (c) => {
       const { id: locationId } = getCurrentLocation(c);
-      const { id } = c.req.valid("param");
-      const input = c.req.valid("json");
+      const { id } = locationResourceParamSchema.parse(c.req.param());
+      const input = options.schemas.update.parse(await c.req.json());
       const updated = await options.service.update(
         getDb(c),
         locationId,
@@ -166,16 +161,16 @@ export function registerAdminCrudRoutes<
         input,
       );
       return c.json(updated, 200);
-    },
+    }),
   );
 
   options.router.openapi(
     deleteRouteDef,
-    async (c) => {
+    defineRouteHandler(deleteRouteDef, async (c) => {
       const { id: locationId } = getCurrentLocation(c);
-      const { id } = c.req.valid("param");
+      const { id } = locationResourceParamSchema.parse(c.req.param());
       await options.service.delete(getDb(c), locationId, id);
       return c.body(null, 204);
-    },
+    }),
   );
 }

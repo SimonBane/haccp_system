@@ -120,7 +120,7 @@ export function EmployeeForm({
   const employeeFormSchema = useMemo(
     () =>
       z.object({
-        email: z.string().trim().email(t("validation.emailInvalid")).max(256),
+        email: z.string().trim().max(256).pipe(z.email({ error: t("validation.emailInvalid") })),
         firstName: z
           .string()
           .trim()
@@ -135,13 +135,13 @@ export function EmployeeForm({
           .enum(["", ORG_ROLE.ADMIN, ORG_ROLE.EMPLOYEE] as const)
           .refine(
             (value): value is EmployeeRole => value !== "",
-            { message: t("validation.roleRequired") },
+            { error: t("validation.roleRequired") },
           ),
         locationIds: multipleLocationsEnabled
           ? z
-              .array(z.string().uuid())
-              .min(1, t("validation.locationsRequired"))
-          : z.array(z.string().uuid()),
+              .array(z.uuid())
+              .min(1, { error: t("validation.locationsRequired") })
+          : z.array(z.uuid()),
       }),
     [multipleLocationsEnabled, t],
   );
@@ -175,13 +175,18 @@ export function EmployeeForm({
         role: employee?.role ?? "",
         locationIds: resolveLocationIds(employee?.locationIds),
       });
-    } else {
+    }
+  }, [open, employee, form, resolveLocationIds]);
+
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
       setPendingAction(null);
       setResendConfirmOpen(false);
       setPendingValues(null);
       setIsResending(false);
     }
-  }, [open, employee, form, resolveLocationIds]);
+    onOpenChange(nextOpen);
+  };
 
   const { isDirty } = useFormState({ control: form.control });
   const hasChanges = !isEditing || !employee || isDirty;
@@ -277,7 +282,7 @@ export function EmployeeForm({
   return (
     <ResponsiveFormDialog
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={handleDialogOpenChange}
       title={isEditing ? t("editTitle") : t("addTitle")}
       description={isEditing ? t("editDescription") : t("addDescription")}
     >

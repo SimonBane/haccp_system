@@ -22,8 +22,12 @@ export const EQUIPMENT_TEMP_MAX_C = 15;
 
 const tempSchema = z.coerce
   .number()
-  .min(EQUIPMENT_TEMP_MIN_C, `Temperature must be at least ${EQUIPMENT_TEMP_MIN_C}°C`)
-  .max(EQUIPMENT_TEMP_MAX_C, `Temperature must be at most ${EQUIPMENT_TEMP_MAX_C}°C`);
+  .min(EQUIPMENT_TEMP_MIN_C, {
+    error: `Temperature must be at least ${EQUIPMENT_TEMP_MIN_C}°C`,
+  })
+  .max(EQUIPMENT_TEMP_MAX_C, {
+    error: `Temperature must be at most ${EQUIPMENT_TEMP_MAX_C}°C`,
+  });
 
 const equipmentFieldsSchema = z.object({
   name: z.string().trim().min(1).max(100),
@@ -32,12 +36,12 @@ const equipmentFieldsSchema = z.object({
   maxTempC: tempSchema,
 });
 
-function withTempRangeValidation<T extends z.ZodTypeAny>(schema: T) {
+function withTempRangeValidation<T extends z.ZodType>(schema: T) {
   return schema.superRefine((data, ctx) => {
     const value = data as { minTempC: number; maxTempC: number };
     if (value.minTempC >= value.maxTempC) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         message: "Minimum temperature must be less than maximum temperature",
         path: ["minTempC"],
       });
@@ -58,14 +62,14 @@ export const updateEquipmentSchema = createEquipmentSchema;
 export type UpdateEquipmentInput = CreateEquipmentInput;
 
 export const equipmentResponseSchema = z.object({
-  id: z.string().uuid(),
-  locationId: z.string().uuid(),
+  id: z.uuid(),
+  locationId: z.uuid(),
   name: z.string(),
   type: equipmentTypeSchema,
   minTempC: z.number(),
   maxTempC: z.number(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
 });
 
 export type EquipmentResponse = z.infer<typeof equipmentResponseSchema>;
