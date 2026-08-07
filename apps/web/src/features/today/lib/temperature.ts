@@ -14,6 +14,19 @@ const PRESET_DELIMITER = ", ";
 
 export type TemperatureVerdict = "ok" | "out_of_range";
 
+/** The corrective actions offered as one-tap options on a deviation. */
+export const CORRECTIVE_PRESET_KEYS = [
+  "movedProduct",
+  "adjustedThermostat",
+  "notifiedManager",
+  "calledService",
+] as const;
+
+export type CorrectivePresetKey = (typeof CORRECTIVE_PRESET_KEYS)[number];
+
+/** Leaves headroom for the presets inside the API's 1000-character field. */
+export const NOTES_MAX_LENGTH = 900;
+
 /**
  * Coerces anything — keystrokes, pastes, autofill — into the nearest legal draft
  * rather than rejecting it. The equipment form drops invalid input on the floor,

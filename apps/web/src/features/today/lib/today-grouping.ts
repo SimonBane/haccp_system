@@ -1,7 +1,7 @@
 import type { TodayResponse, TodayTaskItem } from "@haccp/shared";
 import { zonedMinutesOfDay } from "@haccp/shared";
 
-/** Minutes before/after scheduled time that count as "due now". Easy to tune. */
+/** Minutes after scheduled time that count as "due now". Easy to tune. */
 export const DUE_NOW_WINDOW_MINUTES = 30;
 
 export function parseScheduledTimeToMinutes(time: string): number {
@@ -30,7 +30,8 @@ export function isDueNow(
 ): boolean {
   const nowMinutes = zonedMinutesOfDay(now, timeZone);
   const scheduledMinutes = parseScheduledTimeToMinutes(scheduledTime);
-  return Math.abs(nowMinutes - scheduledMinutes) <= windowMinutes;
+  const minutesSinceScheduled = nowMinutes - scheduledMinutes;
+  return minutesSinceScheduled >= 0 && minutesSinceScheduled <= windowMinutes;
 }
 
 /** Signed minutes from now until `scheduledTime`. Negative means it has passed. */

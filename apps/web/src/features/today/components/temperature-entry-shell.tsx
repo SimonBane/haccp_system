@@ -1,12 +1,9 @@
 "use client";
 
-import {
-  ArrowLeftIcon,
-  ArrowRightIcon,
-  CheckIcon,
-  XIcon,
-} from "lucide-react";
+import { ArrowLeftIcon, XIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { ReactNode, RefObject } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -34,29 +31,34 @@ type Props = {
   leading: "close" | "back";
   leadingLabel: string;
   onLeading: () => void;
-  primaryIcon: "continue" | "confirm";
-  primaryLabel: string;
-  primaryDisabled: boolean;
-  primaryLoading: boolean;
-  onPrimary: () => void;
+  /** Null for a lone check, which then looks exactly like the old flow. */
+  round: { position: number; size: number } | null;
+  /** Keypad on a phone — rendered above the footer inside one action card. */
+  mobileActionPanel?: ReactNode;
+  footer: ReactNode;
   /** Desktop only — mobile opens on its own keypad and needs no focus ring. */
   desktopInitialFocus?: RefObject<HTMLElement | null>;
   children: ReactNode;
 };
 
 /**
- * The surface a temperature reading is entered on.
+ * The surface a round of temperature readings is entered on.
  *
  * On a phone it is a full-screen modal that slides up from the bottom: the modal
- * is exactly the viewport, so its height cannot change while the worker types,
- * and the commit action sits in the top-right corner — as far as possible from
- * the keypad that owns the bottom of the screen.
+ * is exactly the viewport, so its height cannot change while the worker types.
+ * The commit action lives in a bar pinned under the keypad — see
+ * `temperature-round-footer` for why it moved out of the app bar — which frees
+ * the bar's trailing slot for the round counter.
  *
- * On desktop it stays a conventional centred dialog with a footer button; a
- * mouse does not mis-tap.
+ * On desktop it stays a conventional centred dialog with a footer; a mouse does
+ * not mis-tap, and the keyboard never leaves the number field.
+ *
+ * It is mounted once per round and deliberately never remounted between checks:
+ * remounting would replay the slide-up on every advance. Only the entry state
+ * inside it resets.
  *
  * Deliberately not built on ResponsiveFormDialog: full-screen, a custom app bar
- * and no footer would need three new props and a third height variant on a
+ * and a custom action bar would need new props and a third height variant on a
  * component four admin forms depend on.
  */
 export function TemperatureEntryShell({
@@ -67,27 +69,43 @@ export function TemperatureEntryShell({
   leading,
   leadingLabel,
   onLeading,
-  primaryIcon,
-  primaryLabel,
-  primaryDisabled,
-  primaryLoading,
-  onPrimary,
+  round,
+  mobileActionPanel,
+  footer,
   desktopInitialFocus,
   children,
 }: Props) {
-  const isMobile = useIsMobile();
+  const t = useTranslations("TodayPage");
   const LeadingIcon = leading === "close" ? XIcon : ArrowLeftIcon;
-  const PrimaryIcon = primaryIcon === "confirm" ? CheckIcon : ArrowRightIcon;
+
+  // The spoken and the shown forms are separate elements rather than an
+  // aria-label on the badge: a label on a plain span is unreliably announced,
+  // and "2 / 5" read literally is "two slash five".
+  const counter = round ? (
+    <Badge variant="secondary" className="tabular-nums">
+      <span aria-hidden>
+        {t("temperatureDialog.roundProgress", {
+          position: round.position,
+          total: round.size,
+        })}
+      </span>
+      <span className="sr-only">
+        {t("temperatureDialog.roundProgressLabel", {
+          position: round.position,
+          total: round.size,
+        })}
+      </span>
+    </Badge>
+  ) : null;
+
+  const isMobile = useIsMobile();
 
   if (isMobile) {
-    const appBarIconButton =
-      "size-11 rounded-full border-border bg-background shadow-sm";
-
     return (
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent
           side="bottom"
-          // The close control moves into the app bar; this slot is the primary action.
+          // The close control lives in the app bar instead.
           showCloseButton={false}
           className={cn(
             // Variant-qualified, because the stock side=bottom rule is h-auto
@@ -101,11 +119,14 @@ export function TemperatureEntryShell({
             "motion-reduce:duration-0",
           )}
         >
-          <header className="grid h-14 shrink-0 grid-cols-[3rem_1fr_3rem] items-center px-2 pt-[env(safe-area-inset-top)]">
+          {/* The height has to include the inset. Tailwind's preflight makes
+              every box border-box, so a bare h-14 with a safe-area top padding
+              leaves a notched iPhone about 9px of actual app bar. */}
+          <header className="grid h-[calc(3.5rem+env(safe-area-inset-top))] shrink-0 grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-2 px-2 pt-[env(safe-area-inset-top)]">
             <Button
-              variant="outline"
+              variant="ghost"
               size="icon"
-              className={cn(appBarIconButton, "justify-self-start")}
+              className="size-11 justify-self-start rounded-full"
               aria-label={leadingLabel}
               onClick={onLeading}
             >
@@ -119,28 +140,34 @@ export function TemperatureEntryShell({
               </SheetDescription>
             </div>
 
-            <Button
-              variant="outline"
-              size="icon"
-              className={cn(
-                appBarIconButton,
-                "justify-self-end",
-                primaryDisabled
-                  ? "text-muted-foreground"
-                  : "border-primary bg-primary text-primary-foreground hover:bg-primary/80 hover:text-primary-foreground",
-              )}
-              // The icon carries no text on mobile, so the label is its only name.
-              aria-label={primaryLabel}
-              disabled={primaryDisabled}
-              isLoading={primaryLoading}
-              onClick={onPrimary}
-            >
-              <PrimaryIcon className="size-5" />
-            </Button>
+            {/* Matches the leading button's width so the title stays optically
+                centred on a lone check, where there is no counter. */}
+            {counter ?? <span className="w-11" aria-hidden />}
           </header>
 
-          <div className="flex min-h-0 flex-1 flex-col px-4 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+          {round ? (
+            <div aria-hidden className="h-0.5 shrink-0 bg-muted">
+              <div
+                className="h-full bg-primary transition-[width] duration-300 motion-reduce:transition-none"
+                style={{
+                  width: `${((round.position - 1) / round.size) * 100}%`,
+                }}
+              />
+            </div>
+          ) : null}
+
+          <div className="flex min-h-0 flex-1 flex-col px-4 pb-3">
             {children}
+          </div>
+
+          <div className="shrink-0 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <div className="flex flex-col gap-2.5 rounded-2xl border border-border bg-muted/25 p-2.5">
+              {mobileActionPanel}
+              {mobileActionPanel ? (
+                <div className="border-t border-border/60" aria-hidden />
+              ) : null}
+              {footer}
+            </div>
           </div>
         </SheetContent>
       </Sheet>
@@ -154,27 +181,27 @@ export function TemperatureEntryShell({
         initialFocus={desktopInitialFocus}
       >
         <DialogHeader>
-          <DialogTitle className="truncate">{title}</DialogTitle>
-          <DialogDescription className="truncate">{subtitle}</DialogDescription>
+          {/* Dialog's own close button is absolutely positioned in this corner,
+              so the row has to keep clear of it or the counter lands on top. */}
+          <div className="flex items-start justify-between gap-3 pr-14">
+            <div className="min-w-0">
+              <DialogTitle className="truncate">{title}</DialogTitle>
+              <DialogDescription className="truncate">
+                {subtitle}
+              </DialogDescription>
+            </div>
+            {counter}
+          </div>
         </DialogHeader>
 
         {children}
 
-        <DialogFooter className="gap-2 sm:gap-2">
-          {leading === "back" ? (
-            <Button variant="ghost" onClick={onLeading}>
-              <ArrowLeftIcon data-icon="inline-start" />
-              {leadingLabel}
-            </Button>
-          ) : null}
-          <Button
-            disabled={primaryDisabled}
-            isLoading={primaryLoading}
-            onClick={onPrimary}
-          >
-            {primaryLabel}
-            <PrimaryIcon data-icon="inline-end" />
-          </Button>
+        {/* Centered rather than the stock end-aligned footer: end-alignment
+            paired with the hint's now-removed left push used to leave the
+            hint pinned to the far edge and the buttons hugging the other,
+            never reading as one row. */}
+        <DialogFooter className="gap-2 sm:w-full sm:justify-stretch sm:gap-3">
+          {footer}
         </DialogFooter>
       </DialogContent>
     </Dialog>

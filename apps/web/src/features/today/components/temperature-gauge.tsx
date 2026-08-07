@@ -23,8 +23,7 @@ function clamp(value: number, min: number, max: number) {
 
 /**
  * Where the reading falls against the allowed band, readable without comparing
- * numbers. The track is neutral rather than red: nothing is wrong until the
- * needle says so, and a red-by-default scale reads as an alarm on an empty form.
+ * numbers. The track outside the band is red; the allowed range stays green.
  */
 export function TemperatureGauge({
   value,
@@ -37,10 +36,8 @@ export function TemperatureGauge({
 
   const span = Math.max(maxTempC - minTempC, 0.1);
   const padding = Math.max(span * 0.75, 3);
-  const baseMin = minTempC - padding;
-  const baseMax = maxTempC + padding;
-  const domainMin = value === null ? baseMin : Math.min(baseMin, value);
-  const domainMax = value === null ? baseMax : Math.max(baseMax, value);
+  const domainMin = minTempC - padding;
+  const domainMax = maxTempC + padding;
   const domainSpan = domainMax - domainMin || 1;
 
   const percentOf = (temperature: number) =>
@@ -57,17 +54,17 @@ export function TemperatureGauge({
     // Decorative: the status row states the same thing in words, and a needle
     // that moves on every keystroke would flood a screen reader.
     <div aria-hidden className={cn("select-none", className)}>
-      <div className="relative h-2 w-full rounded-full bg-muted">
+      <div className="relative h-2 w-full rounded-full bg-destructive/25">
         <div
-          className="absolute inset-y-0 rounded-full bg-success/30"
+          className="absolute inset-y-0 rounded-full bg-success/55"
           style={{ left: `${bandStart}%`, width: `${bandEnd - bandStart}%` }}
         />
         <span
-          className="absolute top-1/2 h-3 w-px -translate-y-1/2 bg-success/60"
+          className="absolute top-1/2 h-3 w-px -translate-y-1/2 bg-success"
           style={{ left: `${bandStart}%` }}
         />
         <span
-          className="absolute top-1/2 h-3 w-px -translate-y-1/2 bg-success/60"
+          className="absolute top-1/2 h-3 w-px -translate-y-1/2 bg-success"
           style={{ left: `${bandEnd}%` }}
         />
 
@@ -92,7 +89,7 @@ export function TemperatureGauge({
             className="absolute -translate-x-1/2 whitespace-nowrap"
             style={{ left: `${(bandStart + bandEnd) / 2}%` }}
           >
-            {minLabel} … {maxLabel}
+            {minLabel} … {maxLabel} °C
           </span>
         ) : (
           <>
@@ -102,11 +99,14 @@ export function TemperatureGauge({
             >
               {minLabel}
             </span>
+            {/* The unit rides the upper bound: the status row beside it no
+                longer repeats the range in words, so these numbers have to
+                read as temperatures on their own. */}
             <span
-              className="absolute -translate-x-1/2"
+              className="absolute -translate-x-1/2 whitespace-nowrap"
               style={{ left: `${bandEnd}%` }}
             >
-              {maxLabel}
+              {maxLabel} °C
             </span>
           </>
         )}
