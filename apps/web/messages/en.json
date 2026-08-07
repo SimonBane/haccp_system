@@ -45,6 +45,7 @@
     "actions": {
       "complete": "Complete",
       "record": "Record",
+      "recordAll": "Record all",
       "undo": "Undo",
       "viewRecord": "View record"
     },
@@ -62,7 +63,8 @@
       "jumpToOverdue": "Go to overdue tasks ({count})",
       "jumpToDeviation": "Go to out-of-range readings ({count})",
       "nowLine": "Now, {time}",
-      "jumpToNow": "Jump to now"
+      "jumpToNow": "Jump to now",
+      "recordRound": "Record the {time} readings ({count})"
     },
     "row": {
       "lastReadingAt": "Last {time}"
@@ -74,7 +76,7 @@
       "taskType": "Type"
     },
     "keypad": {
-      "toggleSign": "Toggle sign",
+      "label": "Number pad",
       "decimal": "Decimal separator",
       "backspace": "Backspace"
     },
@@ -105,32 +107,48 @@
       "correctiveAction": "Corrective action"
     },
     "temperatureDialog": {
-      "title": "Temperature check",
       "allowedRange": "Allowed range",
       "recordedCLabel": "Measured temperature",
-      "celsius": "°C",
-      "recordedCPlaceholder": "Enter temperature in °C",
       "ok": "OK",
       "outOfRange": "Out of range",
-      "okHint": "Within the allowed range",
-      "outOfRangeHint": "Outside the allowed range",
-      "correctiveActionLabel": "Corrective action taken",
       "correctiveActionPlaceholder": "For example, moved the products and notified the manager…",
-      "correctiveActionHint": "Describe exactly what you did after the deviation.",
       "presets": {
         "movedProduct": "Moved product",
         "adjustedThermostat": "Adjusted thermostat",
         "notifiedManager": "Notified manager",
         "calledService": "Called service"
       },
-      "cancel": "Cancel",
-      "confirm": "Save reading",
+      "confirm": "Save",
       "validation": {
         "required": "Enter a temperature reading",
         "invalid": "Enter a valid number",
-        "correctiveActionRequired": "Describe the corrective action taken",
-        "correctiveActionMax": "Corrective action can be up to 1000 characters"
-      }
+        "correctiveActionRequired": "Select or describe the corrective action taken",
+        "outOfBounds": "Enter a temperature between -99.9 and 99.9 °C",
+        "correctiveActionMax": "Notes can be up to 900 characters"
+      },
+      "close": "Close",
+      "back": "Back",
+      "continueLabel": "Continue",
+      "saveDeviation": "Save deviation",
+      "skip": "Skip",
+      "skipLabel": "Skip {title}",
+      "roundProgress": "{position} / {total}",
+      "roundProgressLabel": "Reading {position} of {total}",
+      "roundSummary": "{count, plural, one {# reading saved} other {# readings saved}}",
+      "roundSummaryDeviations": "{saved} saved · {deviations} out of range",
+      "keyboardHint": "⏎ save · ↑↓ ±0.1",
+      "rangeIdle": "Allowed range {min} – {max} °C",
+      "rangeInline": "{min} – {max} °C",
+      "implausibleHint": "Unusual for this equipment — check the thermometer",
+      "lastReading": "Last: {value} °C at {time}",
+      "noPriorReading": "First reading today",
+      "signToggleLabel": "Negative temperature",
+      "correctiveTitle": "What did you do?",
+      "notesLabel": "Notes",
+      "notesCharacterCount": "{current} / {max}",
+      "charactersLeft": "{count, plural, one {# character left} other {# characters left}}",
+      "srVerdictOk": "{value} °C, within the allowed range",
+      "srVerdictOutOfRange": "{value} °C, outside the allowed range"
     },
     "a11y": {
       "completed": "{title} completed",

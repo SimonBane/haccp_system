@@ -7,6 +7,7 @@ import {
 import {
   isDueNow,
   minutesUntilScheduled,
+  occurrenceKey,
   parseScheduledTimeToMinutes,
 } from "./today-grouping";
 
@@ -19,6 +20,17 @@ import {
  */
 export type TimeGroupState = "done" | "overdue" | "now" | "upcoming";
 
+/**
+ * `completedAt` is when the reading was actually taken; `scheduledTime` is the
+ * round it belonged to. The entry dialog shows the former and falls back to the
+ * latter, which is all a pending row needs.
+ */
+export type TodayPriorReading = {
+  scheduledTime: string;
+  completedAt: string | null;
+  recordedC: number;
+};
+
 export type TodayTimelineItem = {
   task: TodayTaskItem;
   isCompleted: boolean;
@@ -28,7 +40,7 @@ export type TodayTimelineItem = {
    * The most recent reading taken earlier the same day for the same equipment.
    * Derived from the payload we already have — no extra request.
    */
-  priorReading: { scheduledTime: string; recordedC: number } | null;
+  priorReading: TodayPriorReading | null;
 };
 
 export type TodayTimeGroup = {
@@ -74,6 +86,43 @@ export function timeGroupId(scheduledTime: string): string {
   return `time-group-${scheduledTime.replace(":", "-")}`;
 }
 
+/**
+ * Resolves an occurrence key against the current timeline.
+ *
+ * Anything holding on to a task across renders holds the key rather than the
+ * item: the clock ticks every minute and rebuilds the timeline, so a captured
+ * item would keep serving the prior reading it happened to see. Null once the
+ * key stops resolving — a day that rolled over, or a template that was removed.
+ */
+export function findTimelineItem(
+  timeline: TodayTimeline,
+  key: string | null,
+): TodayTimelineItem | null {
+  if (!key) return null;
+
+  for (const group of timeline.groups) {
+    for (const item of group.items) {
+      if (occurrenceKey(item.task) === key) return item;
+    }
+  }
+
+  return null;
+}
+
+/** The round an occurrence belongs to, for queueing the rest of its group. */
+export function findTimelineGroup(
+  timeline: TodayTimeline,
+  key: string | null,
+): TodayTimeGroup | null {
+  if (!key) return null;
+
+  return (
+    timeline.groups.find((group) =>
+      group.items.some((item) => occurrenceKey(item.task) === key),
+    ) ?? null
+  );
+}
+
 function isDeviation(task: TodayTaskItem): boolean {
   return (
     task.completedAt !== null &&
@@ -87,15 +136,9 @@ function isDeviation(task: TodayTaskItem): boolean {
  */
 function buildPriorReadings(
   tasksInTimeOrder: TodayTaskItem[],
-): Map<string, { scheduledTime: string; recordedC: number }> {
-  const priorByTaskKey = new Map<
-    string,
-    { scheduledTime: string; recordedC: number }
-  >();
-  const lastByEquipment = new Map<
-    string,
-    { scheduledTime: string; recordedC: number }
-  >();
+): Map<string, TodayPriorReading> {
+  const priorByTaskKey = new Map<string, TodayPriorReading>();
+  const lastByEquipment = new Map<string, TodayPriorReading>();
 
   for (const task of tasksInTimeOrder) {
     if (!task.equipmentId) continue;
@@ -111,6 +154,7 @@ function buildPriorReadings(
     if (task.temperatureReading) {
       lastByEquipment.set(task.equipmentId, {
         scheduledTime: task.scheduledTime,
+        completedAt: task.completedAt,
         recordedC: task.temperatureReading.recordedC,
       });
     }
@@ -225,6 +269,7 @@ export function buildTodayTimeline(
   const upcomingIndex = groups.findIndex(
     (group) => parseScheduledTimeToMinutes(group.scheduledTime) > nowMinutes,
   );
+  const isAllDone = total > 0 && completedCount === total;
 
   return {
     groups,
@@ -238,12 +283,13 @@ export function buildTodayTimeline(
       groups.find((group) => group.state === "overdue")?.id ?? null,
     firstDeviationGroupId:
       groups.find((group) => group.deviationCount > 0)?.id ?? null,
-    isAllDone: total > 0 && completedCount === total,
-    nowLineIndex: isToday
-      ? upcomingIndex === -1
-        ? groups.length
-        : upcomingIndex
-      : null,
+    isAllDone,
+    nowLineIndex:
+      isToday && !isAllDone
+        ? upcomingIndex === -1
+          ? groups.length
+          : upcomingIndex
+        : null,
     nowMinutes,
   };
 }
