@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  zod: ^4.4.3
+
 importers:
 
   .:
@@ -30,11 +33,8 @@ importers:
         specifier: ^1.14.4
         version: 1.19.14(hono@4.12.28)
       '@hono/zod-openapi':
-        specifier: ^0.19.10
-        version: 0.19.10(hono@4.12.28)(zod@3.25.76)
-      '@hono/zod-validator':
-        specifier: ^0.8.0
-        version: 0.8.0(hono@4.12.28)(zod@3.25.76)
+        specifier: ^1.5.1
+        version: 1.5.1(hono@4.12.28)(zod@4.4.3)
       '@sentry/hono':
         specifier: ^10.69.0
         version: 10.69.0(@hono/node-server@1.19.14(hono@4.12.28))(@sentry/node@10.69.0(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1)))(hono@4.12.28)
@@ -57,8 +57,8 @@ importers:
         specifier: ^6.1.0
         version: 6.1.0(@opentelemetry/api@1.9.1)
       zod:
-        specifier: ^3.25.56
-        version: 3.25.76
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@haccp/eslint-config':
         specifier: workspace:*
@@ -70,8 +70,8 @@ importers:
         specifier: ^0.6.1
         version: 0.6.1(hono@4.12.28)
       '@types/node':
-        specifier: ^20
-        version: 20.19.43
+        specifier: ^24
+        version: 24.13.3
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -109,8 +109,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/shared
       '@hookform/resolvers':
-        specifier: ^5.4.0
-        version: 5.4.0(react-hook-form@7.81.0(react@19.2.4))
+        specifier: ^5.4.2
+        version: 5.7.1(@sinclair/typebox@0.27.10)(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(react-hook-form@7.81.0(react@19.2.4))(superstruct@2.0.2)(zod@4.4.3)
       '@radix-ui/react-slot':
         specifier: ^1.3.0
         version: 1.3.0(@types/react@19.2.17)(react@19.2.4)
@@ -163,8 +163,8 @@ importers:
         specifier: ^1.4.0
         version: 1.4.0
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@haccp/eslint-config':
         specifier: workspace:*
@@ -179,8 +179,8 @@ importers:
         specifier: ^5.101.4
         version: 5.101.4(@tanstack/react-query@5.101.4(react@19.2.4))(react@19.2.4)
       '@types/node':
-        specifier: ^20
-        version: 20.19.43
+        specifier: ^24
+        version: 24.13.3
       '@types/react':
         specifier: ^19
         version: 19.2.17
@@ -212,8 +212,8 @@ importers:
         specifier: ^9.28.0
         version: 9.39.4(jiti@2.7.0)
       eslint-config-next:
-        specifier: ^15.3.3
-        version: 15.5.20(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
+        specifier: ^16.2.10
+        version: 16.2.10(@typescript-eslint/parser@8.63.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
       globals:
         specifier: ^16.2.0
         version: 16.5.0
@@ -224,8 +224,8 @@ importers:
   packages/shared:
     dependencies:
       zod:
-        specifier: ^3.25.56
-        version: 3.25.76
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@haccp/eslint-config':
         specifier: workspace:*
@@ -234,8 +234,8 @@ importers:
         specifier: workspace:*
         version: link:../typescript-config
       '@types/node':
-        specifier: ^20.19.43
-        version: 20.19.43
+        specifier: ^24
+        version: 24.13.3
       eslint:
         specifier: ^9.28.0
         version: 9.39.4(jiti@2.7.0)
@@ -262,10 +262,10 @@ packages:
   '@apm-js-collab/tracing-hooks@0.13.0':
     resolution: {integrity: sha512-mTvWz9rnQwx1U3h0XPTHaX7bgfkpipLLTQyjlC2cdhQpQEuoLT0AGzoydeoq2NxfEVv6fWOOETcSbb2nptleyw==}
 
-  '@asteasolutions/zod-to-openapi@7.3.4':
-    resolution: {integrity: sha512-/2rThQ5zPi9OzVwes6U7lK1+Yvug0iXu25olp7S0XsYmOqnyMfxH7gdSQjn/+DSOHRg7wnotwGJSyL+fBKdnEA==}
+  '@asteasolutions/zod-to-openapi@8.5.0':
+    resolution: {integrity: sha512-SABbKiObg5dLRiTFnqiW1WWwGcg1BJfmHtT2asIBnBHg6Smy/Ms2KHc650+JI4Hw7lSkdiNebEGXpwoxfben8Q==}
     peerDependencies:
-      zod: ^3.20.2
+      zod: ^4.4.3
 
   '@babel/code-frame@7.29.7':
     resolution: {integrity: sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw==}
@@ -1072,29 +1072,96 @@ packages:
     peerDependencies:
       hono: '>=4.0.0'
 
-  '@hono/zod-openapi@0.19.10':
-    resolution: {integrity: sha512-dpoS6DenvoJyvxtQ7Kd633FRZ/Qf74+4+o9s+zZI8pEqnbjdF/DtxIib08WDpCaWabMEJOL5TXpMgNEZvb7hpA==}
+  '@hono/zod-openapi@1.5.1':
+    resolution: {integrity: sha512-ZaDdEIkn6PEGjIYHXJeyByg6yhvLzI+UXn968pWtahpwcQ6HMjQYXI3zNffTl0Wl9QZ79nUnGqiN1erEIu23fA==}
     engines: {node: '>=16.0.0'}
     peerDependencies:
-      hono: '>=4.3.6'
-      zod: '>=3.0.0'
-
-  '@hono/zod-validator@0.7.6':
-    resolution: {integrity: sha512-Io1B6d011Gj1KknV4rXYz4le5+5EubcWEU/speUjuw9XMMIaP3n78yXLhjd2A3PXaXaUwEAluOiAyLqhBEJgsw==}
-    peerDependencies:
-      hono: '>=3.9.0'
-      zod: ^3.25.0 || ^4.0.0
-
-  '@hono/zod-validator@0.8.0':
-    resolution: {integrity: sha512-5uS4S1/LKtZQYvD4BtpPUFkOv8d1wNxHHrChm26buMiEYc1FrHWvDUaKVBwkiVtvSExHSpLGDvcnpI2Copyj9w==}
-    peerDependencies:
       hono: '>=4.10.0'
-      zod: ^3.25.0 || ^4.0.0
+      zod: ^4.4.3
 
-  '@hookform/resolvers@5.4.0':
-    resolution: {integrity: sha512-EIsqr/t/qbinPIhGjMdtvutIN1Kk4uwbROE9/UQ93CAVGR7GkA7Y92+fX80OzXi/OB67jVFYwKGO1WzkxmkFZw==}
+  '@hono/zod-validator@0.9.0':
+    resolution: {integrity: sha512-n0ZSXmCiHVIp4Y5wlOOyZCeTd/rsawA/qW1cipB8QOYKZ9N8Tk0nZUZCXho9cu374AN4JpDNKioNKBJ/W+LBug==}
     peerDependencies:
+      hono: '>=4.11.2'
+      zod: ^4.4.3
+
+  '@hookform/resolvers@5.7.1':
+    resolution: {integrity: sha512-8wS/P4UDr5sQDe4nFaV51TVyfDPrWgNIXweqG0Bs9Z5LSuzKLb+RQNPvkN2oHM5SRrJyWrVH/F+LOUcFjUyvwQ==}
+    peerDependencies:
+      '@sinclair/typebox': '>=0.25.24'
+      '@standard-schema/spec': ^1.0.0
+      '@typeschema/main': '>=0.13.7'
+      '@vinejs/vine': ^2.0.0 || ^3.0.0 || ^4.0.0
+      ajv: ^8.12.0
+      ajv-errors: ^3.0.0
+      ajv-formats: ^2.1.1
+      arktype: ^2.0.0
+      ata-validator: ^1.2.0
+      class-transformer: '>=0.4.0'
+      class-validator: '>=0.12.0'
+      computed-types: ^1.0.0
+      effect: ^3.10.3
+      fluentvalidation-ts: ^3.0.0
+      fp-ts: ^2.7.0
+      io-ts: ^2.0.0
+      joi: ^17.0.0
+      nope-validator: '>=0.12.0'
       react-hook-form: ^7.55.0
+      superstruct: '>=0.12.0'
+      typanion: ^3.3.2
+      valibot: '>=0.31.0 || ^1.0.0-beta.4 || ^1.0.0-rc'
+      vest: '>=3.0.0'
+      yup: ^1.0.0
+      zod: ^4.4.3
+    peerDependenciesMeta:
+      '@sinclair/typebox':
+        optional: true
+      '@standard-schema/spec':
+        optional: true
+      '@typeschema/main':
+        optional: true
+      '@vinejs/vine':
+        optional: true
+      ajv:
+        optional: true
+      ajv-errors:
+        optional: true
+      ajv-formats:
+        optional: true
+      arktype:
+        optional: true
+      ata-validator:
+        optional: true
+      class-transformer:
+        optional: true
+      class-validator:
+        optional: true
+      computed-types:
+        optional: true
+      effect:
+        optional: true
+      fluentvalidation-ts:
+        optional: true
+      fp-ts:
+        optional: true
+      io-ts:
+        optional: true
+      joi:
+        optional: true
+      nope-validator:
+        optional: true
+      superstruct:
+        optional: true
+      typanion:
+        optional: true
+      valibot:
+        optional: true
+      vest:
+        optional: true
+      yup:
+        optional: true
+      zod:
+        optional: true
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -1289,7 +1356,7 @@ packages:
     engines: {node: '>=18'}
     peerDependencies:
       '@cfworker/json-schema': ^4.1.1
-      zod: ^3.25 || ^4.0
+      zod: ^4.4.3
     peerDependenciesMeta:
       '@cfworker/json-schema':
         optional: true
@@ -1302,9 +1369,6 @@ packages:
 
   '@next/env@16.2.10':
     resolution: {integrity: sha512-zLPxg9M0MEHmygpj5OuxjQ+vHMiy/K7cSp74G8ecYolmgUWw0RwN02tF56npup/+qaI8JB97hQgS/r2Hb6QwVA==}
-
-  '@next/eslint-plugin-next@15.5.20':
-    resolution: {integrity: sha512-MZUgFpVd9rGSZpb8bNceUWvkAZe6aQw/6h2SSqHQuYzKfaiEUEVPIO6mXqaBmiBEBSN1f1sOc1uV8GCM90oegg==}
 
   '@next/eslint-plugin-next@16.2.10':
     resolution: {integrity: sha512-Gs8D2m21VnJeFo9qvYIIqJH94frWerWYu41BprU1pLtRVF7PCQNLiFZZ3fG+iPuj3K83Cwv/rt+msLOy8Qgu3Q==}
@@ -1768,9 +1832,6 @@ packages:
 
   '@rtsao/scc@1.1.0':
     resolution: {integrity: sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g==}
-
-  '@rushstack/eslint-patch@1.16.1':
-    resolution: {integrity: sha512-TvZbIpeKqGQQ7X0zSCvPH9riMSFQFSggnfBjFZ1mEoILW+UuXCKwOoPcgjMwiUtRqFZ8jWhPJc4um14vC6I4ag==}
 
   '@schummar/icu-type-parser@1.21.5':
     resolution: {integrity: sha512-bXHSaW5jRTmke9Vd0h5P7BtWZG9Znqb8gSDxZnxaGSJnGwPLDPfS+3g0BKzeWqzgZPsIVZkM7m2tbo18cm5HBw==}
@@ -2725,8 +2786,8 @@ packages:
   '@types/node@12.20.55':
     resolution: {integrity: sha512-J8xLz7q2OFulZ2cyGTLE1TbbZcjpno7FaN6zdJNrgAdrJ+DZzh/uFR6YrTb4C+nXakvud8Q4+rbhoIWlYQbUFQ==}
 
-  '@types/node@20.19.43':
-    resolution: {integrity: sha512-6oYBAi5ikg4Pl+kGsoYtawUMBT2zZMCvPNF7pVLnHZfd1zf38DRiWn/gT01RYCdUqkv7Fhr+C9ot4/tb+2sVvA==}
+  '@types/node@24.13.3':
+    resolution: {integrity: sha512-Dh8vAsV36ig5wa9OX4pXvMc9D3Veibfw2wix0CUwYODLD8nkj9UsLjASr49nPg+2eKzxhBV+v7L8pXvT4e639Q==}
 
   '@types/parse-json@4.0.2':
     resolution: {integrity: sha512-dISoDXWWQwUquiKsyZ4Ng+HX2KsPL7LyHKHQwgGFEA3IaKac4Obd+h2a/a6waisAoepJlBcx9paWqjA8/HVjCw==}
@@ -3792,15 +3853,6 @@ packages:
     resolution: {integrity: sha512-TtpcNJ3XAzx3Gq8sWRzJaVajRs0uVxA2YAkdb1jm2YkPz4G6egUFAyA3n5vtEIZefPk5Wa4UXbKuS5fKkJWdgA==}
     engines: {node: '>=10'}
 
-  eslint-config-next@15.5.20:
-    resolution: {integrity: sha512-Pl/I5544gmkcVVWcnaOMfhJSBK8lZ1NCJ+mGBkd2qvbGt2Gi7sEpgHF06OR13a2p6THODlncpvGsZzY2vUqwxw==}
-    peerDependencies:
-      eslint: ^7.23.0 || ^8.0.0 || ^9.0.0
-      typescript: '>=3.3.1'
-    peerDependenciesMeta:
-      typescript:
-        optional: true
-
   eslint-config-next@16.2.10:
     resolution: {integrity: sha512-HSybLOY0QKf39i4FWUqPN0xWiNDi6A6UqJmZtgDkS3zMqjXTqULvj/sueXx3cdCG0mVG+qH6k5/qdegklH1d1w==}
     peerDependencies:
@@ -3862,12 +3914,6 @@ packages:
     engines: {node: '>=4.0'}
     peerDependencies:
       eslint: ^3 || ^4 || ^5 || ^6 || ^7 || ^8 || ^9
-
-  eslint-plugin-react-hooks@5.2.0:
-    resolution: {integrity: sha512-+f15FfK64YQwZdJNELETdn5ibXEUQmW1DZL6KXhNnc2heoy/sg9VJJeT7n8TlMWouzWqSWavFkIhHyIbIAEapg==}
-    engines: {node: '>=10'}
-    peerDependencies:
-      eslint: ^3.0.0 || ^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0-0 || ^9.0.0
 
   eslint-plugin-react-hooks@7.1.1:
     resolution: {integrity: sha512-f2I7Gw6JbvCexzIInuSbZpfdQ44D7iqdWX01FKLvrPgqxoE7oMj8clOfto8U6vYiz4yd5oKu39rRSVOe1zRu0g==}
@@ -5949,8 +5995,8 @@ packages:
     resolution: {integrity: sha512-nWJ91DjeOkej/TA8pXQ3myruKpKEYgqvpw9lz4OPHj/NWFNluYrjbz9j01CJ8yKQd2g4jFoOkINCTW2I5LEEyw==}
     engines: {node: '>= 0.4'}
 
-  undici-types@6.21.0:
-    resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
+  undici-types@7.18.2:
+    resolution: {integrity: sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w==}
 
   undici-types@8.7.0:
     resolution: {integrity: sha512-gbsS+hAjHg9iV+T8XWdFqnOZEk4f5xrrX3eb9Y1GDe+B5u9H68P6SzYXXUw/rkRvJHRgKIdNfAcrcVj/JvayVA==}
@@ -6176,16 +6222,16 @@ packages:
   zod-to-json-schema@3.25.2:
     resolution: {integrity: sha512-O/PgfnpT1xKSDeQYSCfRI5Gy3hPf91mKVDuYLUHZJMiDFptvP41MSnWofm8dnCm0256ZNfZIM7DSzuSMAFnjHA==}
     peerDependencies:
-      zod: ^3.25.28 || ^4
+      zod: ^4.4.3
 
   zod-validation-error@4.0.2:
     resolution: {integrity: sha512-Q6/nZLe6jxuU80qb/4uJ4t5v2VEZ44lzQjPDhYJNztRQ4wyWc6VF3D3Kb/fAuPetZQnhS3hnajCf9CsWesghLQ==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
-      zod: ^3.25.0 || ^4.0.0
+      zod: ^4.4.3
 
-  zod@3.25.76:
-    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
 snapshots:
 
@@ -6215,10 +6261,10 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@asteasolutions/zod-to-openapi@7.3.4(zod@3.25.76)':
+  '@asteasolutions/zod-to-openapi@8.5.0(zod@4.4.3)':
     dependencies:
       openapi3-ts: 4.6.0
-      zod: 3.25.76
+      zod: 4.4.3
 
   '@babel/code-frame@7.29.7':
     dependencies:
@@ -6941,28 +6987,29 @@ snapshots:
     dependencies:
       hono: 4.12.28
 
-  '@hono/zod-openapi@0.19.10(hono@4.12.28)(zod@3.25.76)':
+  '@hono/zod-openapi@1.5.1(hono@4.12.28)(zod@4.4.3)':
     dependencies:
-      '@asteasolutions/zod-to-openapi': 7.3.4(zod@3.25.76)
-      '@hono/zod-validator': 0.7.6(hono@4.12.28)(zod@3.25.76)
+      '@asteasolutions/zod-to-openapi': 8.5.0(zod@4.4.3)
+      '@hono/zod-validator': 0.9.0(hono@4.12.28)(zod@4.4.3)
       hono: 4.12.28
       openapi3-ts: 4.6.0
-      zod: 3.25.76
+      zod: 4.4.3
 
-  '@hono/zod-validator@0.7.6(hono@4.12.28)(zod@3.25.76)':
+  '@hono/zod-validator@0.9.0(hono@4.12.28)(zod@4.4.3)':
     dependencies:
       hono: 4.12.28
-      zod: 3.25.76
+      zod: 4.4.3
 
-  '@hono/zod-validator@0.8.0(hono@4.12.28)(zod@3.25.76)':
-    dependencies:
-      hono: 4.12.28
-      zod: 3.25.76
-
-  '@hookform/resolvers@5.4.0(react-hook-form@7.81.0(react@19.2.4))':
+  '@hookform/resolvers@5.7.1(@sinclair/typebox@0.27.10)(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(react-hook-form@7.81.0(react@19.2.4))(superstruct@2.0.2)(zod@4.4.3)':
     dependencies:
       '@standard-schema/utils': 0.3.0
       react-hook-form: 7.81.0(react@19.2.4)
+    optionalDependencies:
+      '@sinclair/typebox': 0.27.10
+      ajv: 8.20.0
+      ajv-formats: 2.1.1(ajv@8.20.0)
+      superstruct: 2.0.2
+      zod: 4.4.3
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -7088,7 +7135,7 @@ snapshots:
       '@jest/schemas': 29.6.3
       '@types/istanbul-lib-coverage': 2.0.6
       '@types/istanbul-reports': 3.0.4
-      '@types/node': 20.19.43
+      '@types/node': 24.13.3
       '@types/yargs': 17.0.35
       chalk: 4.1.2
 
@@ -7116,7 +7163,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@modelcontextprotocol/sdk@1.29.0(zod@3.25.76)':
+  '@modelcontextprotocol/sdk@1.29.0(zod@4.4.3)':
     dependencies:
       '@hono/node-server': 1.19.14(hono@4.12.28)
       ajv: 8.20.0
@@ -7133,8 +7180,8 @@ snapshots:
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
       raw-body: 3.0.2
-      zod: 3.25.76
-      zod-to-json-schema: 3.25.2(zod@3.25.76)
+      zod: 4.4.3
+      zod-to-json-schema: 3.25.2(zod@4.4.3)
     transitivePeerDependencies:
       - supports-color
 
@@ -7146,10 +7193,6 @@ snapshots:
     optional: true
 
   '@next/env@16.2.10': {}
-
-  '@next/eslint-plugin-next@15.5.20':
-    dependencies:
-      fast-glob: 3.3.1
 
   '@next/eslint-plugin-next@16.2.10':
     dependencies:
@@ -7511,8 +7554,6 @@ snapshots:
     optional: true
 
   '@rtsao/scc@1.1.0': {}
-
-  '@rushstack/eslint-patch@1.16.1': {}
 
   '@schummar/icu-type-parser@1.21.5': {}
 
@@ -8597,7 +8638,7 @@ snapshots:
 
   '@types/connect@3.4.38':
     dependencies:
-      '@types/node': 20.19.43
+      '@types/node': 24.13.3
 
   '@types/estree@1.0.9': {}
 
@@ -8617,9 +8658,9 @@ snapshots:
 
   '@types/node@12.20.55': {}
 
-  '@types/node@20.19.43':
+  '@types/node@24.13.3':
     dependencies:
-      undici-types: 6.21.0
+      undici-types: 7.18.2
 
   '@types/parse-json@4.0.2': {}
 
@@ -8637,11 +8678,11 @@ snapshots:
 
   '@types/ws@7.4.7':
     dependencies:
-      '@types/node': 20.19.43
+      '@types/node': 24.13.3
 
   '@types/ws@8.18.1':
     dependencies:
-      '@types/node': 20.19.43
+      '@types/node': 24.13.3
 
   '@types/yargs-parser@21.0.3': {}
 
@@ -9211,7 +9252,7 @@ snapshots:
 
   chrome-launcher@0.15.2:
     dependencies:
-      '@types/node': 20.19.43
+      '@types/node': 24.13.3
       escape-string-regexp: 4.0.0
       is-wsl: 2.2.0
       lighthouse-logger: 1.4.2
@@ -9222,7 +9263,7 @@ snapshots:
 
   chromium-edge-launcher@0.3.0:
     dependencies:
-      '@types/node': 20.19.43
+      '@types/node': 24.13.3
       escape-string-regexp: 4.0.0
       is-wsl: 2.2.0
       lighthouse-logger: 1.4.2
@@ -9732,22 +9773,22 @@ snapshots:
 
   escape-string-regexp@4.0.0: {}
 
-  eslint-config-next@15.5.20(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3):
+  eslint-config-next@16.2.10(@typescript-eslint/parser@8.63.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3):
     dependencies:
-      '@next/eslint-plugin-next': 15.5.20
-      '@rushstack/eslint-patch': 1.16.1
-      '@typescript-eslint/eslint-plugin': 8.63.0(@typescript-eslint/parser@8.63.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
-      '@typescript-eslint/parser': 8.63.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
+      '@next/eslint-plugin-next': 16.2.10
       eslint: 9.39.4(jiti@2.7.0)
       eslint-import-resolver-node: 0.3.10
       eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0)(eslint@9.39.4(jiti@2.7.0))
       eslint-plugin-import: 2.32.0(@typescript-eslint/parser@8.63.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3))(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.4(jiti@2.7.0))
       eslint-plugin-jsx-a11y: 6.10.2(eslint@9.39.4(jiti@2.7.0))
       eslint-plugin-react: 7.37.5(eslint@9.39.4(jiti@2.7.0))
-      eslint-plugin-react-hooks: 5.2.0(eslint@9.39.4(jiti@2.7.0))
+      eslint-plugin-react-hooks: 7.1.1(eslint@9.39.4(jiti@2.7.0))
+      globals: 16.4.0
+      typescript-eslint: 8.63.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
     transitivePeerDependencies:
+      - '@typescript-eslint/parser'
       - eslint-import-resolver-webpack
       - eslint-plugin-import-x
       - supports-color
@@ -9758,7 +9799,7 @@ snapshots:
       eslint: 9.39.4(jiti@2.7.0)
       eslint-import-resolver-node: 0.3.10
       eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(eslint@9.39.4(jiti@2.7.0)))(eslint@9.39.4(jiti@2.7.0))
-      eslint-plugin-import: 2.32.0(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.4(jiti@2.7.0))
+      eslint-plugin-import: 2.32.0(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@9.39.4(jiti@2.7.0)))(eslint@9.39.4(jiti@2.7.0)))(eslint@9.39.4(jiti@2.7.0))
       eslint-plugin-jsx-a11y: 6.10.2(eslint@9.39.4(jiti@2.7.0))
       eslint-plugin-react: 7.37.5(eslint@9.39.4(jiti@2.7.0))
       eslint-plugin-react-hooks: 7.1.1(eslint@9.39.4(jiti@2.7.0))
@@ -9791,7 +9832,7 @@ snapshots:
       tinyglobby: 0.2.17
       unrs-resolver: 1.12.2
     optionalDependencies:
-      eslint-plugin-import: 2.32.0(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.4(jiti@2.7.0))
+      eslint-plugin-import: 2.32.0(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@9.39.4(jiti@2.7.0)))(eslint@9.39.4(jiti@2.7.0)))(eslint@9.39.4(jiti@2.7.0))
     transitivePeerDependencies:
       - supports-color
 
@@ -9860,7 +9901,7 @@ snapshots:
       - eslint-import-resolver-webpack
       - supports-color
 
-  eslint-plugin-import@2.32.0(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.4(jiti@2.7.0)):
+  eslint-plugin-import@2.32.0(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@9.39.4(jiti@2.7.0)))(eslint@9.39.4(jiti@2.7.0)))(eslint@9.39.4(jiti@2.7.0)):
     dependencies:
       '@rtsao/scc': 1.1.0
       array-includes: 3.1.9
@@ -9906,18 +9947,14 @@ snapshots:
       safe-regex-test: 1.1.0
       string.prototype.includes: 2.0.1
 
-  eslint-plugin-react-hooks@5.2.0(eslint@9.39.4(jiti@2.7.0)):
-    dependencies:
-      eslint: 9.39.4(jiti@2.7.0)
-
   eslint-plugin-react-hooks@7.1.1(eslint@9.39.4(jiti@2.7.0)):
     dependencies:
       '@babel/core': 7.29.7
       '@babel/parser': 7.29.7
       eslint: 9.39.4(jiti@2.7.0)
       hermes-parser: 0.25.1
-      zod: 3.25.76
-      zod-validation-error: 4.0.2(zod@3.25.76)
+      zod: 4.4.3
+      zod-validation-error: 4.0.2(zod@4.4.3)
     transitivePeerDependencies:
       - supports-color
 
@@ -10670,7 +10707,7 @@ snapshots:
   jest-util@29.7.0:
     dependencies:
       '@jest/types': 29.6.3
-      '@types/node': 20.19.43
+      '@types/node': 24.13.3
       chalk: 4.1.2
       ci-info: 3.9.0
       graceful-fs: 4.2.11
@@ -10687,13 +10724,13 @@ snapshots:
 
   jest-worker@27.5.1:
     dependencies:
-      '@types/node': 20.19.43
+      '@types/node': 24.13.3
       merge-stream: 2.0.0
       supports-color: 8.1.1
 
   jest-worker@29.7.0:
     dependencies:
-      '@types/node': 20.19.43
+      '@types/node': 24.13.3
       jest-util: 29.7.0
       merge-stream: 2.0.0
       supports-color: 8.1.1
@@ -11889,7 +11926,7 @@ snapshots:
       '@babel/plugin-transform-typescript': 7.29.7(@babel/core@7.29.7)
       '@babel/preset-typescript': 7.29.7(@babel/core@7.29.7)
       '@dotenvx/dotenvx': 1.75.1
-      '@modelcontextprotocol/sdk': 1.29.0(zod@3.25.76)
+      '@modelcontextprotocol/sdk': 1.29.0(zod@4.4.3)
       '@types/validate-npm-package-name': 4.0.2
       browserslist: 4.28.5
       commander: 14.0.3
@@ -11914,8 +11951,8 @@ snapshots:
       tsconfig-paths: 4.2.0
       undici: 7.28.0
       validate-npm-package-name: 7.0.2
-      zod: 3.25.76
-      zod-to-json-schema: 3.25.2(zod@3.25.76)
+      zod: 4.4.3
+      zod-to-json-schema: 3.25.2(zod@4.4.3)
     transitivePeerDependencies:
       - '@cfworker/json-schema'
       - babel-plugin-macros
@@ -12307,7 +12344,7 @@ snapshots:
       has-symbols: 1.1.0
       which-boxed-primitive: 1.1.1
 
-  undici-types@6.21.0: {}
+  undici-types@7.18.2: {}
 
   undici-types@8.7.0: {}
 
@@ -12573,12 +12610,12 @@ snapshots:
 
   yoctocolors@2.1.2: {}
 
-  zod-to-json-schema@3.25.2(zod@3.25.76):
+  zod-to-json-schema@3.25.2(zod@4.4.3):
     dependencies:
-      zod: 3.25.76
+      zod: 4.4.3
 
-  zod-validation-error@4.0.2(zod@3.25.76):
+  zod-validation-error@4.0.2(zod@4.4.3):
     dependencies:
-      zod: 3.25.76
+      zod: 4.4.3
 
-  zod@3.25.76: {}
+  zod@4.4.3: {}

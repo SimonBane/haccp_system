@@ -2,7 +2,7 @@ import type { ErrorHandler, NotFoundHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import * as Sentry from "@sentry/hono/node";
 import { apiErrorSchema } from "@haccp/shared";
-import { ZodError } from "zod";
+import { z, ZodError } from "zod";
 import { AppError } from "../errors/app-errors.js";
 import { logger } from "../../lib/logger.js";
 import { isSentryEnabled } from "../../lib/sentry.js";
@@ -30,7 +30,7 @@ export const errorHandler: ErrorHandler<AppEnv> = (err, c) => {
     const payload = apiErrorSchema.parse({
       error: "VALIDATION_ERROR",
       message: "Validation failed",
-      details: err.flatten(),
+      details: z.treeifyError(err),
       requestId,
     });
 

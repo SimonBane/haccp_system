@@ -3,7 +3,7 @@ import { z } from "zod";
 export const organizationLocaleSchema = z.enum(["bg", "en"]);
 
 export const organizationResponseSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   clerkOrgId: z.string(),
   name: z.string(),
   imageUrl: z.string(),
@@ -11,8 +11,8 @@ export const organizationResponseSchema = z.object({
   timezone: z.string(),
   locale: organizationLocaleSchema,
   multipleLocationsEnabled: z.boolean(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
 });
 
 export type OrganizationResponse = z.infer<typeof organizationResponseSchema>;
@@ -35,7 +35,7 @@ export const updateOrganizationSchema = z
     (data) =>
       Object.keys(data).length > 0 &&
       Object.values(data).some((value) => value !== undefined),
-    { message: "At least one field must be provided" },
+    { error: "At least one field must be provided" },
   );
 
 export type UpdateOrganizationInput = z.infer<typeof updateOrganizationSchema>;

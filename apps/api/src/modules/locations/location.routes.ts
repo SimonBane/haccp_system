@@ -1,4 +1,3 @@
-// @ts-nocheck — Vercel Hono preset per-file TS cannot infer OpenAPI handler types reliably.
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import {
   createLocationSchema,
@@ -8,11 +7,11 @@ import {
   uuidParamSchema,
 } from "@haccp/shared";
 import {
+  defineRouteHandler,
   errorResponse,
   jsonResponse,
 } from "../../core/openapi/route-factory.js";
 import {
-  getCurrentLocation,
   getDb,
   getTenant,
   requireOrgContext,
@@ -101,43 +100,52 @@ const deleteRouteDef = createRoute({
   },
 });
 
-locationRoutes.openapi(listRoute, async (c) => {
-  const tenant = getTenant(c);
-  const result = locationService.listFromTenant(tenant.locations);
-  return c.json(result, 200);
-});
+locationRoutes.openapi(
+  listRoute,
+  defineRouteHandler(listRoute, async (c) => {
+    const tenant = getTenant(c);
+    const result = locationService.listFromTenant(tenant.locations);
+    return c.json(result, 200);
+  }),
+);
 
-locationRoutes.openapi(createRouteDef, async (c) => {
-  const { clerkOrgId, organizationId } = requireOrgContext(c);
-  const organization = getTenant(c).organization;
-  const input = c.req.valid("json");
-  const created = await locationService.create(
-    getDb(c),
-    clerkOrgId,
-    organizationId,
-    organization.multipleLocationsEnabled,
-    input,
-  );
-  return c.json(created, 201);
-});
+locationRoutes.openapi(
+  createRouteDef,
+  defineRouteHandler(createRouteDef, async (c) => {
+    const { clerkOrgId, organizationId } = requireOrgContext(c);
+    const organization = getTenant(c).organization;
+    const input = c.req.valid("json");
+    const created = await locationService.create(
+      getDb(c),
+      clerkOrgId,
+      organizationId,
+      organization.multipleLocationsEnabled,
+      input,
+    );
+    return c.json(created, 201);
+  }),
+);
 
-locationRoutes.openapi(updateRouteDef, async (c) => {
-  const { clerkOrgId, organizationId } = requireOrgContext(c);
-  const { id } = c.req.valid("param");
-  const input = c.req.valid("json");
-  const currentLocation = getTenant(c).locations.find(
-    (location) => location.id === id,
-  );
-  const updated = await locationService.update(
-    getDb(c),
-    clerkOrgId,
-    organizationId,
-    id,
-    input,
-    currentLocation,
-  );
-  return c.json(updated, 200);
-});
+locationRoutes.openapi(
+  updateRouteDef,
+  defineRouteHandler(updateRouteDef, async (c) => {
+    const { clerkOrgId, organizationId } = requireOrgContext(c);
+    const { id } = c.req.valid("param");
+    const input = c.req.valid("json");
+    const currentLocation = getTenant(c).locations.find(
+      (location) => location.id === id,
+    );
+    const updated = await locationService.update(
+      getDb(c),
+      clerkOrgId,
+      organizationId,
+      id,
+      input,
+      currentLocation,
+    );
+    return c.json(updated, 200);
+  }),
+);
 
 locationRoutes.openapi(deleteRouteDef, async (c) => {
   const { clerkOrgId, organizationId } = requireOrgContext(c);

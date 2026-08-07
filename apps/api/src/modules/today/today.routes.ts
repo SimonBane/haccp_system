@@ -1,4 +1,3 @@
-// @ts-nocheck — Vercel Hono preset per-file TS cannot infer OpenAPI handler types reliably.
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import {
   completeTodayTemperatureTaskSchema,
@@ -8,6 +7,7 @@ import {
   todayTaskItemSchema,
 } from "@haccp/shared";
 import {
+  defineRouteHandler,
   errorResponse,
   jsonResponse,
 } from "../../core/openapi/route-factory.js";
@@ -116,56 +116,68 @@ const uncompleteTaskRoute = createRoute({
   },
 });
 
-todayRoutes.openapi(getTodayRoute, async (c) => {
-  const { date } = c.req.valid("query");
-  const { id: locationId } = getCurrentLocation(c);
-  const { user } = requireOrgContext(c);
-  const result = await todayService.getToday(
-    getDb(c),
-    locationId,
-    date,
-    user.id,
-    getCurrentOrganization(c).timezone,
-  );
-  return c.json(result, 200);
-});
+todayRoutes.openapi(
+  getTodayRoute,
+  defineRouteHandler(getTodayRoute, async (c) => {
+    const { date } = c.req.valid("query");
+    const { id: locationId } = getCurrentLocation(c);
+    const { user } = requireOrgContext(c);
+    const result = await todayService.getToday(
+      getDb(c),
+      locationId,
+      date,
+      user.id,
+      getCurrentOrganization(c).timezone,
+    );
+    return c.json(result, 200);
+  }),
+);
 
-todayRoutes.openapi(completeTaskRoute, async (c) => {
-  const { user } = requireOrgContext(c);
-  const { id: locationId } = getCurrentLocation(c);
-  const input = c.req.valid("json");
-  const result = await todayCompletionService.completeTask(
-    getDb(c),
-    locationId,
-    { id: user.id, firstName: user.firstName, lastName: user.lastName },
-    input,
-    getCurrentOrganization(c).timezone,
-  );
-  return c.json(result, 200);
-});
+todayRoutes.openapi(
+  completeTaskRoute,
+  defineRouteHandler(completeTaskRoute, async (c) => {
+    const { user } = requireOrgContext(c);
+    const { id: locationId } = getCurrentLocation(c);
+    const input = c.req.valid("json");
+    const result = await todayCompletionService.completeTask(
+      getDb(c),
+      locationId,
+      { id: user.id, firstName: user.firstName, lastName: user.lastName },
+      input,
+      getCurrentOrganization(c).timezone,
+    );
+    return c.json(result, 200);
+  }),
+);
 
-todayRoutes.openapi(completeTemperatureRoute, async (c) => {
-  const { user } = requireOrgContext(c);
-  const { id: locationId } = getCurrentLocation(c);
-  const input = c.req.valid("json");
-  const result = await todayCompletionService.completeTemperatureTask(
-    getDb(c),
-    locationId,
-    { id: user.id, firstName: user.firstName, lastName: user.lastName },
-    input,
-    getCurrentOrganization(c).timezone,
-  );
-  return c.json(result, 200);
-});
+todayRoutes.openapi(
+  completeTemperatureRoute,
+  defineRouteHandler(completeTemperatureRoute, async (c) => {
+    const { user } = requireOrgContext(c);
+    const { id: locationId } = getCurrentLocation(c);
+    const input = c.req.valid("json");
+    const result = await todayCompletionService.completeTemperatureTask(
+      getDb(c),
+      locationId,
+      { id: user.id, firstName: user.firstName, lastName: user.lastName },
+      input,
+      getCurrentOrganization(c).timezone,
+    );
+    return c.json(result, 200);
+  }),
+);
 
-todayRoutes.openapi(uncompleteTaskRoute, async (c) => {
-  const { id: locationId } = getCurrentLocation(c);
-  const input = c.req.valid("json");
-  const result = await todayCompletionService.uncompleteTask(
-    getDb(c),
-    locationId,
-    input,
-    getCurrentOrganization(c).timezone,
-  );
-  return c.json(result, 200);
-});
+todayRoutes.openapi(
+  uncompleteTaskRoute,
+  defineRouteHandler(uncompleteTaskRoute, async (c) => {
+    const { id: locationId } = getCurrentLocation(c);
+    const input = c.req.valid("json");
+    const result = await todayCompletionService.uncompleteTask(
+      getDb(c),
+      locationId,
+      input,
+      getCurrentOrganization(c).timezone,
+    );
+    return c.json(result, 200);
+  }),
+);
