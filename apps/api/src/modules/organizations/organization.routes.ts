@@ -5,6 +5,7 @@ import {
   organizationResponseSchema,
 } from "@haccp/shared";
 import {
+  defineRouteHandler,
   errorResponse,
   jsonResponse,
 } from "../../core/openapi/route-factory.js";
@@ -41,20 +42,23 @@ const patchCurrentRoute = createRoute({
   },
 });
 
-organizationRoutes.openapi(patchCurrentRoute, async (c) => {
-  const { clerkOrgId } = requireOrgContext(c);
-  const tenant = getTenant(c);
-  const input = c.req.valid("json");
-  const updated = await organizationService.updateSettings(
-    getDb(c),
-    clerkOrgId,
-    tenant.organization,
-    tenant.locations.length,
-    input,
-  );
+organizationRoutes.openapi(
+  patchCurrentRoute,
+  defineRouteHandler(patchCurrentRoute, async (c) => {
+    const { clerkOrgId } = requireOrgContext(c);
+    const tenant = getTenant(c);
+    const input = c.req.valid("json");
+    const updated = await organizationService.updateSettings(
+      getDb(c),
+      clerkOrgId,
+      tenant.organization,
+      tenant.locations.length,
+      input,
+    );
 
-  return c.json(updated, 200);
-});
+    return c.json(updated, 200);
+  }),
+);
 
 const patchCurrentNameRoute = createRoute({
   method: "patch",
@@ -79,19 +83,22 @@ const patchCurrentNameRoute = createRoute({
   },
 });
 
-organizationRoutes.openapi(patchCurrentNameRoute, async (c) => {
-  const { clerkOrgId } = requireOrgContext(c);
-  const organization = getCurrentOrganization(c);
-  const input = c.req.valid("json");
-  const updated = await organizationService.updateName(
-    getDb(c),
-    clerkOrgId,
-    organization,
-    input,
-  );
+organizationRoutes.openapi(
+  patchCurrentNameRoute,
+  defineRouteHandler(patchCurrentNameRoute, async (c) => {
+    const { clerkOrgId } = requireOrgContext(c);
+    const organization = getCurrentOrganization(c);
+    const input = c.req.valid("json");
+    const updated = await organizationService.updateName(
+      getDb(c),
+      clerkOrgId,
+      organization,
+      input,
+    );
 
-  return c.json(updated, 200);
-});
+    return c.json(updated, 200);
+  }),
+);
 
 organizationRoutes.put("/current/logo", async (c) => {
   const { clerkOrgId, userId } = requireOrgContext(c);

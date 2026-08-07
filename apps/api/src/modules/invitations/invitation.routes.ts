@@ -1,5 +1,6 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import {
+  defineRouteHandler,
   errorResponse,
   jsonResponse,
 } from "../../core/openapi/route-factory.js";
@@ -32,25 +33,28 @@ const acceptRoute = createRoute({
   },
 });
 
-invitationRoutes.openapi(acceptRoute, async (c) => {
-  const clerkOrgId = c.get("orgId");
-  const clerkUserId = c.get("userId");
-  const orgRole = c.get("orgRole");
+invitationRoutes.openapi(
+  acceptRoute,
+  defineRouteHandler(acceptRoute, async (c) => {
+    const clerkOrgId = c.get("orgId");
+    const clerkUserId = c.get("userId");
+    const orgRole = c.get("orgRole");
 
-  if (!clerkUserId || !orgRole) {
-    throw new UnauthorizedError();
-  }
+    if (!clerkUserId || !orgRole) {
+      throw new UnauthorizedError();
+    }
 
-  if (!clerkOrgId) {
-    throw new ForbiddenError("Organization membership required");
-  }
+    if (!clerkOrgId) {
+      throw new ForbiddenError("Organization membership required");
+    }
 
-  await invitationService.accept(
-    getDb(c),
-    clerkOrgId,
-    clerkUserId,
-    orgRole,
-  );
+    await invitationService.accept(
+      getDb(c),
+      clerkOrgId,
+      clerkUserId,
+      orgRole,
+    );
 
-  return c.json({ success: true as const }, 200);
-});
+    return c.json({ success: true as const }, 200);
+  }),
+);
