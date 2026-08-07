@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const userSummarySchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   firstName: z.string(),
   lastName: z.string(),
 });
@@ -9,7 +9,7 @@ export const userSummarySchema = z.object({
 export type UserSummary = z.infer<typeof userSummarySchema>;
 
 export const userResponseSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   clerkUserId: z.string().nullable(),
   firstName: z.string(),
   lastName: z.string(),

@@ -1,7 +1,7 @@
-// @ts-nocheck — Vercel Hono preset per-file TS cannot infer OpenAPI handler types reliably.
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { tenantContextResponseSchema } from "@haccp/shared";
 import {
+  defineRouteHandler,
   errorResponse,
   jsonResponse,
 } from "../../core/openapi/route-factory.js";
@@ -24,6 +24,9 @@ const getCurrentTenantRoute = createRoute({
   },
 });
 
-tenantRoutes.openapi(getCurrentTenantRoute, async (c) => {
-  return c.json(getTenantContext(c), 200);
-});
+tenantRoutes.openapi(
+  getCurrentTenantRoute,
+  defineRouteHandler(getCurrentTenantRoute, async (c) => {
+    return c.json(getTenantContext(c), 200);
+  }),
+);

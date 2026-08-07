@@ -21,7 +21,7 @@ export type TodayTaskStatus = z.infer<typeof todayTaskStatusSchema>;
 
 const isoDateSchema = z
   .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD");
+  .regex(/^\d{4}-\d{2}-\d{2}$/, { error: "Date must be YYYY-MM-DD" });
 
 export const todayDateQuerySchema = z.object({
   date: isoDateSchema,
@@ -40,10 +40,10 @@ export const todayTaskTemperatureReadingSchema = z
   .nullable();
 
 export const todayTaskItemSchema = z.object({
-  templateId: z.string().uuid(),
+  templateId: z.uuid(),
   title: z.string(),
   type: taskTemplateTypeSchema,
-  equipmentId: z.string().uuid().nullable(),
+  equipmentId: z.uuid().nullable(),
   equipmentName: z.string().nullable(),
   minTempC: z.number().nullable(),
   maxTempC: z.number().nullable(),
@@ -51,7 +51,7 @@ export const todayTaskItemSchema = z.object({
   timeSlot: taskTemplateTimeSlotSchema,
   date: isoDateSchema,
   status: todayTaskStatusSchema,
-  completedAt: z.string().datetime().nullable(),
+  completedAt: z.iso.datetime().nullable(),
   completedBy: userSummarySchema.nullable(),
   temperatureReading: todayTaskTemperatureReadingSchema,
 });
@@ -60,8 +60,8 @@ export type TodayTaskItem = z.infer<typeof todayTaskItemSchema>;
 
 export const todayResponseSchema = z.object({
   date: isoDateSchema,
-  locationId: z.string().uuid(),
-  currentUserId: z.string().uuid(),
+  locationId: z.uuid(),
+  currentUserId: z.uuid(),
   sections: z.object({
     morning: z.array(todayTaskItemSchema),
     afternoon: z.array(todayTaskItemSchema),
@@ -72,7 +72,7 @@ export const todayResponseSchema = z.object({
 export type TodayResponse = z.infer<typeof todayResponseSchema>;
 
 export const completeTodayTaskSchema = z.object({
-  templateId: z.string().uuid(),
+  templateId: z.uuid(),
   date: isoDateSchema,
   scheduledTime: scheduledTimeSchema,
 });

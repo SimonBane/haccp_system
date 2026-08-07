@@ -16,8 +16,8 @@ export const orgRoleSchema = z.enum([ORG_ROLE.ADMIN, ORG_ROLE.EMPLOYEE]);
 export type OrgRole = z.infer<typeof orgRoleSchema>;
 
 const employeeLocationIdsSchema = z
-  .array(z.string().uuid())
-  .min(1, "Select at least one location.");
+  .array(z.uuid())
+  .min(1, { error: "Select at least one location." });
 
 const LEGACY_MEMBER_ROLE = "org:member";
 
@@ -30,18 +30,18 @@ export function normalizeOrgRole(role: string): OrgRole {
 }
 
 export const employeeResponseSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   email: z.string(),
   firstName: z.string(),
   lastName: z.string(),
   role: orgRoleSchema,
   status: membershipStatusSchema,
-  locationIds: z.array(z.string().uuid()),
+  locationIds: z.array(z.uuid()),
   locations: z.array(locationResponseSchema),
-  invitedAt: z.string().datetime().nullable(),
+  invitedAt: z.iso.datetime().nullable(),
   user: userResponseSchema,
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
 });
 
 export type EmployeeResponse = z.infer<typeof employeeResponseSchema>;
@@ -52,8 +52,10 @@ export const employeeListResponseSchema = z.object({
 
 export type EmployeeListResponse = z.infer<typeof employeeListResponseSchema>;
 
+const trimmedEmailSchema = z.string().trim().max(256).pipe(z.email());
+
 export const createEmployeeSchema = z.object({
-  email: z.string().trim().email().max(256),
+  email: trimmedEmailSchema,
   firstName: z.string().trim().min(1).max(100),
   lastName: z.string().trim().min(1).max(100),
   role: orgRoleSchema,
@@ -65,7 +67,7 @@ export type CreateEmployeeInput = z.infer<typeof createEmployeeSchema>;
 
 export const updateEmployeeSchema = z
   .object({
-    email: z.string().trim().email().max(256).optional(),
+    email: trimmedEmailSchema.optional(),
     firstName: z.string().trim().max(100).nullable().optional(),
     lastName: z.string().trim().max(100).nullable().optional(),
     role: orgRoleSchema.optional(),
@@ -73,7 +75,7 @@ export const updateEmployeeSchema = z
   })
   .refine(
     (data) => Object.values(data).some((value) => value !== undefined),
-    { message: "At least one field must be provided" },
+    { error: "At least one field must be provided" },
   );
 
 export type UpdateEmployeeInput = z.infer<typeof updateEmployeeSchema>;

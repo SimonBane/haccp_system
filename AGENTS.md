@@ -29,6 +29,6 @@ API health check: `curl http://localhost:3001/health` → `{"status":"ok","datab
 
 - **Clerk auth requires real keys for any user-facing flow.** Both apps use Clerk (`apps/web/src/app/[locale]/layout.tsx` `ClerkProvider`, `apps/web/src/proxy.ts` `clerkMiddleware`, API `verifyToken` in `apps/api/src/core/middleware/auth.ts`). Placeholder publishable keys let the servers boot, migrations run, and the API `/health` + Swagger work, but the web sign-in page will show a Clerk "Invalid host" error and no authenticated endpoint (everything except `/health` and the docs is behind `requireAuth`) can be exercised. To test real sign-in / org / locations / tasks flows, set genuine Clerk dev keys (`clerk env pull` from a real Clerk instance) in the env files above.
 
-- **`pnpm lint` currently fails** with 7 pre-existing errors: 6 API route files start with `// @ts-nocheck` (intentional, per an in-file comment about the Vercel Hono OpenAPI preset) which `@typescript-eslint/ban-ts-comment` rejects. This is a pre-existing code issue, not an environment problem. `pnpm typecheck` and `pnpm build` pass cleanly.
+- **Node.js 24+** is required (matches CI). Use `@types/node@^24` in app packages.
 
 - **Sentry is disabled locally** (only enabled when `VERCEL_ENV === "production"`); no DSN needed for dev.
