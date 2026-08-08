@@ -1,7 +1,6 @@
 "use client";
 
 import type { LocationResponse } from "@haccp/shared";
-import { tenantContextResponseSchema } from "@haccp/shared";
 import { Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useState } from "react";
@@ -13,7 +12,6 @@ import { useLocationsMutations } from "@/features/locations/hooks/use-locations-
 import { useLocationsQuery } from "@/features/locations/hooks/use-locations-query";
 import { LocationForm } from "@/features/locations/location-form";
 import { useTenant } from "@/features/tenant/tenant-provider";
-import { useAuthenticatedFetch } from "@/lib/api/client";
 import { getErrorMessage } from "@/lib/api/get-error-message";
 
 type LocationsManagerProps = {
@@ -22,8 +20,7 @@ type LocationsManagerProps = {
 
 export function LocationsManager({ initialItems }: LocationsManagerProps) {
   const t = useTranslations("LocationsPage");
-  const { fetchJson } = useAuthenticatedFetch();
-  const { refreshTenant } = useTenant();
+  const { reloadTenant } = useTenant();
   const { data: items = [], refetch } = useLocationsQuery({
     initialData: initialItems,
   });
@@ -37,11 +34,6 @@ export function LocationsManager({ initialItems }: LocationsManagerProps) {
   );
   const [isDeleting, setIsDeleting] = useState(false);
   const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
-
-  const refreshTenantContext = useCallback(async () => {
-    const tenant = await fetchJson("/tenant/current", tenantContextResponseSchema);
-    refreshTenant(tenant);
-  }, [fetchJson, refreshTenant]);
 
   const openCreateForm = useCallback(() => {
     setEditingLocation(null);
@@ -74,7 +66,7 @@ export function LocationsManager({ initialItems }: LocationsManagerProps) {
           input: { isDefault: true },
         });
         await refetch();
-        await refreshTenantContext();
+        await reloadTenant();
         toast.success(t("toast.setDefaultSuccess", { name: location.name }));
       } catch (error) {
         toast.error(getErrorMessage(error, t("errors.generic")));
@@ -82,7 +74,7 @@ export function LocationsManager({ initialItems }: LocationsManagerProps) {
         setSettingDefaultId(null);
       }
     },
-    [refreshTenantContext, refetch, settingDefaultId, t, update],
+    [reloadTenant, refetch, settingDefaultId, t, update],
   );
 
   const confirmDelete = useCallback(async () => {
@@ -93,7 +85,7 @@ export function LocationsManager({ initialItems }: LocationsManagerProps) {
     try {
       await remove.mutateAsync(target.id);
       await refetch();
-      await refreshTenantContext();
+      await reloadTenant();
       toast.success(t("toast.deleteSuccess"));
       setDeleteTarget(null);
     } catch (error) {
@@ -103,7 +95,7 @@ export function LocationsManager({ initialItems }: LocationsManagerProps) {
   }, [
     deleteTarget,
     isDeleting,
-    refreshTenantContext,
+    reloadTenant,
     refetch,
     remove,
     t,
@@ -124,17 +116,17 @@ export function LocationsManager({ initialItems }: LocationsManagerProps) {
           input: { name: values.name },
         });
         await refetch();
-        await refreshTenantContext();
+        await reloadTenant();
         toast.success(t("toast.renameSuccess"));
         return;
       }
 
       await create.mutateAsync({ name: values.name });
       await refetch();
-      await refreshTenantContext();
+      await reloadTenant();
       toast.success(t("toast.createSuccess"));
     },
-    [create, editingLocation, refreshTenantContext, refetch, t, update],
+    [create, editingLocation, reloadTenant, refetch, t, update],
   );
 
   return (

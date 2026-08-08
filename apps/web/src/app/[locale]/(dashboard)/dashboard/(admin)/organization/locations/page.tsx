@@ -1,5 +1,5 @@
 import { type Locale } from "@/i18n/routing";
-import { getTenantContext, listLocations } from "@/lib/api-client";
+import { getTenantContext } from "@/lib/api-client";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { DashboardPageHeader } from "@/components/layout/dashboard-page-header";
@@ -20,7 +20,8 @@ export default async function OrganizationLocationsPage({
     redirect("/dashboard/organization");
   }
 
-  const locations = await listLocations();
+  // tenant.locations is the same list, and getTenantContext is deduped per
+  // render — so a second /locations round trip would buy nothing.
 
   return (
     <>
@@ -34,7 +35,7 @@ export default async function OrganizationLocationsPage({
         ]}
       />
       <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-        <LocationsManager initialItems={locations.items} />
+        <LocationsManager initialItems={tenant.locations} />
       </div>
     </>
   );

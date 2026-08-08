@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import {
   pickDefaultLocation,
+  tenantContextResponseSchema,
   type LocationResponse,
   type TenantContextResponse,
 } from "@haccp/shared";
@@ -13,6 +14,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useAuthenticatedFetch } from "@/lib/api/client";
 import {
   buildLocationCookie,
   resolveLocationId,
@@ -24,6 +26,8 @@ type TenantContextValue = TenantContextResponse & {
   organizationId: string;
   setLocationId: (locationId: string) => void;
   refreshTenant: (tenant: TenantContextResponse) => void;
+  /** Re-fetches `/tenant/current` and applies it. */
+  reloadTenant: () => Promise<void>;
 };
 
 const TenantContext = createContext<TenantContextValue | null>(null);
@@ -43,6 +47,7 @@ export function TenantProvider({
   initialLocationId,
   children,
 }: TenantProviderProps) {
+  const { fetchJson } = useAuthenticatedFetch();
   const [tenant, setTenant] = useState(initialTenant);
   const [locationId, setLocationIdState] = useState(initialLocationId);
 
@@ -85,6 +90,22 @@ export function TenantProvider({
     });
   }, []);
 
+  /**
+   * Re-reads the tenant and applies it.
+   *
+   * Lives here because callers only ever want "the tenant changed, catch up" —
+   * the fetch was previously written out by hand in the locations manager and
+   * the organization settings form, which is two places to keep the endpoint,
+   * the schema and the refresh call in step.
+   */
+  const reloadTenant = useCallback(async () => {
+    const nextTenant = await fetchJson(
+      "/tenant/current",
+      tenantContextResponseSchema,
+    );
+    refreshTenant(nextTenant);
+  }, [fetchJson, refreshTenant]);
+
   const value = useMemo(
     () => ({
       ...tenant,
@@ -93,8 +114,9 @@ export function TenantProvider({
       organizationId: tenant.organization.id,
       setLocationId,
       refreshTenant,
+      reloadTenant,
     }),
-    [tenant, selectedLocation, setLocationId, refreshTenant],
+    [tenant, selectedLocation, setLocationId, refreshTenant, reloadTenant],
   );
 
   return (
