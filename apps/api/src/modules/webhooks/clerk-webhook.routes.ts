@@ -1,5 +1,9 @@
 import { verifyWebhook } from "@clerk/backend/webhooks";
 import { Hono } from "hono";
+import {
+  ForbiddenError,
+  NotFoundError,
+} from "../../core/errors/app-errors.js";
 import { env } from "../../env.js";
 import { getDb } from "../../lib/context.js";
 import { logger } from "../../lib/logger.js";
@@ -25,6 +29,35 @@ clerkWebhookRoutes.post("/clerk", async (c) => {
 
   const db = getDb(c);
 
+  try {
+    await dispatch(db, event);
+  } catch (error) {
+    // Svix retries on any non-2xx. Retrying a permanent failure — an org Clerk
+    // no longer has, a user it cannot see — just burns the delivery budget and
+    // ends in the dead-letter queue either way, so acknowledge those. Anything
+    // else is transient (a database blip, Clerk being slow) and worth a retry.
+    if (error instanceof ForbiddenError || error instanceof NotFoundError) {
+      logger.warn(
+        { err: error, eventType: event.type },
+        "Clerk webhook could not be applied and will not be retried",
+      );
+      return c.text("Acknowledged", 200);
+    }
+
+    logger.error(
+      { err: error, eventType: event.type },
+      "Clerk webhook handler failed",
+    );
+    throw error;
+  }
+
+  return c.text("OK", 200);
+});
+
+async function dispatch(
+  db: ReturnType<typeof getDb>,
+  event: Awaited<ReturnType<typeof verifyWebhook>>,
+): Promise<void> {
   switch (event.type) {
     case "organization.created": {
       const { id, name, image_url: imageUrl, has_image: hasImage } = event.data;
@@ -104,7 +137,6 @@ clerkWebhookRoutes.post("/clerk", async (c) => {
           db,
           clerkOrgId,
           clerkUserId,
-          data.role,
         );
       }
       break;
@@ -112,6 +144,4 @@ clerkWebhookRoutes.post("/clerk", async (c) => {
     default:
       break;
   }
-
-  return c.text("OK", 200);
-});
+}

@@ -1,16 +1,12 @@
 import type { UserResponse } from "@haccp/shared";
 import { ORG_ROLE, safeNormalizeOrgRole } from "@haccp/shared";
 import { clerkClient } from "../../core/auth/clerk-client.js";
-import {
-  clerkErrorStatus,
-  withClerkTimeout,
-} from "../../core/auth/clerk-errors.js";
+import { callClerk } from "../../core/auth/clerk-errors.js";
 import type { Db } from "../../core/db/client.js";
 import { MEMBERSHIP_STATUS } from "../../core/db/schema/organization-memberships.js";
 import {
   ForbiddenError,
   InternalError,
-  ServiceUnavailableError,
 } from "../../core/errors/app-errors.js";
 import { isContention } from "../../lib/db-errors.js";
 import { logger } from "../../lib/logger.js";
@@ -73,25 +69,12 @@ export function isHealthy(row: MembershipContextRow): boolean {
 }
 
 async function fetchClerkProfile(clerkUserId: string) {
-  let clerkUser;
-
-  try {
-    clerkUser = await withClerkTimeout(clerkClient.users.getUser(clerkUserId));
-  } catch (error) {
-    if (clerkErrorStatus(error) === 404) {
-      logger.warn({ clerkUserId }, "Clerk user not found during provisioning");
-      throw new ForbiddenError("Your account is no longer available");
-    }
-
-    if (error instanceof ServiceUnavailableError) {
-      throw error;
-    }
-
-    logger.error({ err: error, clerkUserId }, "Clerk user lookup failed");
-    throw new ServiceUnavailableError(
-      "Could not reach the identity provider. Please try again.",
-    );
-  }
+  const clerkUser = await callClerk(clerkClient.users.getUser(clerkUserId), {
+    notFoundMessage: "Your account is no longer available",
+    notFoundLog: "Clerk user not found during provisioning",
+    failureLog: "Clerk user lookup failed",
+    logContext: { clerkUserId },
+  });
 
   const profileData = mapClerkApiUserToProfileData(clerkUserId, clerkUser);
 

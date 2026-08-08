@@ -88,17 +88,14 @@ export const clerkWebhookService = {
     });
   },
 
+  // The role is deliberately not taken from the event payload — see
+  // membershipService.syncRoleByClerkIds for why re-reading Clerk is what makes
+  // out-of-order delivery safe.
   async handleMembershipUpdated(
     db: Db,
     clerkOrgId: string,
     clerkUserId: string,
-    role: string,
   ): Promise<void> {
-    await membershipService.syncRoleByClerkIds(
-      db,
-      clerkOrgId,
-      clerkUserId,
-      role,
-    );
+    await membershipService.syncRoleByClerkIds(db, clerkOrgId, clerkUserId);
   },
 };
