@@ -39,7 +39,7 @@ export const organizationRepository = {
   },
 
   async updateById(
-    db: Db,
+    db: DbClient,
     organizationId: string,
     updates: Partial<typeof organizations.$inferInsert>,
   ) {

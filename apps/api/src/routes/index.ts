@@ -15,7 +15,6 @@ import { organizationRoutes } from "../modules/organizations/organization.routes
 import { taskTemplateRoutes } from "../modules/task-templates/task-template.routes.js";
 import { tenantRoutes } from "../modules/tenant/tenant.routes.js";
 import { todayRoutes } from "../modules/today/today.routes.js";
-import { invitationRoutes } from "../modules/invitations/invitation.routes.js";
 import { clerkWebhookRoutes } from "../modules/webhooks/clerk-webhook.routes.js";
 import type { AppEnv } from "../types.js";
 
@@ -30,16 +29,6 @@ if (env.NODE_ENV === "development") {
 
 routes.route("/health", healthRoutes);
 routes.route("/webhooks", clerkWebhookRoutes);
-
-function mountAuthOnly(
-  path: string,
-  moduleRoutes: OpenAPIHono<AppEnv>,
-): void {
-  const router = new OpenAPIHono<AppEnv>();
-  router.use("*", requireAuth);
-  router.route("/", moduleRoutes);
-  routes.route(path, router);
-}
 
 function mountProtected(
   path: string,
@@ -80,7 +69,6 @@ function mountLocationScoped(
   routes.route(path, router);
 }
 
-mountAuthOnly("/invitations", invitationRoutes);
 mountProtected("/tenant", tenantRoutes);
 mountAdminProtected("/organizations", organizationRoutes);
 mountAdminProtected("/employees", employeeRoutes);

@@ -1,6 +1,7 @@
 import {
   normalizeEmail,
   normalizeOrgRole,
+  requiresLocationAssignments,
   type EmployeeResponse,
 } from "@haccp/shared";
 
@@ -76,10 +77,15 @@ export function hasInviteMetadataChanges(
 export function resolveEmployeeLocationIds(
   locationIds: string[],
   options: {
+    role: string;
     multipleLocationsEnabled: boolean;
     defaultLocationId: string;
   },
 ): string[] {
+  if (!requiresLocationAssignments(options.role)) {
+    return [];
+  }
+
   if (options.multipleLocationsEnabled) {
     return locationIds;
   }

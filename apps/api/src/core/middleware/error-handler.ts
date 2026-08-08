@@ -15,7 +15,8 @@ export const errorHandler: ErrorHandler<AppEnv> = (err, c) => {
     if (err.statusCode >= 500) {
       logger.error({ err, requestId }, err.message);
 
-      if (isSentryEnabled()) {
+      // 503 means an upstream is down, not that we have a bug — don't flood Sentry.
+      if (isSentryEnabled() && err.statusCode !== 503) {
         Sentry.captureException(err, { extra: { requestId } });
       }
     }

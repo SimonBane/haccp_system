@@ -25,6 +25,27 @@ const locationIdsAgg = sql<string[]>`coalesce(
   array[]::uuid[]
 )`.mapWith((value) => (Array.isArray(value) ? value : []));
 
+export type MembershipContextRow = {
+  membership: OrganizationMembership;
+  user: User;
+  locationIds: string[];
+};
+
+function selectMembershipContext(db: Db) {
+  return db
+    .select({
+      membership: organizationMemberships,
+      user: users,
+      locationIds: locationIdsAgg,
+    })
+    .from(organizationMemberships)
+    .innerJoin(users, eq(organizationMemberships.userId, users.id))
+    .leftJoin(
+      organizationMemberLocations,
+      eq(organizationMemberLocations.membershipId, organizationMemberships.id),
+    );
+}
+
 export const employeeRepository = {
   async findManyWithUsersByOrganizationId(
     db: Db,
@@ -71,18 +92,7 @@ export const employeeRepository = {
   },
 
   async findDetailById(db: Db, organizationId: string, membershipId: string) {
-    const [row] = await db
-      .select({
-        membership: organizationMemberships,
-        user: users,
-        locationIds: locationIdsAgg,
-      })
-      .from(organizationMemberships)
-      .innerJoin(users, eq(organizationMemberships.userId, users.id))
-      .leftJoin(
-        organizationMemberLocations,
-        eq(organizationMemberLocations.membershipId, organizationMemberships.id),
-      )
+    const [row] = await selectMembershipContext(db)
       .where(
         and(
           eq(organizationMemberships.id, membershipId),
@@ -93,15 +103,45 @@ export const employeeRepository = {
       .groupBy(organizationMemberships.id, users.id)
       .limit(1);
 
-    if (!row) {
-      return null;
-    }
+    return row ?? null;
+  },
 
-    return {
-      membership: row.membership,
-      user: row.user,
-      locationIds: row.locationIds,
-    };
+  // The provisioning finders below deliberately do NOT filter deletedAt: they have
+  // to see tombstones in order to restore them when Clerk says the member is live.
+  async findMembershipContextByClerkUserId(
+    db: Db,
+    organizationId: string,
+    clerkUserId: string,
+  ): Promise<MembershipContextRow | null> {
+    const [row] = await selectMembershipContext(db)
+      .where(
+        and(
+          eq(organizationMemberships.organizationId, organizationId),
+          eq(users.clerkUserId, clerkUserId),
+        ),
+      )
+      .groupBy(organizationMemberships.id, users.id)
+      .limit(1);
+
+    return row ?? null;
+  },
+
+  async findMembershipContextByEmail(
+    db: Db,
+    organizationId: string,
+    email: string,
+  ): Promise<MembershipContextRow | null> {
+    const [row] = await selectMembershipContext(db)
+      .where(
+        and(
+          eq(organizationMemberships.organizationId, organizationId),
+          sql`lower(${users.email}) = lower(${email})`,
+        ),
+      )
+      .groupBy(organizationMemberships.id, users.id)
+      .limit(1);
+
+    return row ?? null;
   },
 
   async findMembershipWithUserById(
@@ -146,33 +186,6 @@ export const employeeRepository = {
       .limit(1);
 
     return row ?? null;
-  },
-
-  async getAssignedLocationIdsForUser(
-    db: Db,
-    organizationId: string,
-    userId: string,
-  ): Promise<string[]> {
-    const rows = await db
-      .select({ locationId: organizationMemberLocations.locationId })
-      .from(organizationMemberships)
-      .innerJoin(
-        organizationMemberLocations,
-        eq(
-          organizationMemberLocations.membershipId,
-          organizationMemberships.id,
-        ),
-      )
-      .where(
-        and(
-          eq(organizationMemberships.organizationId, organizationId),
-          eq(organizationMemberships.userId, userId),
-          eq(organizationMemberships.status, "active"),
-          isNull(organizationMemberships.deletedAt),
-        ),
-      );
-
-    return rows.map((row) => row.locationId);
   },
 
   async insert(

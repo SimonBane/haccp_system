@@ -5,7 +5,7 @@ import { locations } from "../../core/db/schema/locations.js";
 export const DEFAULT_LOCATION_NAME = "Main site";
 
 export const locationRepository = {
-  async findByOrganizationId(db: Db, organizationId: string) {
+  async findByOrganizationId(db: DbClient, organizationId: string) {
     return db
       .select()
       .from(locations)

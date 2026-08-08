@@ -1,12 +1,20 @@
 import type {
   TenantContextResponse,
 } from "@haccp/shared";
+import { clerkClient } from "../../core/auth/clerk-client.js";
+import {
+  clerkErrorStatus,
+  withClerkTimeout,
+} from "../../core/auth/clerk-errors.js";
 import type { Db } from "../../core/db/client.js";
 import {
-  ConflictError,
-  NotFoundError,
+  ForbiddenError,
+  InternalError,
+  ServiceUnavailableError,
 } from "../../core/errors/app-errors.js";
 import { isUniqueViolation } from "../../lib/db-errors.js";
+import { logger } from "../../lib/logger.js";
+import { singleFlight } from "../../lib/single-flight.js";
 import { toLocationResponse } from "../locations/location.mapper.js";
 import {
   DEFAULT_LOCATION_NAME,
@@ -33,7 +41,7 @@ type ProvisionTenantOptions = {
   hasImage?: boolean;
 };
 
-function toTenantContext(blob: TenantCacheBlob): ResolvedTenant {
+export function toTenantContext(blob: TenantCacheBlob): ResolvedTenant {
   return {
     organization: blob.organization,
     locations: blob.locations,
@@ -60,6 +68,86 @@ async function loadTenantFromDb(
   );
 }
 
+async function fetchClerkOrganization(clerkOrgId: string) {
+  try {
+    return await withClerkTimeout(
+      clerkClient.organizations.getOrganization({ organizationId: clerkOrgId }),
+    );
+  } catch (error) {
+    // A 404 is authoritative: Clerk cannot mint an org-scoped token for an org it
+    // does not have, so this means "not entitled", not "we are behind".
+    if (clerkErrorStatus(error) === 404) {
+      logger.warn(
+        { clerkOrgId },
+        "Clerk organization not found during provisioning",
+      );
+      throw new ForbiddenError("This organization is no longer available");
+    }
+
+    if (error instanceof ServiceUnavailableError) {
+      throw error;
+    }
+
+    logger.error({ err: error, clerkOrgId }, "Clerk organization lookup failed");
+    throw new ServiceUnavailableError(
+      "Could not reach the identity provider. Please try again.",
+    );
+  }
+}
+
+// Repairs whatever state the losing writer collided with: a live row missing its
+// default location, or a tombstoned row that Clerk says is still active.
+async function reconcileExistingTenant(
+  db: Db,
+  clerkOrgId: string,
+): Promise<TenantCacheBlob> {
+  const existing = await organizationRepository.findAnyByClerkOrgId(
+    db,
+    clerkOrgId,
+  );
+
+  if (!existing) {
+    throw new InternalError("Failed to provision organization");
+  }
+
+  try {
+    await db.transaction(async (tx) => {
+      if (existing.deletedAt) {
+        await organizationRepository.updateById(tx, existing.id, {
+          deletedAt: null,
+        });
+      }
+
+      const currentLocations = await locationRepository.findByOrganizationId(
+        tx,
+        existing.id,
+      );
+
+      // Must stay last: a unique violation aborts the whole transaction, so it has
+      // to be allowed to escape rather than be caught with tx still in use.
+      if (currentLocations.length === 0) {
+        await locationRepository.insert(tx, {
+          organizationId: existing.id,
+          name: DEFAULT_LOCATION_NAME,
+          isDefault: true,
+        });
+      }
+    });
+  } catch (error) {
+    if (!isUniqueViolation(error)) {
+      throw error;
+    }
+  }
+
+  const blob = await loadTenantFromDb(db, clerkOrgId);
+
+  if (!blob) {
+    throw new InternalError("Failed to provision organization");
+  }
+
+  return blob;
+}
+
 export const tenantService = {
   async provisionTenant(
     db: Db,
@@ -71,6 +159,8 @@ export const tenantService = {
       imageUrl = "",
       hasImage = false,
     } = options;
+
+    let blob: TenantCacheBlob;
 
     try {
       const { organization, location } = await db.transaction(async (tx) => {
@@ -90,38 +180,54 @@ export const tenantService = {
         return { organization, location };
       });
 
-      const blob = buildTenantCacheBlob(
+      blob = buildTenantCacheBlob(
         toOrganizationResponse(organization!),
         [toLocationResponse(location!)],
       );
-
-      await tenantCache.set(clerkOrgId, blob);
-      return blob;
     } catch (error) {
-      if (isUniqueViolation(error)) {
-        throw new ConflictError("Organization already exists");
+      if (!isUniqueViolation(error)) {
+        throw error;
       }
 
-      throw error;
+      // Someone else created it, or a partial row already existed. Either way the
+      // winning state is authoritative — adopt it instead of failing.
+      blob = await reconcileExistingTenant(db, clerkOrgId);
     }
+
+    await tenantCache.set(clerkOrgId, blob);
+    return blob;
   },
 
-  async requireTenant(
-    db: Db,
-    clerkOrgId: string,
-  ): Promise<ResolvedTenant> {
+  // The only way to resolve a tenant on the request path. Provisions on miss, so
+  // a missing or half-built org is repaired rather than surfaced as a 404.
+  async ensureTenant(db: Db, clerkOrgId: string): Promise<ResolvedTenant> {
     const cached = await tenantCache.get(clerkOrgId);
     if (cached) {
       return toTenantContext(cached);
     }
 
-    const blob = await loadTenantFromDb(db, clerkOrgId);
-    if (!blob) {
-      throw new NotFoundError("Organization not found");
-    }
+    return singleFlight(`tenant:${clerkOrgId}`, async () => {
+      const recheck = await tenantCache.get(clerkOrgId);
+      if (recheck) {
+        return toTenantContext(recheck);
+      }
 
-    await tenantCache.set(clerkOrgId, blob);
-    return toTenantContext(blob);
+      const existing = await loadTenantFromDb(db, clerkOrgId);
+      if (existing) {
+        await tenantCache.set(clerkOrgId, existing);
+        return toTenantContext(existing);
+      }
+
+      const clerkOrg = await fetchClerkOrganization(clerkOrgId);
+      const blob = await tenantService.provisionTenant(db, clerkOrgId, {
+        name: clerkOrg.name || DEFAULT_ORG_NAME,
+        imageUrl: clerkOrg.imageUrl ?? "",
+        hasImage: clerkOrg.hasImage ?? false,
+      });
+
+      logger.info({ clerkOrgId, action: "jit_tenant_provisioned" }, "Tenant provisioned");
+      return toTenantContext(blob);
+    });
   },
 
   async warmCache(db: Db, clerkOrgId: string): Promise<TenantCacheBlob | null> {
