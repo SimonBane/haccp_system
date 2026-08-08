@@ -2,16 +2,9 @@ import type {
   TenantContextResponse,
 } from "@haccp/shared";
 import { clerkClient } from "../../core/auth/clerk-client.js";
-import {
-  clerkErrorStatus,
-  withClerkTimeout,
-} from "../../core/auth/clerk-errors.js";
+import { callClerk } from "../../core/auth/clerk-errors.js";
 import type { Db } from "../../core/db/client.js";
-import {
-  ForbiddenError,
-  InternalError,
-  ServiceUnavailableError,
-} from "../../core/errors/app-errors.js";
+import { InternalError } from "../../core/errors/app-errors.js";
 import { isUniqueViolation } from "../../lib/db-errors.js";
 import { logger } from "../../lib/logger.js";
 import { singleFlight } from "../../lib/single-flight.js";
@@ -69,30 +62,15 @@ async function loadTenantFromDb(
 }
 
 async function fetchClerkOrganization(clerkOrgId: string) {
-  try {
-    return await withClerkTimeout(
-      clerkClient.organizations.getOrganization({ organizationId: clerkOrgId }),
-    );
-  } catch (error) {
-    // A 404 is authoritative: Clerk cannot mint an org-scoped token for an org it
-    // does not have, so this means "not entitled", not "we are behind".
-    if (clerkErrorStatus(error) === 404) {
-      logger.warn(
-        { clerkOrgId },
-        "Clerk organization not found during provisioning",
-      );
-      throw new ForbiddenError("This organization is no longer available");
-    }
-
-    if (error instanceof ServiceUnavailableError) {
-      throw error;
-    }
-
-    logger.error({ err: error, clerkOrgId }, "Clerk organization lookup failed");
-    throw new ServiceUnavailableError(
-      "Could not reach the identity provider. Please try again.",
-    );
-  }
+  return callClerk(
+    clerkClient.organizations.getOrganization({ organizationId: clerkOrgId }),
+    {
+      notFoundMessage: "This organization is no longer available",
+      notFoundLog: "Clerk organization not found during provisioning",
+      failureLog: "Clerk organization lookup failed",
+      logContext: { clerkOrgId },
+    },
+  );
 }
 
 // Repairs whatever state the losing writer collided with: a live row missing its
