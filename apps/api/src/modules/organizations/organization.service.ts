@@ -30,6 +30,34 @@ function assertValidLogoFile(file: { size: number; type: string }): void {
   }
 }
 
+/**
+ * Applies a patch, then does the three things every organization mutation must
+ * do afterwards: fail loudly if the row vanished, drop the tenant cache so the
+ * next request re-reads, and project the response.
+ *
+ * Collapsed from four copies — the cache invalidation in particular is the kind
+ * of step a fifth mutator would quietly forget.
+ */
+async function applyOrganizationUpdate(
+  db: Db,
+  clerkOrgId: string,
+  patch: Parameters<typeof organizationRepository.updateByClerkOrgId>[2],
+): Promise<OrganizationResponse> {
+  const updated = await organizationRepository.updateByClerkOrgId(
+    db,
+    clerkOrgId,
+    patch,
+  );
+
+  if (!updated) {
+    throw new NotFoundError("Organization not found");
+  }
+
+  await tenantCache.invalidate(clerkOrgId);
+
+  return toOrganizationResponse(updated);
+}
+
 export const organizationService = {
   async updateName(
     db: Db,
@@ -49,19 +77,7 @@ export const organizationService = {
       throw new InternalError("Failed to update organization name in Clerk");
     }
 
-    const updated = await organizationRepository.updateNameByClerkOrgId(
-      db,
-      clerkOrgId,
-      input.name,
-    );
-
-    if (!updated) {
-      throw new NotFoundError("Organization not found");
-    }
-
-    await tenantCache.invalidate(clerkOrgId);
-
-    return toOrganizationResponse(updated);
+    return applyOrganizationUpdate(db, clerkOrgId, { name: input.name });
   },
 
   async updateSettings(
@@ -81,25 +97,13 @@ export const organizationService = {
       );
     }
 
-    const updated = await organizationRepository.updateByClerkOrgId(
-      db,
-      clerkOrgId,
-      {
+    return applyOrganizationUpdate(db, clerkOrgId, {
         ...(input.timezone !== undefined ? { timezone: input.timezone } : {}),
         ...(input.locale !== undefined ? { locale: input.locale } : {}),
         ...(input.multipleLocationsEnabled !== undefined
           ? { multipleLocationsEnabled: input.multipleLocationsEnabled }
           : {}),
-      },
-    );
-
-    if (!updated) {
-      throw new NotFoundError("Organization not found");
-    }
-
-    await tenantCache.invalidate(clerkOrgId);
-
-    return toOrganizationResponse(updated);
+      });
   },
 
   async uploadLogo(
@@ -123,22 +127,10 @@ export const organizationService = {
       throw new InternalError("Failed to upload organization logo");
     }
 
-    const updated = await organizationRepository.updateByClerkOrgId(
-      db,
-      clerkOrgId,
-      {
+    return applyOrganizationUpdate(db, clerkOrgId, {
         imageUrl: clerkOrg.imageUrl,
         hasImage: clerkOrg.hasImage,
-      },
-    );
-
-    if (!updated) {
-      throw new NotFoundError("Organization not found");
-    }
-
-    await tenantCache.invalidate(clerkOrgId);
-
-    return toOrganizationResponse(updated);
+      });
   },
 
   async deleteLogo(
@@ -154,21 +146,9 @@ export const organizationService = {
       throw new InternalError("Failed to delete organization logo");
     }
 
-    const updated = await organizationRepository.updateByClerkOrgId(
-      db,
-      clerkOrgId,
-      {
+    return applyOrganizationUpdate(db, clerkOrgId, {
         imageUrl: clerkOrg.imageUrl,
         hasImage: clerkOrg.hasImage,
-      },
-    );
-
-    if (!updated) {
-      throw new NotFoundError("Organization not found");
-    }
-
-    await tenantCache.invalidate(clerkOrgId);
-
-    return toOrganizationResponse(updated);
+      });
   },
 };

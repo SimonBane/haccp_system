@@ -10,11 +10,9 @@ import {
   getCurrentLocation,
 } from "../../lib/context.js";
 import type { AppEnv } from "../../types.js";
-import { errorResponse, jsonResponse, defineRouteHandler } from "./responses.js";
+import { errorResponse, jsonResponse, defineRouteHandler, bearerSecurity } from "./responses.js";
 
 export { errorResponse, jsonResponse, defineRouteHandler } from "./responses.js";
-
-const bearerSecurity = [{ Bearer: [] }];
 
 /**
  * Reads input @hono/zod-openapi has already validated against the route

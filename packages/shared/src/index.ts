@@ -1,5 +1,12 @@
 export { isSentryEnabled } from "./sentry.js";
 export { normalizeEmail } from "./normalize-email.js";
+export { normalizeName } from "./normalize-name.js";
+export {
+  locationIdsSchema,
+  optionalPersonNameSchema,
+  personNameSchema,
+  trimmedEmailSchema,
+} from "./schemas/fields.js";
 export {
   wallClockToInstant,
   zonedDateString,
@@ -33,6 +40,7 @@ export {
   membershipStatusSchema,
   normalizeOrgRole,
   safeNormalizeOrgRole,
+  needsLocationSelection,
   requiresLocationAssignments,
   orgRoleSchema,
   employeeResponseSchema,

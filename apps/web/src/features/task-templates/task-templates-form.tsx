@@ -14,6 +14,7 @@ import {
   type TaskTemplateWeekday,
 } from "@haccp/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useZodErrorMap } from "@/lib/forms/zod-error-map";
 import { CopyPlusIcon, PlusIcon, SaveIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -51,74 +52,28 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  isEveryDayWeekdays,
-  isWeekdaysPreset,
-} from "@/features/task-templates/lib/format-schedule";
+  buildDefaultTimeRows,
+  buildDefaultWeekdays,
+  getScheduledTimeRowsErrorMessage,
+  getWeekdayPreset,
+  hasDuplicateScheduledTimes,
+  hasTaskChanges,
+  TASK_TYPES,
+  WEEKDAY_PRESET_OPTIONS,
+  type ScheduledTimeRowValue,
+  type WeekdayPreset,
+} from "@/features/task-templates/lib/form-helpers";
 import { ScheduledTimeRow } from "@/features/task-templates/components/scheduled-time-row";
 import { WeekdayMultiSelect } from "@/features/task-templates/components/weekday-multi-select";
 import { cn } from "@/lib/utils";
 
-type WeekdayPreset = "everyDay" | "weekdays" | "custom" | "none";
 
-function getWeekdayPreset(weekdays: TaskTemplateWeekday[]): WeekdayPreset {
-  if (weekdays.length === 0) {
-    return "none";
-  }
 
-  if (isEveryDayWeekdays(weekdays)) {
-    return "everyDay";
-  }
-
-  if (isWeekdaysPreset(weekdays)) {
-    return "weekdays";
-  }
-
-  return "custom";
-}
-
-const TASK_TYPES: TaskTemplateType[] = ["temperature", "cleaning"];
 
 const TASK_TEMPLATES_FORM_ID = "task-templates-form";
 
 const SCHEDULED_TIME_SLOT_CLASS =
   "w-full min-w-0 sm:w-[calc((100%-1.5rem)/3)] md:w-[calc((100%-1.5rem)/4)]";
-
-const WEEKDAY_PRESET_OPTIONS: Array<Exclude<WeekdayPreset, "none">> = [
-  "everyDay",
-  "weekdays",
-  "custom",
-];
-
-function hasDuplicateScheduledTimes(times: string[]): boolean {
-  const filledTimes = times.filter(Boolean);
-  return new Set(filledTimes).size !== filledTimes.length;
-}
-
-function getScheduledTimeRowsErrorMessage(
-  error: unknown,
-): string | undefined {
-  if (!error || typeof error !== "object") return undefined;
-
-  if ("message" in error && error.message) {
-    return String(error.message);
-  }
-
-  if (
-    "root" in error &&
-    error.root &&
-    typeof error.root === "object" &&
-    "message" in error.root &&
-    error.root.message
-  ) {
-    return String(error.root.message);
-  }
-
-  return undefined;
-}
-
-type ScheduledTimeRowValue = {
-  time: string;
-};
 
 type TaskTemplatesFormProps = {
   open: boolean;
@@ -131,58 +86,8 @@ type TaskTemplatesFormProps = {
   onSubmit: (values: TaskTemplateFieldsInput) => Promise<void>;
 };
 
-function buildDefaultTimeRows(
-  task?: TaskTemplateResponse | null,
-  duplicateSource?: TaskTemplateResponse | null,
-): ScheduledTimeRowValue[] {
-  const source = task ?? duplicateSource;
-  if (source && source.scheduledTimes.length > 0) {
-    return source.scheduledTimes.map((time) => ({ time }));
-  }
 
-  return [];
-}
 
-function buildDefaultWeekdays(
-  task?: TaskTemplateResponse | null,
-  duplicateSource?: TaskTemplateResponse | null,
-): TaskTemplateWeekday[] {
-  const source = task ?? duplicateSource;
-  if (source) {
-    return source.weekdays;
-  }
-
-  return [];
-}
-
-function hasTaskChanges(
-  values: {
-    title: string;
-    type: TaskTemplateType | "";
-    weekdays: TaskTemplateWeekday[];
-    scheduledTimeRows: ScheduledTimeRowValue[];
-    equipmentId: string | null;
-  },
-  task: TaskTemplateResponse,
-): boolean {
-  const nextTimes = values.scheduledTimeRows.map((row) => row.time);
-
-  const weekdaysChanged =
-    values.weekdays.length !== task.weekdays.length ||
-    values.weekdays.some((weekday) => !task.weekdays.includes(weekday));
-
-  const timesChanged =
-    nextTimes.length !== task.scheduledTimes.length ||
-    nextTimes.some((time) => !task.scheduledTimes.includes(time));
-
-  return (
-    values.title !== task.title ||
-    values.type !== task.type ||
-    weekdaysChanged ||
-    timesChanged ||
-    values.equipmentId !== task.equipmentId
-  );
-}
 
 export function TaskTemplatesForm({
   open,
@@ -277,8 +182,10 @@ export function TaskTemplatesForm({
     };
   }, [task, duplicateSource, suggestedDuplicateTitle]);
 
+  const zodErrorMap = useZodErrorMap();
+
   const form = useForm<TaskTemplatesFormValues>({
-    resolver: zodResolver(tasksFormSchema),
+    resolver: zodResolver(tasksFormSchema, { error: zodErrorMap }),
     defaultValues,
     mode: "onTouched",
   });

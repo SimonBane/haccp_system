@@ -1,5 +1,5 @@
 import type { UserResponse } from "@haccp/shared";
-import { normalizeEmail } from "@haccp/shared";
+import { normalizeEmail, normalizeName } from "@haccp/shared";
 import type { Db, DbClient } from "../../core/db/client.js";
 import type { User } from "../../core/db/schema/users.js";
 import { ConflictError, InternalError, NotFoundError } from "../../core/errors/app-errors.js";
@@ -15,10 +15,6 @@ import { userRepository } from "./user.repository.js";
 
 // deletedAt rides along so provisioning can restore a tombstoned row in the same write.
 export type ClerkProfileUpsert = ClerkProfileData & { deletedAt?: Date | null };
-
-function normalizeName(value: string | undefined | null): string {
-  return value?.trim() ?? "";
-}
 
 async function persistUser(
   db: DbClient,

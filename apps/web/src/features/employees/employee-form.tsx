@@ -5,9 +5,11 @@ import {
   requiresLocationAssignments,
   type EmployeeResponse,
   type LocationResponse,
+  needsLocationSelection,
 } from "@haccp/shared";
 import { useAuth } from "@clerk/nextjs";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useZodErrorMap } from "@/lib/forms/zod-error-map";
 import { SaveIcon, SendIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -143,10 +145,11 @@ export function EmployeeForm({
         locationIds: z.array(z.uuid()),
       })
       .check((ctx) => {
+        // Same predicate the API enforces. The form additionally waives it for
+        // single-location organisations, where there is nothing to choose and
+        // the assignment is filled in on submit.
         if (
-          multipleLocationsEnabled &&
-          requiresLocationAssignments(ctx.value.role) &&
-          ctx.value.locationIds.length === 0
+          needsLocationSelection({ ...ctx.value, multipleLocationsEnabled })
         ) {
           ctx.issues.push({
             code: "custom",
@@ -169,8 +172,10 @@ export function EmployeeForm({
     [defaultLocationId, multipleLocationsEnabled],
   );
 
+  const zodErrorMap = useZodErrorMap();
+
   const form = useForm<EmployeeFormInput, unknown, EmployeeFormValues>({
-    resolver: zodResolver(employeeFormSchema),
+    resolver: zodResolver(employeeFormSchema, { error: zodErrorMap }),
     defaultValues: {
       email: employee?.email ?? "",
       firstName: employee?.firstName ?? "",

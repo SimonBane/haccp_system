@@ -10,6 +10,7 @@ import {
   type EquipmentType,
 } from "@haccp/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useZodErrorMap } from "@/lib/forms/zod-error-map";
 import { useTranslations } from "next-intl";
 import { CopyPlusIcon, PlusIcon, SaveIcon } from "lucide-react";
 import { useEffect, useMemo } from "react";
@@ -224,8 +225,10 @@ export function EquipmentForm({
     [equipment, duplicateSource, suggestedDuplicateName],
   );
 
+  const zodErrorMap = useZodErrorMap();
+
   const form = useForm<EquipmentFormValues>({
-    resolver: zodResolver(equipmentFormSchema),
+    resolver: zodResolver(equipmentFormSchema, { error: zodErrorMap }),
     defaultValues,
     mode: "onTouched",
   });

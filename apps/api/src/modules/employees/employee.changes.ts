@@ -3,7 +3,7 @@ import type {
   OrgRole,
   UpdateEmployeeInput,
 } from "@haccp/shared";
-import { normalizeEmail, normalizeOrgRole } from "@haccp/shared";
+import { normalizeEmail, normalizeOrgRole, normalizeName } from "@haccp/shared";
 import {
   resolveLocationAssignments,
   sameLocationIds,
@@ -17,10 +17,6 @@ export type EmployeeChanges = {
   role?: OrgRole;
   locationIds?: string[];
 };
-
-export function normalizeName(value: string | null | undefined): string {
-  return value?.trim() ?? "";
-}
 
 export function diffEmployeeChanges(
   detail: EmployeeDetail,

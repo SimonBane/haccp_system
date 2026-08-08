@@ -3,6 +3,7 @@ import {
   normalizeOrgRole,
   requiresLocationAssignments,
   type EmployeeResponse,
+  normalizeName,
 } from "@haccp/shared";
 
 export type EmployeeInviteMetadataValues = {
@@ -45,10 +46,6 @@ export function statusVariant(
     default:
       return "outline";
   }
-}
-
-function normalizeName(value: string | null | undefined): string {
-  return value?.trim() ?? "";
 }
 
 export function hasInviteMetadataChanges(

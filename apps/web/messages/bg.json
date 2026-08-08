@@ -582,5 +582,12 @@
       "invalidLogoType": "Логото трябва да е JPG, PNG, GIF или WebP изображение.",
       "logoTooLarge": "Логото трябва да е 2 MB или по-малко."
     }
+  },
+  "Validation": {
+    "required": "Полето е задължително",
+    "tooShort": "Минимум {min} символа",
+    "tooLong": "Максимум {max} символа",
+    "emailInvalid": "Невалиден имейл адрес",
+    "locationsRequired": "Изберете поне един обект"
   }
 }
