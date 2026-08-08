@@ -6,17 +6,8 @@ import { Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { MobileHeaderAddButton } from "@/components/layout/mobile-header-add-button";
+import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
 import { LocationsData } from "@/features/locations/data-table/data";
 import { useLocationsMutations } from "@/features/locations/hooks/use-locations-mutations";
 import { useLocationsQuery } from "@/features/locations/hooks/use-locations-query";
@@ -164,36 +155,24 @@ export function LocationsManager({ initialItems }: LocationsManagerProps) {
         onSetDefault={handleSetDefault}
       />
 
-      <AlertDialog
+      <ResponsiveAlertDialog
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => {
           if (!open && !isDeleting) setDeleteTarget(null);
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("deleteDialog.title")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteTarget
-                ? t("deleteDialog.confirm", { name: deleteTarget.name })
-                : t("deleteDialog.fallback")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>
-              {t("deleteDialog.cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              isLoading={isDeleting}
-              onClick={confirmDelete}
-            >
-              <Trash2Icon data-icon="inline-start" />
-              {t("deleteDialog.confirmAction")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        title={t("deleteDialog.title")}
+        description={
+          deleteTarget
+            ? t("deleteDialog.confirm", { name: deleteTarget.name })
+            : t("deleteDialog.fallback")
+        }
+        cancelLabel={t("deleteDialog.cancel")}
+        cancelDisabled={isDeleting}
+        confirmLabel={t("deleteDialog.confirmAction")}
+        confirmIcon={<Trash2Icon data-icon="inline-start" />}
+        isLoading={isDeleting}
+        onConfirm={confirmDelete}
+      />
 
       {formOpen ? (
         <LocationForm

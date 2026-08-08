@@ -5,6 +5,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import type { useTranslations } from "next-intl";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 import { EquipmentTableRowActions } from "@/features/equipment/data-table/row-actions";
+import { formatTemp } from "@/features/equipment/lib/format";
 
 type EquipmentTranslations = ReturnType<
   typeof useTranslations<"EquipmentPage">
@@ -17,10 +18,6 @@ type GetColumnsParams = {
   onDuplicate: (equipment: EquipmentResponse) => void;
   onDelete: (equipment: EquipmentResponse) => void;
 };
-
-function formatTemp(value: number): string {
-  return `${value}°C`;
-}
 
 export function getColumns({
   t,

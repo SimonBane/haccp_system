@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
+  REQUIRED_LABEL_CLASS,
   Field,
   FieldError,
   FieldGroup,
@@ -64,9 +65,6 @@ const EQUIPMENT_TYPES: EquipmentType[] = [
 ];
 
 const EQUIPMENT_FORM_ID = "equipment-form";
-
-const REQUIRED_LABEL_CLASS =
-  "gap-1 after:text-destructive after:content-['*']";
 
 const numberInputNoSpinClass =
   "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";

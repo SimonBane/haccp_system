@@ -1,20 +1,12 @@
 "use client";
 
 import type { EmployeeResponse } from "@haccp/shared";
+import { Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { MobileHeaderAddButton } from "@/components/layout/mobile-header-add-button";
+import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
 import { EmployeesData } from "@/features/employees/data-table/data";
 import {
   EmployeeForm,
@@ -202,39 +194,24 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
         onSave={handleSave}
       />
 
-      <AlertDialog
+      <ResponsiveAlertDialog
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => {
-          if (!open) {
-            setDeleteTarget(null);
-          }
+          if (!open && !isDeleting) setDeleteTarget(null);
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("deleteDialog.title")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteTarget
-                ? t("deleteDialog.confirm", { email: deleteTarget.email })
-                : t("deleteDialog.fallback")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>
-              {t("deleteDialog.cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              disabled={isDeleting}
-              onClick={(event) => {
-                event.preventDefault();
-                void confirmDelete();
-              }}
-            >
-              {t("deleteDialog.confirmAction")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        title={t("deleteDialog.title")}
+        description={
+          deleteTarget
+            ? t("deleteDialog.confirm", { email: deleteTarget.email })
+            : t("deleteDialog.fallback")
+        }
+        cancelLabel={t("deleteDialog.cancel")}
+        cancelDisabled={isDeleting}
+        confirmLabel={t("deleteDialog.confirmAction")}
+        confirmIcon={<Trash2Icon data-icon="inline-start" />}
+        isLoading={isDeleting}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

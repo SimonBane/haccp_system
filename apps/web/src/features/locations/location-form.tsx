@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  REQUIRED_LABEL_CLASS,
   Field,
   FieldError,
   FieldGroup,
@@ -32,9 +33,6 @@ type LocationFormProps = {
 };
 
 const LOCATION_FORM_ID = "location-form";
-
-const REQUIRED_LABEL_CLASS =
-  "gap-1 after:text-destructive after:content-['*']";
 
 export function LocationForm({
   open,

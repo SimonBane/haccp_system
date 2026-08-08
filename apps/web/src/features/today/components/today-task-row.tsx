@@ -15,7 +15,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
-import { useOrgTimeZone } from "@/features/tenant/use-org-timezone";
 import { cn } from "@/lib/utils";
 import { formatTemperature, formatTimeOfDay } from "../lib/format";
 import type { TimeGroupState, TodayTimelineItem } from "../lib/today-timeline";

@@ -13,8 +13,7 @@ export {
   getLocalizedPath,
   type AppLocale,
 } from "./lib/locale-path.js";
-export type { ApiError, HealthResponse } from "./types/api.js";
-export { apiErrorSchema } from "./schemas/error.js";
+export { apiErrorSchema, type ApiError } from "./schemas/error.js";
 export {
   uuidParamSchema,
   locationIdParamSchema,
@@ -47,7 +46,7 @@ export {
   type CreateEmployeeInput,
   type UpdateEmployeeInput,
 } from "./schemas/employee.js";
-export { healthResponseSchema, type HealthResponseSchema } from "./schemas/health.js";
+export { healthResponseSchema, type HealthResponse } from "./schemas/health.js";
 export {
   locationResponseSchema,
   type LocationResponse,

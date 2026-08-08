@@ -1,11 +1,10 @@
 "use client";
 
 import type { LocationResponse } from "@haccp/shared";
-import { PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useMemo, type ReactNode } from "react";
-import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table/data-table";
+import { DataTableAddButton } from "@/components/ui/data-table/data-table-add-button";
 import { getColumns } from "@/features/locations/data-table/columns";
 import { LocationsMobileCard } from "@/features/locations/data-table/mobile-card";
 
@@ -17,15 +16,6 @@ type LocationsDataProps = {
   onDelete: (location: LocationResponse) => void;
   onSetDefault: (location: LocationResponse) => void;
 };
-
-function LocationsToolbar({ onAdd, label }: { onAdd: () => void; label: string }) {
-  return (
-    <Button type="button" onClick={onAdd}>
-      <PlusIcon />
-      {label}
-    </Button>
-  );
-}
 
 export function LocationsData({
   items,
@@ -52,7 +42,7 @@ export function LocationsData({
   );
 
   const toolbar = useMemo<ReactNode>(
-    () => <LocationsToolbar onAdd={onAdd} label={t("add")} />,
+    () => <DataTableAddButton onClick={onAdd} label={t("add")} />,
     [onAdd, t],
   );
 
