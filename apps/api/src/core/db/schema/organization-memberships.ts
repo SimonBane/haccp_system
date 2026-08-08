@@ -1,4 +1,6 @@
+import { sql } from "drizzle-orm";
 import {
+  index,
   pgTable,
   text,
   timestamp,
@@ -49,6 +51,13 @@ export const organizationMemberships = pgTable(
       table.id,
       table.organizationId,
     ),
+    // Covers the employee list end to end: the org filter, the deleted_at
+    // predicate and the created_at ordering, which otherwise forced a sort on
+    // every load. status and clerk_invitation_id are deliberately left
+    // unindexed — no query filters on either on its own.
+    index("organization_memberships_org_active_created_idx")
+      .on(table.organizationId, table.createdAt)
+      .where(sql`${table.deletedAt} is null`),
   ],
 );
 
