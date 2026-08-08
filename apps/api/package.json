@@ -12,6 +12,7 @@
     "db:generate": "node --env-file=.env --env-file=.env.local ./node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate": "node --env-file=.env --env-file=.env.local ./node_modules/drizzle-kit/bin.cjs migrate",
     "db:migrate:deploy": "drizzle-kit migrate",
+    "db:check": "drizzle-kit generate",
     "db:studio": "node --env-file=.env --env-file=.env.local ./node_modules/drizzle-kit/bin.cjs studio"
   },
   "dependencies": {

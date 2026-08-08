@@ -104,3 +104,16 @@ jobs:
         run: pnpm --filter @haccp/api db:migrate:deploy
         env:
           DIRECT_DATABASE_URL: postgresql://haccp:haccp@localhost:5432/haccp
+
+      # Guards both failure modes that let drizzle/meta drift out of sync with
+      # the TS schema: a schema change committed without a migration, and a
+      # hand-written migration the snapshots never learned about. Either one
+      # makes the *next* generate diff against a stale snapshot and emit
+      # destructive SQL, so catch it at the PR that introduces it.
+      - name: Check for uncommitted schema drift
+        run: pnpm --filter @haccp/api db:check
+        env:
+          DIRECT_DATABASE_URL: postgresql://haccp:haccp@localhost:5432/haccp
+
+      - name: Fail if a migration was generated
+        run: git diff --exit-code --stat -- apps/api/drizzle
