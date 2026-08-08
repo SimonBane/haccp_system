@@ -1,6 +1,11 @@
 import type { TodayTaskItem } from "@haccp/shared";
 import { describe, expect, it } from "vitest";
-import { buildTodayTimeline, timeGroupId } from "./today-timeline";
+import {
+  applyClock,
+  buildTodayTaskGroups,
+  buildTodayTimeline,
+  timeGroupId,
+} from "./today-timeline";
 
 /**
  * Characterization test for the Today timeline.
@@ -327,16 +332,60 @@ describe("buildTodayTimeline", () => {
     expect(input.map((t) => t.title)).toEqual(order);
   });
 
-  /**
-   * The reason the split exists. Today every call reallocates every item, so
-   * `TodayTaskRow`'s memo can never hit. After the split this must hold; before
-   * it, it documents the defect.
-   */
-  it("currently reallocates item objects on every clock tick", () => {
-    const a = buildTodayTimeline(tasks, at("09:00"), DATE, SOFIA);
-    const b = buildTodayTimeline(tasks, at("09:01"), DATE, SOFIA);
+describe("buildTodayTaskGroups + applyClock", () => {
+    const tasks = buildTasks();
 
-    expect(a.groups[0].items[0]).toEqual(b.groups[0].items[0]);
-    expect(a.groups[0].items[0]).not.toBe(b.groups[0].items[0]);
+    it("is equivalent to buildTodayTimeline at every clock position", () => {
+      const base = buildTodayTaskGroups(tasks);
+
+      for (const [clock, date] of [
+        ["06:00", DATE],
+        ["12:10", DATE],
+        ["21:00", DATE],
+        ["09:00", "2026-01-14"],
+        ["09:00", "2026-01-16"],
+      ] as const) {
+        expect(applyClock(base, at(clock), date, SOFIA)).toEqual(
+          buildTodayTimeline(tasks, at(clock), date, SOFIA),
+        );
+      }
+    });
+
+    /**
+     * The reason the split exists. `TodayTaskRow` is memoised on `item`, so an
+     * identity change every minute made the memo permanently useless — ~40 rows
+     * re-rendering on a wall-mounted tablet for no new information.
+     */
+    it("keeps item identity stable across clock ticks", () => {
+      const base = buildTodayTaskGroups(tasks);
+      const a = applyClock(base, at("09:00"), DATE, SOFIA);
+      const b = applyClock(base, at("09:01"), DATE, SOFIA);
+
+      expect(a.groups[0].items[0]).toBe(b.groups[0].items[0]);
+      expect(a.groups[0].items).toBe(b.groups[0].items);
+    });
+
+    it("still produces a fresh timeline when the tasks change", () => {
+      // Identity must track the data, so an optimistic patch still re-renders.
+      const a = applyClock(buildTodayTaskGroups(tasks), at("09:00"), DATE, SOFIA);
+      const b = applyClock(
+        buildTodayTaskGroups(buildTasks()),
+        at("09:00"),
+        DATE,
+        SOFIA,
+      );
+
+      expect(a.groups[0].items[0]).not.toBe(b.groups[0].items[0]);
+    });
+
+    it("recomputes clock-derived state while reusing the items", () => {
+      const base = buildTodayTaskGroups(tasks);
+      const morning = applyClock(base, at("06:00"), DATE, SOFIA);
+      const evening = applyClock(base, at("21:00"), DATE, SOFIA);
+
+      expect(morning.groups[0].state).toBe("upcoming");
+      expect(evening.groups[0].state).toBe("overdue");
+      expect(morning.groups[0].items).toBe(evening.groups[0].items);
+    });
   });
 });

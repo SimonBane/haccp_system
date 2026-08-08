@@ -23,6 +23,13 @@ import type { TimeGroupState, TodayTimelineItem } from "../lib/today-timeline";
 type Props = {
   item: TodayTimelineItem;
   groupState: TimeGroupState;
+  /**
+   * Passed down rather than read from tenant context. A context consumer
+   * re-renders whenever the provider's value changes no matter what `memo`
+   * says, and this is the one component in the app rendered ~40 times on the
+   * primary screen — so it stays fully decoupled from tenant state.
+   */
+  timeZone: string;
   isSyncing: boolean;
   currentUserId: string | null;
   onActivate: (item: TodayTimelineItem) => void;
@@ -62,13 +69,13 @@ function formatUserName(
 export const TodayTaskRow = memo(function TodayTaskRow({
   item,
   groupState,
+  timeZone,
   isSyncing,
   currentUserId,
   onActivate,
 }: Props) {
   const t = useTranslations("TodayPage");
   const locale = useLocale();
-  const timeZone = useOrgTimeZone();
   const { task, isCompleted, isDeviation, priorReading } = item;
 
   const isTemperature = task.type === "temperature";

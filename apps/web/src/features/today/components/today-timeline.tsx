@@ -13,6 +13,7 @@ import { TodayTimeGroup } from "./today-time-group";
 
 type Props = {
   timeline: Timeline;
+  timeZone: string;
   /** Changes when the day changes, so the auto-scroll runs once per day. */
   scrollKey: string;
   syncingKeys: ReadonlySet<string>;
@@ -22,6 +23,7 @@ type Props = {
 
 export function TodayTimeline({
   timeline,
+  timeZone,
   scrollKey,
   syncingKeys,
   currentUserId,
@@ -62,6 +64,12 @@ export function TodayTimeline({
           ) : null}
           <TodayTimeGroup
             group={group}
+            state={group.state}
+            timeZone={timeZone}
+            // Only an upcoming round shows a countdown. Passing null for the
+            // rest keeps their props identical minute to minute, so the memo
+            // holds and only the groups whose label actually changed re-render.
+            minutesUntil={group.state === "upcoming" ? group.minutesUntil : null}
             isLastBeforeNowLine={
               timeline.nowLineIndex !== null &&
               timeline.nowLineIndex > 0 &&
