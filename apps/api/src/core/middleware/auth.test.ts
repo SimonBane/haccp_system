@@ -73,6 +73,18 @@ describe("requireAuth", () => {
       const res = await get(AUTHED);
       expect(res.status).toBe(401);
     });
+
+    it("a JWT-shaped token whose segments are not valid JSON", async () => {
+      // Verified against @clerk/backend: "not.a.jwt" fails in JSON.parse during
+      // decoding and surfaces as a bare SyntaxError, never reaching Clerk's own
+      // classification. Caught live by curl during Phase 4, not by this suite.
+      verifyToken.mockRejectedValue(
+        new SyntaxError("Unexpected token in JSON at position 0"),
+      );
+
+      const res = await get(AUTHED);
+      expect(res.status).toBe(401);
+    });
   });
 
   describe("503 — we could not verify", () => {

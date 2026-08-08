@@ -66,6 +66,17 @@ export const userService = {
       return cached;
     }
 
+    return userService.resolveUserFromDb(db, clerkUserId);
+  },
+
+  /**
+   * The cold half of `resolveUser`, for callers that have already missed the
+   * cache — re-reading it there is a guaranteed miss on every cold request.
+   */
+  async resolveUserFromDb(
+    db: Db,
+    clerkUserId: string,
+  ): Promise<UserResponse | null> {
     const user = await userRepository.findByClerkUserId(db, clerkUserId);
     if (!user) {
       return null;
