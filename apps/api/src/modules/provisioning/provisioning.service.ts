@@ -42,7 +42,7 @@ export type ResolvedRequestContext = {
   membership: MembershipCacheBlob;
 };
 
-function toBlob(row: MembershipContextRow): MembershipCacheBlob {
+export function toBlob(row: MembershipContextRow): MembershipCacheBlob {
   return {
     membershipId: row.membership.id,
     organizationId: row.membership.organizationId,
@@ -56,7 +56,7 @@ function toBlob(row: MembershipContextRow): MembershipCacheBlob {
 // stale token (valid for up to ~60s after a demotion through our own UI) rewrite
 // the role back on every request. The organizationMembership.updated webhook is
 // the correction channel instead.
-function isHealthy(row: MembershipContextRow): boolean {
+export function isHealthy(row: MembershipContextRow): boolean {
   if (
     row.membership.deletedAt !== null ||
     row.user.deletedAt !== null ||
