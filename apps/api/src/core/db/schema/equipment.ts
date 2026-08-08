@@ -1,7 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
   check,
-  index,
   numeric,
   pgTable,
   text,
@@ -30,11 +29,12 @@ export const equipment = pgTable(
       .notNull(),
   },
   (table) => [
+    // No standalone location_id index: it is an exact left prefix of this
+    // composite unique, which already serves every location-scoped lookup.
     uniqueIndex("equipment_location_id_name_unique").on(
       table.locationId,
       table.name,
     ),
-    index("equipment_location_id_idx").on(table.locationId),
     check(
       "equipment_min_temp_less_than_max_temp",
       sql`${table.minTempC} < ${table.maxTempC}`,

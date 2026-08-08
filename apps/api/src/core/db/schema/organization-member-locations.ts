@@ -1,5 +1,6 @@
 import {
   foreignKey,
+  index,
   pgTable,
   primaryKey,
   timestamp,
@@ -34,6 +35,19 @@ export const organizationMemberLocations = pgTable(
       columns: [table.locationId, table.organizationId],
       foreignColumns: [locations.id, locations.organizationId],
     }).onDelete("cascade"),
+    // Postgres indexes the referenced side of a foreign key, never the
+    // referencing side. Without these, every cascade from a deleted location or
+    // organization has to sequential-scan this table — and the primary key
+    // (membership_id, location_id) cannot help, because location_id is not a
+    // usable prefix of it. Column order matches each FK so the planner can use
+    // them directly.
+    index("organization_member_locations_location_id_organization_id_idx").on(
+      table.locationId,
+      table.organizationId,
+    ),
+    index("organization_member_locations_organization_id_idx").on(
+      table.organizationId,
+    ),
   ],
 );
 
