@@ -7,4 +7,4 @@ export const healthResponseSchema = z.object({
   database: z.literal("connected"),
 });
 
-export type HealthResponseSchema = z.infer<typeof healthResponseSchema>;
+export type HealthResponse = z.infer<typeof healthResponseSchema>;

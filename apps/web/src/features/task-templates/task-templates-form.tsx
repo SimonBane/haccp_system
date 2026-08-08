@@ -33,6 +33,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  REQUIRED_LABEL_CLASS,
   Field,
   FieldError,
   FieldGroup,
@@ -78,9 +79,6 @@ function getWeekdayPreset(weekdays: TaskTemplateWeekday[]): WeekdayPreset {
 const TASK_TYPES: TaskTemplateType[] = ["temperature", "cleaning"];
 
 const TASK_TEMPLATES_FORM_ID = "task-templates-form";
-
-const REQUIRED_LABEL_CLASS =
-  "gap-1 after:text-destructive after:content-['*']";
 
 const SCHEDULED_TIME_SLOT_CLASS =
   "w-full min-w-0 sm:w-[calc((100%-1.5rem)/3)] md:w-[calc((100%-1.5rem)/4)]";

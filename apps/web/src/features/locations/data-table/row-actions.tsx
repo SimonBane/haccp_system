@@ -3,20 +3,16 @@
 import type { LocationResponse } from "@haccp/shared";
 import type { Row } from "@tanstack/react-table";
 import {
-  MoreHorizontalIcon,
   PencilIcon,
   Trash2Icon,
 } from "lucide-react";
 import type { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DataTableRowActions } from "@/components/ui/data-table/data-table-row-actions";
 import {
   Tooltip,
   TooltipContent,
@@ -49,26 +45,7 @@ export function LocationsTableRowActions({
     : t("tooltips.cannotDeleteLast");
 
   return (
-    <div className="flex justify-end" onClick={(event) => event.stopPropagation()}>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button
-              type="button"
-              variant="ghost"
-              className="h-10 w-10 p-0 md:h-8 md:w-8"
-              onClick={(event) => event.stopPropagation()}
-            />
-          }
-        >
-          <span className="sr-only">{t("openMenu")}</span>
-          <MoreHorizontalIcon />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="end"
-          className="w-max min-w-0"
-          onClick={(event) => event.stopPropagation()}
-        >
+    <DataTableRowActions srLabel={t("openMenu")}>
           <DropdownMenuGroup>
             <DropdownMenuItem onClick={() => onRename(location)}>
               <PencilIcon />
@@ -101,8 +78,6 @@ export function LocationsTableRowActions({
               </Tooltip>
             )}
           </DropdownMenuGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+    </DataTableRowActions>
   );
 }

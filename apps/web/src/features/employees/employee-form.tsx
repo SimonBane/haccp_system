@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
 import { DialogFooter } from "@/components/ui/dialog";
 import {
+  REQUIRED_LABEL_CLASS,
   Field,
   FieldDescription,
   FieldError,
@@ -81,9 +82,6 @@ export type EmployeeFormValues = {
 };
 
 const EMPLOYEE_FORM_ID = "employee-form";
-
-const REQUIRED_LABEL_CLASS =
-  "gap-1 after:text-destructive after:content-['*']";
 
 export function EmployeeForm({
   open,

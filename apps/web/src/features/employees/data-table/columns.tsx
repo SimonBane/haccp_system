@@ -1,20 +1,26 @@
 "use client";
 
 import type { EmployeeResponse } from "@haccp/shared";
-import { ORG_ROLE, requiresLocationAssignments } from "@haccp/shared";
+import { requiresLocationAssignments } from "@haccp/shared";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { useTranslations } from "next-intl";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 import { EmployeesTableRowActions } from "@/features/employees/data-table/row-actions";
-import { displayName, initials, statusVariant } from "@/features/employees/utils";
+import {
+  EmployeeIdentity,
+  EmployeeLocationsBadges,
+  EmployeeRoleBadge,
+  EmployeeStatusBadge,
+} from "@/features/employees/presentation";
+import { displayName } from "@/features/employees/utils";
 
 type EmployeesTranslations = ReturnType<
   typeof useTranslations<"EmployeesPage">
 >;
 
 type GetColumnsParams = {
+  // Column definitions are built outside React, so this one genuinely has to be
+  // passed in — the cells below render inside it and use the shared components.
   t: EmployeesTranslations;
   showLocationsColumn?: boolean;
   onEdit: (employee: EmployeeResponse) => void;
@@ -40,28 +46,7 @@ export function getColumns({
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title={t("columns.employee")} />
       ),
-      cell: ({ row }) => {
-        const employee = row.original;
-        return (
-          <div className="flex items-center gap-3">
-            <Avatar className="size-8">
-              {employee.user?.hasImage ? (
-                <AvatarImage
-                  src={employee.user.imageUrl}
-                  alt={displayName(employee)}
-                />
-              ) : null}
-              <AvatarFallback>{initials(employee)}</AvatarFallback>
-            </Avatar>
-            <div className="min-w-0">
-              <div className="truncate font-medium">{displayName(employee)}</div>
-              <div className="truncate text-xs text-muted-foreground">
-                {employee.email}
-              </div>
-            </div>
-          </div>
-        );
-      },
+      cell: ({ row }) => <EmployeeIdentity employee={row.original} />,
     },
     {
       accessorKey: "status",
@@ -69,11 +54,7 @@ export function getColumns({
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title={t("columns.status")} />
       ),
-      cell: ({ row }) => (
-        <Badge variant={statusVariant(row.original.status)}>
-          {t(`status.${row.original.status}`)}
-        </Badge>
-      ),
+      cell: ({ row }) => <EmployeeStatusBadge employee={row.original} />,
     },
     {
       accessorKey: "role",
@@ -81,13 +62,7 @@ export function getColumns({
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title={t("columns.role")} />
       ),
-      cell: ({ row }) => (
-        <Badge variant="outline">
-          {row.original.role === ORG_ROLE.ADMIN
-            ? t("roles.admin")
-            : t("roles.member")}
-        </Badge>
-      ),
+      cell: ({ row }) => <EmployeeRoleBadge employee={row.original} />,
     },
     ...(showLocationsColumn
       ? [
@@ -104,31 +79,11 @@ export function getColumns({
                 title={t("columns.locations")}
               />
             ),
-            cell: ({ row }) => {
-              const locations = row.original.locations;
-
-              if (!requiresLocationAssignments(row.original.role)) {
-                return <Badge variant="secondary">{t("allLocations")}</Badge>;
-              }
-
-              if (locations.length === 0) {
-                return (
-                  <span className="text-sm text-muted-foreground">
-                    {t("noLocations")}
-                  </span>
-                );
-              }
-
-              return (
-                <div className="flex flex-wrap gap-1">
-                  {locations.map((location) => (
-                    <Badge key={location.id} variant="secondary">
-                      {location.name}
-                    </Badge>
-                  ))}
-                </div>
-              );
-            },
+            cell: ({ row }) => (
+              <div className="flex flex-wrap gap-1">
+                <EmployeeLocationsBadges employee={row.original} />
+              </div>
+            ),
           } satisfies ColumnDef<EmployeeResponse>,
         ]
       : []),

@@ -1,11 +1,10 @@
 "use client";
 
 import type { TaskTemplateResponse, TaskTemplateType } from "@haccp/shared";
-import { PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useMemo, type ReactNode } from "react";
-import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table/data-table";
+import { DataTableAddButton } from "@/components/ui/data-table/data-table-add-button";
 import { getColumns } from "@/features/task-templates/data-table/columns";
 import { TaskTemplatesMobileCard } from "@/features/task-templates/data-table/mobile-card";
 
@@ -16,21 +15,6 @@ type TaskTemplatesDataProps = {
   onDuplicate: (task: TaskTemplateResponse) => void;
   onDelete: (task: TaskTemplateResponse) => void;
 };
-
-function TaskTemplatesToolbar({
-  onAdd,
-  label,
-}: {
-  onAdd: () => void;
-  label: string;
-}) {
-  return (
-    <Button type="button" onClick={onAdd}>
-      <PlusIcon />
-      {label}
-    </Button>
-  );
-}
 
 export function TaskTemplatesData({
   items,
@@ -75,7 +59,7 @@ export function TaskTemplatesData({
   );
 
   const toolbar = useMemo<ReactNode>(
-    () => <TaskTemplatesToolbar onAdd={onAdd} label={t("add")} />,
+    () => <DataTableAddButton onClick={onAdd} label={t("add")} />,
     [onAdd, t],
   );
 
@@ -104,10 +88,7 @@ export function TaskTemplatesData({
       emptyMessage={t("emptyTitle")}
       emptyDescription={t("emptyDescription")}
       emptyAction={
-        <Button type="button" onClick={onAdd}>
-          <PlusIcon />
-          {t("add")}
-        </Button>
+        <DataTableAddButton onClick={onAdd} label={t("add")} />
       }
       noResultsMessage={tTable("noResults")}
       enablePagination
