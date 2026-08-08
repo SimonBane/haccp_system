@@ -16,6 +16,22 @@ export { errorResponse, jsonResponse, defineRouteHandler } from "./responses.js"
 
 const bearerSecurity = [{ Bearer: [] }];
 
+/**
+ * Reads input @hono/zod-openapi has already validated against the route
+ * definition's schema.
+ *
+ * The generic exists because this factory's schemas are type parameters, so
+ * `c.req.valid` has nothing concrete to infer from — the same reason
+ * `defineRouteHandler` casts. Validation itself is entirely the framework's;
+ * this only names the resulting shape.
+ */
+function validated<T>(
+  c: { req: { valid: (target: never) => unknown } },
+  target: "json" | "param",
+): T {
+  return c.req.valid(target as never) as T;
+}
+
 type AdminCrudService<
   TCreate extends z.ZodType,
   TUpdate extends z.ZodType,
@@ -142,7 +158,11 @@ export function registerAdminCrudRoutes<
     createRouteDef,
     defineRouteHandler(createRouteDef, async (c) => {
       const { id: locationId } = getCurrentLocation(c);
-      const input = options.schemas.create.parse(await c.req.json());
+      // Already validated against schemas.create by @hono/zod-openapi from the
+      // route definition above — re-parsing here ran every schema twice. The
+      // cast is only to name the shape: TCreate is generic here, so c.req.valid
+      // cannot infer it, and defineRouteHandler already casts for the same reason.
+      const input = validated<z.output<TCreate>>(c, "json");
       const created = await options.service.create(getDb(c), locationId, input);
       return c.json(created, 201);
     }),
@@ -152,8 +172,8 @@ export function registerAdminCrudRoutes<
     updateRouteDef,
     defineRouteHandler(updateRouteDef, async (c) => {
       const { id: locationId } = getCurrentLocation(c);
-      const { id } = locationResourceParamSchema.parse(c.req.param());
-      const input = options.schemas.update.parse(await c.req.json());
+      const { id } = validated<{ id: string }>(c, "param");
+      const input = validated<z.output<TUpdate>>(c, "json");
       const updated = await options.service.update(
         getDb(c),
         locationId,
@@ -168,7 +188,7 @@ export function registerAdminCrudRoutes<
     deleteRouteDef,
     defineRouteHandler(deleteRouteDef, async (c) => {
       const { id: locationId } = getCurrentLocation(c);
-      const { id } = locationResourceParamSchema.parse(c.req.param());
+      const { id } = validated<{ id: string }>(c, "param");
       await options.service.delete(getDb(c), locationId, id);
       return c.body(null, 204);
     }),

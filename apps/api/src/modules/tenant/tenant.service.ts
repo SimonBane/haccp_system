@@ -184,7 +184,21 @@ export const tenantService = {
       return toTenantContext(cached);
     }
 
+    return tenantService.provisionTenantOnMiss(db, clerkOrgId);
+  },
+
+  /**
+   * The cold half of `ensureTenant`, for callers that have already missed the
+   * cache. Skipping the leading read there saves a guaranteed-miss round trip
+   * on every cold request.
+   */
+  async provisionTenantOnMiss(
+    db: Db,
+    clerkOrgId: string,
+  ): Promise<ResolvedTenant> {
     return singleFlight(`tenant:${clerkOrgId}`, async () => {
+      // This one is not redundant: a request that queued behind the flight leader
+      // arrives here after the leader has already written the cache.
       const recheck = await tenantCache.get(clerkOrgId);
       if (recheck) {
         return toTenantContext(recheck);

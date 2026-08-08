@@ -112,7 +112,13 @@ export const provisioningService = {
 
         if (row && isHealthy(row)) {
           const blob = toBlob(row);
-          await membershipCache.set(clerkOrgId, clerkUserId, blob);
+          // The user row came back on this query's inner join, so cache it here
+          // rather than letting resolveRequestContext re-SELECT what we already
+          // hold. isHealthy guarantees a non-null clerkUserId.
+          await Promise.all([
+            membershipCache.set(clerkOrgId, clerkUserId, blob),
+            userService.cacheUser(row.user),
+          ]);
           return blob;
         }
 
@@ -196,9 +202,11 @@ export const provisioningService = {
       membershipCache.get(clerkOrgId, clerkUserId),
     ]);
 
+    // The cold entry points, since the cache reads above already missed —
+    // ensureTenant/resolveUser would each re-read and miss again.
     const tenant = tenantBlob
       ? toTenantContext(tenantBlob)
-      : await tenantService.ensureTenant(db, clerkOrgId);
+      : await tenantService.provisionTenantOnMiss(db, clerkOrgId);
 
     const membership =
       membershipBlob ??
@@ -208,7 +216,19 @@ export const provisioningService = {
         orgRole,
       }));
 
-    let user = userBlob ?? (await userService.resolveUser(db, clerkUserId));
+    // Deliberately sequential. These look independent, but ensureMembership's
+    // query inner-joins users and now caches that row, so running them together
+    // would issue a second SELECT for something the first one already fetched.
+    //
+    // Which resolver to use therefore depends on whether membership was warm:
+    // if it was, nothing has populated the user cache and reading it again is a
+    // guaranteed miss; if it was cold, ensureMembership has very likely just
+    // filled it, and the cache-aware path turns a query into a Redis hit.
+    let user =
+      userBlob ??
+      (membershipBlob
+        ? await userService.resolveUserFromDb(db, clerkUserId)
+        : await userService.resolveUser(db, clerkUserId));
 
     if (!user) {
       // Membership cache was warm but the user row is gone or tombstoned.

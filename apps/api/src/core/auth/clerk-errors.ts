@@ -52,10 +52,16 @@ const INVALID_TOKEN_REASONS = new Set<string>([
 
 /** True when the failure is the caller's token rather than an upstream problem. */
 export function isInvalidTokenError(error: unknown): boolean {
-  return (
-    error instanceof TokenVerificationError &&
-    INVALID_TOKEN_REASONS.has(error.reason)
-  );
+  if (error instanceof TokenVerificationError) {
+    return INVALID_TOKEN_REASONS.has(error.reason);
+  }
+
+  // A token shaped like a JWT but carrying segments that are not valid JSON —
+  // "not.a.jwt" — fails in JSON.parse before Clerk classifies anything, so it
+  // surfaces as a bare SyntaxError. That is unambiguously a bad token, and it
+  // happens before any network call: Clerk wraps its own JWKS parse failures as
+  // TokenVerificationError with a RemoteJWK* reason, which is handled above.
+  return error instanceof SyntaxError;
 }
 
 /** True when we could not verify because our own Clerk credentials are wrong. */
