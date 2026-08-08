@@ -33,6 +33,8 @@ export {
   ORG_ROLE,
   membershipStatusSchema,
   normalizeOrgRole,
+  safeNormalizeOrgRole,
+  requiresLocationAssignments,
   orgRoleSchema,
   employeeResponseSchema,
   employeeListResponseSchema,

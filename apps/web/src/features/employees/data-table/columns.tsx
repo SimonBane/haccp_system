@@ -1,7 +1,7 @@
 "use client";
 
 import type { EmployeeResponse } from "@haccp/shared";
-import { ORG_ROLE } from "@haccp/shared";
+import { ORG_ROLE, requiresLocationAssignments } from "@haccp/shared";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { useTranslations } from "next-intl";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -94,7 +94,9 @@ export function getColumns({
           {
             id: "locations",
             accessorFn: (row: EmployeeResponse) =>
-              row.locations.map((location) => location.name).join(", "),
+              requiresLocationAssignments(row.role)
+                ? row.locations.map((location) => location.name).join(", ")
+                : t("allLocations"),
             meta: { view_label: t("columns.locations") },
             header: ({ column }) => (
               <DataTableColumnHeader
@@ -104,6 +106,10 @@ export function getColumns({
             ),
             cell: ({ row }) => {
               const locations = row.original.locations;
+
+              if (!requiresLocationAssignments(row.original.role)) {
+                return <Badge variant="secondary">{t("allLocations")}</Badge>;
+              }
 
               if (locations.length === 0) {
                 return (

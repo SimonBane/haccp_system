@@ -13,13 +13,16 @@ import {
 } from "./user.mapper.js";
 import { userRepository } from "./user.repository.js";
 
+// deletedAt rides along so provisioning can restore a tombstoned row in the same write.
+export type ClerkProfileUpsert = ClerkProfileData & { deletedAt?: Date | null };
+
 function normalizeName(value: string | undefined | null): string {
   return value?.trim() ?? "";
 }
 
-async function persistUserAndCache(
+async function persistUser(
   db: DbClient,
-  profileData: ClerkProfileData,
+  profileData: ClerkProfileUpsert,
   existingUserId?: string,
 ): Promise<User> {
   const user = existingUserId
@@ -32,38 +35,29 @@ async function persistUserAndCache(
       : new InternalError("Failed to create user");
   }
 
-  await userCache.set(
-    profileData.clerkUserId,
-    buildUserCacheBlob(toUserResponse(user)),
-  );
   return user;
 }
 
 export const userService = {
+  // Transaction-only. The caller translates 23505 with its own message.
   async ensureDraftUser(
     db: DbClient,
     input: { email: string; firstName?: string; lastName?: string },
   ) {
-    try {
-      const email = normalizeEmail(input.email);
-      const existing = await userRepository.findByEmail(db, email);
-      if (existing) {
-        return existing;
-      }
-
-      return await userRepository.insert(db, {
-        email,
-        firstName: normalizeName(input.firstName),
-        lastName: normalizeName(input.lastName),
-        clerkUserId: null,
-        imageUrl: "",
-        hasImage: false,
-      });
-    } catch (error) {
-      mapDbMutationError(error, {
-        unique: () => new ConflictError("A user with this email already exists"),
-      });
+    const email = normalizeEmail(input.email);
+    const existing = await userRepository.findByEmail(db, email);
+    if (existing) {
+      return existing;
     }
+
+    return userRepository.insert(db, {
+      email,
+      firstName: normalizeName(input.firstName),
+      lastName: normalizeName(input.lastName),
+      clerkUserId: null,
+      imageUrl: "",
+      hasImage: false,
+    });
   },
 
   async resolveUser(db: Db, clerkUserId: string): Promise<UserResponse | null> {
@@ -94,10 +88,7 @@ export const userService = {
       }
 
       const profileData = buildClerkProfileData(clerkUserId, profile);
-
-      const user = existing
-        ? await userRepository.updateById(db, existing.id, profileData)
-        : await userRepository.insert(db, profileData);
+      const user = await userRepository.updateById(db, existing.id, profileData);
 
       if (user) {
         await userCache.set(clerkUserId, buildUserCacheBlob(toUserResponse(user)));
@@ -111,39 +102,31 @@ export const userService = {
     }
   },
 
+  // Transaction-only. Deliberately does not translate 23505 or write the cache —
+  // the caller owning the transaction does both after it commits.
   async linkClerkProfileToDraftUser(
     db: DbClient,
     userId: string,
-    profileData: ClerkProfileData,
-  ): Promise<User | null> {
-    try {
-      return await persistUserAndCache(db, profileData, userId);
-    } catch (error) {
-      mapDbMutationError(error, {
-        unique: () => new ConflictError("A user with this email already exists"),
-      });
-    }
+    profileData: ClerkProfileUpsert,
+  ): Promise<User> {
+    return persistUser(db, profileData, userId);
   },
 
+  // Transaction-only. Same contract as linkClerkProfileToDraftUser.
   async upsertUserFromClerk(
     db: DbClient,
-    profileData: ClerkProfileData,
+    profileData: ClerkProfileUpsert,
   ): Promise<User> {
-    try {
-      const existing = await userRepository.findByClerkUserIdOrEmail(
-        db,
-        profileData.clerkUserId,
-        profileData.email,
-      );
+    const existing = await userRepository.findByClerkUserIdOrEmail(
+      db,
+      profileData.clerkUserId,
+      profileData.email,
+    );
 
-      return persistUserAndCache(db, profileData, existing?.id);
-    } catch (error) {
-      mapDbMutationError(error, {
-        unique: () => new ConflictError("A user with this email already exists"),
-      });
-    }
+    return persistUser(db, profileData, existing?.id);
   },
 
+  // Transaction-only. The caller invalidates the cache after the transaction commits.
   async updateProfile(
     db: DbClient,
     userId: string,
@@ -153,32 +136,28 @@ export const userService = {
       lastName?: string | null;
     },
   ): Promise<User | null> {
-    try {
-      const user = await userRepository.updateById(db, userId, {
-        email: updates.email ? normalizeEmail(updates.email) : undefined,
-        firstName:
-          updates.firstName !== undefined
-            ? normalizeName(updates.firstName)
-            : undefined,
-        lastName:
-          updates.lastName !== undefined
-            ? normalizeName(updates.lastName)
-            : undefined,
-      });
+    return userRepository.updateById(db, userId, {
+      email: updates.email ? normalizeEmail(updates.email) : undefined,
+      firstName:
+        updates.firstName !== undefined
+          ? normalizeName(updates.firstName)
+          : undefined,
+      lastName:
+        updates.lastName !== undefined
+          ? normalizeName(updates.lastName)
+          : undefined,
+    });
+  },
 
-      if (user?.clerkUserId) {
-        await userCache.set(
-          user.clerkUserId,
-          buildUserCacheBlob(toUserResponse(user)),
-        );
-      }
-
-      return user;
-    } catch (error) {
-      mapDbMutationError(error, {
-        unique: () => new ConflictError("A user with this email already exists"),
-      });
+  async cacheUser(user: User): Promise<void> {
+    if (!user.clerkUserId) {
+      return;
     }
+
+    await userCache.set(
+      user.clerkUserId,
+      buildUserCacheBlob(toUserResponse(user)),
+    );
   },
 
   async invalidateCache(clerkUserId: string): Promise<void> {

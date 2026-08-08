@@ -1,6 +1,10 @@
 "use client";
 
-import { ORG_ROLE, type EmployeeResponse } from "@haccp/shared";
+import {
+  ORG_ROLE,
+  requiresLocationAssignments,
+  type EmployeeResponse,
+} from "@haccp/shared";
 import type { Row } from "@tanstack/react-table";
 import type { useTranslations } from "next-intl";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -70,7 +74,9 @@ export function EmployeesMobileCard({
             ? t("roles.admin")
             : t("roles.member")}
         </Badge>
-        {employee.locations.length > 0 ? (
+        {!requiresLocationAssignments(employee.role) ? (
+          <Badge variant="outline">{t("allLocations")}</Badge>
+        ) : employee.locations.length > 0 ? (
           employee.locations.map((location) => (
             <Badge key={location.id} variant="outline">
               {location.name}

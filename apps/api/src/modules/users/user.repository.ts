@@ -79,7 +79,7 @@ export const userRepository = {
     const [row] = await db
       .select()
       .from(users)
-      .where(and(eq(users.email, email)))
+      .where(sql`lower(${users.email}) = lower(${email})`)
       .limit(1);
 
     return row ?? null;

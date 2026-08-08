@@ -101,6 +101,7 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
   const handleSave = useCallback(
     async (values: EmployeeFormValues, inviteNow: boolean): Promise<boolean> => {
       const locationIds = resolveEmployeeLocationIds(values.locationIds, {
+        role: values.role,
         multipleLocationsEnabled,
         defaultLocationId,
       });

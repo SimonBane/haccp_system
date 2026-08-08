@@ -79,6 +79,36 @@ clerkWebhookRoutes.post("/clerk", async (c) => {
       }
       break;
     }
+    case "organizationMembership.created": {
+      const data = event.data;
+      const clerkOrgId = data.organization?.id;
+      const clerkUserId = data.public_user_data?.user_id;
+
+      if (clerkOrgId && clerkUserId) {
+        await clerkWebhookService.handleMembershipCreated(
+          db,
+          clerkOrgId,
+          clerkUserId,
+          data.role,
+        );
+      }
+      break;
+    }
+    case "organizationMembership.updated": {
+      const data = event.data;
+      const clerkOrgId = data.organization?.id;
+      const clerkUserId = data.public_user_data?.user_id;
+
+      if (clerkOrgId && clerkUserId) {
+        await clerkWebhookService.handleMembershipUpdated(
+          db,
+          clerkOrgId,
+          clerkUserId,
+          data.role,
+        );
+      }
+      break;
+    }
     default:
       break;
   }

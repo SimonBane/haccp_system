@@ -38,7 +38,8 @@ import {
   toEmployeeResponse,
 } from "./employee.mapper.js";
 import { issueMembershipInvitation } from "./employee.invitations.js";
-import { membershipLocationsCache } from "./membership-locations-cache.js";
+import { resolveLocationAssignments } from "./employee.locations.js";
+import { membershipCache } from "./membership-cache.js";
 import { employeeRepository } from "./employee.repository.js";
 
 async function requireEmployeeDetail(
@@ -100,7 +101,19 @@ async function createDraftEmployee(
   db: Db,
   organizationId: string,
   input: CreateEmployeeInput,
-): Promise<{ membership: OrganizationMembership; user: User }> {
+  tenantLocations: LocationResponse[],
+): Promise<{
+  membership: OrganizationMembership;
+  user: User;
+  locationIds: string[];
+}> {
+  const role = normalizeOrgRole(input.role);
+  const locationIds = resolveLocationAssignments(
+    role,
+    input.locationIds,
+    tenantLocations,
+  );
+
   try {
     return await db.transaction(async (tx) => {
       const user = await userService.ensureDraftUser(tx, {
@@ -116,7 +129,7 @@ async function createDraftEmployee(
       const membership = await employeeRepository.insert(tx, {
         organizationId,
         userId: user.id,
-        role: normalizeOrgRole(input.role),
+        role,
         status: MEMBERSHIP_STATUS.DRAFT,
       });
 
@@ -128,10 +141,10 @@ async function createDraftEmployee(
         tx,
         membership.id,
         organizationId,
-        input.locationIds,
+        locationIds,
       );
 
-      return { membership, user };
+      return { membership, user, locationIds };
     });
   } catch (error) {
     mapDbMutationError(error, {
@@ -223,11 +236,11 @@ export const employeeService = {
   ): Promise<EmployeeResponse> {
     assertLocationIdsBelongToTenant(input.locationIds, tenantLocations);
 
-    const { membership: draft, user } = await createDraftEmployee(
-      db,
-      organizationId,
-      input,
-    );
+    const {
+      membership: draft,
+      user,
+      locationIds,
+    } = await createDraftEmployee(db, organizationId, input, tenantLocations);
 
     const membership = input.inviteNow
       ? await issueMembershipInvitation(db, organizationId, draft.id, {
@@ -241,10 +254,10 @@ export const employeeService = {
         })
       : draft;
 
-    await membershipLocationsCache.invalidate(organizationId, membership.userId);
+    await membershipCache.invalidate(clerkOrgId, user.clerkUserId);
 
     return buildEmployeeResponseFromDetail(
-      { membership, user, locationIds: input.locationIds },
+      { membership, user, locationIds },
       tenantLocations,
     );
   },
@@ -261,7 +274,7 @@ export const employeeService = {
     tenantLocations: LocationResponse[],
   ): Promise<EmployeeResponse> {
     const detail = await requireEmployeeDetail(db, organizationId, membershipId);
-    const changes = diffEmployeeChanges(detail, input);
+    const changes = diffEmployeeChanges(detail, input, tenantLocations);
 
     assertUpdateAllowed(detail, input, changes, actorUserDbId, tenantLocations);
 
@@ -275,6 +288,10 @@ export const employeeService = {
       detail,
       changes,
     );
+
+    if (hasProfileChanges(changes) && next.user.clerkUserId) {
+      await userService.invalidateCache(next.user.clerkUserId);
+    }
 
     const { clerkInvitationId, status } = detail.membership;
 
@@ -308,11 +325,8 @@ export const employeeService = {
           )
         : next.membership;
 
-    if (changes.locationIds) {
-      await membershipLocationsCache.invalidate(
-        organizationId,
-        detail.membership.userId,
-      );
+    if (changes.locationIds || changes.role) {
+      await membershipCache.invalidate(clerkOrgId, detail.user.clerkUserId);
     }
 
     return buildEmployeeResponseFromDetail(detail, tenantLocations, {
@@ -420,25 +434,6 @@ export const employeeService = {
       organizationId,
       membershipId,
     );
-    await membershipLocationsCache.invalidate(organizationId, row.membership.userId);
-  },
-
-  async getAssignedLocationIdsForUser(
-    db: Db,
-    organizationId: string,
-    userDbId: string,
-  ): Promise<string[]> {
-    const cached = await membershipLocationsCache.get(organizationId, userDbId);
-    if (cached) {
-      return cached;
-    }
-
-    const locationIds = await employeeRepository.getAssignedLocationIdsForUser(
-      db,
-      organizationId,
-      userDbId,
-    );
-    await membershipLocationsCache.set(organizationId, userDbId, locationIds);
-    return locationIds;
+    await membershipCache.invalidate(clerkOrgId, row.user.clerkUserId);
   },
 };

@@ -15,9 +15,13 @@ export const orgRoleSchema = z.enum([ORG_ROLE.ADMIN, ORG_ROLE.EMPLOYEE]);
 
 export type OrgRole = z.infer<typeof orgRoleSchema>;
 
-const employeeLocationIdsSchema = z
-  .array(z.uuid())
-  .min(1, { error: "Select at least one location." });
+// Admins reach every location in their org, so an admin membership carries no
+// assignments at all and [] means "all". Employees always need at least one.
+const employeeLocationIdsSchema = z.array(z.uuid());
+
+export function requiresLocationAssignments(role: OrgRole | string): boolean {
+  return role !== ORG_ROLE.ADMIN;
+}
 
 const LEGACY_MEMBER_ROLE = "org:member";
 
@@ -27,6 +31,16 @@ export function normalizeOrgRole(role: string): OrgRole {
   }
 
   return orgRoleSchema.parse(role);
+}
+
+// Never throws. Provisioning runs on every request, so an unrecognized Clerk
+// role must degrade to the least-privileged one rather than fail the request.
+export function safeNormalizeOrgRole(role: string | null | undefined): OrgRole {
+  if (role === ORG_ROLE.ADMIN) {
+    return ORG_ROLE.ADMIN;
+  }
+
+  return ORG_ROLE.EMPLOYEE;
 }
 
 export const employeeResponseSchema = z.object({
@@ -54,14 +68,28 @@ export type EmployeeListResponse = z.infer<typeof employeeListResponseSchema>;
 
 const trimmedEmailSchema = z.string().trim().max(256).pipe(z.email());
 
-export const createEmployeeSchema = z.object({
-  email: trimmedEmailSchema,
-  firstName: z.string().trim().min(1).max(100),
-  lastName: z.string().trim().min(1).max(100),
-  role: orgRoleSchema,
-  locationIds: employeeLocationIdsSchema,
-  inviteNow: z.boolean().optional(),
-});
+export const createEmployeeSchema = z
+  .object({
+    email: trimmedEmailSchema,
+    firstName: z.string().trim().min(1).max(100),
+    lastName: z.string().trim().min(1).max(100),
+    role: orgRoleSchema,
+    locationIds: employeeLocationIdsSchema,
+    inviteNow: z.boolean().optional(),
+  })
+  .check((ctx) => {
+    if (
+      requiresLocationAssignments(ctx.value.role) &&
+      ctx.value.locationIds.length === 0
+    ) {
+      ctx.issues.push({
+        code: "custom",
+        path: ["locationIds"],
+        message: "Select at least one location.",
+        input: ctx.value.locationIds,
+      });
+    }
+  });
 
 export type CreateEmployeeInput = z.infer<typeof createEmployeeSchema>;
 
