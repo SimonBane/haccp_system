@@ -2,6 +2,7 @@
 
 import type { LocationResponse } from "@haccp/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useZodErrorMap } from "@/lib/forms/zod-error-map";
 import { PlusIcon, SaveIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo } from "react";
@@ -55,8 +56,10 @@ export function LocationForm({
     [t],
   );
 
+  const zodErrorMap = useZodErrorMap();
+
   const form = useForm({
-    resolver: zodResolver(locationFormSchema),
+    resolver: zodResolver(locationFormSchema, { error: zodErrorMap }),
     defaultValues: {
       name: location?.name ?? "",
     },

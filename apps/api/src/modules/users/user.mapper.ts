@@ -1,10 +1,6 @@
 import type { UserResponse } from "@haccp/shared";
-import { normalizeEmail } from "@haccp/shared";
+import { normalizeEmail, normalizeName } from "@haccp/shared";
 import type { User } from "../../core/db/schema/users.js";
-
-function normalizeName(value: string | undefined | null): string {
-  return value?.trim() ?? "";
-}
 
 export function toUserResponse(user: User): UserResponse {
   return {
@@ -18,21 +14,7 @@ export function toUserResponse(user: User): UserResponse {
   };
 }
 
-export function toUserSummary(user: User) {
-  return {
-    id: user.id,
-    firstName: user.firstName,
-    lastName: user.lastName,
-  };
-}
 
-export function toUserSummaryFromResponse(user: UserResponse) {
-  return {
-    id: user.id,
-    firstName: user.firstName,
-    lastName: user.lastName,
-  };
-}
 
 export type ClerkUserProfile = {
   firstName: string;

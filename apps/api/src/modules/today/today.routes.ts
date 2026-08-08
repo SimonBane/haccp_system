@@ -1,3 +1,4 @@
+import { bearerSecurity } from "../../core/openapi/responses.js";
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import {
   completeTodayTemperatureTaskSchema,
@@ -20,8 +21,6 @@ import {
 import type { AppEnv } from "../../types.js";
 import { todayCompletionService } from "./today-completion.service.js";
 import { todayService } from "./today.service.js";
-
-const bearerSecurity = [{ Bearer: [] }];
 
 export const todayRoutes = new OpenAPIHono<AppEnv>();
 

@@ -168,25 +168,6 @@ export const employeeRepository = {
     return row ?? null;
   },
 
-  async findByEmail(db: Db, organizationId: string, email: string) {
-    const [row] = await db
-      .select({
-        membership: organizationMemberships,
-        user: users,
-      })
-      .from(organizationMemberships)
-      .innerJoin(users, eq(organizationMemberships.userId, users.id))
-      .where(
-        and(
-          eq(organizationMemberships.organizationId, organizationId),
-          sql`lower(${users.email}) = lower(${email})`,
-          isNull(organizationMemberships.deletedAt),
-        ),
-      )
-      .limit(1);
-
-    return row ?? null;
-  },
 
   async insert(
     db: DbClient,

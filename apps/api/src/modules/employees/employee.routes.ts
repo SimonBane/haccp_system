@@ -1,3 +1,4 @@
+import { bearerSecurity } from "../../core/openapi/responses.js";
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import {
   createEmployeeSchema,
@@ -14,8 +15,6 @@ import {
 import { getDb, getTenant, requireOrgContext } from "../../lib/context.js";
 import { employeeService } from "./employee.service.js";
 import type { AppEnv } from "../../types.js";
-
-const bearerSecurity = [{ Bearer: [] }];
 
 export const employeeRoutes = new OpenAPIHono<AppEnv>();
 
