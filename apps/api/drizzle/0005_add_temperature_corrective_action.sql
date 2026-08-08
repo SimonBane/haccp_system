@@ -1,1 +1,0 @@
-ALTER TABLE "temperature_logs" ADD COLUMN "corrective_action" text;
