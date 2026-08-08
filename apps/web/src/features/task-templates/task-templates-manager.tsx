@@ -1,6 +1,10 @@
 "use client";
 
-import type { TaskTemplateFieldsInput, TaskTemplateResponse } from "@haccp/shared";
+import type {
+  EquipmentResponse,
+  TaskTemplateFieldsInput,
+  TaskTemplateResponse,
+} from "@haccp/shared";
 import { Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useState } from "react";
@@ -16,11 +20,14 @@ import { getErrorMessage } from "@/lib/api/get-error-message";
 
 type TaskTemplatesManagerProps = {
   initialItems: TaskTemplateResponse[];
+  /** Seeds the form's equipment select, so opening the dialog needs no request. */
+  initialEquipment: EquipmentResponse[];
   initialLocationId: string;
 };
 
 export function TaskTemplatesManager({
   initialItems,
+  initialEquipment,
   initialLocationId,
 }: TaskTemplatesManagerProps) {
   const t = useTranslations("TasksPage");
@@ -28,7 +35,10 @@ export function TaskTemplatesManager({
     initialData: initialItems,
     initialLocationId,
   });
-  const equipment = useEquipmentOptions();
+  const equipment = useEquipmentOptions({
+    initialData: initialEquipment,
+    initialLocationId,
+  });
   const { create, update, remove } = useTaskTemplatesMutations();
 
   const [formOpen, setFormOpen] = useState(false);

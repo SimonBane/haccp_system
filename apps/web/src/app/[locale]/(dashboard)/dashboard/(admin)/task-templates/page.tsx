@@ -1,6 +1,7 @@
 import { type Locale } from "@/i18n/routing";
 import {
   getTenantContext,
+  listEquipment,
   listTaskTemplates,
   resolveActiveLocationId,
 } from "@/lib/api-client";
@@ -20,7 +21,13 @@ export default async function TaskTemplatesPage({
 
   const tenant = await getTenantContext();
   const locationId = await resolveActiveLocationId(tenant);
-  const taskTemplates = await listTaskTemplates(locationId);
+  // Genuinely parallel: both need only the location. Equipment is fetched here
+  // rather than left to the client because the form's dropdown otherwise fires a
+  // request on mount for a dialog that is closed.
+  const [taskTemplates, equipment] = await Promise.all([
+    listTaskTemplates(locationId),
+    listEquipment(locationId),
+  ]);
 
   return (
     <>
@@ -33,6 +40,7 @@ export default async function TaskTemplatesPage({
       <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
         <TaskTemplatesManager
           initialItems={taskTemplates.items}
+          initialEquipment={equipment.items}
           initialLocationId={locationId}
         />
       </div>

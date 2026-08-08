@@ -16,6 +16,7 @@ import {
 } from "@haccp/shared";
 import { auth } from "@clerk/nextjs/server";
 import { cookies } from "next/headers";
+import { cache } from "react";
 
 import { LOCATION_COOKIE, resolveLocationId } from "@/lib/location-preference";
 import { locationScopedPath } from "./paths";
@@ -59,9 +60,18 @@ async function fetchJson<T>(
   return schema.parse(body);
 }
 
-export async function getTenantContext(): Promise<TenantContextResponse> {
-  return fetchJson("/tenant/current", tenantContextResponseSchema);
-}
+/**
+ * Deduped per render pass.
+ *
+ * The dashboard shell fetches the tenant and so does every page beneath it.
+ * Next's own fetch memoization does not apply here — `cache: "no-store"` opts
+ * out of it — so without this each render pays two `/tenant/current` round
+ * trips and mints two Clerk tokens for identical data.
+ */
+export const getTenantContext = cache(
+  async (): Promise<TenantContextResponse> =>
+    fetchJson("/tenant/current", tenantContextResponseSchema),
+);
 
 export async function resolveActiveLocationId(
   tenant: TenantContextResponse,
