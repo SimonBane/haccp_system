@@ -21,6 +21,11 @@
     "description": "Your account is not linked to an organization. Contact your administrator to receive an invitation.",
     "backHome": "Back to home"
   },
+  "DashboardErrorPage": {
+    "title": "Something went wrong",
+    "description": "We could not load your workspace. This is usually temporary — please try again.",
+    "retry": "Try again"
+  },
   "ForbiddenPage": {
     "description": "You do not have permission to access this page."
   },
@@ -30,8 +35,7 @@
   "AcceptInvitationPage": {
     "noToken": "No invitation token found. Use the link from your invitation email.",
     "processing": "Processing your invitation…",
-    "completing": "Signing you in…",
-    "acceptError": "We could not finish setting up your account. Refresh the page or try again."
+    "completing": "Signing you in…"
   },
   "DashboardPage": {
     "breadcrumbApp": "SafeCheck",
@@ -470,6 +474,7 @@
     "locationsEmpty": "No locations found.",
     "noLocationsAvailable": "No locations available yet.",
     "noLocations": "No locations",
+    "allLocations": "All locations",
     "noLocationsWarning": "This employee will not have access to any location until at least one is assigned.",
     "save": "Save",
     "saveAndInvite": "Save and Invite",
@@ -577,5 +582,12 @@
       "invalidLogoType": "Logo must be a JPG, PNG, GIF, or WebP image.",
       "logoTooLarge": "Logo must be 2 MB or smaller."
     }
+  },
+  "Validation": {
+    "required": "This field is required",
+    "tooShort": "Must be at least {min} characters",
+    "tooLong": "Must be at most {max} characters",
+    "emailInvalid": "Enter a valid email address",
+    "locationsRequired": "Select at least one location"
   }
 }

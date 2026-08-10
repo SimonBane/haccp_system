@@ -1,3 +1,4 @@
+import { bearerSecurity } from "../../core/openapi/responses.js";
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import {
   createLocationSchema,
@@ -18,8 +19,6 @@ import {
 } from "../../lib/context.js";
 import { locationService } from "./location.service.js";
 import type { AppEnv } from "../../types.js";
-
-const bearerSecurity = [{ Bearer: [] }];
 
 export const locationRoutes = new OpenAPIHono<AppEnv>();
 

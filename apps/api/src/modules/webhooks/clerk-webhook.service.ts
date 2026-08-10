@@ -1,6 +1,7 @@
 import { userService } from "../users/user.service.js";
 import { userRepository } from "../users/user.repository.js";
 import { membershipService } from "../memberships/membership.service.js";
+import { provisioningService } from "../provisioning/provisioning.service.js";
 import { tenantService } from "../tenant/tenant.service.js";
 import { organizationRepository } from "../organizations/organization.repository.js";
 import { extractClerkProfile } from "../users/user.mapper.js";
@@ -69,5 +70,32 @@ export const clerkWebhookService = {
     clerkUserId: string,
   ): Promise<void> {
     await membershipService.removeByClerkIds(db, clerkOrgId, clerkUserId);
+  },
+
+  // Fallback for the request path: same provisioning code, triggered by the event
+  // instead of by a request. Whichever arrives first wins; the other adopts it.
+  async handleMembershipCreated(
+    db: Db,
+    clerkOrgId: string,
+    clerkUserId: string,
+    role: string,
+  ): Promise<void> {
+    const tenant = await tenantService.ensureTenant(db, clerkOrgId);
+    await provisioningService.ensureMembership(db, {
+      tenant,
+      clerkUserId,
+      orgRole: role,
+    });
+  },
+
+  // The role is deliberately not taken from the event payload — see
+  // membershipService.syncRoleByClerkIds for why re-reading Clerk is what makes
+  // out-of-order delivery safe.
+  async handleMembershipUpdated(
+    db: Db,
+    clerkOrgId: string,
+    clerkUserId: string,
+  ): Promise<void> {
+    await membershipService.syncRoleByClerkIds(db, clerkOrgId, clerkUserId);
   },
 };

@@ -1,7 +1,9 @@
 import {
   normalizeEmail,
   normalizeOrgRole,
+  requiresLocationAssignments,
   type EmployeeResponse,
+  normalizeName,
 } from "@haccp/shared";
 
 export type EmployeeInviteMetadataValues = {
@@ -46,10 +48,6 @@ export function statusVariant(
   }
 }
 
-function normalizeName(value: string | null | undefined): string {
-  return value?.trim() ?? "";
-}
-
 export function hasInviteMetadataChanges(
   employee: EmployeeResponse,
   values: EmployeeInviteMetadataValues,
@@ -76,10 +74,15 @@ export function hasInviteMetadataChanges(
 export function resolveEmployeeLocationIds(
   locationIds: string[],
   options: {
+    role: string;
     multipleLocationsEnabled: boolean;
     defaultLocationId: string;
   },
 ): string[] {
+  if (!requiresLocationAssignments(options.role)) {
+    return [];
+  }
+
   if (options.multipleLocationsEnabled) {
     return locationIds;
   }

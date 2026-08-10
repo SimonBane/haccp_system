@@ -1,7 +1,6 @@
 "use client";
 
 import type { OrganizationResponse } from "@haccp/shared";
-import { tenantContextResponseSchema } from "@haccp/shared";
 import { useTranslations } from "next-intl";
 import { TriangleAlertIcon } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -36,7 +35,6 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useTenant } from "@/features/tenant/tenant-provider";
-import { useAuthenticatedFetch } from "@/lib/api/client";
 import { getErrorMessage } from "@/lib/api/get-error-message";
 
 type SettingsSection = "general" | "regional" | "locations";
@@ -55,9 +53,8 @@ export function OrganizationSettingsForm({
   initialOrganization,
 }: OrganizationSettingsFormProps) {
   const t = useTranslations("SettingsPage");
-  const { fetchJson } = useAuthenticatedFetch();
   const { updateName, updateSettings } = useOrganizationMutations();
-  const { organization, refreshTenant, locations } = useTenant();
+  const { organization, reloadTenant, locations } = useTenant();
   const localeLabels = useMemo(
     () => ({
       bg: t("localeBg"),
@@ -100,14 +97,6 @@ export function OrganizationSettingsForm({
     setMultipleLocationsEnabled(checked);
   }
 
-  async function refreshTenantContext() {
-    const tenant = await fetchJson(
-      "/tenant/current",
-      tenantContextResponseSchema,
-    );
-    refreshTenant(tenant);
-  }
-
   async function saveSection(section: SettingsSection) {
     const isSectionDirty =
       section === "general"
@@ -136,7 +125,7 @@ export function OrganizationSettingsForm({
         });
       }
 
-      await refreshTenantContext();
+      await reloadTenant();
       if (section === "locations") {
         setShowMultipleLocationsDisableWarning(false);
       }

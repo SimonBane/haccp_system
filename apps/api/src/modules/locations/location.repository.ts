@@ -1,11 +1,11 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import type { Db, DbClient } from "../../core/db/client.js";
 import { locations } from "../../core/db/schema/locations.js";
 
 export const DEFAULT_LOCATION_NAME = "Main site";
 
 export const locationRepository = {
-  async findByOrganizationId(db: Db, organizationId: string) {
+  async findByOrganizationId(db: DbClient, organizationId: string) {
     return db
       .select()
       .from(locations)
@@ -13,48 +13,8 @@ export const locationRepository = {
       .orderBy(asc(locations.name));
   },
 
-  async findDefaultByOrganizationId(db: Db, organizationId: string) {
-    const [row] = await db
-      .select()
-      .from(locations)
-      .where(
-        and(
-          eq(locations.organizationId, organizationId),
-          eq(locations.isDefault, true),
-        ),
-      )
-      .limit(1);
 
-    return row ?? null;
-  },
 
-  async findByIdAndOrganization(
-    db: Db,
-    organizationId: string,
-    locationId: string,
-  ) {
-    const [row] = await db
-      .select()
-      .from(locations)
-      .where(
-        and(
-          eq(locations.id, locationId),
-          eq(locations.organizationId, organizationId),
-        ),
-      )
-      .limit(1);
-
-    return row ?? null;
-  },
-
-  async countByOrganizationId(db: Db, organizationId: string) {
-    const [row] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(locations)
-      .where(eq(locations.organizationId, organizationId));
-
-    return row?.count ?? 0;
-  },
 
   async insert(db: DbClient, data: typeof locations.$inferInsert) {
     const [created] = await db.insert(locations).values(data).returning();

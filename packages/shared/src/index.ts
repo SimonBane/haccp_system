@@ -1,5 +1,12 @@
 export { isSentryEnabled } from "./sentry.js";
 export { normalizeEmail } from "./normalize-email.js";
+export { normalizeName } from "./normalize-name.js";
+export {
+  locationIdsSchema,
+  optionalPersonNameSchema,
+  personNameSchema,
+  trimmedEmailSchema,
+} from "./schemas/fields.js";
 export {
   wallClockToInstant,
   zonedDateString,
@@ -13,8 +20,7 @@ export {
   getLocalizedPath,
   type AppLocale,
 } from "./lib/locale-path.js";
-export type { ApiError, HealthResponse } from "./types/api.js";
-export { apiErrorSchema } from "./schemas/error.js";
+export { apiErrorSchema, type ApiError } from "./schemas/error.js";
 export {
   uuidParamSchema,
   locationIdParamSchema,
@@ -33,6 +39,9 @@ export {
   ORG_ROLE,
   membershipStatusSchema,
   normalizeOrgRole,
+  safeNormalizeOrgRole,
+  needsLocationSelection,
+  requiresLocationAssignments,
   orgRoleSchema,
   employeeResponseSchema,
   employeeListResponseSchema,
@@ -45,7 +54,7 @@ export {
   type CreateEmployeeInput,
   type UpdateEmployeeInput,
 } from "./schemas/employee.js";
-export { healthResponseSchema, type HealthResponseSchema } from "./schemas/health.js";
+export { healthResponseSchema, type HealthResponse } from "./schemas/health.js";
 export {
   locationResponseSchema,
   type LocationResponse,

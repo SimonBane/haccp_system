@@ -2,6 +2,7 @@
 
 import type { LocationResponse } from "@haccp/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useZodErrorMap } from "@/lib/forms/zod-error-map";
 import { PlusIcon, SaveIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo } from "react";
@@ -17,6 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  REQUIRED_LABEL_CLASS,
   Field,
   FieldError,
   FieldGroup,
@@ -32,9 +34,6 @@ type LocationFormProps = {
 };
 
 const LOCATION_FORM_ID = "location-form";
-
-const REQUIRED_LABEL_CLASS =
-  "gap-1 after:text-destructive after:content-['*']";
 
 export function LocationForm({
   open,
@@ -57,8 +56,10 @@ export function LocationForm({
     [t],
   );
 
+  const zodErrorMap = useZodErrorMap();
+
   const form = useForm({
-    resolver: zodResolver(locationFormSchema),
+    resolver: zodResolver(locationFormSchema, { error: zodErrorMap }),
     defaultValues: {
       name: location?.name ?? "",
     },

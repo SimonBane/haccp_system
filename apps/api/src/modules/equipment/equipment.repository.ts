@@ -48,19 +48,4 @@ export const equipmentRepository = {
     return deleted ?? null;
   },
 
-  async findByIdAndLocation(
-    db: Db,
-    locationId: string,
-    equipmentId: string,
-  ) {
-    const [row] = await db
-      .select({ id: equipment.id, name: equipment.name })
-      .from(equipment)
-      .where(
-        and(eq(equipment.id, equipmentId), eq(equipment.locationId, locationId)),
-      )
-      .limit(1);
-
-    return row ?? null;
-  },
 };

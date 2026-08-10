@@ -15,6 +15,7 @@ import {
   DataTableMobileCardBadge,
 } from "@/components/ui/data-table/data-table-mobile-card";
 import { EquipmentTableRowActions } from "@/features/equipment/data-table/row-actions";
+import { formatTemp } from "@/features/equipment/lib/format";
 
 type EquipmentTranslations = ReturnType<
   typeof useTranslations<"EquipmentPage">
@@ -25,10 +26,6 @@ const EQUIPMENT_TYPE_ICONS: Record<EquipmentType, typeof RefrigeratorIcon> = {
   freezer: SnowflakeIcon,
   display_case: StoreIcon,
 };
-
-function formatTemp(value: number): string {
-  return `${value}°C`;
-}
 
 type EquipmentMobileCardProps = {
   row: Row<EquipmentResponse>;

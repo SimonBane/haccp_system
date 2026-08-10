@@ -1,11 +1,10 @@
 "use client";
 
 import type { EquipmentResponse, EquipmentType } from "@haccp/shared";
-import { PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useMemo, type ReactNode } from "react";
-import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table/data-table";
+import { DataTableAddButton } from "@/components/ui/data-table/data-table-add-button";
 import { getColumns } from "@/features/equipment/data-table/columns";
 import { EquipmentMobileCard } from "@/features/equipment/data-table/mobile-card";
 
@@ -16,15 +15,6 @@ type EquipmentDataProps = {
   onDuplicate: (equipment: EquipmentResponse) => void;
   onDelete: (equipment: EquipmentResponse) => void;
 };
-
-function EquipmentToolbar({ onAdd, label }: { onAdd: () => void; label: string }) {
-  return (
-    <Button type="button" onClick={onAdd}>
-      <PlusIcon />
-      {label}
-    </Button>
-  );
-}
 
 export function EquipmentData({
   items,
@@ -58,7 +48,7 @@ export function EquipmentData({
   );
 
   const toolbar = useMemo<ReactNode>(
-    () => <EquipmentToolbar onAdd={onAdd} label={t("add")} />,
+    () => <DataTableAddButton onClick={onAdd} label={t("add")} />,
     [onAdd, t],
   );
 
@@ -86,10 +76,7 @@ export function EquipmentData({
       emptyMessage={t("emptyTitle")}
       emptyDescription={t("emptyDescription")}
       emptyAction={
-        <Button type="button" onClick={onAdd}>
-          <PlusIcon />
-          {t("add")}
-        </Button>
+        <DataTableAddButton onClick={onAdd} label={t("add")} />
       }
       noResultsMessage={tTable("noResults")}
       enablePagination

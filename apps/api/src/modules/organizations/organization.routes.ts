@@ -1,3 +1,4 @@
+import { bearerSecurity } from "../../core/openapi/responses.js";
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import {
   updateOrganizationNameSchema,
@@ -13,8 +14,6 @@ import { ValidationError } from "../../core/errors/app-errors.js";
 import { getCurrentOrganization, getDb, getTenant, requireOrgContext } from "../../lib/context.js";
 import { organizationService } from "./organization.service.js";
 import type { AppEnv } from "../../types.js";
-
-const bearerSecurity = [{ Bearer: [] }];
 
 export const organizationRoutes = new OpenAPIHono<AppEnv>();
 

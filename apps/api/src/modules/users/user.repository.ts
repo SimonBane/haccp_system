@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, eq, isNull, or, sql } from "drizzle-orm";
 import type { Db, DbClient } from "../../core/db/client.js";
 import { users } from "../../core/db/schema/users.js";
 
@@ -25,26 +25,7 @@ export const userRepository = {
     return row ?? null;
   },
 
-  async findById(db: DbClient, userId: string) {
-    const [row] = await db
-      .select()
-      .from(users)
-      .where(and(eq(users.id, userId), isNull(users.deletedAt)))
-      .limit(1);
 
-    return row ?? null;
-  },
-
-  async findByIds(db: Db, userIds: string[]) {
-    if (userIds.length === 0) {
-      return [];
-    }
-
-    return db
-      .select()
-      .from(users)
-      .where(and(inArray(users.id, userIds), isNull(users.deletedAt)));
-  },
 
   async insert(db: DbClient, data: typeof users.$inferInsert) {
     const [created] = await db.insert(users).values(data).returning();
@@ -79,7 +60,7 @@ export const userRepository = {
     const [row] = await db
       .select()
       .from(users)
-      .where(and(eq(users.email, email)))
+      .where(sql`lower(${users.email}) = lower(${email})`)
       .limit(1);
 
     return row ?? null;

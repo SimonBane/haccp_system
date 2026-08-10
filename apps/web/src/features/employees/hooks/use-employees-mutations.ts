@@ -11,10 +11,12 @@ import {
 import { useAuth, useUser } from "@clerk/nextjs";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ApiRequestError, parseApiError } from "@/lib/api-utils";
+import { useTenant } from "@/features/tenant/tenant-provider";
 import { useAuthenticatedFetch } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
 
 export function useEmployeesMutations() {
+  const { organization } = useTenant();
   const { fetchJson, fetchApi } = useAuthenticatedFetch();
   const queryClient = useQueryClient();
   const { userId: clerkUserId } = useAuth();
@@ -22,7 +24,7 @@ export function useEmployeesMutations() {
 
   const invalidateEmployees = () => {
     void queryClient.invalidateQueries({
-      queryKey: queryKeys.employees(),
+      queryKey: queryKeys.employees(organization.id),
     });
   };
 

@@ -3,7 +3,7 @@ import type { Db, DbClient } from "../../core/db/client.js";
 import { taskCompletions } from "../../core/db/schema/task-completions.js";
 import { temperatureLogs } from "../../core/db/schema/temperature-logs.js";
 import { users } from "../../core/db/schema/users.js";
-import type { CompletionRecord } from "./today.mapper.js";
+import { buildCompletionKey, type CompletionRecord } from "./today.mapper.js";
 
 export type CompletionWithTemperatureRow = {
   taskTemplateId: string;
@@ -136,7 +136,10 @@ export const todayRepository = {
     const completionByKey = new Map<string, CompletionRecord>();
 
     for (const row of rows) {
-      const key = `${row.taskTemplateId}|${row.scheduledTime}`;
+      // Shared with the mapper on purpose: this key is what joins a completion
+      // back to the template that generated it, and two independent copies of
+      // the format would fail silently as "completed tasks render as pending".
+      const key = buildCompletionKey(row.taskTemplateId, row.scheduledTime);
       completionByKey.set(key, {
         completedAt: row.completedAt,
         completedBy: {

@@ -1,5 +1,13 @@
-import type { OrgRole, UpdateEmployeeInput } from "@haccp/shared";
-import { normalizeEmail, normalizeOrgRole } from "@haccp/shared";
+import type {
+  LocationResponse,
+  OrgRole,
+  UpdateEmployeeInput,
+} from "@haccp/shared";
+import { normalizeEmail, normalizeOrgRole, normalizeName } from "@haccp/shared";
+import {
+  resolveLocationAssignments,
+  sameLocationIds,
+} from "./employee.locations.js";
 import type { EmployeeDetail } from "./employee.mapper.js";
 
 export type EmployeeChanges = {
@@ -10,22 +18,10 @@ export type EmployeeChanges = {
   locationIds?: string[];
 };
 
-export function normalizeName(value: string | null | undefined): string {
-  return value?.trim() ?? "";
-}
-
-function sameLocationIds(current: string[], next: string[]): boolean {
-  if (current.length !== next.length) {
-    return false;
-  }
-
-  const currentIds = new Set(current);
-  return next.every((locationId) => currentIds.has(locationId));
-}
-
 export function diffEmployeeChanges(
   detail: EmployeeDetail,
   input: UpdateEmployeeInput,
+  tenantLocations: LocationResponse[],
 ): EmployeeChanges {
   const changes: EmployeeChanges = {};
 
@@ -57,11 +53,16 @@ export function diffEmployeeChanges(
     }
   }
 
-  if (
-    input.locationIds !== undefined &&
-    !sameLocationIds(detail.locationIds, input.locationIds)
-  ) {
-    changes.locationIds = input.locationIds;
+  // Resolved against the resulting role, so a role flip rewrites assignments even
+  // when the payload omits locationIds.
+  const targetLocationIds = resolveLocationAssignments(
+    changes.role ?? normalizeOrgRole(detail.membership.role),
+    input.locationIds ?? detail.locationIds,
+    tenantLocations,
+  );
+
+  if (!sameLocationIds(detail.locationIds, targetLocationIds)) {
+    changes.locationIds = targetLocationIds;
   }
 
   return changes;
