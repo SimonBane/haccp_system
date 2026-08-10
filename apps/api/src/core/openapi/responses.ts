@@ -15,6 +15,9 @@ export function defineRouteHandler<R extends RouteConfig>(
   return handler as unknown as RouteHandler<R, AppEnv>;
 }
 
+/** Every protected route's OpenAPI security block. */
+export const bearerSecurity = [{ Bearer: [] }];
+
 export function errorResponse(description: string) {
   return {
     description,

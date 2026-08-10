@@ -28,7 +28,8 @@ import { useTodayQuery } from "./hooks/use-today-query";
 import { tapFeedback } from "./lib/haptics";
 import { flatTodayTasks, occurrenceKey } from "./lib/today-grouping";
 import {
-  buildTodayTimeline,
+  applyClock,
+  buildTodayTaskGroups,
   findTimelineItem,
   type TodayTimelineItem,
 } from "./lib/today-timeline";
@@ -85,15 +86,19 @@ export function TodayView({
   const runUncomplete = uncompleteTask.mutateAsync;
   const runCompleteTemperature = completeTemperatureTask.mutateAsync;
 
+  // Two stages, so the minute tick cannot reallocate the rows. Everything the
+  // clock does not affect — grouping, per-item state, the counts — is memoised
+  // on the response alone, and applyClock layers the live state on top while
+  // carrying each group's items through by reference. That is what lets the
+  // memo on TodayTaskRow actually bail out between ticks.
+  const taskGroups = useMemo(
+    () => buildTodayTaskGroups(response ? flatTodayTasks(response) : []),
+    [response],
+  );
+
   const timeline = useMemo(
-    () =>
-      buildTodayTimeline(
-        response ? flatTodayTasks(response) : [],
-        now,
-        selectedDate,
-        timeZone,
-      ),
-    [response, now, selectedDate, timeZone],
+    () => applyClock(taskGroups, now, selectedDate, timeZone),
+    [taskGroups, now, selectedDate, timeZone],
   );
 
   // Both surfaces hold a key rather than the item itself: the clock tick
@@ -302,15 +307,28 @@ export function TodayView({
   const isToday = selectedDate === todayDate;
   const dateLabel = formatLocalDate(response?.date ?? selectedDate, locale);
 
+  const goToPreviousDay = useCallback(
+    () => setSelectedDate((date) => shiftLocalDate(date, -1)),
+    [],
+  );
+  const goToNextDay = useCallback(
+    () => setSelectedDate((date) => shiftLocalDate(date, 1)),
+    [],
+  );
+  const goToToday = useCallback(
+    () => setSelectedDate(todayDate),
+    [todayDate],
+  );
+
   const header = (
     <TodayStickyHeader
       timeline={timeline}
       selectedDate={selectedDate}
       dateLabel={dateLabel}
       isToday={isToday}
-      onPreviousDay={() => setSelectedDate((date) => shiftLocalDate(date, -1))}
-      onToday={() => setSelectedDate(todayDate)}
-      onNextDay={() => setSelectedDate((date) => shiftLocalDate(date, 1))}
+      onPreviousDay={goToPreviousDay}
+      onToday={goToToday}
+      onNextDay={goToNextDay}
     />
   );
 
@@ -366,6 +384,7 @@ export function TodayView({
 
             <TodayTimeline
               timeline={timeline}
+              timeZone={timeZone}
               scrollKey={selectedDate}
               syncingKeys={syncingKeys}
               currentUserId={currentUserId}

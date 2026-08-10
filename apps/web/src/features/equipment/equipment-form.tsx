@@ -10,6 +10,7 @@ import {
   type EquipmentType,
 } from "@haccp/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useZodErrorMap } from "@/lib/forms/zod-error-map";
 import { useTranslations } from "next-intl";
 import { CopyPlusIcon, PlusIcon, SaveIcon } from "lucide-react";
 import { useEffect, useMemo } from "react";
@@ -18,6 +19,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
+  REQUIRED_LABEL_CLASS,
   Field,
   FieldError,
   FieldGroup,
@@ -64,9 +66,6 @@ const EQUIPMENT_TYPES: EquipmentType[] = [
 ];
 
 const EQUIPMENT_FORM_ID = "equipment-form";
-
-const REQUIRED_LABEL_CLASS =
-  "gap-1 after:text-destructive after:content-['*']";
 
 const numberInputNoSpinClass =
   "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
@@ -226,8 +225,10 @@ export function EquipmentForm({
     [equipment, duplicateSource, suggestedDuplicateName],
   );
 
+  const zodErrorMap = useZodErrorMap();
+
   const form = useForm<EquipmentFormValues>({
-    resolver: zodResolver(equipmentFormSchema),
+    resolver: zodResolver(equipmentFormSchema, { error: zodErrorMap }),
     defaultValues,
     mode: "onTouched",
   });

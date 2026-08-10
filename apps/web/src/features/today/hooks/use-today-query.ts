@@ -32,6 +32,17 @@ export function useTodayQuery(date: string, options?: UseTodayQueryOptions) {
         todayResponseSchema,
       ),
     initialData,
+    // Scoped to this one query rather than the global default. Today is the
+    // only shared surface: two people work the same location off separate
+    // tablets, and without this neither sees the other's completions until a
+    // reload. Every other list is a single admin editing their own data, where
+    // a focus refetch would clobber the rows under an open dialog.
+    //
+    // Deliberately not a refetchInterval: a poll landing between an optimistic
+    // patch and the server confirm would flash a completed row back to
+    // incomplete in front of someone with wet hands.
+    refetchOnWindowFocus: true,
+    staleTime: 15_000,
     placeholderData: (previousData, previousQuery) => {
       if (previousQuery?.queryKey[1] !== locationId) {
         return undefined;

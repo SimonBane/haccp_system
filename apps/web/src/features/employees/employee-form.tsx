@@ -1,18 +1,26 @@
 "use client";
 
-import { ORG_ROLE, type EmployeeResponse, type LocationResponse } from "@haccp/shared";
+import {
+  ORG_ROLE,
+  requiresLocationAssignments,
+  type EmployeeResponse,
+  type LocationResponse,
+  needsLocationSelection,
+} from "@haccp/shared";
 import { useAuth } from "@clerk/nextjs";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useZodErrorMap } from "@/lib/forms/zod-error-map";
 import { SaveIcon, SendIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Controller, useForm, useFormState } from "react-hook-form";
+import { Controller, useForm, useFormState, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
 import { DialogFooter } from "@/components/ui/dialog";
 import {
+  REQUIRED_LABEL_CLASS,
   Field,
   FieldDescription,
   FieldError,
@@ -77,9 +85,6 @@ export type EmployeeFormValues = {
 
 const EMPLOYEE_FORM_ID = "employee-form";
 
-const REQUIRED_LABEL_CLASS =
-  "gap-1 after:text-destructive after:content-['*']";
-
 export function EmployeeForm({
   open,
   onOpenChange,
@@ -137,32 +142,46 @@ export function EmployeeForm({
             (value): value is EmployeeRole => value !== "",
             { error: t("validation.roleRequired") },
           ),
-        locationIds: multipleLocationsEnabled
-          ? z
-              .array(z.uuid())
-              .min(1, { error: t("validation.locationsRequired") })
-          : z.array(z.uuid()),
+        locationIds: z.array(z.uuid()),
+      })
+      .check((ctx) => {
+        // Same predicate the API enforces. The form additionally waives it for
+        // single-location organisations, where there is nothing to choose and
+        // the assignment is filled in on submit.
+        if (
+          needsLocationSelection({ ...ctx.value, multipleLocationsEnabled })
+        ) {
+          ctx.issues.push({
+            code: "custom",
+            path: ["locationIds"],
+            message: t("validation.locationsRequired"),
+            input: ctx.value.locationIds,
+          });
+        }
       }),
     [multipleLocationsEnabled, t],
   );
 
   const resolveLocationIds = useCallback(
-    (locationIds: string[] | undefined) =>
+    (role: string, locationIds: string[] | undefined) =>
       resolveEmployeeLocationIds(locationIds ?? [], {
+        role,
         multipleLocationsEnabled,
         defaultLocationId,
       }),
     [defaultLocationId, multipleLocationsEnabled],
   );
 
+  const zodErrorMap = useZodErrorMap();
+
   const form = useForm<EmployeeFormInput, unknown, EmployeeFormValues>({
-    resolver: zodResolver(employeeFormSchema),
+    resolver: zodResolver(employeeFormSchema, { error: zodErrorMap }),
     defaultValues: {
       email: employee?.email ?? "",
       firstName: employee?.firstName ?? "",
       lastName: employee?.lastName ?? "",
       role: employee?.role ?? "",
-      locationIds: resolveLocationIds(employee?.locationIds),
+      locationIds: resolveLocationIds(employee?.role ?? "", employee?.locationIds),
     },
   });
 
@@ -173,7 +192,7 @@ export function EmployeeForm({
         firstName: employee?.firstName ?? "",
         lastName: employee?.lastName ?? "",
         role: employee?.role ?? "",
-        locationIds: resolveLocationIds(employee?.locationIds),
+        locationIds: resolveLocationIds(employee?.role ?? "", employee?.locationIds),
       });
     }
   }, [open, employee, form, resolveLocationIds]);
@@ -191,6 +210,11 @@ export function EmployeeForm({
   const { isDirty } = useFormState({ control: form.control });
   const hasChanges = !isEditing || !employee || isDirty;
 
+  const selectedRole = useWatch({ control: form.control, name: "role" });
+  // Admins reach every location, so there is nothing to pick for them.
+  const showLocationPicker =
+    multipleLocationsEnabled && requiresLocationAssignments(selectedRole);
+
   const submit = async (inviteNow: boolean) => {
     const action: SubmitAction = inviteNow ? "invite" : "save";
     setPendingAction(action);
@@ -200,7 +224,7 @@ export function EmployeeForm({
         const completed = await onSave(
           {
             ...values,
-            locationIds: resolveLocationIds(values.locationIds),
+            locationIds: resolveLocationIds(values.role, values.locationIds),
           },
           inviteNow,
         );
@@ -220,7 +244,7 @@ export function EmployeeForm({
       await form.handleSubmit(async (values) => {
         const resolved = {
           ...values,
-          locationIds: resolveLocationIds(values.locationIds),
+          locationIds: resolveLocationIds(values.role, values.locationIds),
         };
 
         if (
@@ -421,7 +445,7 @@ export function EmployeeForm({
               }}
             />
 
-            {multipleLocationsEnabled ? (
+            {showLocationPicker ? (
               <Controller
                 control={form.control}
                 name="locationIds"

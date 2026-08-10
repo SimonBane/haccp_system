@@ -12,78 +12,15 @@
     {
       "idx": 1,
       "version": "7",
-      "when": 1783953718154,
-      "tag": "0001_create_locations_and_equipment",
+      "when": 1786218260530,
+      "tag": "0001_baseline",
       "breakpoints": true
     },
     {
       "idx": 2,
       "version": "7",
-      "when": 1784115162955,
-      "tag": "0002_create_task_templates",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1784231394322,
-      "tag": "0003_create_task_completions",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1784231434787,
-      "tag": "0004_create_temperature_logs",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1784299637004,
-      "tag": "0005_add_temperature_corrective_action",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1784967251481,
-      "tag": "0006_optimize_table_indexes",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1785000000000,
-      "tag": "0007_create_organizations_and_replace_org_id",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1785100000000,
-      "tag": "0008_create_users_memberships_and_replace_user_refs",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1785200000000,
-      "tag": "0009_add_organization_image_fields",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "7",
-      "when": 1785300000000,
-      "tag": "0010_add_users_email_unique",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "7",
-      "when": 1785400000000,
-      "tag": "0011_enforce_member_location_organization_scope",
+      "when": 1786219914642,
+      "tag": "0002_swift_hiroim",
       "breakpoints": true
     }
   ]

@@ -73,24 +73,6 @@ export const taskTemplateRepository = {
     return row ?? null;
   },
 
-  async findByIdAndLocation(
-    db: Db,
-    locationId: string,
-    taskTemplateId: string,
-  ) {
-    const [row] = await db
-      .select()
-      .from(taskTemplates)
-      .where(
-        and(
-          eq(taskTemplates.id, taskTemplateId),
-          eq(taskTemplates.locationId, locationId),
-        ),
-      )
-      .limit(1);
-
-    return row ?? null;
-  },
 
   async insert(db: Db, data: typeof taskTemplates.$inferInsert) {
     const [created] = await db.insert(taskTemplates).values(data).returning();

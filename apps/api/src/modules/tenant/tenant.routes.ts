@@ -1,3 +1,4 @@
+import { bearerSecurity } from "../../core/openapi/responses.js";
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { tenantContextResponseSchema } from "@haccp/shared";
 import {
@@ -7,8 +8,6 @@ import {
 } from "../../core/openapi/route-factory.js";
 import { getTenantContext } from "../../lib/context.js";
 import type { AppEnv } from "../../types.js";
-
-const bearerSecurity = [{ Bearer: [] }];
 
 export const tenantRoutes = new OpenAPIHono<AppEnv>();
 

@@ -6,6 +6,7 @@ import type {
   UserResponse,
 } from "@haccp/shared";
 import type { Db } from "./core/db/client.js";
+import type { MembershipCacheBlob } from "./modules/employees/membership-cache.js";
 import type { ResolvedTenant } from "./modules/tenant/tenant.service.js";
 
 export type AppLocationContext = LocationResponse;
@@ -20,6 +21,7 @@ export type AppEnv = {
     orgId: string | null;
     orgRole: string | null;
     tenant: ResolvedTenant | undefined;
+    membership: MembershipCacheBlob | undefined;
     assignedLocationIds: string[] | null | undefined;
     db: Db;
     currentLocation: AppLocationContext | undefined;

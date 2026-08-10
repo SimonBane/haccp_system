@@ -1,7 +1,7 @@
 import { occurrenceKey } from "./today-grouping";
 import { findTimelineGroup } from "./today-timeline";
 import type {
-  TodayTimeGroup,
+  TodayTaskGroup,
   TodayTimeline,
   TodayTimelineItem,
 } from "./today-timeline";
@@ -28,8 +28,10 @@ export function isChainableTemperatureItem(item: TodayTimelineItem): boolean {
   );
 }
 
+// Takes the clock-independent group: a round is decided by its checks, not by
+// where the clock happens to be, so this works on either shape.
 export function chainableTemperatureItems(
-  group: TodayTimeGroup,
+  group: TodayTaskGroup,
 ): TodayTimelineItem[] {
   return group.items.filter(isChainableTemperatureItem);
 }

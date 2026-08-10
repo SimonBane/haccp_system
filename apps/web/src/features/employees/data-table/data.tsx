@@ -1,11 +1,10 @@
 "use client";
 
 import type { EmployeeResponse } from "@haccp/shared";
-import { PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useMemo, type ReactNode } from "react";
-import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table/data-table";
+import { DataTableAddButton } from "@/components/ui/data-table/data-table-add-button";
 import { getColumns } from "@/features/employees/data-table/columns";
 import { EmployeesMobileCard } from "@/features/employees/data-table/mobile-card";
 import { useTenant } from "@/features/tenant/tenant-provider";
@@ -18,15 +17,6 @@ type EmployeesDataProps = {
   onRevokeInvitation: (employee: EmployeeResponse) => void;
   onDelete: (employee: EmployeeResponse) => void;
 };
-
-function EmployeesToolbar({ onAdd, label }: { onAdd: () => void; label: string }) {
-  return (
-    <Button type="button" onClick={onAdd}>
-      <PlusIcon />
-      {label}
-    </Button>
-  );
-}
 
 export function EmployeesData({
   items,
@@ -55,7 +45,7 @@ export function EmployeesData({
   );
 
   const toolbar = useMemo<ReactNode>(
-    () => <EmployeesToolbar onAdd={onAdd} label={t("add")} />,
+    () => <DataTableAddButton onClick={onAdd} label={t("add")} />,
     [onAdd, t],
   );
 

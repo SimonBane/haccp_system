@@ -9,16 +9,18 @@ import {
 } from "@haccp/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ApiRequestError, parseApiError } from "@/lib/api-utils";
+import { useTenant } from "@/features/tenant/tenant-provider";
 import { useAuthenticatedFetch } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
 
 export function useLocationsMutations() {
+  const { organization } = useTenant();
   const { fetchJson, fetchApi } = useAuthenticatedFetch();
   const queryClient = useQueryClient();
 
   const invalidateLocations = () => {
     void queryClient.invalidateQueries({
-      queryKey: queryKeys.locations(),
+      queryKey: queryKeys.locations(organization.id),
     });
   };
 

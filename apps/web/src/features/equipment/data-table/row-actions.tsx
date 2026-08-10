@@ -4,20 +4,16 @@ import type { EquipmentResponse } from "@haccp/shared";
 import type { Row } from "@tanstack/react-table";
 import {
   CopyPlusIcon,
-  MoreHorizontalIcon,
   PencilIcon,
   Trash2Icon,
 } from "lucide-react";
 import type { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DataTableRowActions } from "@/components/ui/data-table/data-table-row-actions";
 
 type EquipmentTranslations = ReturnType<
   typeof useTranslations<"EquipmentPage">
@@ -41,26 +37,7 @@ export function EquipmentTableRowActions({
   const equipment = row.original;
 
   return (
-    <div className="flex justify-end" onClick={(event) => event.stopPropagation()}>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button
-              type="button"
-              variant="ghost"
-              className="h-10 w-10 p-0 md:h-8 md:w-8"
-              onClick={(event) => event.stopPropagation()}
-            />
-          }
-        >
-          <span className="sr-only">{t("openMenu")}</span>
-          <MoreHorizontalIcon />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="end"
-          className="w-max min-w-0"
-          onClick={(event) => event.stopPropagation()}
-        >
+    <DataTableRowActions srLabel={t("openMenu")}>
           <DropdownMenuGroup>
             <DropdownMenuItem onClick={() => onEdit(equipment)}>
               <PencilIcon />
@@ -81,8 +58,6 @@ export function EquipmentTableRowActions({
               {t("delete")}
             </DropdownMenuItem>
           </DropdownMenuGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+    </DataTableRowActions>
   );
 }

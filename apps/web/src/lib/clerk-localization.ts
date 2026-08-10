@@ -1,6 +1,6 @@
 import { bgBG, enUS } from "@clerk/localizations";
 import { getLocalizedPath } from "@haccp/shared";
-import { routing, type Locale } from "@/i18n/routing";
+import type { Locale } from "@/i18n/routing";
 
 const clerkLocalizations = {
   bg: bgBG,

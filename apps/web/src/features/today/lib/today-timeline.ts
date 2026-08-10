@@ -43,18 +43,39 @@ export type TodayTimelineItem = {
   priorReading: TodayPriorReading | null;
 };
 
-export type TodayTimeGroup = {
+/**
+ * A round and its tasks, with everything the clock does not affect.
+ *
+ * Split out from `TodayTimeGroup` so it can be memoised on the response alone.
+ * The clock ticks every minute; rebuilding these objects on each tick gave every
+ * row a new `item` identity and made `TodayTaskRow`'s memo permanently useless.
+ */
+export type TodayTaskGroup = {
   /** Also the DOM anchor id, so header chips can scroll to a group. */
   id: string;
   scheduledTime: string;
-  state: TimeGroupState;
   items: TodayTimelineItem[];
   total: number;
   completedCount: number;
   remainingCount: number;
   deviationCount: number;
+};
+
+export type TodayTimeGroup = TodayTaskGroup & {
+  state: TimeGroupState;
   /** Signed minutes from now to this group. Negative means it has passed. */
   minutesUntil: number;
+};
+
+/** The clock-independent half of the timeline. */
+export type TodayTaskGroups = {
+  groups: TodayTaskGroup[];
+  total: number;
+  completedCount: number;
+  remainingCount: number;
+  deviationCount: number;
+  firstDeviationGroupId: string | null;
+  isAllDone: boolean;
 };
 
 export type TodayTimeline = {
@@ -198,12 +219,13 @@ function deriveGroupState(params: {
     : "upcoming";
 }
 
-export function buildTodayTimeline(
-  tasks: TodayTaskItem[],
-  now: Date,
-  selectedDate: string,
-  timeZone: string,
-): TodayTimeline {
+/**
+ * Everything derivable from the day's tasks alone: grouping, per-item state and
+ * the counts. Memoise this on the response and the item objects stay
+ * referentially stable across clock ticks, which is what lets `TodayTaskRow`'s
+ * memo actually bail out.
+ */
+export function buildTodayTaskGroups(tasks: TodayTaskItem[]): TodayTaskGroups {
   const inTimeOrder = [...tasks].sort(
     (a, b) =>
       parseScheduledTimeToMinutes(a.scheduledTime) -
@@ -224,40 +246,68 @@ export function buildTodayTimeline(
     byTime.set(task.scheduledTime, items);
   }
 
-  const groups: TodayTimeGroup[] = [...byTime.entries()].map(
+  const groups: TodayTaskGroup[] = [...byTime.entries()].map(
     ([scheduledTime, items]) => {
       const completedCount = items.filter((item) => item.isCompleted).length;
       const deviationCount = items.filter((item) => item.isDeviation).length;
-      const remainingCount = items.length - completedCount;
 
       return {
         id: timeGroupId(scheduledTime),
         scheduledTime,
-        state: deriveGroupState({
-          remainingCount,
-          scheduledTime,
-          now,
-          selectedDate,
-          timeZone,
-        }),
         items,
         total: items.length,
         completedCount,
-        remainingCount,
+        remainingCount: items.length - completedCount,
         deviationCount,
-        minutesUntil: minutesUntilOccurrence(
-          selectedDate,
-          scheduledTime,
-          now,
-          timeZone,
-        ),
       };
     },
   );
 
   const total = tasks.length;
   const completedCount = groups.reduce((sum, g) => sum + g.completedCount, 0);
-  const deviationCount = groups.reduce((sum, g) => sum + g.deviationCount, 0);
+
+  return {
+    groups,
+    total,
+    completedCount,
+    remainingCount: total - completedCount,
+    deviationCount: groups.reduce((sum, g) => sum + g.deviationCount, 0),
+    firstDeviationGroupId:
+      groups.find((group) => group.deviationCount > 0)?.id ?? null,
+    isAllDone: total > 0 && completedCount === total,
+  };
+}
+
+/**
+ * Layers the clock over the task groups: which rounds are live, overdue or still
+ * ahead, and where the now marker sits.
+ *
+ * `items` is carried through by reference — this is the whole point of the
+ * split, and the reason a tick no longer re-renders every row.
+ */
+export function applyClock(
+  base: TodayTaskGroups,
+  now: Date,
+  selectedDate: string,
+  timeZone: string,
+): TodayTimeline {
+  const groups: TodayTimeGroup[] = base.groups.map((group) => ({
+    ...group,
+    state: deriveGroupState({
+      remainingCount: group.remainingCount,
+      scheduledTime: group.scheduledTime,
+      now,
+      selectedDate,
+      timeZone,
+    }),
+    minutesUntil: minutesUntilOccurrence(
+      selectedDate,
+      group.scheduledTime,
+      now,
+      timeZone,
+    ),
+  }));
+
   const overdueCount = groups
     .filter((group) => group.state === "overdue")
     .reduce((sum, group) => sum + group.remainingCount, 0);
@@ -269,27 +319,34 @@ export function buildTodayTimeline(
   const upcomingIndex = groups.findIndex(
     (group) => parseScheduledTimeToMinutes(group.scheduledTime) > nowMinutes,
   );
-  const isAllDone = total > 0 && completedCount === total;
 
   return {
     groups,
-    total,
-    completedCount,
-    remainingCount: total - completedCount,
+    total: base.total,
+    completedCount: base.completedCount,
+    remainingCount: base.remainingCount,
     overdueCount,
-    deviationCount,
+    deviationCount: base.deviationCount,
     focusGroupId: groups.find((group) => group.state !== "done")?.id ?? null,
     firstOverdueGroupId:
       groups.find((group) => group.state === "overdue")?.id ?? null,
-    firstDeviationGroupId:
-      groups.find((group) => group.deviationCount > 0)?.id ?? null,
-    isAllDone,
+    firstDeviationGroupId: base.firstDeviationGroupId,
+    isAllDone: base.isAllDone,
     nowLineIndex:
-      isToday && !isAllDone
+      isToday && !base.isAllDone
         ? upcomingIndex === -1
           ? groups.length
           : upcomingIndex
         : null,
     nowMinutes,
   };
+}
+
+export function buildTodayTimeline(
+  tasks: TodayTaskItem[],
+  now: Date,
+  selectedDate: string,
+  timeZone: string,
+): TodayTimeline {
+  return applyClock(buildTodayTaskGroups(tasks), now, selectedDate, timeZone);
 }

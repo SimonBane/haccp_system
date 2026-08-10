@@ -5,8 +5,11 @@ export const queryKeys = {
   todayByLocation: (locationId: string) => ["today", locationId] as const,
   equipment: (locationId: string) => ["equipment", locationId] as const,
   taskTemplates: (locationId: string) => ["task-templates", locationId] as const,
-  locations: () => ["locations"] as const,
-  employees: () => ["employees"] as const,
+  // Org-scoped rather than bare, so switching Clerk organisation without a hard
+  // reload cannot serve the previous org's rows out of a still-live cache.
+  // Every other key carries a locationId for the same reason.
+  locations: (organizationId: string) => ["locations", organizationId] as const,
+  employees: (organizationId: string) => ["employees", organizationId] as const,
 };
 
 export function isLocationScopedQueryKey(queryKey: readonly unknown[]): boolean {

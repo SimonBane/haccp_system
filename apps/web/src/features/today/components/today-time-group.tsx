@@ -7,7 +7,7 @@ import {
   ThermometerIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +20,7 @@ import { chainableTemperatureItems } from "../lib/today-round";
 import { occurrenceKey } from "../lib/today-grouping";
 import type {
   TimeGroupState,
-  TodayTimeGroup,
+  TodayTaskGroup,
   TodayTimelineItem,
 } from "../lib/today-timeline";
 import {
@@ -32,7 +32,16 @@ import {
 import { TodayTaskRow } from "./today-task-row";
 
 type Props = {
-  group: TodayTimeGroup;
+  /** Clock-independent, so its identity survives the minute tick. */
+  group: TodayTaskGroup;
+  state: TimeGroupState;
+  timeZone: string;
+  /**
+   * Only an upcoming round renders a countdown, so callers pass null for every
+   * other state. That keeps this component's props stable minute to minute and
+   * lets the memo below actually bail out.
+   */
+  minutesUntil: number | null;
   /** Last completed round before the live now marker — stays expanded. */
   isLastBeforeNowLine: boolean;
   /** Last block on the axis, so its rail fades out instead of reaching for a
@@ -106,8 +115,11 @@ function useDurationLabel() {
   };
 }
 
-export function TodayTimeGroup({
+export const TodayTimeGroup = memo(function TodayTimeGroup({
   group,
+  state,
+  minutesUntil,
+  timeZone,
   isLastBeforeNowLine,
   isTail,
   syncingKeys,
@@ -120,11 +132,11 @@ export function TodayTimeGroup({
   // A finished group folds away, unless it hides a deviation worth seeing or
   // it is the anchor round directly above the live now marker.
   const [open, setOpen] = useState(
-    group.state !== "done" || group.deviationCount > 0 || isLastBeforeNowLine,
+    state !== "done" || group.deviationCount > 0 || isLastBeforeNowLine,
   );
 
   const headingId = `${group.id}-heading`;
-  const railClassName = getRailClassName(group.state, group.deviationCount);
+  const railClassName = getRailClassName(state, group.deviationCount);
 
   // Offered only when there is a round to run. A single pending check is what
   // tapping its row already does, so a button beside it would be noise.
@@ -132,14 +144,14 @@ export function TodayTimeGroup({
   const roundStart = roundItems.length >= 2 ? roundItems[0] : null;
 
   const summaryText = (() => {
-    switch (group.state) {
+    switch (state) {
       case "now":
       case "overdue":
         return t("timeline.remaining", { count: group.remainingCount });
       case "done":
         return t("timeline.doneCount", { count: group.total });
       case "upcoming":
-        return durationLabel(group.minutesUntil, "until");
+        return durationLabel(minutesUntil ?? 0, "until");
     }
   })();
 
@@ -170,18 +182,18 @@ export function TodayTimeGroup({
             "flex size-3.5 items-center justify-center",
           )}
         >
-          {group.state === "now" ? (
+          {state === "now" ? (
             <span className="absolute inline-flex size-full rounded-full bg-primary opacity-60 motion-safe:animate-ping" />
           ) : null}
           <span
             className={cn(
               "relative size-3.5 rounded-full ring-4",
-              getDotRingClassName(group.state, group.deviationCount),
-              group.state === "now" && "bg-primary",
-              group.state === "overdue" && "bg-destructive",
-              group.state === "done" &&
+              getDotRingClassName(state, group.deviationCount),
+              state === "now" && "bg-primary",
+              state === "overdue" && "bg-destructive",
+              state === "done" &&
                 (group.deviationCount > 0 ? "bg-destructive" : "bg-success"),
-              group.state === "upcoming" && "border-2 border-border bg-card",
+              state === "upcoming" && "border-2 border-border bg-card",
             )}
           />
         </span>
@@ -199,24 +211,24 @@ export function TodayTimeGroup({
               id={headingId}
               className={cn(
                 "text-[15px] leading-none font-semibold tabular-nums",
-                group.state === "now" && "text-primary",
-                group.state === "overdue" && "text-destructive",
-                group.state === "done" && "text-muted-foreground",
+                state === "now" && "text-primary",
+                state === "overdue" && "text-destructive",
+                state === "done" && "text-muted-foreground",
               )}
             >
               {group.scheduledTime}
             </time>
 
-            {group.state === "now" ? (
+            {state === "now" ? (
               <Badge className="uppercase">{t("timeline.now")}</Badge>
             ) : null}
-            {group.state === "overdue" ? (
+            {state === "overdue" ? (
               <Badge variant="destructive">
                 <CircleAlertIcon />
                 {t("timeline.overdue")}
               </Badge>
             ) : null}
-            {group.state === "done" && group.deviationCount === 0 ? (
+            {state === "done" && group.deviationCount === 0 ? (
               <CheckIcon className="size-4 text-success" aria-hidden />
             ) : null}
             {group.deviationCount > 0 ? (
@@ -229,7 +241,7 @@ export function TodayTimeGroup({
             {/* A deviation badge alongside a state badge already fills a 375px
               header, and the count is the least important of the three — it
               stays in the trigger's aria-label either way. */}
-            {group.state === "done" && group.deviationCount > 0 ? null : (
+            {state === "done" && group.deviationCount > 0 ? null : (
               <span
                 className={cn(
                   "truncate text-[13px] text-muted-foreground",
@@ -274,7 +286,8 @@ export function TodayTimeGroup({
               <li key={occurrenceKey(item.task)}>
                 <TodayTaskRow
                   item={item}
-                  groupState={group.state}
+                  groupState={state}
+                  timeZone={timeZone}
                   isSyncing={syncingKeys.has(occurrenceKey(item.task))}
                   currentUserId={currentUserId}
                   onActivate={onActivate}
@@ -286,4 +299,4 @@ export function TodayTimeGroup({
       </section>
     </Collapsible>
   );
-}
+});
