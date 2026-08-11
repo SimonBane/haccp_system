@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useTranslations } from "next-intl";
 import * as Sentry from "@sentry/nextjs";
+import { CenteredShell } from "@/components/layout/centered-shell";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -29,7 +30,7 @@ export default function DashboardError({
   }, [error]);
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center p-safe">
+    <CenteredShell>
       <Card className="w-full max-w-lg">
         <CardHeader>
           <CardTitle>{t("title")}</CardTitle>
@@ -39,6 +40,6 @@ export default function DashboardError({
           <Button onClick={reset}>{t("retry")}</Button>
         </CardContent>
       </Card>
-    </div>
+    </CenteredShell>
   );
 }

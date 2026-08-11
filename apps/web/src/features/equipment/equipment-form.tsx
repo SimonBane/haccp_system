@@ -369,6 +369,13 @@ export function EquipmentForm({
       }
       className="sm:min-h-[24rem]"
       initialFocus={isEditing || isDuplicating ? undefined : false}
+      closeLabel={t("cancel")}
+      submit={{
+        label: isEditing ? t("save") : t("add"),
+        formId: EQUIPMENT_FORM_ID,
+        isLoading: isSubmitting,
+        disabled: isEditing && !hasChanges,
+      }}
       footer={formFooter}
     >
         <form
@@ -483,6 +490,8 @@ export function EquipmentForm({
                         id={`${EQUIPMENT_FORM_ID}-min-temp`}
                         type="text"
                         inputMode="decimal"
+
+                        enterKeyHint="next"
                         aria-invalid={fieldState.invalid}
                         className={numberInputNoSpinClass}
                         name={field.name}
@@ -527,6 +536,8 @@ export function EquipmentForm({
                         id={`${EQUIPMENT_FORM_ID}-max-temp`}
                         type="text"
                         inputMode="decimal"
+
+                        enterKeyHint="next"
                         aria-invalid={fieldState.invalid}
                         className={numberInputNoSpinClass}
                         name={field.name}

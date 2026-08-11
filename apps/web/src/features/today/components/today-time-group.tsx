@@ -160,7 +160,7 @@ export const TodayTimeGroup = memo(function TodayTimeGroup({
       <section
         id={group.id}
         aria-labelledby={headingId}
-        className="relative scroll-mt-28 pb-2 pl-9 sm:pl-11"
+        className="relative scroll-mt-4 pb-2 pl-9 sm:pl-11 md:scroll-mt-16"
       >
         {/* Rail from this round's own dot down to the next one, carrying this
             round's state — a colour never starts before the dot that earned

@@ -2,22 +2,19 @@
 
 import type { LocationResponse } from "@haccp/shared";
 import type { Row } from "@tanstack/react-table";
+import { MapPinIcon } from "lucide-react";
 import type { useTranslations } from "next-intl";
-import { Badge } from "@/components/ui/badge";
 import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  MobileListBadge,
+  MobileListRow,
+} from "@/components/ui/data-table/data-table-mobile-list";
 import { LocationsTableRowActions } from "@/features/locations/data-table/row-actions";
 
 type LocationsTranslations = ReturnType<
   typeof useTranslations<"LocationsPage">
 >;
 
-type LocationsMobileCardProps = {
+type LocationsMobileRowProps = {
   row: Row<LocationResponse>;
   t: LocationsTranslations;
   totalCount: number;
@@ -31,21 +28,22 @@ export function LocationsMobileCard({
   totalCount,
   onRename,
   onDelete,
-}: LocationsMobileCardProps) {
+}: LocationsMobileRowProps) {
   const location = row.original;
 
   return (
-    <Card className="py-4">
-      <CardHeader className="pb-2">
-        <div className="flex items-center gap-2">
-          <CardTitle className="text-base">{location.name}</CardTitle>
-          {location.isDefault ? (
-            <Badge variant="secondary">{t("status.default")}</Badge>
-          ) : null}
-        </div>
-      </CardHeader>
-      <CardContent />
-      <CardFooter className="justify-end border-t pt-3">
+    <MobileListRow
+      leading={
+        <MapPinIcon className="size-5 text-muted-foreground" aria-hidden />
+      }
+      title={location.name}
+      trailing={
+        location.isDefault ? (
+          <MobileListBadge>{t("status.default")}</MobileListBadge>
+        ) : null
+      }
+      showChevron={false}
+      actions={
         <LocationsTableRowActions
           row={row}
           t={t}
@@ -53,7 +51,7 @@ export function LocationsMobileCard({
           onRename={onRename}
           onDelete={onDelete}
         />
-      </CardFooter>
-    </Card>
+      }
+    />
   );
 }

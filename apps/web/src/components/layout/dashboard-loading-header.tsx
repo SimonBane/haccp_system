@@ -8,10 +8,13 @@ import { Skeleton } from "@/components/ui/skeleton";
  * The sidebar trigger stays real — it is rendered by the layout above the
  * suspense boundary and remains usable while the page resolves, so skeletoning
  * it would make the shell look broken rather than loading.
+ *
+ * Desktop-only, mirroring `DashboardPageHeader`: on mobile the breadcrumb bar
+ * does not exist, so showing one while loading made the page shift on arrival.
  */
 export function DashboardLoadingHeader() {
   return (
-    <header className="flex h-16 shrink-0 items-center gap-2">
+    <header className="hidden h-16 shrink-0 items-center gap-2 md:flex">
       <div className="flex flex-1 items-center gap-2 px-4">
         <SidebarTrigger className="-ml-1" />
         <Separator

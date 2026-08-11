@@ -6,7 +6,10 @@ import { useTranslations } from "next-intl";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
-import { MobileHeaderAddButton } from "@/components/layout/mobile-header-add-button";
+import {
+  MobileHeaderAddAction,
+  PageHeader,
+} from "@/components/layout/page-header";
 import { EquipmentForm } from "@/features/equipment/equipment-form";
 import { EquipmentData } from "@/features/equipment/data-table/data";
 import { useEquipmentMutations } from "@/features/equipment/hooks/use-equipment-mutations";
@@ -111,15 +114,10 @@ export function EquipmentManager({
   );
 
   return (
-    <div className="space-y-6">
-      <MobileHeaderAddButton label={t("add")} onClick={openCreateForm} />
+    <div className="flex flex-1 flex-col gap-6">
+      <MobileHeaderAddAction label={t("add")} onClick={openCreateForm} />
 
-      <div className="hidden md:block">
-        <h1 className="text-xl font-semibold tracking-tight md:text-2xl">
-          {t("title")}
-        </h1>
-        <p className="text-sm text-muted-foreground">{t("description")}</p>
-      </div>
+      <PageHeader title={t("title")} description={t("description")} />
 
       <EquipmentData
         items={items}

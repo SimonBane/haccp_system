@@ -40,7 +40,7 @@ export function TodayNowLine({
       // every round's dot, which is what lets the rail run dot to dot without
       // a seam. Equal padding also keeps the marker from crowding the hour
       // below it, where its dot used to get lost against the passing rail.
-      className="relative flex scroll-mt-28 items-center gap-2 py-4 pl-9 sm:pl-11"
+      className="relative flex scroll-mt-4 items-center gap-2 py-4 pl-9 sm:pl-11 md:scroll-mt-16"
     >
       {/* The rest of the day is ahead of this marker, so the rail leaving it
           is dashed whatever the round below turns out to be. */}

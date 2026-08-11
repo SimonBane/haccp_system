@@ -2,6 +2,7 @@ import { type Locale } from "@/i18n/routing";
 import { getTenantContext, listEquipment, resolveActiveLocationId } from "@/lib/api-client";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { DashboardPageHeader } from "@/components/layout/dashboard-page-header";
+import { PageContainer } from "@/components/layout/page-container";
 import { EquipmentManager } from "@/features/equipment/equipment-manager";
 
 export default async function EquipmentPage({
@@ -26,12 +27,12 @@ export default async function EquipmentPage({
           { label: t("breadcrumb"), current: true },
         ]}
       />
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+      <PageContainer width="content">
         <EquipmentManager
           initialItems={equipment.items}
           initialLocationId={locationId}
         />
-      </div>
+      </PageContainer>
     </>
   );
 }
