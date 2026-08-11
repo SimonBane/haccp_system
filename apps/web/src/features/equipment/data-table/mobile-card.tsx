@@ -6,14 +6,9 @@ import {
   RefrigeratorIcon,
   SnowflakeIcon,
   StoreIcon,
-  ThermometerIcon,
 } from "lucide-react";
 import type { useTranslations } from "next-intl";
-import type { ReactNode } from "react";
-import {
-  DataTableMobileCard,
-  DataTableMobileCardBadge,
-} from "@/components/ui/data-table/data-table-mobile-card";
+import { MobileListRow } from "@/components/ui/data-table/data-table-mobile-list";
 import { EquipmentTableRowActions } from "@/features/equipment/data-table/row-actions";
 import { formatTemp } from "@/features/equipment/lib/format";
 
@@ -27,7 +22,7 @@ const EQUIPMENT_TYPE_ICONS: Record<EquipmentType, typeof RefrigeratorIcon> = {
   display_case: StoreIcon,
 };
 
-type EquipmentMobileCardProps = {
+type EquipmentMobileRowProps = {
   row: Row<EquipmentResponse>;
   t: EquipmentTranslations;
   typeLabels: Record<EquipmentType, string>;
@@ -43,21 +38,24 @@ export function EquipmentMobileCard({
   onEdit,
   onDuplicate,
   onDelete,
-}: EquipmentMobileCardProps) {
+}: EquipmentMobileRowProps) {
   const equipment = row.original;
   const TypeIcon = EQUIPMENT_TYPE_ICONS[equipment.type];
 
-  const badges: ReactNode = (
-    <DataTableMobileCardBadge>
-      <TypeIcon className="size-3.5" aria-hidden />
-      {typeLabels[equipment.type]}
-    </DataTableMobileCardBadge>
-  );
-
   return (
-    <DataTableMobileCard
+    <MobileListRow
+      leading={
+        <TypeIcon className="size-5 text-muted-foreground" aria-hidden />
+      }
       title={equipment.name}
-      showChevron
+      subtitle={typeLabels[equipment.type]}
+      // The allowed range is the number this list exists to show, so it goes
+      // in the trailing slot rather than into a label/value row underneath.
+      trailing={
+        <span className="tabular-nums">
+          {formatTemp(equipment.minTempC)} – {formatTemp(equipment.maxTempC)}
+        </span>
+      }
       actions={
         <EquipmentTableRowActions
           row={row}
@@ -67,21 +65,6 @@ export function EquipmentMobileCard({
           onDelete={onDelete}
         />
       }
-      badges={badges}
-      metadata={[
-        {
-          label: t("allowedTempLabel"),
-          value: (
-            <span className="inline-flex items-center gap-1.5 tabular-nums">
-              <ThermometerIcon
-                className="size-3.5 shrink-0 text-muted-foreground"
-                aria-hidden
-              />
-              {formatTemp(equipment.minTempC)} – {formatTemp(equipment.maxTempC)}
-            </span>
-          ),
-        },
-      ]}
     />
   );
 }

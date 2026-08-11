@@ -21,6 +21,25 @@ import { displayName, initials, statusVariant } from "./utils";
  * status or a set of locations *looks like* lives here.
  */
 
+export function EmployeeAvatar({
+  employee,
+  size = "sm",
+}: {
+  employee: EmployeeResponse;
+  size?: "sm" | "md";
+}) {
+  const name = displayName(employee);
+
+  return (
+    <Avatar className={size === "md" ? "size-10" : "size-8"}>
+      {employee.user?.hasImage ? (
+        <AvatarImage src={employee.user.imageUrl} alt={name} />
+      ) : null}
+      <AvatarFallback>{initials(employee)}</AvatarFallback>
+    </Avatar>
+  );
+}
+
 export function EmployeeIdentity({
   employee,
   size = "sm",
@@ -32,12 +51,7 @@ export function EmployeeIdentity({
 
   return (
     <div className="flex items-center gap-3">
-      <Avatar className={size === "md" ? "size-10" : "size-8"}>
-        {employee.user?.hasImage ? (
-          <AvatarImage src={employee.user.imageUrl} alt={name} />
-        ) : null}
-        <AvatarFallback>{initials(employee)}</AvatarFallback>
-      </Avatar>
+      <EmployeeAvatar employee={employee} size={size} />
       <div className="min-w-0">
         <div
           className={cn(

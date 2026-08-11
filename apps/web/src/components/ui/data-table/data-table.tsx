@@ -40,7 +40,9 @@ interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   onRowClick?: (row: Row<TData>) => void;
-  renderMobileCard?: (row: Row<TData>) => React.ReactNode;
+  renderMobileRow?: (row: Row<TData>) => React.ReactNode;
+  /** Swipe-left tray on the mobile list. The row menu remains the a11y path. */
+  renderSwipeActions?: (row: Row<TData>) => React.ReactNode;
   emptyMessage?: string;
   emptyDescription?: string;
   emptyAction?: React.ReactNode;
@@ -91,7 +93,8 @@ export function DataTable<TData, TValue>({
   columns,
   data,
   onRowClick,
-  renderMobileCard,
+  renderMobileRow,
+  renderSwipeActions,
   emptyMessage = "No results.",
   emptyDescription,
   emptyAction,
@@ -119,7 +122,7 @@ export function DataTable<TData, TValue>({
 }: DataTableProps<TData, TValue>) {
   const t = useTranslations("DataTable.selection");
   const isMobile = useIsMobile();
-  const useCardList = isMobile && Boolean(renderMobileCard);
+  const useCardList = isMobile && Boolean(renderMobileRow);
   const [sorting, setSorting] = React.useState<SortingState>(
     initialSorting ?? [],
   );
@@ -203,7 +206,10 @@ export function DataTable<TData, TValue>({
   return (
     <div
       className={cn(
-        "flex min-h-0 flex-1 flex-col gap-1 rounded-md bg-muted/50 p-2 md:gap-2 md:p-3",
+        // No frame around the toolbar and grid. The table already draws its
+        // own card; a tinted, ringed box around that plus the search field
+        // was a second container doing no work.
+        "flex min-h-0 flex-1 flex-col gap-3",
         classNameWrapper,
       )}
     >
@@ -212,13 +218,13 @@ export function DataTable<TData, TValue>({
           <div
             className={cn(
               "flex flex-col gap-2",
-              !useCardList && "sm:flex-row sm:flex-wrap sm:items-end sm:justify-between",
+              !useCardList && "sm:flex-row sm:flex-wrap sm:items-center sm:justify-between",
             )}
           >
             <div
               className={cn(
                 "flex w-full flex-col gap-2",
-                !useCardList && "sm:w-auto sm:flex-row sm:flex-wrap sm:items-end",
+                !useCardList && "sm:w-auto sm:flex-row sm:flex-wrap sm:items-center",
               )}
             >
               {enableSearch && searchColumn ? (
@@ -241,10 +247,11 @@ export function DataTable<TData, TValue>({
         </div>
       ) : null}
 
-      {useCardList && renderMobileCard ? (
+      {useCardList && renderMobileRow ? (
         <DataTableCardList
           table={table}
-          renderMobileCard={renderMobileCard}
+          renderMobileRow={renderMobileRow}
+          renderSwipeActions={renderSwipeActions}
           onRowClick={onRowClick}
           emptyMessage={displayEmptyMessage}
           emptyDescription={isFiltered ? undefined : emptyDescription}
@@ -254,7 +261,7 @@ export function DataTable<TData, TValue>({
       ) : (
       <div
         className={cn(
-          "min-h-0 overflow-auto rounded-md border bg-card px-1 pb-1 shadow-xs md:px-0 md:pb-2",
+          "min-h-0 overflow-auto rounded-md border bg-card shadow-xs",
           className,
         )}
       >
@@ -368,7 +375,9 @@ export function DataTable<TData, TValue>({
       </div>
       )}
 
-      {enablePagination ? (
+      {/* No pager on the mobile list: native lists scroll, and these sets are
+          tens of rows. Search still narrows them. */}
+      {enablePagination && !useCardList ? (
         <div className="shrink-0">
           <DataTablePagination
             table={table}

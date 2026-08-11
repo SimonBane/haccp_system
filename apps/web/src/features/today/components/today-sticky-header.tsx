@@ -13,7 +13,8 @@ import {
   MobileHeaderActions,
   MobileHeaderCenter,
   MobileHeaderTitle,
-} from "@/components/layout/mobile-header-slot";
+} from "@/components/layout/shell-slots";
+import { pageWidthVariants } from "@/components/layout/page-container";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -227,10 +228,11 @@ export function TodayStickyHeader({
   }
 
   return (
-    // md:top-2 matches the m-2 inset card SidebarInset renders on desktop, so
-    // the bar pins flush with the card edge instead of floating above it.
-    <header className="sticky top-2 z-30 rounded-t-xl bg-background backdrop-blur-xl supports-[backdrop-filter]:bg-background/85">
-      <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
+    // top-0, not top-2: the bar sticks inside the shell's scroll region, whose
+    // padding box already starts at the desktop card edge. An offset here
+    // would leave a gap for content to scroll through.
+    <header className="sticky top-0 z-30 rounded-t-xl bg-background backdrop-blur-xl supports-[backdrop-filter]:bg-background/85">
+      <div className={pageWidthVariants({ width: "narrow" })}>
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-2.5">
           <h1 className="min-w-0 truncate text-lg font-semibold tracking-tight sm:text-xl">
             {title}

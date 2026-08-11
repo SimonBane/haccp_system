@@ -5,6 +5,7 @@ import { classifyTemperatureResult, zonedDateString } from "@haccp/shared";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { pageWidthVariants } from "@/components/layout/page-container";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -12,6 +13,7 @@ import { useNow } from "@/hooks/use-now";
 import { useOrgTimeZone } from "@/features/tenant/use-org-timezone";
 import { getErrorMessage } from "@/lib/api/get-error-message";
 import { formatLocalDate, shiftLocalDate } from "@/lib/date";
+import { cn } from "@/lib/utils";
 import { TemperatureRoundFlow } from "./components/temperature-round-flow";
 import { TodayAllDone } from "./components/today-all-done";
 import { TodayEmptyState } from "./components/today-empty-state";
@@ -347,7 +349,7 @@ export function TodayView({
     return (
       <div className="flex flex-1 flex-col">
         {header}
-        <div className="mx-auto w-full max-w-3xl px-4 pt-6 sm:px-6">
+        <div className={cn(pageWidthVariants({ width: "narrow" }), "pt-6")}>
           <Alert>
             <AlertTitle>{t("error.title")}</AlertTitle>
             <AlertDescription>{t("error.description")}</AlertDescription>
@@ -364,7 +366,9 @@ export function TodayView({
     <div className="flex flex-1 flex-col">
       {header}
 
-      <div className="relative mx-auto w-full max-w-3xl px-4 pb-16 sm:px-6">
+      <div
+        className={cn(pageWidthVariants({ width: "narrow" }), "relative pb-16")}
+      >
         {isFetching && response.date !== selectedDate ? (
           <div className="absolute inset-x-0 top-1 z-10 flex justify-center">
             <Spinner className="size-5" />

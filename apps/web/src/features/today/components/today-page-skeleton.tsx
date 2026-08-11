@@ -1,8 +1,10 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { pageWidthVariants } from "@/components/layout/page-container";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 function RowSkeleton() {
   return (
@@ -53,8 +55,15 @@ export function TodayPageSkeleton() {
     <div className="flex flex-1 flex-col" aria-busy="true">
       <span className="sr-only">{t("loading")}</span>
 
-      <header className="sticky top-0 z-30 bg-background pt-[env(safe-area-inset-top)] backdrop-blur-xl md:top-2 md:rounded-t-xl supports-[backdrop-filter]:bg-background/85">
-        <div className="mx-auto flex w-full max-w-3xl items-center gap-2 px-4 py-2.5 sm:px-6">
+      {/* No safe-area padding: this renders below the top bar, which already
+          clears the notch, and inside the scroll region rather than over it. */}
+      <header className="sticky top-0 z-30 bg-background backdrop-blur-xl md:rounded-t-xl supports-[backdrop-filter]:bg-background/85">
+        <div
+          className={cn(
+            pageWidthVariants({ width: "narrow" }),
+            "flex items-center gap-2 py-2.5",
+          )}
+        >
           <Skeleton className="h-6 w-24" />
           <Skeleton className="size-7 rounded-md" />
           <Skeleton className="ml-auto h-5 w-12" />
@@ -65,7 +74,9 @@ export function TodayPageSkeleton() {
         />
       </header>
 
-      <div className="mx-auto w-full max-w-3xl px-4 pt-4 pb-16 sm:px-6">
+      <div
+        className={cn(pageWidthVariants({ width: "narrow" }), "pt-4 pb-16")}
+      >
         <GroupSkeleton rows={2} />
         <GroupSkeleton rows={3} />
         <GroupSkeleton rows={1} />

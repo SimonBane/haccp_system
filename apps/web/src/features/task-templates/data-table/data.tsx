@@ -2,9 +2,11 @@
 
 import type { TaskTemplateResponse, TaskTemplateType } from "@haccp/shared";
 import { useTranslations } from "next-intl";
-import { useCallback, useMemo, type ReactNode } from "react";
+import { useCallback, useMemo } from "react";
+import { PencilIcon, Trash2Icon } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { DataTableAddButton } from "@/components/ui/data-table/data-table-add-button";
+import { MobileListSwipeAction } from "@/components/ui/data-table/data-table-mobile-list";
 import { getColumns } from "@/features/task-templates/data-table/columns";
 import { TaskTemplatesMobileCard } from "@/features/task-templates/data-table/mobile-card";
 
@@ -58,12 +60,26 @@ export function TaskTemplatesData({
     [t, typeLabels, scheduleLabels, onEdit, onDuplicate, onDelete],
   );
 
-  const toolbar = useMemo<ReactNode>(
-    () => <DataTableAddButton onClick={onAdd} label={t("add")} />,
-    [onAdd, t],
+  const renderSwipeActions = useCallback(
+    (row: { original: TaskTemplateResponse }) => (
+      <>
+        <MobileListSwipeAction
+          label={t("edit")}
+          icon={<PencilIcon className="size-4" />}
+          onClick={() => onEdit(row.original)}
+        />
+        <MobileListSwipeAction
+          label={t("delete")}
+          icon={<Trash2Icon className="size-4" />}
+          variant="destructive"
+          onClick={() => onDelete(row.original)}
+        />
+      </>
+    ),
+    [onDelete, onEdit, t],
   );
 
-  const renderMobileCard = useCallback(
+  const renderMobileRow = useCallback(
     (row: Parameters<typeof TaskTemplatesMobileCard>[0]["row"]) => (
       <TaskTemplatesMobileCard
         row={row}
@@ -94,10 +110,10 @@ export function TaskTemplatesData({
       enablePagination
       pageSize={10}
       enableColumnVisibility
-      classNameWrapper="bg-sidebar ring-1 ring-sidebar-border"
+      toolbar={<DataTableAddButton onClick={onAdd} label={t("add")} />}
       onRowClick={(row) => onEdit(row.original)}
-      renderMobileCard={renderMobileCard}
-      toolbar={toolbar}
+      renderMobileRow={renderMobileRow}
+      renderSwipeActions={renderSwipeActions}
     />
   );
 }

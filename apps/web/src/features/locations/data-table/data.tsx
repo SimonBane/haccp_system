@@ -2,9 +2,11 @@
 
 import type { LocationResponse } from "@haccp/shared";
 import { useTranslations } from "next-intl";
-import { useCallback, useMemo, type ReactNode } from "react";
+import { useCallback, useMemo } from "react";
+import { PencilIcon, Trash2Icon } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { DataTableAddButton } from "@/components/ui/data-table/data-table-add-button";
+import { MobileListSwipeAction } from "@/components/ui/data-table/data-table-mobile-list";
 import { getColumns } from "@/features/locations/data-table/columns";
 import { LocationsMobileCard } from "@/features/locations/data-table/mobile-card";
 
@@ -41,12 +43,26 @@ export function LocationsData({
     [t, items.length, settingDefaultId, onRename, onDelete, onSetDefault],
   );
 
-  const toolbar = useMemo<ReactNode>(
-    () => <DataTableAddButton onClick={onAdd} label={t("add")} />,
-    [onAdd, t],
+  const renderSwipeActions = useCallback(
+    (row: { original: LocationResponse }) => (
+      <>
+        <MobileListSwipeAction
+          label={t("rename")}
+          icon={<PencilIcon className="size-4" />}
+          onClick={() => onRename(row.original)}
+        />
+        <MobileListSwipeAction
+          label={t("delete")}
+          icon={<Trash2Icon className="size-4" />}
+          variant="destructive"
+          onClick={() => onDelete(row.original)}
+        />
+      </>
+    ),
+    [onDelete, onRename, t],
   );
 
-  const renderMobileCard = useCallback(
+  const renderMobileRow = useCallback(
     (row: Parameters<typeof LocationsMobileCard>[0]["row"]) => (
       <LocationsMobileCard
         row={row}
@@ -67,15 +83,16 @@ export function LocationsData({
       searchColumn="name"
       searchPlaceholder={t("searchPlaceholder")}
       emptyMessage={t("emptyTitle")}
+      emptyAction={<DataTableAddButton onClick={onAdd} label={t("add")} />}
       noResultsMessage={tTable("noResults")}
       enablePagination={false}
       initialSorting={[
         { id: "default", desc: false }
       ]}
-      classNameWrapper="bg-sidebar ring-1 ring-sidebar-border"
+      toolbar={<DataTableAddButton onClick={onAdd} label={t("add")} />}
       onRowClick={(row) => onRename(row.original)}
-      renderMobileCard={renderMobileCard}
-      toolbar={toolbar}
+      renderMobileRow={renderMobileRow}
+      renderSwipeActions={renderSwipeActions}
     />
   );
 }

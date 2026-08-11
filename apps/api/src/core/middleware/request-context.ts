@@ -7,7 +7,6 @@ import type { AppEnv } from "../../types.js";
 export const requestContextMiddleware = createMiddleware<AppEnv>(
   async (c, next) => {
     const clerkOrgId = c.get("orgId");
-
     if (!clerkOrgId) {
       throw new ForbiddenError("Organization membership required");
     }

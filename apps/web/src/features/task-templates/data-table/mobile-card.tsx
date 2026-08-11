@@ -2,18 +2,15 @@
 
 import type { TaskTemplateResponse, TaskTemplateType } from "@haccp/shared";
 import type { Row } from "@tanstack/react-table";
+import { ClipboardCheckIcon, ThermometerIcon } from "lucide-react";
 import type { useTranslations } from "next-intl";
-import type { ReactNode } from "react";
-import {
-  DataTableMobileCard,
-  DataTableMobileCardBadge,
-} from "@/components/ui/data-table/data-table-mobile-card";
+import { MobileListRow } from "@/components/ui/data-table/data-table-mobile-list";
 import { formatScheduleSummary } from "@/features/task-templates/lib/format-schedule";
 import { TaskTemplatesTableRowActions } from "@/features/task-templates/data-table/row-actions";
 
 type TasksTranslations = ReturnType<typeof useTranslations<"TasksPage">>;
 
-type TaskTemplatesMobileCardProps = {
+type TaskTemplatesMobileRowProps = {
   row: Row<TaskTemplateResponse>;
   t: TasksTranslations;
   typeLabels: Record<TaskTemplateType, string>;
@@ -37,37 +34,44 @@ export function TaskTemplatesMobileCard({
   onEdit,
   onDuplicate,
   onDelete,
-}: TaskTemplatesMobileCardProps) {
+}: TaskTemplatesMobileRowProps) {
   const task = row.original;
-  const scheduleSummary = formatScheduleSummary(
+  const schedule = formatScheduleSummary(
     task.weekdays,
     task.scheduledTimes,
     scheduleLabels,
   );
-  const timesSummary = task.scheduledTimes.join(", ");
 
-  const metadata: { label: string; value: ReactNode }[] = [
-    {
-      label: t("columns.schedule"),
-      value: scheduleSummary,
-    },
-    {
-      label: t("timesLabel"),
-      value: <span className="tabular-nums">{timesSummary}</span>,
-    },
-  ];
-
-  if (task.type === "temperature") {
-    metadata.push({
-      label: t("columns.equipment"),
-      value: task.equipmentName ?? "—",
-    });
-  }
+  // Type, schedule and (for temperature checks) the equipment, on one line —
+  // the three things that distinguish one template from another.
+  const detail = [
+    typeLabels[task.type],
+    schedule,
+    task.type === "temperature" ? task.equipmentName : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
-    <DataTableMobileCard
+    <MobileListRow
+      leading={
+        task.type === "temperature" ? (
+          <ThermometerIcon
+            className="size-5 text-muted-foreground"
+            aria-hidden
+          />
+        ) : (
+          <ClipboardCheckIcon
+            className="size-5 text-muted-foreground"
+            aria-hidden
+          />
+        )
+      }
       title={task.title}
-      showChevron
+      subtitle={detail}
+      trailing={
+        <span className="tabular-nums">{task.scheduledTimes.join(", ")}</span>
+      }
       actions={
         <TaskTemplatesTableRowActions
           row={row}
@@ -77,12 +81,6 @@ export function TaskTemplatesMobileCard({
           onDelete={onDelete}
         />
       }
-      badges={
-        <DataTableMobileCardBadge>
-          {typeLabels[task.type]}
-        </DataTableMobileCardBadge>
-      }
-      metadata={metadata}
     />
   );
 }

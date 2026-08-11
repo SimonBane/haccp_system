@@ -3,6 +3,8 @@
 import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
+import { useScrollContainer } from "@/components/layout/shell-scroll";
+import { ShellOverlay } from "@/components/layout/shell-slots";
 import { Button } from "@/components/ui/button";
 import { scrollToElementId } from "../lib/scroll";
 import { NOW_LINE_ID } from "./today-now-line";
@@ -13,11 +15,15 @@ type Props = {
 };
 
 /**
- * Roughly the sticky header, so the marker does not count as visible under it.
- * Kept well under the marker's own `scroll-mt-28` (112px) landing position, or
- * jumping to it would immediately re-trigger the pill.
+ * Clearance at the top of the scrollport. Only the desktop sticky header sits
+ * inside the region and overlays the marker; on mobile the top bar is chrome
+ * outside it, so a couple of pixels is enough.
+ *
+ * Must stay under the marker's own `scroll-mt-*` landing position, or jumping
+ * to it would immediately re-trigger the pill.
  */
-const TOP_INSET = 72;
+const TOP_INSET_MOBILE = 8;
+const TOP_INSET_DESKTOP = 56;
 /** Keeps the pill from flickering as the marker grazes the bottom edge. */
 const BOTTOM_INSET = 64;
 
@@ -33,10 +39,11 @@ const BOTTOM_INSET = 64;
  */
 export function TodayJumpToNow({ nowLineIndex }: Props) {
   const t = useTranslations("TodayPage");
+  const scroller = useScrollContainer();
   const [direction, setDirection] = useState<"up" | "down" | null>(null);
 
   useEffect(() => {
-    if (nowLineIndex === null) return;
+    if (nowLineIndex === null || !scroller) return;
 
     let frame = 0;
 
@@ -45,11 +52,19 @@ export function TodayJumpToNow({ nowLineIndex }: Props) {
       const element = document.getElementById(NOW_LINE_ID);
       if (!element) return;
 
+      // Measured against the scrollport, not the viewport: the region is
+      // inset by the top bar and by the desktop card's own margin, and
+      // window.innerHeight knows about neither.
+      const port = scroller.getBoundingClientRect();
+      const topInset =
+        port.width < 768 ? TOP_INSET_MOBILE : TOP_INSET_DESKTOP;
       const { top, bottom } = element.getBoundingClientRect();
       const isVisible =
-        bottom > TOP_INSET && top < window.innerHeight - BOTTOM_INSET;
+        bottom > port.top + topInset && top < port.bottom - BOTTOM_INSET;
 
-      setDirection(isVisible ? null : top < TOP_INSET ? "up" : "down");
+      setDirection(
+        isVisible ? null : top < port.top + topInset ? "up" : "down",
+      );
     };
 
     const schedule = () => {
@@ -57,34 +72,39 @@ export function TodayJumpToNow({ nowLineIndex }: Props) {
     };
 
     schedule();
-    window.addEventListener("scroll", schedule, { passive: true });
-    window.addEventListener("resize", schedule, { passive: true });
+    scroller.addEventListener("scroll", schedule, { passive: true });
+    // Catches what `resize` misses: the top bar changing height, the software
+    // keyboard, and the desktop sidebar collapsing.
+    const observer = new ResizeObserver(schedule);
+    observer.observe(scroller);
 
     return () => {
       if (frame) cancelAnimationFrame(frame);
-      window.removeEventListener("scroll", schedule);
-      window.removeEventListener("resize", schedule);
+      scroller.removeEventListener("scroll", schedule);
+      observer.disconnect();
     };
-  }, [nowLineIndex]);
+  }, [nowLineIndex, scroller]);
 
   // Gated on the render path rather than cleared inside the effect: a stale
   // direction simply stays hidden until the next measurement.
   if (nowLineIndex === null || !direction) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-[max(1.5rem,calc(env(safe-area-inset-bottom)+0.75rem))] z-40 flex justify-center">
-      <Button
-        size="sm"
-        className="pointer-events-auto h-9 gap-1.5 rounded-full px-4 shadow-lg motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2"
-        onClick={() => scrollToElementId(NOW_LINE_ID)}
-      >
-        {direction === "up" ? (
-          <ArrowUpIcon className="size-3.5" />
-        ) : (
-          <ArrowDownIcon className="size-3.5" />
-        )}
-        {t("timeline.jumpToNow")}
-      </Button>
-    </div>
+    <ShellOverlay>
+      <div className="absolute inset-x-0 bottom-3 flex justify-center">
+        <Button
+          size="sm"
+          className="pointer-events-auto h-9 gap-1.5 rounded-full px-4 shadow-lg motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2"
+          onClick={() => scrollToElementId(NOW_LINE_ID)}
+        >
+          {direction === "up" ? (
+            <ArrowUpIcon className="size-3.5" />
+          ) : (
+            <ArrowDownIcon className="size-3.5" />
+          )}
+          {t("timeline.jumpToNow")}
+        </Button>
+      </div>
+    </ShellOverlay>
   );
 }

@@ -7,6 +7,7 @@ import {
 } from "@/lib/api-client";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { DashboardPageHeader } from "@/components/layout/dashboard-page-header";
+import { PageContainer } from "@/components/layout/page-container";
 import { TaskTemplatesManager } from "@/features/task-templates/task-templates-manager";
 
 export default async function TaskTemplatesPage({
@@ -37,13 +38,13 @@ export default async function TaskTemplatesPage({
           { label: t("breadcrumb"), current: true },
         ]}
       />
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+      <PageContainer width="content">
         <TaskTemplatesManager
           initialItems={taskTemplates.items}
           initialEquipment={equipment.items}
           initialLocationId={locationId}
         />
-      </div>
+      </PageContainer>
     </>
   );
 }
