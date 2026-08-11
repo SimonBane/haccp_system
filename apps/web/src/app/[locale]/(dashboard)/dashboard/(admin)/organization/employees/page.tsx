@@ -2,6 +2,7 @@ import { type Locale } from "@/i18n/routing";
 import { listEmployees } from "@/lib/api-client";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { DashboardPageHeader } from "@/components/layout/dashboard-page-header";
+import { PageContainer } from "@/components/layout/page-container";
 import { EmployeesManager } from "@/features/employees/employees-manager";
 
 export default async function OrganizationEmployeesPage({
@@ -26,9 +27,9 @@ export default async function OrganizationEmployeesPage({
           { label: t("breadcrumb"), current: true },
         ]}
       />
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+      <PageContainer width="content">
         <EmployeesManager initialItems={employees.items} />
-      </div>
+      </PageContainer>
     </>
   );
 }

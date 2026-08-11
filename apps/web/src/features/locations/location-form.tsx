@@ -3,28 +3,18 @@
 import type { LocationResponse } from "@haccp/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useZodErrorMap } from "@/lib/forms/zod-error-map";
-import { PlusIcon, SaveIcon } from "lucide-react";
+import { CheckIcon, PlusIcon, SaveIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo } from "react";
-import { Controller, useForm, useFormState } from "react-hook-form";
+import { useForm, useFormState } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  REQUIRED_LABEL_CLASS,
-  Field,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
+import { DialogFooter } from "@/components/ui/dialog";
+import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
+import { FieldGroup } from "@/components/ui/field";
+import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type LocationFormProps = {
   open: boolean;
@@ -42,6 +32,7 @@ export function LocationForm({
   onSubmit,
 }: LocationFormProps) {
   const t = useTranslations("LocationsPage");
+  const isMobile = useIsMobile();
   const isEditing = Boolean(location);
 
   const locationFormSchema = useMemo(
@@ -81,71 +72,73 @@ export function LocationForm({
     onOpenChange(false);
   });
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
-            {isEditing ? t("editTitle") : t("addTitle")}
-          </DialogTitle>
-          <DialogDescription>
-            {isEditing ? t("editDescription") : t("addDescription")}
-          </DialogDescription>
-        </DialogHeader>
+  const formFooter = (
+    <DialogFooter>
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => onOpenChange(false)}
+      >
+        {t("cancel")}
+      </Button>
+      <Button
+        type="submit"
+        form={LOCATION_FORM_ID}
+        isLoading={isSubmitting}
+        disabled={isEditing && !hasChanges}
+      >
+        {isMobile ? (
+          <>
+            <CheckIcon data-icon="inline-start" />
+            {isEditing ? t("save") : t("add")}
+          </>
+        ) : isEditing ? (
+          <>
+            <SaveIcon data-icon="inline-start" />
+            {t("save")}
+          </>
+        ) : (
+          <>
+            <PlusIcon data-icon="inline-start" />
+            {t("add")}
+          </>
+        )}
+      </Button>
+    </DialogFooter>
+  );
 
-        <form id={LOCATION_FORM_ID} className="space-y-4" onSubmit={handleSubmit}>
+  return (
+    <ResponsiveFormDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      // One field — a content-height sheet, not a whole screen.
+      mobileVariant="sheet"
+      title={isEditing ? t("editTitle") : t("addTitle")}
+      description={isEditing ? t("editDescription") : t("addDescription")}
+      closeLabel={t("cancel")}
+      footer={formFooter}
+    >
+      <form id={LOCATION_FORM_ID} className="space-y-4" onSubmit={handleSubmit}>
           <FieldGroup>
-            <Controller
+            <FormField
               control={form.control}
               name="name"
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="location-name" className={REQUIRED_LABEL_CLASS}>
-                    {t("nameLabel")}
-                  </FieldLabel>
-                  <Input
-                    {...field}
-                    id="location-name"
-                    autoComplete="off"
-                    placeholder={t("namePlaceholder")}
-                  />
-                  {fieldState.error ? (
-                    <FieldError errors={[fieldState.error]} />
-                  ) : null}
-                </Field>
+              htmlFor="location-name"
+              label={t("nameLabel")}
+              required
+            >
+              {({ field, id }) => (
+                <Input
+                  {...field}
+                  id={id}
+                  autoComplete="off"
+                  enterKeyHint="done"
+                  placeholder={t("namePlaceholder")}
+                />
               )}
-            />
+            </FormField>
           </FieldGroup>
-        </form>
-
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-          >
-            {t("cancel")}
-          </Button>
-          <Button
-            type="submit"
-            form={LOCATION_FORM_ID}
-            isLoading={isSubmitting}
-            disabled={isEditing && !hasChanges}
-          >
-            {isEditing ? (
-              <>
-                <SaveIcon data-icon="inline-start" />
-                {t("save")}
-              </>
-            ) : (
-              <>
-                <PlusIcon data-icon="inline-start" />
-                {t("add")}
-              </>
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </form>
+    </ResponsiveFormDialog>
   );
 }

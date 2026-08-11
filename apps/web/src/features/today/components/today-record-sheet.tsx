@@ -59,6 +59,8 @@ export function TodayRecordSheet({
     <ResponsiveFormDialog
       open={open}
       onOpenChange={onOpenChange}
+      // Read-only detail with two buttons — a whole screen would be overkill.
+      mobileVariant="sheet"
       title={task.title}
       description={
         <>

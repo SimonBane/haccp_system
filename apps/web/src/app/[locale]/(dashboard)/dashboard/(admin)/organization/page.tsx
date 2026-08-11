@@ -2,6 +2,7 @@ import { type Locale } from "@/i18n/routing";
 import { getTenantContext } from "@/lib/api-client";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { DashboardPageHeader } from "@/components/layout/dashboard-page-header";
+import { PageContainer } from "@/components/layout/page-container";
 import { OrganizationSettingsForm } from "@/features/organization/organization-settings-form";
 
 export default async function OrganizationPage({
@@ -20,9 +21,9 @@ export default async function OrganizationPage({
       <DashboardPageHeader
         breadcrumbs={[{ label: t("breadcrumb"), current: true }]}
       />
-      <div className="flex flex-1 flex-col">
+      <PageContainer width="narrow">
         <OrganizationSettingsForm initialOrganization={tenant.organization} />
-      </div>
+      </PageContainer>
     </>
   );
 }

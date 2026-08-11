@@ -59,11 +59,17 @@ export async function generateMetadata({
 export function generateViewport() {
   return {
     // Match the painted canvas so splash / chrome blend with the app surface.
+    // These track --background, which is what the top bar paints; the previous
+    // dark value was --sidebar and read as a lighter band above the content.
     themeColor: [
       { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-      { media: "(prefers-color-scheme: dark)", color: "#252525" },
+      { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
     ],
     viewportFit: "cover",
+    // The shell is a locked, fixed-height column, so the software keyboard has
+    // nothing to scroll out of its way. Resizing the viewport instead keeps a
+    // focused field — and a pinned form footer — above it.
+    interactiveWidget: "resizes-content",
   };
 }
 
@@ -92,15 +98,12 @@ export default async function LocaleLayout({
         <ServiceWorkerRegistration />
         <QueryProvider>
           <TooltipProvider>
-            <div className="flex min-h-svh flex-col bg-background">
+            {/* Neutral full-height column: wraps both the dashboard and the
+                auth pages, each of which decides for itself what scrolls. */}
+            <div className="flex h-full min-h-0 flex-col bg-background">
               {children}
             </div>
-            <Toaster
-              position="top-center"
-              offset={{
-                top: "max(0.5rem, env(safe-area-inset-top, 0px))",
-              }}
-            />
+            <Toaster position="bottom-right" />
           </TooltipProvider>
         </QueryProvider>
       </NextIntlClientProvider>

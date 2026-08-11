@@ -1,6 +1,7 @@
 import { type Locale } from "@/i18n/routing";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
+import { CenteredShell } from "@/components/layout/centered-shell";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -21,7 +22,7 @@ export default async function NoOrganizationPage({
   const t = await getTranslations("NoOrganizationPage");
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center p-safe">
+    <CenteredShell>
       <Card className="w-full max-w-lg">
         <CardHeader>
           <CardTitle>{t("title")}</CardTitle>
@@ -33,6 +34,6 @@ export default async function NoOrganizationPage({
           </Link>
         </CardContent>
       </Card>
-    </div>
+    </CenteredShell>
   );
 }

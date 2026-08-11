@@ -4,16 +4,16 @@ import { PanelLeftIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { useSidebar } from "@/components/ui/sidebar";
-import { useMobileHeaderSlotRef } from "@/components/layout/mobile-header-slot";
+import { useShellSlotRef } from "@/components/layout/shell-slots";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export function MobileTopBar() {
   const t = useTranslations("Sidebar");
   const isMobile = useIsMobile();
   const { toggleSidebar } = useSidebar();
-  const titleRef = useMobileHeaderSlotRef("title");
-  const centerRef = useMobileHeaderSlotRef("center");
-  const actionsRef = useMobileHeaderSlotRef("actions");
+  const titleRef = useShellSlotRef("title");
+  const centerRef = useShellSlotRef("center");
+  const actionsRef = useShellSlotRef("actions");
 
   // Kept out of the desktop tree entirely so pages can render their slot
   // content unconditionally without it landing in a hidden duplicate bar.
@@ -22,7 +22,10 @@ export function MobileTopBar() {
   }
 
   return (
-    <header className="sticky top-0 z-40 bg-background pt-[var(--safe-area-inset-top,env(safe-area-inset-top,0px))] md:hidden">
+    // Not sticky: the shell is a fixed-height flex column, so this is simply a
+    // sibling of the scroll region and cannot scroll at all. relative z-10
+    // keeps it painting above the region that follows it.
+    <header className="relative z-10 shrink-0 bg-background pt-[var(--safe-area-inset-top,env(safe-area-inset-top,0px))] md:hidden">
       <div className="flex h-14 items-center gap-1 px-2">
         <Button
           variant="outline"

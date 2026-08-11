@@ -59,7 +59,7 @@ const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
       <InputGroup
         className={cn(
           "w-[250px]",
-          size === "sm" ? "h-8" : "h-10",
+          size === "sm" ? "h-8" : "h-(--control-h)",
           className,
         )}
       >
