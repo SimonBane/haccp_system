@@ -10,7 +10,7 @@ import {
 import { useAuth } from "@clerk/nextjs";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useZodErrorMap } from "@/lib/forms/zod-error-map";
-import { SaveIcon, SendIcon } from "lucide-react";
+import { CheckIcon, SaveIcon, SendIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Controller, useForm, useFormState, useWatch } from "react-hook-form";
@@ -19,6 +19,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
 import { DialogFooter } from "@/components/ui/dialog";
+import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
 import {
   REQUIRED_LABEL_CLASS,
   Field,
@@ -28,14 +29,6 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  Popover,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -303,12 +296,101 @@ export function EmployeeForm({
     }
   };
 
+  const formFooter = (
+      <DialogFooter>
+        {!isEditing ? (
+          <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              isLoading={pendingAction === "save"}
+              disabled={pendingAction !== null && pendingAction !== "save"}
+              onClick={() => void submit(false)}
+            >
+              <SaveIcon data-icon="inline-start" />
+              {t("save")}
+            </Button>
+            <Button
+              type="button"
+              isLoading={pendingAction === "invite"}
+              disabled={pendingAction !== null && pendingAction !== "invite"}
+              onClick={() => void submit(true)}
+            >
+              <SendIcon data-icon="inline-start" />
+              {t("saveAndInvite")}
+            </Button>
+          </div>
+        ) : (
+          <Button
+            type="button"
+            isLoading={pendingAction === "save"}
+            disabled={
+              !hasChanges ||
+              (pendingAction !== null && pendingAction !== "save")
+            }
+            onClick={() => void submitEdit()}
+          >
+            <SaveIcon data-icon="inline-start" />
+            {t("save")}
+          </Button>
+        )}
+      </DialogFooter>
+  );
+
+  // Two ways to finish a new employee, so the mobile nav-bar icon opens a
+  // choice rather than guessing which one was meant.
+  const submitAction = isEditing
+    ? {
+        label: t("save"),
+        icon: <CheckIcon className="size-5" />,
+        isLoading: pendingAction === "save",
+        disabled:
+          !hasChanges || (pendingAction !== null && pendingAction !== "save"),
+        onClick: () => void submitEdit(),
+      }
+    : {
+        label: t("save"),
+        icon: <CheckIcon className="size-5" />,
+        disabled: pendingAction !== null,
+        options: [
+          {
+            label: t("save"),
+            icon: <SaveIcon data-icon="inline-start" />,
+            isLoading: pendingAction === "save",
+            disabled: pendingAction !== null && pendingAction !== "save",
+            onClick: () => void submit(false),
+          },
+          {
+            label: t("saveAndInvite"),
+            icon: <SendIcon data-icon="inline-start" />,
+            isLoading: pendingAction === "invite",
+            disabled: pendingAction !== null && pendingAction !== "invite",
+            onClick: () => void submit(true),
+          },
+        ],
+      };
+
   return (
-    <ResponsiveFormDialog
+    <>
+      <ResponsiveAlertDialog
+        open={resendConfirmOpen}
+        onOpenChange={handleResendConfirmOpenChange}
+        title={t("resendDialog.title")}
+        description={t("resendDialog.confirm")}
+        cancelLabel={t("resendDialog.cancel")}
+        cancelDisabled={isResending}
+        confirmLabel={t("resendDialog.confirmAction")}
+        isLoading={isResending}
+        onConfirm={() => void confirmResend()}
+      />
+      <ResponsiveFormDialog
       open={open}
       onOpenChange={handleDialogOpenChange}
       title={isEditing ? t("editTitle") : t("addTitle")}
       description={isEditing ? t("editDescription") : t("addDescription")}
+      closeLabel={t("cancel")}
+      submit={submitAction}
+      footer={formFooter}
     >
         <form id={EMPLOYEE_FORM_ID} className="space-y-6">
           <FieldGroup>
@@ -324,6 +406,8 @@ export function EmployeeForm({
                     {...field}
                     id="employee-email"
                     type="email"
+                    inputMode="email"
+                    enterKeyHint="next"
                     autoComplete="off"
                     disabled={isActive}
                     placeholder={t("emailPlaceholder")}
@@ -481,82 +565,8 @@ export function EmployeeForm({
             ) : null}
           </FieldGroup>
 
-          <DialogFooter>
-            {!isEditing ? (
-              <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  isLoading={pendingAction === "save"}
-                  disabled={pendingAction !== null && pendingAction !== "save"}
-                  onClick={() => void submit(false)}
-                >
-                  <SaveIcon data-icon="inline-start" />
-                  {t("save")}
-                </Button>
-                <Button
-                  type="button"
-                  isLoading={pendingAction === "invite"}
-                  disabled={pendingAction !== null && pendingAction !== "invite"}
-                  onClick={() => void submit(true)}
-                >
-                  <SendIcon data-icon="inline-start" />
-                  {t("saveAndInvite")}
-                </Button>
-              </div>
-            ) : (
-              <Popover
-                open={resendConfirmOpen}
-                onOpenChange={handleResendConfirmOpenChange}
-              >
-                <PopoverTrigger
-                  render={
-                    <Button
-                      type="button"
-                      isLoading={pendingAction === "save"}
-                      disabled={
-                        !hasChanges ||
-                        (pendingAction !== null && pendingAction !== "save")
-                      }
-                      onClick={() => void submitEdit()}
-                    />
-                  }
-                >
-                  <SaveIcon data-icon="inline-start" />
-                  {t("save")}
-                </PopoverTrigger>
-                <PopoverContent side="bottom" align="center">
-                  <PopoverHeader>
-                    <PopoverTitle>{t("resendDialog.title")}</PopoverTitle>
-                    <PopoverDescription>
-                      {t("resendDialog.confirm")}
-                    </PopoverDescription>
-                  </PopoverHeader>
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={isResending}
-                      onClick={() => setResendConfirmOpen(false)}
-                    >
-                      {t("resendDialog.cancel")}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      isLoading={isResending}
-                      disabled={isResending}
-                      onClick={() => void confirmResend()}
-                    >
-                      {t("resendDialog.confirmAction")}
-                    </Button>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            )}
-          </DialogFooter>
         </form>
-    </ResponsiveFormDialog>
+      </ResponsiveFormDialog>
+    </>
   );
 }

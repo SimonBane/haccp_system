@@ -2,9 +2,11 @@
 
 import type { EmployeeResponse } from "@haccp/shared";
 import { useTranslations } from "next-intl";
-import { useCallback, useMemo, type ReactNode } from "react";
+import { useCallback, useMemo } from "react";
+import { PencilIcon, Trash2Icon } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { DataTableAddButton } from "@/components/ui/data-table/data-table-add-button";
+import { MobileListSwipeAction } from "@/components/ui/data-table/data-table-mobile-list";
 import { getColumns } from "@/features/employees/data-table/columns";
 import { EmployeesMobileCard } from "@/features/employees/data-table/mobile-card";
 import { useTenant } from "@/features/tenant/tenant-provider";
@@ -44,12 +46,26 @@ export function EmployeesData({
     [t, showLocationsColumn, onEdit, onInvite, onRevokeInvitation, onDelete],
   );
 
-  const toolbar = useMemo<ReactNode>(
-    () => <DataTableAddButton onClick={onAdd} label={t("add")} />,
-    [onAdd, t],
+  const renderSwipeActions = useCallback(
+    (row: { original: EmployeeResponse }) => (
+      <>
+        <MobileListSwipeAction
+          label={t("edit")}
+          icon={<PencilIcon className="size-4" />}
+          onClick={() => onEdit(row.original)}
+        />
+        <MobileListSwipeAction
+          label={t("delete")}
+          icon={<Trash2Icon className="size-4" />}
+          variant="destructive"
+          onClick={() => onDelete(row.original)}
+        />
+      </>
+    ),
+    [onDelete, onEdit, t],
   );
 
-  const renderMobileCard = useCallback(
+  const renderMobileRow = useCallback(
     (row: Parameters<typeof EmployeesMobileCard>[0]["row"]) => (
       <EmployeesMobileCard
         row={row}
@@ -71,13 +87,14 @@ export function EmployeesData({
       searchColumn="employee"
       searchPlaceholder={t("searchPlaceholder")}
       emptyMessage={t("emptyTitle")}
+      emptyAction={<DataTableAddButton onClick={onAdd} label={t("add")} />}
       noResultsMessage={tTable("noResults")}
       enablePagination
       pageSize={10}
-      classNameWrapper="bg-sidebar ring-1 ring-sidebar-border"
+      toolbar={<DataTableAddButton onClick={onAdd} label={t("add")} />}
       onRowClick={(row) => onEdit(row.original)}
-      renderMobileCard={renderMobileCard}
-      toolbar={toolbar}
+      renderMobileRow={renderMobileRow}
+      renderSwipeActions={renderSwipeActions}
     />
   );
 }

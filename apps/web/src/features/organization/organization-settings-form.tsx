@@ -3,8 +3,12 @@
 import type { OrganizationResponse } from "@haccp/shared";
 import { useTranslations } from "next-intl";
 import { TriangleAlertIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { Controller, useForm, useFormState } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/layout/page-header";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,9 +26,9 @@ import {
   FieldContent,
   FieldDescription,
   FieldGroup,
-  FieldLabel,
   FieldTitle,
 } from "@/components/ui/field";
+import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -36,8 +40,23 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useTenant } from "@/features/tenant/tenant-provider";
 import { getErrorMessage } from "@/lib/api/get-error-message";
+import { useZodErrorMap } from "@/lib/forms/zod-error-map";
 
 type SettingsSection = "general" | "regional" | "locations";
+
+type SettingsValues = {
+  name: string;
+  timezone: string;
+  locale: OrganizationResponse["locale"];
+  multipleLocationsEnabled: boolean;
+};
+
+/** Which fields each card owns — drives both its dirty state and its save. */
+const SECTION_FIELDS = {
+  general: ["name"],
+  regional: ["timezone", "locale"],
+  locations: ["multipleLocationsEnabled"],
+} as const satisfies Record<SettingsSection, readonly (keyof SettingsValues)[]>;
 
 type OrganizationSettingsFormProps = {
   initialOrganization: OrganizationResponse;
@@ -63,14 +82,10 @@ export function OrganizationSettingsForm({
     [t],
   );
 
-  const [name, setName] = useState(initialOrganization.name);
-  const [timezone, setTimezone] = useState(initialOrganization.timezone);
-  const [locale, setLocale] = useState(initialOrganization.locale);
-  const [multipleLocationsEnabled, setMultipleLocationsEnabled] = useState(
-    initialOrganization.multipleLocationsEnabled,
-  );
   const [showMultipleLocationsDisableWarning, setShowMultipleLocationsDisableWarning] =
     useState(false);
+  // One flag per card, not react-hook-form's single `isSubmitting`: the three
+  // sections save independently and must be able to be in flight separately.
   const [submittingSections, setSubmittingSections] = useState<
     Record<SettingsSection, boolean>
   >({
@@ -79,53 +94,72 @@ export function OrganizationSettingsForm({
     locations: false,
   });
 
-  const isGeneralDirty = name !== organization.name;
-  const isRegionalDirty =
-    timezone !== organization.timezone || locale !== organization.locale;
-  const isLocationsDirty =
-    multipleLocationsEnabled !== organization.multipleLocationsEnabled;
+  const zodErrorMap = useZodErrorMap();
+  const settingsSchema = useMemo(
+    () =>
+      z.object({
+        name: z.string().trim().min(1).max(256),
+        timezone: z.string().min(1),
+        locale: z.enum(["bg", "en"]),
+        multipleLocationsEnabled: z.boolean(),
+      }),
+    [],
+  );
+
+  const form = useForm<SettingsValues>({
+    resolver: zodResolver(settingsSchema, { error: zodErrorMap }),
+    defaultValues: {
+      name: initialOrganization.name,
+      timezone: initialOrganization.timezone,
+      locale: initialOrganization.locale,
+      multipleLocationsEnabled: initialOrganization.multipleLocationsEnabled,
+    },
+  });
+
+  const { dirtyFields } = useFormState({ control: form.control });
+  const isSectionDirty = useCallback(
+    (section: SettingsSection) =>
+      SECTION_FIELDS[section].some((field) => dirtyFields[field]),
+    [dirtyFields],
+  );
+
   const cannotDisableMultipleLocations =
     showMultipleLocationsDisableWarning && locations.length > 1;
 
-  function handleMultipleLocationsChange(checked: boolean) {
-    if (!checked && locations.length > 1) {
-      setShowMultipleLocationsDisableWarning(true);
-      return;
-    }
-
-    setShowMultipleLocationsDisableWarning(false);
-    setMultipleLocationsEnabled(checked);
-  }
-
   async function saveSection(section: SettingsSection) {
-    const isSectionDirty =
-      section === "general"
-        ? isGeneralDirty
-        : section === "regional"
-          ? isRegionalDirty
-          : isLocationsDirty;
-
-    if (!isSectionDirty || submittingSections[section]) {
+    if (!isSectionDirty(section) || submittingSections[section]) {
       return;
     }
 
+    // Validate only this card's fields — a half-filled field in another
+    // section must not block the one being saved.
+    if (!(await form.trigger(SECTION_FIELDS[section]))) {
+      return;
+    }
+
+    const values = form.getValues();
     setSubmittingSections((current) => ({ ...current, [section]: true }));
 
     try {
       if (section === "general") {
-        await updateName.mutateAsync({ name });
+        await updateName.mutateAsync({ name: values.name });
       } else if (section === "regional") {
         await updateSettings.mutateAsync({
-          ...(timezone !== organization.timezone ? { timezone } : {}),
-          ...(locale !== organization.locale ? { locale } : {}),
+          ...(dirtyFields.timezone ? { timezone: values.timezone } : {}),
+          ...(dirtyFields.locale ? { locale: values.locale } : {}),
         });
       } else {
         await updateSettings.mutateAsync({
-          multipleLocationsEnabled,
+          multipleLocationsEnabled: values.multipleLocationsEnabled,
         });
       }
 
       await reloadTenant();
+      // Re-baseline just this section, so saving one card does not clear the
+      // unsaved-changes state of another.
+      for (const field of SECTION_FIELDS[section]) {
+        form.resetField(field, { defaultValue: values[field] });
+      }
       if (section === "locations") {
         setShowMultipleLocationsDisableWarning(false);
       }
@@ -138,7 +172,9 @@ export function OrganizationSettingsForm({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pt-4 pb-16 sm:px-6">
+    <>
+      <PageHeader title={t("title")} description={t("description")} />
+
       <Card className="gap-0 p-0">
         <CardHeader className={settingsCardHeaderClassName}>
           <CardTitle>{t("sections.general.title")}</CardTitle>
@@ -146,15 +182,17 @@ export function OrganizationSettingsForm({
         <CardContent className="px-(--card-spacing) pb-(--card-spacing)">
           <FieldGroup>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:items-start">
-              <Field>
-                <FieldLabel htmlFor="organization-name">{t("name")}</FieldLabel>
-                <Input
-                  id="organization-name"
-                  maxLength={256}
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                />
-              </Field>
+              <FormField
+                control={form.control}
+                name="name"
+                htmlFor="organization-name"
+                label={t("name")}
+                required
+              >
+                {({ field, id }) => (
+                  <Input {...field} id={id} maxLength={256} />
+                )}
+              </FormField>
 
               <OrganizationLogoUpload organization={organization} />
             </div>
@@ -162,7 +200,7 @@ export function OrganizationSettingsForm({
         </CardContent>
         <CardFooter className={settingsCardFooterClassName}>
           <Button
-            disabled={!isGeneralDirty}
+            disabled={!isSectionDirty("general")}
             isLoading={submittingSections.general}
             onClick={() => void saveSection("general")}
             size="sm"
@@ -179,37 +217,49 @@ export function OrganizationSettingsForm({
         </CardHeader>
         <CardContent className="px-(--card-spacing) pb-(--card-spacing)">
           <FieldGroup>
-            <Field>
-              <FieldLabel htmlFor="timezone">{t("timezone")}</FieldLabel>
-              <TimezonePicker
-                id="timezone"
-                value={timezone}
-                onValueChange={setTimezone}
-              />
-            </Field>
+            <FormField
+              control={form.control}
+              name="timezone"
+              htmlFor="timezone"
+              label={t("timezone")}
+            >
+              {({ field, id }) => (
+                <TimezonePicker
+                  id={id}
+                  value={field.value}
+                  onValueChange={field.onChange}
+                />
+              )}
+            </FormField>
 
-            <Field>
-              <FieldLabel>{t("locale")}</FieldLabel>
-              <Select
-                value={locale}
-                onValueChange={(value) =>
-                  setLocale(value as OrganizationResponse["locale"])
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue>{localeLabels[locale]}</SelectValue>
-                </SelectTrigger>
-                <SelectContent alignItemWithTrigger={false}>
-                  <SelectItem value="bg">{t("localeBg")}</SelectItem>
-                  <SelectItem value="en">{t("localeEn")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
+            <FormField
+              control={form.control}
+              name="locale"
+              htmlFor="organization-locale"
+              label={t("locale")}
+            >
+              {({ field, id }) => (
+                <Select
+                  value={field.value}
+                  onValueChange={(value) =>
+                    field.onChange(value as OrganizationResponse["locale"])
+                  }
+                >
+                  <SelectTrigger id={id}>
+                    <SelectValue>{localeLabels[field.value]}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent alignItemWithTrigger={false}>
+                    <SelectItem value="bg">{t("localeBg")}</SelectItem>
+                    <SelectItem value="en">{t("localeEn")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            </FormField>
           </FieldGroup>
         </CardContent>
         <CardFooter className={settingsCardFooterClassName}>
           <Button
-            disabled={!isRegionalDirty}
+            disabled={!isSectionDirty("regional")}
             isLoading={submittingSections.regional}
             onClick={() => void saveSection("regional")}
             size="sm"
@@ -232,11 +282,27 @@ export function OrganizationSettingsForm({
                 {t("multipleLocationsDescription")}
               </FieldDescription>
             </FieldContent>
-            <Switch
-              id="multiple-locations"
-              checked={multipleLocationsEnabled}
-              onCheckedChange={handleMultipleLocationsChange}
-              size="lg"
+            <Controller
+              control={form.control}
+              name="multipleLocationsEnabled"
+              render={({ field }) => (
+                <Switch
+                  id="multiple-locations"
+                  checked={field.value}
+                  onCheckedChange={(checked) => {
+                    // Turning this off with more than one location would
+                    // orphan the extras, so refuse and explain rather than
+                    // letting the save fail server-side.
+                    if (!checked && locations.length > 1) {
+                      setShowMultipleLocationsDisableWarning(true);
+                      return;
+                    }
+                    setShowMultipleLocationsDisableWarning(false);
+                    field.onChange(checked);
+                  }}
+                  size="lg"
+                />
+              )}
             />
           </Field>
           {cannotDisableMultipleLocations ? (
@@ -255,7 +321,7 @@ export function OrganizationSettingsForm({
         </CardContent>
         <CardFooter className={settingsCardFooterClassName}>
           <Button
-            disabled={!isLocationsDirty}
+            disabled={!isSectionDirty("locations")}
             isLoading={submittingSections.locations}
             onClick={() => void saveSection("locations")}
             size="sm"
@@ -265,6 +331,6 @@ export function OrganizationSettingsForm({
           </Button>
         </CardFooter>
       </Card>
-    </div>
+    </>
   );
 }

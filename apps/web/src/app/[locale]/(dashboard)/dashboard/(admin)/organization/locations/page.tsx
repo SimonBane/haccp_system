@@ -3,6 +3,7 @@ import { getTenantContext } from "@/lib/api-client";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { DashboardPageHeader } from "@/components/layout/dashboard-page-header";
+import { PageContainer } from "@/components/layout/page-container";
 import { LocationsManager } from "@/features/locations/locations-manager";
 
 export default async function OrganizationLocationsPage({
@@ -34,9 +35,9 @@ export default async function OrganizationLocationsPage({
           { label: t("breadcrumb"), current: true },
         ]}
       />
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+      <PageContainer width="content">
         <LocationsManager initialItems={tenant.locations} />
-      </div>
+      </PageContainer>
     </>
   );
 }

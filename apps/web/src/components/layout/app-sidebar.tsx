@@ -78,7 +78,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   );
 
   return (
-    <Sidebar variant="inset" {...props}>
+    <Sidebar variant="inset" aria-label={t("navigation")} {...props}>
       <SidebarHeader>
         <SidebarMenu>
           {hasLocationSwitcher ? (

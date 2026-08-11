@@ -370,6 +370,13 @@ export function TaskTemplatesForm({
             : t("addDescription")
       }
       initialFocus={isEditing || isDuplicating ? undefined : false}
+      closeLabel={t("cancel")}
+      submit={{
+        label: isEditing ? t("save") : t("add"),
+        formId: TASK_TEMPLATES_FORM_ID,
+        isLoading: isSubmitting,
+        disabled: isEditing && !hasChanges,
+      }}
       footer={formFooter}
     >
         <form

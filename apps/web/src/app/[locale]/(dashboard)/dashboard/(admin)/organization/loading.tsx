@@ -1,11 +1,12 @@
 import { DashboardLoadingHeader } from "@/components/layout/dashboard-loading-header";
+import { PageContainer } from "@/components/layout/page-container";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function OrganizationLoading() {
   return (
     <>
       <DashboardLoadingHeader />
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+      <PageContainer width="narrow">
         <div className="hidden md:block">
           <Skeleton className="h-8 w-48" />
           <Skeleton className="mt-2 h-4 w-72" />
@@ -18,7 +19,7 @@ export default function OrganizationLoading() {
             <Skeleton className="h-9 w-full max-w-sm" />
           </div>
         ))}
-      </div>
+      </PageContainer>
     </>
   );
 }

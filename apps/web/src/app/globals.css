@@ -90,6 +90,43 @@
   --sidebar-ring: oklch(0.708 0 0);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
+
+  /*
+   * Mobile drawer reveal, 0 closed to 1 open. Declared here rather than as an
+   * inline style so a React re-render mid-drag cannot reset it — the gesture
+   * writes it directly to the shell element and inline wins.
+   *
+   * Note the panel transitions `transform`, never this property: an
+   * unregistered custom property is not interpolable, so animating it would
+   * silently teleport instead of slide.
+   */
+  /*
+   * One height for every form control — input, select, combobox, input group,
+   * search — so a form reads as a single clean column rather than a ragged one.
+   * 44px on touch, 36px from md up.
+   *
+   * A token rather than a responsive `h-11 md:h-9` pair on each component:
+   * that pair silently breaks call sites that override the height, because
+   * tailwind-merge lets a plain `h-auto` beat `h-11` but not `md:h-9`. One
+   * unqualified utility per component keeps every existing override working.
+   */
+  --control-h: 2.75rem;
+
+  --drawer-progress: 0;
+  --drawer-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --drawer-duration: 400ms;
+}
+
+@media (width >= 48rem) {
+  :root {
+    --control-h: 2.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --drawer-duration: 0ms;
+  }
 }
 
 .dark {
@@ -134,11 +171,40 @@
   * {
     @apply border-border outline-ring/50;
   }
+
+  /*
+   * The document does not scroll — each shell owns its own scroll region.
+   *
+   * This is what stops iOS rubber-band from sliding the content panel off the
+   * fixed drawer painted behind it, and what lets chrome be a flex sibling of
+   * the scroller instead of `position: sticky` against a box that never moves.
+   *
+   * It must be declared on `html`, not only `body`: Base UI's dialog scroll
+   * lock bails out entirely when html computes to `overflow: hidden`, and
+   * otherwise takes a path that assigns body height/width/position and fights
+   * this. `overscroll-behavior` goes on both, because with html hidden the
+   * usual body-to-viewport propagation no longer applies.
+   */
   html {
-    @apply min-h-svh bg-background font-sans;
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+    @apply bg-background font-sans;
+  }
+
+  /* Chrome should not offer a text-selection callout on long-press — that is
+     a document affordance, and this is an app shell. Content keeps it. */
+  [data-slot="sidebar"],
+  [data-slot="sidebar-inset"] > header,
+  button {
+    -webkit-touch-callout: none;
   }
   body {
-    @apply min-h-svh bg-background text-foreground;
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    @apply bg-background text-foreground;
   }
 }
 
@@ -150,6 +216,63 @@
     --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
     --safe-area-inset-left: env(safe-area-inset-left, 0px);
   }
+}
+
+/*
+ * Mobile drawer reveal.
+ *
+ * Written as CSS rather than utility classes because the whole mechanism is
+ * one contract — the panel and the scrim must move by exactly the same amount,
+ * on the same curve, and stop transitioning at exactly the same moment — and
+ * because Tailwind's arbitrary-value parser rejects `calc(a*b)`.
+ *
+ * `translate` and `opacity` are transitioned, never `--drawer-progress`: an
+ * unregistered custom property is not interpolable, so animating it directly
+ * would teleport rather than slide.
+ */
+@media (width < 48rem) {
+  [data-slot="sidebar-inset"],
+  [data-slot="sidebar-scrim"] {
+    translate: calc(var(--drawer-progress) * var(--sidebar-width, 16rem)) 0;
+    transition:
+      translate var(--drawer-duration) var(--drawer-ease),
+      opacity var(--drawer-duration) var(--drawer-ease);
+  }
+
+  [data-slot="sidebar-scrim"] {
+    opacity: calc(var(--drawer-progress) * 1);
+  }
+
+  /* While the finger is down the panel tracks it exactly — any transition
+     here makes each frame chase the last and the drag feels laggy. */
+  [data-drawer-dragging] [data-slot="sidebar-inset"],
+  [data-drawer-dragging] [data-slot="sidebar-scrim"] {
+    transition: none;
+  }
+
+  [data-drawer-dragging] [data-slot="sidebar-inset"] {
+    will-change: translate;
+  }
+}
+
+/*
+ * Inset grouped list.
+ *
+ * The hairline hangs off the row's inner element, which starts after the
+ * leading avatar or icon — so the rule lines up with the title instead of
+ * running the full width. That single detail is most of what separates a
+ * native-looking list from a bordered table.
+ */
+[data-slot="mobile-list"] > * + * [data-slot="mobile-list-row-inner"] {
+  border-top: 1px solid var(--border);
+}
+
+/* A section header restarts the group, so the row under it needs no rule. */
+[data-slot="mobile-list"]
+  > [data-slot="mobile-list-section"]
+  + *
+  [data-slot="mobile-list-row-inner"] {
+  border-top: 0;
 }
 
 @layer utilities {

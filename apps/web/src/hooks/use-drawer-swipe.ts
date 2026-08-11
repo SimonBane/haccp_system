@@ -2,233 +2,343 @@
 
 import * as React from "react";
 
-const AXIS_LOCK_PX = 8;
-const TAP_MOVE_THRESHOLD_PX = 10;
+/**
+ * How a closed drawer is opened by touch.
+ *
+ * - "anywhere": any rightward drag on the content panel, ChatGPT-style.
+ * - "edge":     only a drag starting within EDGE_ZONE_PX of the leading edge.
+ *
+ * Closing always works from anywhere on the panel, in both modes.
+ */
+export type DrawerOpenMode = "edge" | "anywhere";
+
+const PROGRESS_VAR = "--drawer-progress";
+const DRAGGING_ATTR = "data-drawer-dragging";
+
+/** Travel before the gesture is claimed as horizontal. */
+const ACTIVATION_PX = 8;
+/** Horizontal must beat vertical by this much, or we keep waiting. */
+const AXIS_RATIO = 1.2;
+/** Past this, a release is a drag rather than a tap. */
+const TAP_SLOP_PX = 10;
+/** Fraction of the width past which a slow release settles open. */
 const SNAP_DISTANCE_RATIO = 0.4;
-/** px per ms — a flick this fast snaps open/closed regardless of distance. */
-const SNAP_VELOCITY = 0.5;
+/** px/ms — a flick this fast wins regardless of distance. */
+const SNAP_VELOCITY = 0.35;
+/** Only samples this recent feed the velocity estimate. */
+const VELOCITY_WINDOW_MS = 80;
+const EDGE_ZONE_PX = 24;
 
-function startsInNoSwipeZone(target: EventTarget | null): boolean {
-  return target instanceof Element && target.closest("[data-no-swipe]") !== null;
-}
+type Sample = { x: number; t: number };
 
-function getSidebarWidthPx(): number {
-  if (typeof window === "undefined") {
-    return 256;
-  }
-  const root = parseFloat(getComputedStyle(document.documentElement).fontSize);
-  return root * 16;
-}
-
-type DragState = {
+type Drag = {
+  pointerId: number;
   startX: number;
   startY: number;
-  startOffset: number;
-  startTime: number;
+  /** Progress when the finger went down — a drag can start mid-animation. */
+  startProgress: number;
+  /** Committed state at gesture start; pointercancel reverts to this. */
+  startOpen: boolean;
   axis: "none" | "x";
+  moved: boolean;
+  samples: Sample[];
 };
 
 /**
- * ChatGPT-style mobile sidebar reveal: the inset follows horizontal swipes from
- * anywhere on screen, with animated snap on release and programmatic open/close.
+ * Yields to a horizontally scrollable ancestor that still has room to move in
+ * the drag direction, and to anything explicitly opted out. Without this the
+ * drawer steals the gesture from tables, carousels and the temperature keypad.
  */
-export function useSidebarReveal({
+function startsInProtectedRegion(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  if (target.closest("[data-no-swipe]")) return true;
+
+  for (
+    let node: Element | null = target;
+    node && node !== document.body;
+    node = node.parentElement
+  ) {
+    const overflowX = getComputedStyle(node).overflowX;
+    const scrollable = overflowX === "auto" || overflowX === "scroll";
+    if (scrollable && node.scrollWidth > node.clientWidth) return true;
+  }
+
+  return false;
+}
+
+/**
+ * The mobile drawer gesture: the content panel follows the finger to reveal a
+ * sidebar sitting behind it, then snaps on release.
+ *
+ * The panel's position is a CSS custom property written straight to the DOM
+ * inside a rAF — React never re-renders during a drag, and only learns the
+ * final open/closed state on release.
+ */
+export function useDrawerSwipe({
   open,
   onOpenChange,
   enabled,
-  sidebarWidthPx: sidebarWidthProp,
+  mode = "anywhere",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   enabled: boolean;
-  sidebarWidthPx?: number;
+  mode?: DrawerOpenMode;
 }) {
-  const [sidebarWidthPx, setSidebarWidthPx] = React.useState(
-    sidebarWidthProp ?? getSidebarWidthPx(),
-  );
-  const [offset, setOffset] = React.useState(0);
-  const [dragging, setDragging] = React.useState(false);
+  const [root, setRoot] = React.useState<HTMLElement | null>(null);
 
+  // Latest-value refs so the pointer listeners can stay attached across
+  // renders instead of being torn down and rebuilt on every state change.
+  // Declared first so this effect runs before the ones that read them.
   const openRef = React.useRef(open);
-  const offsetRef = React.useRef(0);
-  const dragRef = React.useRef<DragState | null>(null);
-  const gestureMovedRef = React.useRef(false);
+  const onOpenChangeRef = React.useRef(onOpenChange);
+  React.useEffect(() => {
+    openRef.current = open;
+    onOpenChangeRef.current = onOpenChange;
+  });
 
-  openRef.current = open;
-  offsetRef.current = offset;
+  /** Source of truth during a drag. Deliberately not React state. */
+  const progressRef = React.useRef(open ? 1 : 0);
+  const dragRef = React.useRef<Drag | null>(null);
+  const frameRef = React.useRef(0);
+  const pendingRef = React.useRef(0);
+  /** Swallows the click a finished drag would otherwise synthesise. */
+  const swallowClickRef = React.useRef(false);
+
+  const writeProgress = React.useCallback(
+    (value: number) => {
+      progressRef.current = value;
+      pendingRef.current = value;
+      if (frameRef.current || !root) return;
+      frameRef.current = requestAnimationFrame(() => {
+        frameRef.current = 0;
+        root.style.setProperty(PROGRESS_VAR, `${pendingRef.current}`);
+      });
+    },
+    [root],
+  );
+
+  /** Settles to 0 or 1 with the CSS transition re-enabled. */
+  const settle = React.useCallback(
+    (next: boolean) => {
+      if (frameRef.current) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = 0;
+      }
+      progressRef.current = next ? 1 : 0;
+      if (!root) return;
+
+      root.removeAttribute(DRAGGING_ATTR);
+      // Load-bearing: without a forced reflow the style engine coalesces
+      // "stop suppressing transitions" and "jump to the target" into a single
+      // change that is still untransitioned, and the panel teleports.
+      void root.offsetWidth;
+      root.style.setProperty(PROGRESS_VAR, next ? "1" : "0");
+    },
+    [root],
+  );
+
+  // Programmatic open/close: the hamburger, a nav link, Escape, the scrim.
+  React.useEffect(() => {
+    if (!enabled || dragRef.current) return;
+    settle(open);
+  }, [open, enabled, settle]);
+
+  // Teardown when the viewport crosses the md breakpoint mid-session.
+  React.useEffect(() => {
+    if (enabled || !root) return;
+
+    if (frameRef.current) {
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = 0;
+    }
+    dragRef.current = null;
+    root.removeAttribute(DRAGGING_ATTR);
+    root.style.setProperty(PROGRESS_VAR, "0");
+    progressRef.current = 0;
+    if (openRef.current) onOpenChangeRef.current(false);
+  }, [enabled, root]);
 
   React.useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-    const update = () => {
-      setSidebarWidthPx(sidebarWidthProp ?? getSidebarWidthPx());
+    if (!enabled || !root) return;
+
+    const panelWidth = () => {
+      const panel = root.querySelector<HTMLElement>(
+        '[data-slot="sidebar"][data-mobile="true"]',
+      );
+      return panel?.getBoundingClientRect().width || 256;
     };
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, [enabled, sidebarWidthProp]);
 
-  // Animate to target when open state changes programmatically (hamburger, nav, tap).
-  React.useEffect(() => {
-    if (!enabled || dragging) {
-      return;
-    }
-    const target = open ? sidebarWidthPx : 0;
-    setOffset(target);
-    offsetRef.current = target;
-  }, [open, sidebarWidthPx, dragging, enabled]);
-
-  React.useEffect(() => {
-    if (!enabled) {
-      setOffset(0);
-      offsetRef.current = 0;
-      setDragging(false);
-      dragRef.current = null;
-    }
-  }, [enabled]);
-
-  React.useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-
-    const onTouchStart = (event: TouchEvent) => {
-      const touch = event.touches[0];
-      if (!touch || event.touches.length > 1) {
-        dragRef.current = null;
-        return;
+    const releaseCapture = (pointerId: number) => {
+      try {
+        root.releasePointerCapture(pointerId);
+      } catch {
+        // The pointer is already gone; nothing to release.
       }
-      if (startsInNoSwipeZone(event.target)) {
-        dragRef.current = null;
-        return;
+    };
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (!event.isPrimary || event.pointerType === "mouse") return;
+      if (dragRef.current) return;
+      // Cleared here rather than only when a click arrives: a touch drag does
+      // not always synthesise one, and a flag left standing would eat the
+      // next genuine tap.
+      swallowClickRef.current = false;
+      if (startsInProtectedRegion(event.target)) return;
+
+      const isOpen = openRef.current;
+      if (!isOpen && mode === "edge") {
+        const inset = root.getBoundingClientRect().left;
+        if (event.clientX - inset > EDGE_ZONE_PX) return;
       }
-      gestureMovedRef.current = false;
+
       dragRef.current = {
-        startX: touch.clientX,
-        startY: touch.clientY,
-        startOffset: offsetRef.current,
-        startTime: Date.now(),
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        startProgress: progressRef.current,
+        startOpen: isOpen,
         axis: "none",
+        moved: false,
+        samples: [{ x: event.clientX, t: event.timeStamp }],
       };
     };
 
-    const onTouchMove = (event: TouchEvent) => {
-      const state = dragRef.current;
-      const touch = event.touches[0];
-      if (!state || !touch) {
-        return;
+    const onPointerMove = (event: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag || event.pointerId !== drag.pointerId) return;
+
+      const dx = event.clientX - drag.startX;
+      const dy = event.clientY - drag.startY;
+
+      if (Math.abs(dx) > TAP_SLOP_PX || Math.abs(dy) > TAP_SLOP_PX) {
+        drag.moved = true;
       }
 
-      const deltaX = touch.clientX - state.startX;
-      const deltaY = touch.clientY - state.startY;
+      if (drag.axis === "none") {
+        // Only *wait* on an ambiguous sample. The previous implementation
+        // discarded the gesture the moment one frame looked vertical, which
+        // is exactly what a slow thumb arc produces — hence "swiping slowly
+        // does nothing". The browser owns vertical panning via touch-action
+        // and tells us it took over by sending pointercancel.
+        if (Math.abs(dx) < ACTIVATION_PX) return;
+        if (Math.abs(dx) < Math.abs(dy) * AXIS_RATIO) return;
 
-      if (state.axis === "none") {
-        if (
-          Math.abs(deltaX) < AXIS_LOCK_PX &&
-          Math.abs(deltaY) < AXIS_LOCK_PX
-        ) {
-          return;
-        }
-        if (Math.abs(deltaY) >= Math.abs(deltaX)) {
+        // A closed drawer ignores leftward drags entirely rather than
+        // claiming them and clamping to zero, which is what leaves room for
+        // swipe-left row actions underneath.
+        if (!drag.startOpen && dx < 0) {
           dragRef.current = null;
           return;
         }
-        state.axis = "x";
-        setDragging(true);
+
+        drag.axis = "x";
+        drag.samples.length = 0;
+        try {
+          root.setPointerCapture(drag.pointerId);
+        } catch {
+          // Capture is best-effort; the drag still tracks without it.
+        }
+        root.setAttribute(DRAGGING_ATTR, "");
       }
 
-      if (
-        Math.abs(deltaX) > TAP_MOVE_THRESHOLD_PX ||
-        Math.abs(deltaY) > TAP_MOVE_THRESHOLD_PX
-      ) {
-        gestureMovedRef.current = true;
-      }
+      drag.samples.push({ x: event.clientX, t: event.timeStamp });
+      if (drag.samples.length > 12) drag.samples.shift();
 
-      const nextOffset = Math.max(
-        0,
-        Math.min(sidebarWidthPx, state.startOffset + deltaX),
-      );
-
-      event.preventDefault();
-      setOffset(nextOffset);
-      offsetRef.current = nextOffset;
+      // Subtract the activation distance, or the panel jumps ACTIVATION_PX
+      // out from under the finger on the frame the drag engages.
+      const adjusted = dx - Math.sign(dx) * ACTIVATION_PX;
+      const next = drag.startProgress + adjusted / panelWidth();
+      writeProgress(Math.max(0, Math.min(1, next)));
     };
 
-    const onTouchEnd = () => {
-      const state = dragRef.current;
+    const onPointerUp = (event: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag || event.pointerId !== drag.pointerId) return;
       dragRef.current = null;
-      setDragging(false);
+      releaseCapture(drag.pointerId);
 
-      if (!state || state.axis !== "x") {
+      if (drag.axis !== "x") {
+        root.removeAttribute(DRAGGING_ATTR);
         return;
       }
 
-      const currentOffset = offsetRef.current;
-      const deltaFromStart = currentOffset - state.startOffset;
-      const elapsed = Math.max(Date.now() - state.startTime, 1);
-      const velocity = Math.abs(deltaFromStart) / elapsed;
+      swallowClickRef.current = drag.moved;
 
-      let shouldOpen: boolean;
-      if (velocity > SNAP_VELOCITY) {
-        shouldOpen = deltaFromStart > 0;
-      } else {
-        shouldOpen = currentOffset > sidebarWidthPx * SNAP_DISTANCE_RATIO;
-      }
+      // Velocity over the trailing window only. Measured across the whole
+      // gesture, a long slow drag that ends in a decisive flick reads as slow.
+      const now = event.timeStamp;
+      const recent = drag.samples.filter((s) => now - s.t <= VELOCITY_WINDOW_MS);
+      const first = recent[0] ?? drag.samples[0];
+      const elapsed = Math.max(now - (first?.t ?? now), 1);
+      const velocity = (event.clientX - (first?.x ?? event.clientX)) / elapsed;
 
-      const targetOffset = shouldOpen ? sidebarWidthPx : 0;
-      setOffset(targetOffset);
-      offsetRef.current = targetOffset;
+      const shouldOpen =
+        Math.abs(velocity) > SNAP_VELOCITY
+          ? velocity > 0
+          : progressRef.current > SNAP_DISTANCE_RATIO;
 
-      if (shouldOpen !== openRef.current) {
-        onOpenChange(shouldOpen);
+      settle(shouldOpen);
+      if (shouldOpen !== openRef.current) onOpenChangeRef.current(shouldOpen);
+    };
+
+    const onPointerCancel = (event: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      dragRef.current = null;
+      releaseCapture(drag.pointerId);
+
+      // The browser claimed the gesture — a vertical pan, a system edge swipe,
+      // a second finger. Return to where the drag started rather than commit.
+      settle(drag.startOpen);
+      if (drag.startOpen !== openRef.current) {
+        onOpenChangeRef.current(drag.startOpen);
       }
     };
 
-    const stop = () => {
-      if (dragRef.current?.axis === "x") {
-        onTouchEnd();
-      } else {
-        dragRef.current = null;
-        setDragging(false);
-      }
+    const onClickCapture = (event: MouseEvent) => {
+      if (!swallowClickRef.current) return;
+      swallowClickRef.current = false;
+      event.stopPropagation();
+      event.preventDefault();
     };
 
-    window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("touchmove", onTouchMove, { passive: false });
-    window.addEventListener("touchend", stop, { passive: true });
-    window.addEventListener("touchcancel", stop, { passive: true });
+    root.addEventListener("pointerdown", onPointerDown, { passive: true });
+    root.addEventListener("pointermove", onPointerMove, { passive: true });
+    root.addEventListener("pointerup", onPointerUp, { passive: true });
+    root.addEventListener("pointercancel", onPointerCancel, { passive: true });
+    root.addEventListener("lostpointercapture", onPointerCancel, {
+      passive: true,
+    });
+    root.addEventListener("click", onClickCapture, true);
 
     return () => {
-      window.removeEventListener("touchstart", onTouchStart);
-      window.removeEventListener("touchmove", onTouchMove);
-      window.removeEventListener("touchend", stop);
-      window.removeEventListener("touchcancel", stop);
+      root.removeEventListener("pointerdown", onPointerDown);
+      root.removeEventListener("pointermove", onPointerMove);
+      root.removeEventListener("pointerup", onPointerUp);
+      root.removeEventListener("pointercancel", onPointerCancel);
+      root.removeEventListener("lostpointercapture", onPointerCancel);
+      root.removeEventListener("click", onClickCapture, true);
+      if (dragRef.current) {
+        releaseCapture(dragRef.current.pointerId);
+        dragRef.current = null;
+      }
+      root.removeAttribute(DRAGGING_ATTR);
     };
-  }, [enabled, sidebarWidthPx, onOpenChange]);
+  }, [enabled, root, mode, writeProgress, settle]);
 
-  const onInsetClick = React.useCallback(() => {
-    if (!openRef.current) {
-      return;
-    }
-    if (gestureMovedRef.current) {
-      gestureMovedRef.current = false;
-      return;
-    }
-    onOpenChange(false);
-  }, [onOpenChange]);
+  React.useEffect(() => {
+    if (!enabled || !open) return;
 
-  const insetStyle = React.useMemo(
-    (): React.CSSProperties => ({
-      transform: `translate3d(${offset}px, 0, 0)`,
-    }),
-    [offset],
-  );
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onOpenChangeRef.current(false);
+    };
 
-  return {
-    offset,
-    dragging,
-    insetStyle,
-    onInsetClick,
-  };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [enabled, open]);
+
+  return { rootRef: setRoot };
 }
