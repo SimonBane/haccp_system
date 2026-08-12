@@ -117,6 +117,18 @@
   --drawer-duration: 400ms;
 
   /*
+   * The height of the screen area the app is painting into. Every full-height
+   * surface — the document, the canvas layer, the mobile shell — measures
+   * itself with this and nothing else, so there is one answer to change.
+   *
+   * In a browser tab that answer is `dvh`. The document never scrolls, so the
+   * toolbars never collapse and the dynamic viewport is exactly what the user
+   * can see; `vh` would reach under Safari's URL bar. The installed app
+   * overrides this below.
+   */
+  --app-viewport-height: 100dvh;
+
+  /*
    * Visual-viewport geometry, written by `useKeyboardInset`.
    *
    * `--keyboard-inset`: how much of the *layout* viewport the software
@@ -126,8 +138,8 @@
    * `--app-vv-top`: iOS sometimes shifts the visual viewport down after
    * focus (and leaves it there). The mobile shell follows that offset so
    * chrome is not letterboxed. Height is deliberately *not* taken from
-   * `visualViewport.height` — that value stops above the home indicator in
-   * installed iOS PWAs; the shell uses dvh instead.
+   * `visualViewport.height`, which is one of the values WebKit under-reports
+   * in an installed app; the shell uses `--app-viewport-height` instead.
    *
    * `--keyboard-gap`: same inset, measured from inside `SidebarInset`,
    * which already carries the bottom safe-area as padding.
@@ -138,6 +150,42 @@
     calc(var(--keyboard-inset) - var(--safe-area-inset-bottom, 0px))
   );
   --app-vv-top: 0px;
+}
+
+/*
+ * Installed app: `vh`, not `dvh`.
+ *
+ * With `viewport-fit=cover` WebKit reports the dynamic and small viewports —
+ * along with `-webkit-fill-available` and `visualViewport.height` — short of
+ * the screen the web view actually covers, by the safe-area insets
+ * (webkit.org/b/254868, open since Safari 16). That shortfall is the white
+ * band under the app on an iPhone: the shell ends where `dvh` says the
+ * viewport does, and the home-indicator strip below it is bare canvas.
+ *
+ * `vh` is measured correctly there, and it is safe here for the same reason
+ * it is wrong in a tab: an installed window has no collapsing browser chrome,
+ * so the large viewport *is* the visible one.
+ *
+ * Matching `standalone` and `fullscreen` by name rather than "anything
+ * installed": `minimal-ui` — which this app's `display_override` also asks
+ * for — keeps collapsible chrome, and there `dvh` remains the right answer.
+ */
+@media all and (display-mode: standalone), all and (display-mode: fullscreen) {
+  :root {
+    --app-viewport-height: 100vh;
+  }
+}
+
+/*
+ * The same override, from the one signal iOS is dependable about.
+ *
+ * `(display-mode: standalone)` is not guaranteed to match in a home-screen app
+ * on iOS — several builds report `browser` while visibly running with no
+ * Safari chrome — and this fix is worth nothing if it misses. `RootLayout`
+ * writes the attribute from `navigator.standalone`, before first paint.
+ */
+:root[data-standalone] {
+  --app-viewport-height: 100vh;
 }
 
 @media (width >= 48rem) {
@@ -209,11 +257,7 @@
    * usual body-to-viewport propagation no longer applies.
    */
   html {
-    /* dvh, not lvh or -webkit-fill-available: both of those measure the
-       viewport as if the browser toolbars were hidden, which pushes the shell
-       under Safari's URL bar. The document never scrolls, so the toolbars
-       never collapse and dvh is simply what the user can see. */
-    height: 100dvh;
+    height: var(--app-viewport-height);
     overflow: hidden;
     overscroll-behavior: none;
     -webkit-tap-highlight-color: transparent;
@@ -264,7 +308,7 @@
  * black window behind the web view. A real fixed box repaints like any other
  * element.
  *
- * Sized in dvh like the shell, so it paints exactly the visible viewport
+ * Sized like the shell, so it paints exactly the screen area the app covers
  * rather than reaching under Safari's toolbars.
  */
 body::before {
@@ -273,7 +317,7 @@ body::before {
   top: 0;
   left: 0;
   width: 100%;
-  height: 100dvh;
+  height: var(--app-viewport-height);
   z-index: -1;
   background-color: var(--background);
   pointer-events: none;
@@ -309,9 +353,10 @@ body::before {
  * would teleport rather than slide.
  *
  * The wrapper follows `--app-vv-top` when iOS shifts the visual viewport,
- * but its height is a dvh, not `visualViewport.height` — that value stops
- * above the home indicator in installed iOS PWAs. Sidebar and scrim are
- * `absolute` inside it so they share that box.
+ * but its height comes from `--app-viewport-height`, never
+ * `visualViewport.height` — that value stops above the home indicator in
+ * installed iOS PWAs. Sidebar and scrim are `absolute` inside it so they
+ * share that box.
  */
 @media (width < 48rem) {
   [data-slot="sidebar-wrapper"] {
@@ -319,10 +364,9 @@ body::before {
     top: var(--app-vv-top, 0px);
     left: 0;
     width: 100%;
-    /* dvh is the visible viewport: full screen in a standalone PWA, and the
-       area above the URL bar in Safari. The offset is subtracted so a
-       non-zero `--app-vv-top` cannot push the bottom off screen. */
-    height: calc(100dvh - var(--app-vv-top, 0px));
+    /* The offset is subtracted so a non-zero `--app-vv-top` cannot push the
+       bottom off screen. */
+    height: calc(var(--app-viewport-height) - var(--app-vv-top, 0px));
   }
 
   [data-slot="sidebar-inset"],
