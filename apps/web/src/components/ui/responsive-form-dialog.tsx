@@ -1,8 +1,9 @@
 "use client";
 
-import { CheckIcon, XIcon } from "lucide-react";
+import { XIcon } from "lucide-react";
 import * as React from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { handOffKeyboard } from "@/lib/keyboard-primer";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,42 +13,35 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
-/** One choice behind the nav-bar submit icon, when there is more than one. */
-export type ResponsiveFormSubmitOption = {
+/** One button in the mobile form's bottom action bar. */
+export type ResponsiveFormAction = {
   label: string;
   icon?: React.ReactNode;
-  onClick: () => void;
+  variant?: React.ComponentProps<typeof Button>["variant"];
+  /** id of the `<form>` this submits, so the button can live outside it. */
+  formId?: string;
+  onClick?: () => void;
   isLoading?: boolean;
   disabled?: boolean;
 };
 
-/** The submit action, shown as an icon button in the mobile nav bar. */
-export type ResponsiveFormSubmit = {
-  label: string;
-  /** id of the `<form>` this submits, so the button can live outside it. */
-  formId?: string;
-  icon?: React.ReactNode;
-  isLoading?: boolean;
-  disabled?: boolean;
-  onClick?: () => void;
+export type ResponsiveFormActions = {
   /**
-   * When set, the icon opens a popover of these instead of submitting —
-   * for forms that genuinely have two ways to finish, like save vs.
-   * save-and-invite.
+   * "stack" gives each action a full-width row — the default, and right for one
+   * action or for two of unequal weight. "split" divides the bar evenly, which
+   * is what two peers want: save vs. save-and-invite, neither subordinate.
    */
-  options?: ResponsiveFormSubmitOption[];
+  layout?: "stack" | "split";
+  items: ResponsiveFormAction[];
+};
+
+/** The field to land on when the form opens, and what to do with its value. */
+export type ResponsiveFormAutoFocus = {
+  ref: React.RefObject<HTMLInputElement | null>;
+  /** "select" for an edit — the value is a starting point, not a prefix. */
+  selection?: "select" | "end" | "none";
 };
 
 type ResponsiveFormDialogProps = {
@@ -56,169 +50,82 @@ type ResponsiveFormDialogProps = {
   title: React.ReactNode;
   description?: React.ReactNode;
   children: React.ReactNode;
-  /** Desktop footer. On mobile it is only used when there is no `submit`. */
+  /** Desktop footer. Mobile uses `actions`. */
   footer?: React.ReactNode;
-  submit?: ResponsiveFormSubmit;
+  /** The mobile action bar, pinned to the bottom above the keyboard. */
+  actions?: ResponsiveFormActions;
   closeLabel?: string;
   className?: string;
+  /** Desktop only. Mobile focus is `autoFocusField`. */
   initialFocus?: boolean;
   /**
-   * How the form presents on a phone.
-   *
-   * "fullscreen" is the default for anything longer than a couple of fields: a
-   * partial-height sheet leaves a long form scrolling inside a letterbox and
-   * one careless swipe from dismissal. "sheet" suits a single-field edit.
+   * Pair with `primeKeyboard()` in the control that opens this form, or on iOS
+   * the field focuses silently with no keyboard.
    */
-  mobileVariant?: "fullscreen" | "sheet";
+  autoFocusField?: ResponsiveFormAutoFocus;
 };
-
-const DISMISS_THRESHOLD_PX = 96;
 
 /**
  * Slide the whole sheet up from the bottom, the way a native modal presents.
  *
- * Base UI's stock bottom-sheet transition only nudges 2.5rem, which on a
- * full-height form reads as a flicker rather than a transition.
+ * Every translate here is qualified with `data-[side=bottom]:`, and that is
+ * load-bearing rather than decorative. The stock sheet ships
+ * `data-[side=bottom]:data-ending-style:translate-y-[2.5rem]`, which carries one
+ * more variant than a bare `data-ending-style:translate-y-full` and therefore
+ * wins on specificity — tailwind-merge cannot collapse the pair either, since
+ * the variant prefixes differ. That is what made the sheet drop 40px, sit there
+ * for the duration, and then vanish instead of sliding out.
  */
-const SHEET_SLIDE =
-  "duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] data-starting-style:translate-y-full data-ending-style:translate-y-full data-starting-style:opacity-100 data-ending-style:opacity-100";
+export const SHEET_SLIDE =
+  "duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] data-[side=bottom]:data-starting-style:translate-y-full data-[side=bottom]:data-ending-style:translate-y-full data-starting-style:opacity-100 data-ending-style:opacity-100 motion-reduce:duration-0";
 
-/**
- * Drag-down-to-dismiss, from the grab handle only.
- *
- * Deliberately not from the sheet body: the body scrolls, and claiming drags
- * there is what makes web sheets feel like they are fighting you.
- */
-function SheetGrabHandle({ onDismiss }: { onDismiss: () => void }) {
-  const ref = React.useRef<HTMLDivElement>(null);
-
-  React.useEffect(() => {
-    const node = ref.current;
-    const sheet = node?.closest<HTMLElement>('[data-slot="sheet-content"]');
-    if (!node || !sheet) return;
-
-    let startY: number | null = null;
-    let offset = 0;
-    let frame = 0;
-
-    const write = () => {
-      frame = 0;
-      sheet.style.translate = `0 ${offset}px`;
-    };
-
-    const onPointerDown = (event: PointerEvent) => {
-      if (!event.isPrimary) return;
-      startY = event.clientY;
-      sheet.style.transition = "none";
-      node.setPointerCapture(event.pointerId);
-    };
-
-    const onPointerMove = (event: PointerEvent) => {
-      if (startY === null) return;
-      offset = Math.max(0, event.clientY - startY);
-      if (!frame) frame = requestAnimationFrame(write);
-    };
-
-    const onPointerUp = () => {
-      if (startY === null) return;
-      const dismissed = offset > DISMISS_THRESHOLD_PX;
-      startY = null;
-      if (frame) {
-        cancelAnimationFrame(frame);
-        frame = 0;
-      }
-      sheet.style.transition = "";
-      sheet.style.translate = "";
-      offset = 0;
-      if (dismissed) onDismiss();
-    };
-
-    node.addEventListener("pointerdown", onPointerDown, { passive: true });
-    node.addEventListener("pointermove", onPointerMove, { passive: true });
-    node.addEventListener("pointerup", onPointerUp, { passive: true });
-    node.addEventListener("pointercancel", onPointerUp, { passive: true });
-
-    return () => {
-      node.removeEventListener("pointerdown", onPointerDown);
-      node.removeEventListener("pointermove", onPointerMove);
-      node.removeEventListener("pointerup", onPointerUp);
-      node.removeEventListener("pointercancel", onPointerUp);
-      if (frame) cancelAnimationFrame(frame);
-    };
-  }, [onDismiss]);
+function FormActionBar({ actions }: { actions: ResponsiveFormActions }) {
+  const split = actions.layout === "split";
 
   return (
     <div
-      ref={ref}
-      // Generous hit area around a small visual handle — the standard trick
-      // for making a 4px affordance actually grabbable with a thumb.
-      className="flex shrink-0 cursor-grab touch-none justify-center pt-2 pb-1"
-      aria-hidden
+      data-slot="form-action-bar"
+      className={cn(
+        // No rule above it: the bar is part of the form, not chrome bolted to
+        // the bottom of it.
+        "flex shrink-0 gap-2 bg-background px-4 pt-3",
+        // When the keyboard is up the home indicator is behind it, so the calc
+        // goes negative and max() falls back to the plain 12px gutter — no dead
+        // band between the keys and the buttons.
+        "pb-[max(0.75rem,calc(env(safe-area-inset-bottom)-var(--keyboard-inset,0px)))]",
+        split ? "flex-row" : "flex-col",
+      )}
     >
-      <div className="h-1 w-9 rounded-full bg-muted-foreground/30" />
+      {actions.items.map((action) => (
+        <Button
+          key={action.label}
+          type={action.formId ? "submit" : "button"}
+          form={action.formId}
+          variant={action.variant}
+          isLoading={action.isLoading}
+          disabled={action.disabled}
+          onClick={action.onClick}
+          className={cn("min-h-12 text-base", split ? "flex-1" : "w-full")}
+        >
+          {action.icon}
+          {action.label}
+        </Button>
+      ))}
     </div>
   );
 }
 
-/** The nav bar's submit affordance: one icon, or one icon plus a popover. */
-function NavBarSubmit({ submit }: { submit: ResponsiveFormSubmit }) {
-  const icon = submit.icon ?? <CheckIcon className="size-5" />;
-  const busy =
-    submit.isLoading || submit.options?.some((option) => option.isLoading);
-
-  if (!submit.options?.length) {
-    return (
-      <Button
-        type={submit.formId ? "submit" : "button"}
-        form={submit.formId}
-        size="icon-lg"
-        aria-label={submit.label}
-        isLoading={submit.isLoading}
-        disabled={submit.disabled}
-        onClick={submit.onClick}
-        className="size-(--control-h) shrink-0"
-      >
-        {icon}
-      </Button>
-    );
-  }
-
-  return (
-    <Popover>
-      <PopoverTrigger
-        render={
-          <Button
-            type="button"
-            size="icon-lg"
-            aria-label={submit.label}
-            isLoading={busy}
-            disabled={submit.disabled}
-            className="size-(--control-h) shrink-0"
-          />
-        }
-      >
-        {icon}
-      </PopoverTrigger>
-      <PopoverContent align="end" side="bottom" className="w-auto gap-1 p-1">
-        {submit.options.map((option) => (
-          <Button
-            key={option.label}
-            type="button"
-            variant="ghost"
-            className="w-full justify-start"
-            isLoading={option.isLoading}
-            disabled={option.disabled}
-            onClick={option.onClick}
-          >
-            {option.icon}
-            {option.label}
-          </Button>
-        ))}
-      </PopoverContent>
-    </Popover>
-  );
-}
-
+/**
+ * One form surface, two presentations.
+ *
+ * On a phone it is always the whole screen: a partial-height sheet leaves a form
+ * scrolling inside a letterbox, one careless swipe from dismissal, and made the
+ * app feel like it had two kinds of form for no reason a user could name. The
+ * actions live in a bar pinned to the bottom, which the sheet lifts clear of the
+ * software keyboard — see the `[data-side=bottom]` rule in globals.css.
+ *
+ * On desktop it stays a centred dialog with a conventional footer.
+ */
 export function ResponsiveFormDialog({
   open,
   onOpenChange,
@@ -226,32 +133,48 @@ export function ResponsiveFormDialog({
   description,
   children,
   footer,
-  submit,
+  actions,
   closeLabel,
   className,
   initialFocus,
-  mobileVariant = "fullscreen",
+  autoFocusField,
 }: ResponsiveFormDialogProps) {
   const isMobile = useIsMobile();
   const close = React.useCallback(() => onOpenChange(false), [onOpenChange]);
 
-  if (isMobile && mobileVariant === "fullscreen") {
+  // A function rather than a ref: Base UI's default resolver deliberately
+  // focuses the popup itself on a touch interaction, to *suppress* the
+  // keyboard. Returning false says focus has been placed already, which also
+  // stops Base UI taking it back.
+  //
+  // Not memoised — Base UI reads it once when the popup opens, so a new
+  // identity per render costs nothing and keeps it off the stale-closure path.
+  const resolveSheetFocus = () => {
+    const node = autoFocusField?.ref.current;
+    if (!node) return true;
+    handOffKeyboard(node, autoFocusField?.selection ?? "none");
+    return false;
+  };
+
+  if (isMobile) {
     return (
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent
           side="bottom"
           showCloseButton={false}
+          initialFocus={resolveSheetFocus}
           className={cn(
-            // Anchored below the notch rather than truly edge-to-edge, so the
-            // rounded top actually reads as a sheet presented over the page.
-            "inset-x-0 bottom-0 top-[max(0.75rem,env(safe-area-inset-top))]",
-            "flex h-auto flex-col gap-0 rounded-t-2xl border-0 p-0",
+            // Edge to edge and square: this is the screen now, not a card laid
+            // over it. The safe area is padding on the nav bar, so the bar's
+            // own background reaches under the notch.
+            "inset-x-0 top-0 flex h-auto flex-col gap-0 rounded-none border-0 p-0",
             SHEET_SLIDE,
           )}
         >
-          {/* X · Title · submit icon. No rule under it — the elevation change
-              between chrome and content is enough separation. */}
-          <div className="flex shrink-0 items-center gap-2 px-3 pt-3 pb-2">
+          {/* X · Title. No rule under it — the elevation change between chrome
+              and content is enough separation, and the commit action belongs
+              under the thumb, not in the far corner. */}
+          <div className="flex shrink-0 items-center gap-2 px-3 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
             <Button
               type="button"
               variant="outline"
@@ -265,52 +188,15 @@ export function ResponsiveFormDialog({
             <SheetTitle className="min-w-0 flex-1 truncate text-center text-base">
               {title}
             </SheetTitle>
-            {submit ? (
-              <NavBarSubmit submit={submit} />
-            ) : (
-              // Balances the X so the title stays optically centred.
-              <span className="size-10 shrink-0" aria-hidden />
-            )}
+            {/* Balances the X so the title stays optically centred. */}
+            <span className="size-(--control-h) shrink-0" aria-hidden />
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-3 pb-4">
             {children}
           </div>
 
-          {/* Only when the action did not move into the nav bar. */}
-          {!submit && footer ? (
-            <div className="shrink-0 bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] [&_[data-slot=dialog-footer]]:flex-col [&_[data-slot=dialog-footer]]:gap-2 [&_button]:w-full [&_button]:min-h-11">
-              {footer}
-            </div>
-          ) : null}
-        </SheetContent>
-      </Sheet>
-    );
-  }
-
-  if (isMobile) {
-    return (
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent
-          side="bottom"
-          showCloseButton={false}
-          className={cn(
-            "flex max-h-[94dvh] flex-col gap-0 overflow-hidden rounded-t-2xl border-0 p-0",
-            SHEET_SLIDE,
-          )}
-        >
-          <SheetGrabHandle onDismiss={close} />
-          <SheetHeader className="shrink-0 px-4 pt-2 pb-0 text-left">
-            <SheetTitle>{title}</SheetTitle>
-          </SheetHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-3 pb-4">
-            {children}
-          </div>
-          {footer ? (
-            <div className="shrink-0 bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] [&_[data-slot=dialog-footer]]:flex-col [&_[data-slot=dialog-footer]]:gap-2 [&_button]:w-full [&_button]:min-h-11">
-              {footer}
-            </div>
-          ) : null}
+          {actions?.items.length ? <FormActionBar actions={actions} /> : null}
         </SheetContent>
       </Sheet>
     );

@@ -22,20 +22,25 @@ type Drag = {
 };
 
 /**
- * Swipe a list row left to reveal its actions.
+ * Swipe a list row left to reveal delete.
  *
  * Direction is what keeps this from fighting the navigation drawer: the drawer
  * only claims *rightward* drags while it is closed, so leftward drags arrive
  * here untouched. Once this row is open it marks itself `data-no-swipe`, so
  * the rightward drag that closes it is not taken by the drawer either.
  *
- * Swipe is not reachable by keyboard or screen reader, so every row that uses
- * this must keep an equivalent overflow menu.
+ * Revealing rather than committing on over-swipe, deliberately: a delete here
+ * is permanent, there is no trash to recover from, and the hand doing the
+ * swiping is often gloved. The confirm dialog stays.
+ *
+ * Swipe reaches neither keyboard nor screen reader, so every row that uses this
+ * must keep an equivalent path to the same action — `DataTableCardList` gives
+ * it the long-press sheet and a focusable actions button.
  */
 export function SwipeableRow({
   children,
   actions,
-  actionsWidth = 152,
+  actionsWidth = 88,
   onOpenChange,
   className,
 }: {

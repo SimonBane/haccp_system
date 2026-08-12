@@ -20,8 +20,11 @@ import {
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { DataTableCardList } from "@/components/ui/data-table/data-table-card-list";
+import type { MobileListVariant } from "@/components/ui/data-table/data-table-mobile-list";
+import type { RowAction } from "@/components/ui/data-table/row-action";
 import { DataTableColumnHideButton } from "@/components/ui/data-table/data-table-column-hide-button";
 import { DataTablePagination } from "@/components/ui/data-table/data-table-pagination";
+import { DataTableMobileSearch } from "@/components/ui/data-table/data-table-mobile-search";
 import { DataTableSearch } from "@/components/ui/data-table/data-table-search";
 import { createSelectColumn } from "@/components/ui/data-table/data-table-select-column";
 import { DataTableViewOptions } from "@/components/ui/data-table/data-table-view-options";
@@ -41,8 +44,15 @@ interface DataTableProps<TData, TValue> {
   data: TData[];
   onRowClick?: (row: Row<TData>) => void;
   renderMobileRow?: (row: Row<TData>) => React.ReactNode;
-  /** Swipe-left tray on the mobile list. The row menu remains the a11y path. */
-  renderSwipeActions?: (row: Row<TData>) => React.ReactNode;
+  /**
+   * Everything you can do to a row, declared once. Rendered as the desktop
+   * overflow menu, the mobile long-press sheet and the mobile swipe-left tray.
+   */
+  getRowActions?: (row: Row<TData>) => RowAction[];
+  /** Names a row in the mobile action sheet and its screen-reader control. */
+  getRowLabel?: (row: Row<TData>) => string;
+  /** Density of the mobile list. "card" for records that need more than a line. */
+  mobileVariant?: MobileListVariant;
   emptyMessage?: string;
   emptyDescription?: string;
   emptyAction?: React.ReactNode;
@@ -94,7 +104,9 @@ export function DataTable<TData, TValue>({
   data,
   onRowClick,
   renderMobileRow,
-  renderSwipeActions,
+  getRowActions,
+  getRowLabel,
+  mobileVariant,
   emptyMessage = "No results.",
   emptyDescription,
   emptyAction,
@@ -197,9 +209,14 @@ export function DataTable<TData, TValue>({
   const displayEmptyMessage = isFiltered ? noResultsMessage : emptyMessage;
   const showColumnVisibility = enableColumnVisibility && !useCardList;
   const showInlineToolbar = Boolean(Toolbar) || Boolean(toolbar);
+  // Search floats over the bottom of the screen on the card list, so on mobile
+  // the toolbar row usually has nothing left in it and the list starts flush at
+  // the top. Only a custom `Toolbar` keeps it.
+  const useFloatingSearch = useCardList && enableSearch && Boolean(searchColumn);
   const showToolbar =
-    enableSearch ||
+    (enableSearch && !useFloatingSearch) ||
     (showInlineToolbar && !useCardList) ||
+    Boolean(Toolbar) ||
     showColumnVisibility;
   const shouldShowSelectionCount = showSelectionCount ?? enableRowSelection;
 
@@ -227,7 +244,7 @@ export function DataTable<TData, TValue>({
                 !useCardList && "sm:w-auto sm:flex-row sm:flex-wrap sm:items-center",
               )}
             >
-              {enableSearch && searchColumn ? (
+              {enableSearch && searchColumn && !useFloatingSearch ? (
                 <DataTableSearch
                   table={table}
                   column={searchColumn}
@@ -251,11 +268,15 @@ export function DataTable<TData, TValue>({
         <DataTableCardList
           table={table}
           renderMobileRow={renderMobileRow}
-          renderSwipeActions={renderSwipeActions}
+          getRowActions={getRowActions}
+          getRowLabel={getRowLabel}
+          variant={mobileVariant}
           onRowClick={onRowClick}
           emptyMessage={displayEmptyMessage}
           emptyDescription={isFiltered ? undefined : emptyDescription}
-          emptyAction={isFiltered || useCardList ? undefined : emptyAction}
+          // Previously dropped on every mobile render, which meant the
+          // "add your first one" button never appeared on a phone at all.
+          emptyAction={isFiltered ? undefined : emptyAction}
           className={className}
         />
       ) : (
@@ -377,6 +398,14 @@ export function DataTable<TData, TValue>({
 
       {/* No pager on the mobile list: native lists scroll, and these sets are
           tens of rows. Search still narrows them. */}
+      {useFloatingSearch && searchColumn ? (
+        <DataTableMobileSearch
+          table={table}
+          column={searchColumn}
+          placeholder={searchPlaceholder ?? ""}
+        />
+      ) : null}
+
       {enablePagination && !useCardList ? (
         <div className="shrink-0">
           <DataTablePagination

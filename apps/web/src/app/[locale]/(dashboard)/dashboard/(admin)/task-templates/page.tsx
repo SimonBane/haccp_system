@@ -5,8 +5,7 @@ import {
   listTaskTemplates,
   resolveActiveLocationId,
 } from "@/lib/api-client";
-import { getTranslations, setRequestLocale } from "next-intl/server";
-import { DashboardPageHeader } from "@/components/layout/dashboard-page-header";
+import { setRequestLocale } from "next-intl/server";
 import { PageContainer } from "@/components/layout/page-container";
 import { TaskTemplatesManager } from "@/features/task-templates/task-templates-manager";
 
@@ -17,8 +16,6 @@ export default async function TaskTemplatesPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale as Locale);
-
-  const t = await getTranslations("TasksPage");
 
   const tenant = await getTenantContext();
   const locationId = await resolveActiveLocationId(tenant);
@@ -31,20 +28,12 @@ export default async function TaskTemplatesPage({
   ]);
 
   return (
-    <>
-      <DashboardPageHeader
-        breadcrumbs={[
-          { label: t("breadcrumbSettings") },
-          { label: t("breadcrumb"), current: true },
-        ]}
+    <PageContainer width="content">
+      <TaskTemplatesManager
+        initialItems={taskTemplates.items}
+        initialEquipment={equipment.items}
+        initialLocationId={locationId}
       />
-      <PageContainer width="content">
-        <TaskTemplatesManager
-          initialItems={taskTemplates.items}
-          initialEquipment={equipment.items}
-          initialLocationId={locationId}
-        />
-      </PageContainer>
-    </>
+    </PageContainer>
   );
 }

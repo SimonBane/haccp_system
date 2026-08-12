@@ -1,8 +1,7 @@
 import { type Locale } from "@/i18n/routing";
 import { getTenantContext } from "@/lib/api-client";
-import { getTranslations, setRequestLocale } from "next-intl/server";
+import { setRequestLocale } from "next-intl/server";
 import { redirect } from "next/navigation";
-import { DashboardPageHeader } from "@/components/layout/dashboard-page-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { LocationsManager } from "@/features/locations/locations-manager";
 
@@ -14,7 +13,6 @@ export default async function OrganizationLocationsPage({
   const { locale } = await params;
   setRequestLocale(locale as Locale);
 
-  const t = await getTranslations("LocationsPage");
   const tenant = await getTenantContext();
 
   if (!tenant.organization.multipleLocationsEnabled) {
@@ -25,19 +23,8 @@ export default async function OrganizationLocationsPage({
   // render — so a second /locations round trip would buy nothing.
 
   return (
-    <>
-      <DashboardPageHeader
-        breadcrumbs={[
-          {
-            label: t("breadcrumbOrganization"),
-            href: "/dashboard/organization",
-          },
-          { label: t("breadcrumb"), current: true },
-        ]}
-      />
-      <PageContainer width="content">
-        <LocationsManager initialItems={tenant.locations} />
-      </PageContainer>
-    </>
+    <PageContainer width="content">
+      <LocationsManager initialItems={tenant.locations} />
+    </PageContainer>
   );
 }

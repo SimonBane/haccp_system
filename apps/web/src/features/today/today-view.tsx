@@ -3,7 +3,7 @@
 import type { TodayResponse, TodayTaskItem } from "@haccp/shared";
 import { classifyTemperatureResult, zonedDateString } from "@haccp/shared";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { pageWidthVariants } from "@/components/layout/page-container";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -13,8 +13,12 @@ import { useNow } from "@/hooks/use-now";
 import { useOrgTimeZone } from "@/features/tenant/use-org-timezone";
 import { getErrorMessage } from "@/lib/api/get-error-message";
 import { formatLocalDate, shiftLocalDate } from "@/lib/date";
+import { primeKeyboard } from "@/lib/keyboard-primer";
 import { cn } from "@/lib/utils";
-import { TemperatureRoundFlow } from "./components/temperature-round-flow";
+import {
+  TemperatureRoundFlow,
+  type TemperatureCheck,
+} from "./components/temperature-round-flow";
 import { TodayAllDone } from "./components/today-all-done";
 import { TodayEmptyState } from "./components/today-empty-state";
 import { TodayJumpToNow } from "./components/today-jump-to-now";
@@ -119,6 +123,54 @@ export function TodayView({
     skip: skipRound,
     close: closeRound,
   } = round;
+
+  /*
+   * Both modal surfaces on this page are latched.
+   *
+   * Base UI runs a popup's exit transition on the element it already owns, so
+   * the component has to outlive the state that opened it. `round` and
+   * `recordItem` are already null by the time the sheet starts sliding out, so
+   * the last non-null value is kept and rendered with `open={false}` until the
+   * next one replaces it.
+   */
+  const isRoundOpen =
+    round.item !== null &&
+    round.currentKey !== null &&
+    round.item.task.minTempC !== null &&
+    round.item.task.maxTempC !== null;
+
+  // Latched during render rather than in an effect, the documented way to
+  // adjust state when a prop changes — an effect here would commit the mount
+  // and the open together, and a popup that appears already open has no closed
+  // frame to transition from.
+  const [lastCheck, setLastCheck] = useState<TemperatureCheck | null>(null);
+
+  const liveCheck: TemperatureCheck | null = isRoundOpen
+    ? {
+        item: round.item as TodayTimelineItem,
+        occurrenceKey: round.currentKey as string,
+        minTempC: round.item?.task.minTempC as number,
+        maxTempC: round.item?.task.maxTempC as number,
+        position: round.position,
+        size: round.size,
+      }
+    : null;
+
+  if (liveCheck && lastCheck?.occurrenceKey !== liveCheck.occurrenceKey) {
+    setLastCheck(liveCheck);
+  }
+
+  const [lastRecordItem, setLastRecordItem] =
+    useState<TodayTimelineItem | null>(null);
+
+  if (recordItem && lastRecordItem !== recordItem) {
+    setLastRecordItem(recordItem);
+  }
+
+  // Live while open so the minute tick keeps the prior reading fresh; the
+  // latched copy only takes over while the sheet is sliding away.
+  const shownCheck = liveCheck ?? lastCheck;
+  const shownRecordItem = recordItem ?? lastRecordItem;
 
   const markSyncing = useCallback((key: string, syncing: boolean) => {
     setSyncingKeys((previous) => {
@@ -287,6 +339,10 @@ export function TodayView({
       }
 
       if (item.task.type === "temperature") {
+        // First statement in the handler, before any guard that could return:
+        // iOS only raises the keyboard for a focus in the gesture's own task,
+        // and the sheet is two commits away. See lib/keyboard-primer.
+        primeKeyboard();
         if (
           item.task.minTempC === null ||
           item.task.maxTempC === null ||
@@ -404,32 +460,26 @@ export function TodayView({
         {announcement}
       </span>
 
-      {round.item &&
-      round.currentKey &&
-      round.item.task.minTempC !== null &&
-      round.item.task.maxTempC !== null ? (
-        <TemperatureRoundFlow
-          item={round.item}
-          occurrenceKey={round.currentKey}
-          minTempC={round.item.task.minTempC}
-          maxTempC={round.item.task.maxTempC}
-          position={round.position}
-          size={round.size}
-          onSubmit={handleTemperatureConfirm}
-          onSkip={handleTemperatureSkip}
-          onClose={handleTemperatureClose}
-        />
-      ) : null}
+      {/* Both surfaces are mounted from first paint and toggled by `open`, so
+          Base UI has an element to run the enter and exit transitions on. The
+          latched copies keep the contents on screen while they slide away. */}
+      <TemperatureRoundFlow
+        open={isRoundOpen}
+        check={shownCheck}
+        onSubmit={handleTemperatureConfirm}
+        onSkip={handleTemperatureSkip}
+        onClose={handleTemperatureClose}
+      />
 
-      {recordItem ? (
+      {shownRecordItem ? (
         <TodayRecordSheet
-          open
+          open={Boolean(recordItem)}
           onOpenChange={(open) => {
             if (!open) setRecordKey(null);
           }}
-          item={recordItem}
+          item={shownRecordItem}
           currentUserId={currentUserId}
-          isUndoing={syncingKeys.has(occurrenceKey(recordItem.task))}
+          isUndoing={syncingKeys.has(occurrenceKey(shownRecordItem.task))}
           onUndo={(item) => void handleUndo(item.task)}
         />
       ) : null}

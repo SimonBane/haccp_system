@@ -5,7 +5,8 @@ import { requiresLocationAssignments } from "@haccp/shared";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { useTranslations } from "next-intl";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
-import { EmployeesTableRowActions } from "@/features/employees/data-table/row-actions";
+import { DataTableRowActions } from "@/components/ui/data-table/data-table-row-actions";
+import type { GetRowActions } from "@/components/ui/data-table/row-action";
 import {
   EmployeeIdentity,
   EmployeeLocationsBadges,
@@ -23,19 +24,13 @@ type GetColumnsParams = {
   // passed in — the cells below render inside it and use the shared components.
   t: EmployeesTranslations;
   showLocationsColumn?: boolean;
-  onEdit: (employee: EmployeeResponse) => void;
-  onInvite: (employee: EmployeeResponse) => void;
-  onRevokeInvitation: (employee: EmployeeResponse) => void;
-  onDelete: (employee: EmployeeResponse) => void;
+  getRowActions: GetRowActions<EmployeeResponse>;
 };
 
 export function getColumns({
   t,
   showLocationsColumn = true,
-  onEdit,
-  onInvite,
-  onRevokeInvitation,
-  onDelete,
+  getRowActions,
 }: GetColumnsParams): ColumnDef<EmployeeResponse>[] {
   return [
     {
@@ -92,13 +87,9 @@ export function getColumns({
       enableSorting: false,
       enableHiding: false,
       cell: ({ row }) => (
-        <EmployeesTableRowActions
-          row={row}
-          t={t}
-          onEdit={onEdit}
-          onInvite={onInvite}
-          onRevokeInvitation={onRevokeInvitation}
-          onDelete={onDelete}
+        <DataTableRowActions
+          srLabel={t("openMenu")}
+          actions={getRowActions(row.original)}
         />
       ),
     },

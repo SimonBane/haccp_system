@@ -3,7 +3,9 @@ import { getMessages, getTranslations, setRequestLocale } from "next-intl/server
 import { hasLocale } from "next-intl";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
+import { KeyboardInsetSync } from "@/components/keyboard-inset-sync";
 import { LocaleHtmlLang } from "@/components/locale-html-lang";
+import { ThemeColorSync } from "@/components/theme-color-sync";
 import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -58,13 +60,11 @@ export async function generateMetadata({
 
 export function generateViewport() {
   return {
-    // Match the painted canvas so splash / chrome blend with the app surface.
-    // These track --background, which is what the top bar paints; the previous
-    // dark value was --sidebar and read as a lighter band above the content.
-    themeColor: [
-      { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-      { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
-    ],
+    // One entry, deliberately not media-scoped: a `prefers-color-scheme` query
+    // resolves against the OS, while the app's own theme comes from next-themes
+    // and can differ. `ThemeColorSync` owns this from mount onward; this is only
+    // the pre-hydration value.
+    themeColor: "#ffffff",
     viewportFit: "cover",
     // The shell is a locked, fixed-height column, so the software keyboard has
     // nothing to scroll out of its way. Resizing the viewport instead keeps a
@@ -95,6 +95,8 @@ export default async function LocaleLayout({
     <AppClerkProvider locale={resolvedLocale}>
       <NextIntlClientProvider messages={messages}>
         <LocaleHtmlLang />
+        <ThemeColorSync />
+        <KeyboardInsetSync />
         <ServiceWorkerRegistration />
         <QueryProvider>
           <TooltipProvider>

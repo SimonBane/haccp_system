@@ -36,8 +36,9 @@ type PageContainerProps = VariantProps<typeof pageWidthVariants> & {
  * The standard body of a dashboard page: one centred column with a consistent
  * gutter and a 24px rhythm between sections.
  *
- * Top padding is mobile-only — on desktop the breadcrumb bar above already
- * provides the gap, and doubling it pushes every page down by 16px.
+ * The page owns its own top gap on both platforms now. It used to be mobile-only
+ * because a breadcrumb bar sat above on desktop and supplied one; with that gone
+ * the desktop pages started flush against the top of the inset.
  */
 export function PageContainer({
   width,
@@ -48,7 +49,7 @@ export function PageContainer({
     <div
       className={cn(
         pageWidthVariants({ width }),
-        "flex min-w-0 flex-1 flex-col gap-6 pt-4 pb-16 md:pt-0",
+        "flex min-w-0 flex-1 flex-col gap-6 pt-4 pb-16 md:pt-6",
         className,
       )}
     >
