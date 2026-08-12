@@ -10,9 +10,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="bg"
-      // Height lives in globals.css (`-webkit-fill-available` / dvh). A
-      // Tailwind `h-full` here would win the cascade and recreate the iOS
-      // PWA short-viewport gap above the home indicator.
+      // Height lives in globals.css, where `html` is sized in dvh. A Tailwind
+      // `h-full` here would win the cascade and resolve against the layout
+      // viewport instead, which is taller than what the user can see.
       className={cn("antialiased", "font-sans", inter.variable)}
       suppressHydrationWarning
     >
