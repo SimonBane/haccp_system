@@ -126,8 +126,8 @@
    * `--app-vv-top`: iOS sometimes shifts the visual viewport down after
    * focus (and leaves it there). The mobile shell follows that offset so
    * chrome is not letterboxed. Height is deliberately *not* taken from
-   * `visualViewport` — that value is short of the covered screen in iOS
-   * PWAs and was leaving a dead band above the home indicator.
+   * `visualViewport.height` — that value stops above the home indicator in
+   * installed iOS PWAs; the shell uses dvh instead.
    *
    * `--keyboard-gap`: same inset, measured from inside `SidebarInset`,
    * which already carries the bottom safe-area as padding.
@@ -209,11 +209,11 @@
    * usual body-to-viewport propagation no longer applies.
    */
   html {
-    /* Prefer fill-available over percentage: on iOS standalone, `100%` is
-       routinely short of the covered screen and leaves a dead bottom band. */
-    height: 100%;
-    height: -webkit-fill-available;
-    min-height: 100dvh;
+    /* dvh, not lvh or -webkit-fill-available: both of those measure the
+       viewport as if the browser toolbars were hidden, which pushes the shell
+       under Safari's URL bar. The document never scrolls, so the toolbars
+       never collapse and dvh is simply what the user can see. */
+    height: 100dvh;
     overflow: hidden;
     overscroll-behavior: none;
     -webkit-tap-highlight-color: transparent;
@@ -238,8 +238,6 @@
   }
   body {
     height: 100%;
-    height: -webkit-fill-available;
-    min-height: 100dvh;
     overflow: hidden;
     overscroll-behavior: none;
     @apply bg-background text-foreground;
@@ -266,9 +264,8 @@
  * black window behind the web view. A real fixed box repaints like any other
  * element.
  *
- * `100lvh` always covers the area under collapsing browser chrome. The mobile
- * shell separately pins itself to the visual viewport; this layer is the
- * fallback for routes that never mount that shell.
+ * Sized in dvh like the shell, so it paints exactly the visible viewport
+ * rather than reaching under Safari's toolbars.
  */
 body::before {
   content: "";
@@ -276,8 +273,7 @@ body::before {
   top: 0;
   left: 0;
   width: 100%;
-  height: 100lvh;
-  min-height: -webkit-fill-available;
+  height: 100dvh;
   z-index: -1;
   background-color: var(--background);
   pointer-events: none;
@@ -313,9 +309,9 @@ body::before {
  * would teleport rather than slide.
  *
  * The wrapper follows `--app-vv-top` when iOS shifts the visual viewport,
- * but its height comes from CSS fill units — never `visualViewport.height`,
- * which ends above the home indicator in installed iOS PWAs. Sidebar and
- * scrim are `absolute` inside it so they share that box.
+ * but its height is a dvh, not `visualViewport.height` — that value stops
+ * above the home indicator in installed iOS PWAs. Sidebar and scrim are
+ * `absolute` inside it so they share that box.
  */
 @media (width < 48rem) {
   [data-slot="sidebar-wrapper"] {
@@ -323,11 +319,10 @@ body::before {
     top: var(--app-vv-top, 0px);
     left: 0;
     width: 100%;
-    /* Large viewport + fill-available: covers the PWA home-indicator band
-       that `100%` / `visualViewport.height` leave empty. Subtract the offset
-       so a non-zero `--app-vv-top` does not overflow the bottom. */
-    height: calc(100lvh - var(--app-vv-top, 0px));
-    min-height: -webkit-fill-available;
+    /* dvh is the visible viewport: full screen in a standalone PWA, and the
+       area above the URL bar in Safari. The offset is subtracted so a
+       non-zero `--app-vv-top` cannot push the bottom off screen. */
+    height: calc(100dvh - var(--app-vv-top, 0px));
   }
 
   [data-slot="sidebar-inset"],

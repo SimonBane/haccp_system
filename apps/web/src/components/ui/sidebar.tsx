@@ -96,10 +96,10 @@ function SidebarProvider({
           // them makes this a containing block and detaches every portalled
           // fixed overlay from the viewport.
           //
-          // Desktop: h-full against the html/body percentage chain.
-          // Mobile: globals.css fixes this box to the covered viewport
-          // (`100lvh` / `-webkit-fill-available`, plus `--app-vv-top` when
-          // iOS shifts the visual viewport) so the drawer cannot letterbox.
+          // Desktop: h-full against the html/body height chain.
+          // Mobile: globals.css fixes this box to the visible viewport
+          // (`100dvh`, offset by `--app-vv-top` when iOS shifts the visual
+          // viewport) so the drawer cannot letterbox or run under the URL bar.
           "group/sidebar-wrapper relative flex h-full w-full overflow-hidden",
           "has-data-[variant=inset]:bg-sidebar max-md:bg-sidebar",
           className
