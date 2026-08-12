@@ -97,9 +97,9 @@ function SidebarProvider({
           // fixed overlay from the viewport.
           //
           // Desktop: h-full against the html/body height chain.
-          // Mobile: globals.css fixes this box to the visible viewport
-          // (`100dvh`, offset by `--app-vv-top` when iOS shifts the visual
-          // viewport) so the drawer cannot letterbox or run under the URL bar.
+          // Mobile: globals.css fixes this box to `--app-viewport-height`,
+          // offset by `--app-vv-top` when iOS shifts the visual viewport, so
+          // the drawer cannot letterbox or run under the URL bar.
           "group/sidebar-wrapper relative flex h-full w-full overflow-hidden",
           "has-data-[variant=inset]:bg-sidebar max-md:bg-sidebar",
           className
@@ -152,7 +152,10 @@ function Sidebar({
         data-slot="sidebar-container"
         data-side={side}
         className={cn(
-          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) data-[side=left]:left-0 data-[side=right]:right-0 md:flex",
+          // Height from the shared token, not `h-svh`: WebKit under-reports
+          // the small viewport in an installed app, which would leave this
+          // panel short of the screen on an iPad home-screen app.
+          "fixed inset-y-0 z-10 hidden h-(--app-viewport-height) w-(--sidebar-width) data-[side=left]:left-0 data-[side=right]:right-0 md:flex",
           // Adjust the padding for floating and inset variants.
           variant === "floating" || variant === "inset"
             ? "p-2"
