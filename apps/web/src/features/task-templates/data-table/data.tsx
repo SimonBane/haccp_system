@@ -3,12 +3,12 @@
 import type { TaskTemplateResponse, TaskTemplateType } from "@haccp/shared";
 import { useTranslations } from "next-intl";
 import { useCallback, useMemo } from "react";
-import { PencilIcon, Trash2Icon } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { DataTableAddButton } from "@/components/ui/data-table/data-table-add-button";
-import { MobileListSwipeAction } from "@/components/ui/data-table/data-table-mobile-list";
 import { getColumns } from "@/features/task-templates/data-table/columns";
 import { TaskTemplatesMobileCard } from "@/features/task-templates/data-table/mobile-card";
+import { getTaskTemplateRowActions } from "@/features/task-templates/data-table/row-actions";
+import { primeKeyboard } from "@/lib/keyboard-primer";
 
 type TaskTemplatesDataProps = {
   items: TaskTemplateResponse[];
@@ -47,51 +47,45 @@ export function TaskTemplatesData({
     [t],
   );
 
-  const columns = useMemo(
+  // Priming has to happen inside the tap; see lib/keyboard-primer.
+  const openAdd = useCallback(() => {
+    primeKeyboard();
+    onAdd();
+  }, [onAdd]);
+
+  const openEdit = useCallback(
+    (task: TaskTemplateResponse) => {
+      primeKeyboard();
+      onEdit(task);
+    },
+    [onEdit],
+  );
+
+  const getRowActions = useMemo(
     () =>
-      getColumns({
+      getTaskTemplateRowActions({
         t,
-        typeLabels,
-        scheduleLabels,
-        onEdit,
+        onEdit: openEdit,
         onDuplicate,
         onDelete,
       }),
-    [t, typeLabels, scheduleLabels, onEdit, onDuplicate, onDelete],
+    [t, openEdit, onDuplicate, onDelete],
   );
 
-  const renderSwipeActions = useCallback(
-    (row: { original: TaskTemplateResponse }) => (
-      <>
-        <MobileListSwipeAction
-          label={t("edit")}
-          icon={<PencilIcon className="size-4" />}
-          onClick={() => onEdit(row.original)}
-        />
-        <MobileListSwipeAction
-          label={t("delete")}
-          icon={<Trash2Icon className="size-4" />}
-          variant="destructive"
-          onClick={() => onDelete(row.original)}
-        />
-      </>
-    ),
-    [onDelete, onEdit, t],
+  const columns = useMemo(
+    () => getColumns({ t, typeLabels, scheduleLabels, getRowActions }),
+    [t, typeLabels, scheduleLabels, getRowActions],
   );
 
   const renderMobileRow = useCallback(
     (row: Parameters<typeof TaskTemplatesMobileCard>[0]["row"]) => (
       <TaskTemplatesMobileCard
         row={row}
-        t={t}
         typeLabels={typeLabels}
         scheduleLabels={scheduleLabels}
-        onEdit={onEdit}
-        onDuplicate={onDuplicate}
-        onDelete={onDelete}
       />
     ),
-    [t, typeLabels, scheduleLabels, onEdit, onDuplicate, onDelete],
+    [typeLabels, scheduleLabels],
   );
 
   return (
@@ -103,17 +97,19 @@ export function TaskTemplatesData({
       searchPlaceholder={t("searchPlaceholder")}
       emptyMessage={t("emptyTitle")}
       emptyDescription={t("emptyDescription")}
-      emptyAction={
-        <DataTableAddButton onClick={onAdd} label={t("add")} />
-      }
+      emptyAction={<DataTableAddButton onClick={openAdd} label={t("add")} />}
       noResultsMessage={tTable("noResults")}
       enablePagination
       pageSize={10}
       enableColumnVisibility
-      toolbar={<DataTableAddButton onClick={onAdd} label={t("add")} />}
-      onRowClick={(row) => onEdit(row.original)}
+      toolbar={<DataTableAddButton onClick={openAdd} label={t("add")} />}
+      onRowClick={(row) => openEdit(row.original)}
       renderMobileRow={renderMobileRow}
-      renderSwipeActions={renderSwipeActions}
+      // A template carries a type, a weekday pattern, equipment and up to six
+      // times — more than a one-line row can show without truncating.
+      mobileVariant="card"
+      getRowActions={(row) => getRowActions(row.original)}
+      getRowLabel={(row) => row.original.title}
     />
   );
 }

@@ -19,10 +19,13 @@ import {
   SheetDescription,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { SHEET_SLIDE } from "@/components/ui/responsive-form-dialog";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { handOffKeyboard } from "@/lib/keyboard-primer";
 import { cn } from "@/lib/utils";
 
 type Props = {
+  /** Kept mounted while false so the exit transition can run. */
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
@@ -33,22 +36,20 @@ type Props = {
   onLeading: () => void;
   /** Null for a lone check, which then looks exactly like the old flow. */
   round: { position: number; size: number } | null;
-  /** Keypad on a phone — rendered above the footer inside one action card. */
-  mobileActionPanel?: ReactNode;
   footer: ReactNode;
-  /** Desktop only — mobile opens on its own keypad and needs no focus ring. */
-  desktopInitialFocus?: RefObject<HTMLElement | null>;
+  /** The reading field, focused on open so the keyboard comes straight up. */
+  initialFocus?: RefObject<HTMLInputElement | null>;
   children: ReactNode;
 };
 
 /**
  * The surface a round of temperature readings is entered on.
  *
- * On a phone it is a full-screen modal that slides up from the bottom: the modal
- * is exactly the viewport, so its height cannot change while the worker types.
- * The commit action lives in a bar pinned under the keypad — see
- * `temperature-round-footer` for why it moved out of the app bar — which frees
- * the bar's trailing slot for the round counter.
+ * On a phone it is a full-screen modal that slides up from the bottom and then
+ * shortens to whatever the software keyboard leaves — see the `[data-side=bottom]`
+ * rule in globals.css. The commit action rides that bottom edge, so it ends up
+ * directly on top of the keys; that is what freed the app bar's trailing slot for
+ * the round counter.
  *
  * On desktop it stays a conventional centred dialog with a footer; a mouse does
  * not mis-tap, and the keyboard never leaves the number field.
@@ -70,9 +71,8 @@ export function TemperatureEntryShell({
   leadingLabel,
   onLeading,
   round,
-  mobileActionPanel,
   footer,
-  desktopInitialFocus,
+  initialFocus,
   children,
 }: Props) {
   const t = useTranslations("TodayPage");
@@ -107,16 +107,25 @@ export function TemperatureEntryShell({
           side="bottom"
           // The close control lives in the app bar instead.
           showCloseButton={false}
+          // Base UI's default resolver focuses the popup itself on a touch
+          // interaction, precisely to keep the keyboard down. Here the keyboard
+          // is the point, so put focus on the reading field and select what is
+          // in it — a retype then overwrites rather than appends.
+          initialFocus={() => {
+            const node = initialFocus?.current;
+            if (!node) return true;
+            handOffKeyboard(node, "select");
+            return false;
+          }}
           className={cn(
-            // Variant-qualified, because the stock side=bottom rule is h-auto
-            // and would otherwise win on specificity.
-            "data-[side=bottom]:h-[100dvh] max-h-none gap-0 rounded-none border-0 p-0",
-            // The stock bottom sheet nudges 2.5rem and fades. Across a full
-            // screen that reads as a flicker rather than a slide.
-            "duration-300 data-starting-style:opacity-100 data-ending-style:opacity-100",
-            "data-[side=bottom]:data-starting-style:translate-y-full",
-            "data-[side=bottom]:data-ending-style:translate-y-full",
-            "motion-reduce:duration-0",
+            // top-0 with h-auto rather than a fixed 100dvh: the shell's own
+            // `bottom` is driven by --keyboard-inset, and a resolved height
+            // would make the popup overflow the top by the keyboard's height
+            // instead of getting shorter.
+            "top-0 data-[side=bottom]:h-auto max-h-none gap-0 rounded-none border-0 p-0",
+            // The same slide every other form uses, from the same constant, so
+            // the two surfaces cannot drift apart.
+            SHEET_SLIDE,
           )}
         >
           {/* The height has to include the inset. Tailwind's preflight makes
@@ -145,29 +154,15 @@ export function TemperatureEntryShell({
             {counter ?? <span className="w-11" aria-hidden />}
           </header>
 
-          {round ? (
-            <div aria-hidden className="h-0.5 shrink-0 bg-muted">
-              <div
-                className="h-full bg-primary transition-[width] duration-300 motion-reduce:transition-none"
-                style={{
-                  width: `${((round.position - 1) / round.size) * 100}%`,
-                }}
-              />
-            </div>
-          ) : null}
-
           <div className="flex min-h-0 flex-1 flex-col px-4 pb-3">
             {children}
           </div>
 
-          <div className="shrink-0 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-            <div className="flex flex-col gap-2.5 rounded-2xl border border-border bg-muted/25 p-2.5">
-              {mobileActionPanel}
-              {mobileActionPanel ? (
-                <div className="border-t border-border/60" aria-hidden />
-              ) : null}
-              {footer}
-            </div>
+          {/* Sits directly on top of the software keyboard: the sheet shortens
+              by --keyboard-inset, and the home-indicator gutter collapses when
+              the keyboard is already covering it. */}
+          <div className="shrink-0 bg-popover px-4 pt-3 pb-[max(0.75rem,calc(env(safe-area-inset-bottom)-var(--keyboard-inset,0px)))]">
+            {footer}
           </div>
         </SheetContent>
       </Sheet>
@@ -178,7 +173,7 @@ export function TemperatureEntryShell({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="max-h-[90dvh] w-full gap-5 overflow-y-auto sm:max-w-md"
-        initialFocus={desktopInitialFocus}
+        initialFocus={initialFocus}
       >
         <DialogHeader>
           {/* Dialog's own close button is absolutely positioned in this corner,

@@ -96,17 +96,12 @@ export function TaskTemplatesManager({
     }
   }, [deleteTarget, isDeleting, refetch, remove, t]);
 
+  // Only the open flag. Clearing the record here too would change the form's
+  // `key` mid-exit, remounting it and killing the slide-out — every open path
+  // below already sets the record explicitly, so there is nothing to reset.
   const handleFormOpenChange = useCallback((open: boolean) => {
-    if (!open) {
-      setFormOpen(false);
-      setEditingTask(null);
-      setDuplicateSource(null);
-    }
+    if (!open) setFormOpen(false);
   }, []);
-
-  const handleDuplicateFromForm = useCallback(() => {
-    if (editingTask) openDuplicateForm(editingTask);
-  }, [editingTask, openDuplicateForm]);
 
   const handleSubmit = useCallback(
     async (values: TaskTemplateFieldsInput) => {
@@ -159,27 +154,22 @@ export function TaskTemplatesManager({
         onConfirm={confirmDelete}
       />
 
-      {formOpen ? (
-        <TaskTemplatesForm
-          key={
-            duplicateSource
-              ? `duplicate-${duplicateSource.id}`
-              : (editingTask?.id ?? "create")
-          }
-          open
-          onOpenChange={handleFormOpenChange}
-          task={editingTask}
-          duplicateSource={duplicateSource}
-          suggestedDuplicateTitle={
-            duplicateSource
-              ? t("duplicateSuggestedTitle", { title: duplicateSource.title })
-              : undefined
-          }
-          equipment={equipment}
-          onDuplicate={handleDuplicateFromForm}
-          onSubmit={handleSubmit}
-        />
-      ) : null}
+      {/* Always mounted, `open` toggled: Base UI runs the sheet's exit
+          transition on the popup it already owns, so unmounting the form here
+          would cut the slide-out and make it vanish instead. */}
+      <TaskTemplatesForm
+        open={formOpen}
+        onOpenChange={handleFormOpenChange}
+        task={editingTask}
+        duplicateSource={duplicateSource}
+        suggestedDuplicateTitle={
+          duplicateSource
+            ? t("duplicateSuggestedTitle", { title: duplicateSource.title })
+            : undefined
+        }
+        equipment={equipment}
+        onSubmit={handleSubmit}
+      />
     </div>
   );
 }

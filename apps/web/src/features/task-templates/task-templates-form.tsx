@@ -15,7 +15,7 @@ import {
 } from "@haccp/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useZodErrorMap } from "@/lib/forms/zod-error-map";
-import { CopyPlusIcon, PlusIcon, SaveIcon } from "lucide-react";
+import { PlusIcon, SaveIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -82,7 +82,6 @@ type TaskTemplatesFormProps = {
   duplicateSource?: TaskTemplateResponse | null;
   suggestedDuplicateTitle?: string;
   equipment: Pick<EquipmentResponse, "id" | "name">[];
-  onDuplicate?: () => void;
   onSubmit: (values: TaskTemplateFieldsInput) => Promise<void>;
 };
 
@@ -96,7 +95,6 @@ export function TaskTemplatesForm({
   duplicateSource,
   suggestedDuplicateTitle,
   equipment,
-  onDuplicate,
   onSubmit,
 }: TaskTemplatesFormProps) {
   const t = useTranslations("TasksPage");
@@ -195,36 +193,70 @@ export function TaskTemplatesForm({
     name: "scheduledTimeRows",
   });
 
-  const [weekdayPreset, setWeekdayPreset] = useState<WeekdayPreset>(() =>
-    getWeekdayPreset(defaultValues.weekdays),
-  );
-  const [autoFocusTimeIndex, setAutoFocusTimeIndex] = useState<number | null>(
-    null,
-  );
-  const [duplicateTimesError, setDuplicateTimesError] = useState<string | null>(
-    null,
-  );
-  const skipWeekdaysBlurRef = useRef(false);
+  /*
+   * The three bits of scheduling state that are not the form's values, held
+   * together because they are always reset together — once per open.
+   *
+   * One object rather than three `useState`s so the reset below is a single
+   * update: three in a row inside an effect is a cascade of renders, and the
+   * remount that used to do this instead is what broke the sheet's slide-in.
+   */
+  const [scheduleUi, setScheduleUi] = useState<{
+    weekdayPreset: WeekdayPreset;
+    autoFocusTimeIndex: number | null;
+    duplicateTimesError: string | null;
+  }>(() => ({
+    weekdayPreset: getWeekdayPreset(defaultValues.weekdays),
+    autoFocusTimeIndex: null,
+    duplicateTimesError: null,
+  }));
+  const { weekdayPreset, autoFocusTimeIndex, duplicateTimesError } = scheduleUi;
 
-  const handleDialogOpenChange = (nextOpen: boolean) => {
-    if (nextOpen) {
-      form.reset(defaultValues);
-      setWeekdayPreset(getWeekdayPreset(defaultValues.weekdays));
-      setAutoFocusTimeIndex(null);
-      setDuplicateTimesError(null);
+  const setWeekdayPreset = (next: WeekdayPreset) =>
+    setScheduleUi((previous) => ({ ...previous, weekdayPreset: next }));
+  const setAutoFocusTimeIndex = (next: number | null) =>
+    setScheduleUi((previous) => ({ ...previous, autoFocusTimeIndex: next }));
+  const setDuplicateTimesError = (next: string | null) =>
+    setScheduleUi((previous) => ({ ...previous, duplicateTimesError: next }));
+  const skipWeekdaysBlurRef = useRef(false);
+  const titleRef = useRef<HTMLInputElement | null>(null);
+
+  /*
+   * Reset on open, driven by the prop rather than by the open handler: the
+   * parent opens this by flipping `open`, which never calls `onOpenChange`.
+   *
+   * This used to be a remount via a changing `key`. That reset everything for
+   * free, but a sheet that mounts already-open has no closed state to
+   * transition from, so the slide-in was skipped every time the record changed
+   * — which is why the first open after switching records never animated.
+   *
+   * The UI state is adjusted during render, the documented way to reset state
+   * when a prop changes; only `form.reset` goes in an effect, because that is
+   * the part talking to something outside React.
+   */
+  const [openedValues, setOpenedValues] =
+    useState<TaskTemplatesFormValues | null>(null);
+
+  // Cleared back to null while closed, so reopening the *same* record still
+  // counts as a fresh open — `defaultValues` keeps its identity in that case and
+  // comparing on it alone would leave last session's weekday preset behind.
+  const openedTarget = open ? defaultValues : null;
+
+  if (openedValues !== openedTarget) {
+    setOpenedValues(openedTarget);
+    if (openedTarget) {
+      setScheduleUi({
+        weekdayPreset: getWeekdayPreset(openedTarget.weekdays),
+        autoFocusTimeIndex: null,
+        duplicateTimesError: null,
+      });
     }
-    onOpenChange(nextOpen);
-  };
+  }
 
   useEffect(() => {
-    if (!open || !duplicateSource || task) return;
-
-    const timeoutId = window.setTimeout(() => {
-      form.setFocus("title", { shouldSelect: true });
-    }, 0);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [open, task, duplicateSource, form]);
+    if (!open) return;
+    form.reset(defaultValues);
+  }, [open, defaultValues, form]);
 
   const typeLabels: Record<TaskTemplateType, string> = {
     temperature: t("types.temperature"),
@@ -315,46 +347,29 @@ export function TaskTemplatesForm({
     });
   }
 
+  // Duplicate is reached from the row's action menu on both platforms now —
+  // see the note in equipment-form.
+  const submitLabel = isEditing ? t("save") : t("add");
+  const SubmitIcon = isEditing ? SaveIcon : PlusIcon;
+
   const formFooter = (
     <DialogFooter>
-      {isEditing ? (
-        <>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={isSubmitting}
-            onClick={onDuplicate}
-          >
-            <CopyPlusIcon data-icon="inline-start" />
-            {t("duplicate")}
-          </Button>
-          <Button
-            type="submit"
-            form={TASK_TEMPLATES_FORM_ID}
-            isLoading={isSubmitting}
-            disabled={!hasChanges}
-          >
-            <SaveIcon data-icon="inline-start" />
-            {t("save")}
-          </Button>
-        </>
-      ) : (
-        <Button
-          type="submit"
-          form={TASK_TEMPLATES_FORM_ID}
-          isLoading={isSubmitting}
-        >
-          <PlusIcon data-icon="inline-start" />
-          {t("add")}
-        </Button>
-      )}
+      <Button
+        type="submit"
+        form={TASK_TEMPLATES_FORM_ID}
+        isLoading={isSubmitting}
+        disabled={isEditing && !hasChanges}
+      >
+        <SubmitIcon data-icon="inline-start" />
+        {submitLabel}
+      </Button>
     </DialogFooter>
   );
 
   return (
     <ResponsiveFormDialog
       open={open}
-      onOpenChange={handleDialogOpenChange}
+      onOpenChange={onOpenChange}
       title={
         isEditing
           ? t("editTitle")
@@ -371,11 +386,19 @@ export function TaskTemplatesForm({
       }
       initialFocus={isEditing || isDuplicating ? undefined : false}
       closeLabel={t("cancel")}
-      submit={{
-        label: isEditing ? t("save") : t("add"),
-        formId: TASK_TEMPLATES_FORM_ID,
-        isLoading: isSubmitting,
-        disabled: isEditing && !hasChanges,
+      autoFocusField={{
+        ref: titleRef,
+        selection: isEditing || isDuplicating ? "select" : "none",
+      }}
+      actions={{
+        items: [
+          {
+            label: submitLabel,
+            formId: TASK_TEMPLATES_FORM_ID,
+            isLoading: isSubmitting,
+            disabled: isEditing && !hasChanges,
+          },
+        ],
       }}
       footer={formFooter}
     >
@@ -398,6 +421,10 @@ export function TaskTemplatesForm({
                   </FieldLabel>
                   <Input
                     {...field}
+                    ref={(node) => {
+                      field.ref(node);
+                      titleRef.current = node;
+                    }}
                     id={`${TASK_TEMPLATES_FORM_ID}-title`}
                     aria-invalid={fieldState.invalid}
                     placeholder={t("titlePlaceholder")}
@@ -701,7 +728,10 @@ export function TaskTemplatesForm({
                   variant="outline"
                   className={cn(
                     SCHEDULED_TIME_SLOT_CLASS,
-                    "shrink-0 px-2",
+                    // Buttons default to 36px; the time fields beside it are
+                    // --control-h, which is 44px on touch. Match them or the
+                    // row of slots is visibly ragged on a phone.
+                    "h-(--control-h) shrink-0 px-2",
                   )}
                   onClick={() => {
                     const nextIndex = fields.length;

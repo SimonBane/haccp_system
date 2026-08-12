@@ -95,20 +95,13 @@ export function LocationsManager({ initialItems }: LocationsManagerProps) {
       setIsDeleting(false);
       toast.error(getErrorMessage(error, t("toast.deleteError")));
     }
-  }, [
-    deleteTarget,
-    isDeleting,
-    reloadTenant,
-    refetch,
-    remove,
-    t,
-  ]);
+  }, [deleteTarget, isDeleting, reloadTenant, refetch, remove, t]);
 
+  // Only the open flag. Clearing the record here too would change the form's
+  // `key` mid-exit, remounting it and killing the slide-out — every open path
+  // below already sets the record explicitly, so there is nothing to reset.
   const handleFormOpenChange = useCallback((open: boolean) => {
-    if (!open) {
-      setFormOpen(false);
-      setEditingLocation(null);
-    }
+    if (!open) setFormOpen(false);
   }, []);
 
   const handleSubmit = useCallback(
@@ -166,15 +159,15 @@ export function LocationsManager({ initialItems }: LocationsManagerProps) {
         onConfirm={confirmDelete}
       />
 
-      {formOpen ? (
-        <LocationForm
-          key={editingLocation?.id ?? "create"}
-          open
-          onOpenChange={handleFormOpenChange}
-          location={editingLocation}
-          onSubmit={handleSubmit}
-        />
-      ) : null}
+      {/* Always mounted, `open` toggled: Base UI runs the sheet's exit
+          transition on the popup it already owns, so unmounting the form here
+          would cut the slide-out and make it vanish instead. */}
+      <LocationForm
+        open={formOpen}
+        onOpenChange={handleFormOpenChange}
+        location={editingLocation}
+        onSubmit={handleSubmit}
+      />
     </div>
   );
 }

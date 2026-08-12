@@ -10,14 +10,17 @@ import {
 import { useAuth } from "@clerk/nextjs";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useZodErrorMap } from "@/lib/forms/zod-error-map";
-import { CheckIcon, SaveIcon, SendIcon } from "lucide-react";
+import { SaveIcon, SendIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm, useFormState, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
+import {
+  ResponsiveFormDialog,
+  type ResponsiveFormActions,
+} from "@/components/ui/responsive-form-dialog";
 import { DialogFooter } from "@/components/ui/dialog";
 import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
 import {
@@ -96,6 +99,9 @@ export function EmployeeForm({
   }, [tenantLocations, locationId]);
   const isEditing = Boolean(employee);
   const isActive = employee?.status === "active";
+  // Not focused for an active member: their email field is disabled, so a
+  // primed keyboard would come up over something that cannot take it.
+  const emailRef = useRef<HTMLInputElement | null>(null);
   const isEditingSelf =
     Boolean(employee?.user.clerkUserId) &&
     employee?.user.clerkUserId === clerkUserId;
@@ -337,32 +343,34 @@ export function EmployeeForm({
       </DialogFooter>
   );
 
-  // Two ways to finish a new employee, so the mobile nav-bar icon opens a
-  // choice rather than guessing which one was meant.
-  const submitAction = isEditing
+  // A new employee has two genuine ways to finish, neither subordinate to the
+  // other, so they split the bar evenly rather than hiding one behind a menu.
+  const formActions: ResponsiveFormActions = isEditing
     ? {
-        label: t("save"),
-        icon: <CheckIcon className="size-5" />,
-        isLoading: pendingAction === "save",
-        disabled:
-          !hasChanges || (pendingAction !== null && pendingAction !== "save"),
-        onClick: () => void submitEdit(),
-      }
-    : {
-        label: t("save"),
-        icon: <CheckIcon className="size-5" />,
-        disabled: pendingAction !== null,
-        options: [
+        items: [
           {
             label: t("save"),
             icon: <SaveIcon data-icon="inline-start" />,
+            isLoading: pendingAction === "save",
+            disabled:
+              !hasChanges ||
+              (pendingAction !== null && pendingAction !== "save"),
+            onClick: () => void submitEdit(),
+          },
+        ],
+      }
+    : {
+        layout: "split",
+        items: [
+          {
+            label: t("save"),
+            variant: "outline",
             isLoading: pendingAction === "save",
             disabled: pendingAction !== null && pendingAction !== "save",
             onClick: () => void submit(false),
           },
           {
             label: t("saveAndInvite"),
-            icon: <SendIcon data-icon="inline-start" />,
             isLoading: pendingAction === "invite",
             disabled: pendingAction !== null && pendingAction !== "invite",
             onClick: () => void submit(true),
@@ -389,7 +397,8 @@ export function EmployeeForm({
       title={isEditing ? t("editTitle") : t("addTitle")}
       description={isEditing ? t("editDescription") : t("addDescription")}
       closeLabel={t("cancel")}
-      submit={submitAction}
+      autoFocusField={isActive ? undefined : { ref: emailRef }}
+      actions={formActions}
       footer={formFooter}
     >
         <form id={EMPLOYEE_FORM_ID} className="space-y-6">
@@ -404,6 +413,10 @@ export function EmployeeForm({
                   </FieldLabel>
                   <Input
                     {...field}
+                    ref={(node) => {
+                      field.ref(node);
+                      emailRef.current = node;
+                    }}
                     id="employee-email"
                     type="email"
                     inputMode="email"
