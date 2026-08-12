@@ -5,7 +5,6 @@ import * as React from "react";
 /** Published on <html> so portalled sheets and the shell can read them. */
 const KEYBOARD_INSET_VAR = "--keyboard-inset";
 const VV_TOP_VAR = "--app-vv-top";
-const VV_HEIGHT_VAR = "--app-vv-height";
 
 /**
  * Below this, a visual-viewport change is browser chrome moving rather than the
@@ -37,15 +36,14 @@ function measureKeyboardInset(win: Window): number {
 }
 
 /**
- * Publishes the visual-viewport geometry the mobile shell must track, plus
- * `--keyboard-inset` for anything portalled to the layout viewport.
+ * Publishes `--keyboard-inset` for portalled sheets, and `--app-vv-top` so the
+ * mobile shell can follow an iOS visual-viewport offset without shrinking to
+ * `visualViewport.height`.
  *
- * iOS will shift `visualViewport.offsetTop` after focusing the drawer (and
- * sometimes leave it there after blur). Fixed layers then sit against the
- * layout viewport while the user is looking at a cropped slice — the gray
- * letterbox bands above and below the app. Pinning the shell to
- * `--app-vv-top` / `--app-vv-height` keeps chrome painted edge-to-edge on
- * what is actually on screen.
+ * Height must stay on CSS fill units (`100lvh` / `-webkit-fill-available`).
+ * Driving it from `visualViewport.height` is what left a dead band above the
+ * home indicator in installed iOS PWAs — that API is routinely shorter than
+ * the covered screen.
  *
  * Mount exactly once, at the top of the client tree.
  */
@@ -58,7 +56,6 @@ export function useKeyboardInset(): void {
     let frame = 0;
     let lastInset = Number.NaN;
     let lastTop = Number.NaN;
-    let lastHeight = Number.NaN;
 
     const write = () => {
       frame = 0;
@@ -70,14 +67,9 @@ export function useKeyboardInset(): void {
       }
 
       const top = Math.max(0, viewport?.offsetTop ?? 0);
-      const height = Math.round(viewport?.height ?? win.innerHeight);
       if (top !== lastTop) {
         lastTop = top;
         root.style.setProperty(VV_TOP_VAR, `${top}px`);
-      }
-      if (height !== lastHeight) {
-        lastHeight = height;
-        root.style.setProperty(VV_HEIGHT_VAR, `${height}px`);
       }
     };
 
@@ -120,7 +112,6 @@ export function useKeyboardInset(): void {
       win.removeEventListener("scroll", unscroll);
       root.style.removeProperty(KEYBOARD_INSET_VAR);
       root.style.removeProperty(VV_TOP_VAR);
-      root.style.removeProperty(VV_HEIGHT_VAR);
     };
   }, []);
 }

@@ -10,10 +10,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="bg"
-      className={cn("h-full antialiased", "font-sans", inter.variable)}
+      // Height lives in globals.css (`-webkit-fill-available` / dvh). A
+      // Tailwind `h-full` here would win the cascade and recreate the iOS
+      // PWA short-viewport gap above the home indicator.
+      className={cn("antialiased", "font-sans", inter.variable)}
       suppressHydrationWarning
     >
-      <body className="flex h-full flex-col font-sans">
+      <body className="flex flex-col font-sans">
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
