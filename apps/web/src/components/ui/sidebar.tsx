@@ -93,15 +93,13 @@ function SidebarProvider({
           // Fixed height, never scrolls: the shell's scroll region lives
           // inside SidebarInset. Nothing here may set transform, filter,
           // backdrop-filter, will-change, contain or perspective — any of
-          // them makes this a containing block and detaches the scrim and
-          // every portalled fixed overlay from the viewport.
+          // them makes this a containing block and detaches every portalled
+          // fixed overlay from the viewport.
           //
-          // h-full, not h-dvh: html and body are both `height: 100%`, and a
-          // second unit here means the shell can disagree with them by the
-          // height of a browser toolbar — an overflow that `body { overflow:
-          // hidden }` silently clips, leaving a strip painted by nothing but
-          // the canvas. The document never scrolls, so the toolbars can never
-          // auto-hide and dvh could not have differed usefully anyway.
+          // Desktop: h-full against the html/body percentage chain.
+          // Mobile: globals.css pins this box to the visual viewport
+          // (`--app-vv-top` / `--app-vv-height`) so iOS toolbar / focus
+          // shifts cannot letterbox the drawer and content.
           "group/sidebar-wrapper relative flex h-full w-full overflow-hidden",
           "has-data-[variant=inset]:bg-sidebar max-md:bg-sidebar",
           className
@@ -227,7 +225,9 @@ function MobileSidebar({
       data-variant={variant}
       data-side={side}
       className={cn(
-        "fixed inset-y-0 z-10 flex w-(--sidebar-width) flex-col bg-sidebar text-sidebar-foreground outline-none md:hidden",
+        // Absolute on mobile: the wrapper is the visual-viewport-locked shell
+        // (see globals.css). Fixed would ignore that box and re-letterbox.
+        "absolute inset-y-0 z-10 flex w-(--sidebar-width) flex-col bg-sidebar text-sidebar-foreground outline-none md:hidden",
         side === "left" ? "left-0" : "right-0",
         className
       )}
@@ -292,8 +292,9 @@ function SidebarScrim({ label }: { label: string }) {
       aria-hidden={!(isMobile && openMobile)}
       onClick={() => setOpenMobile(false)}
       className={cn(
-        // Position and opacity come from globals.css, alongside the inset's.
-        "fixed inset-0 z-30 touch-none bg-black/40 md:hidden",
+        // Absolute + opacity/translate: same visual-viewport shell as the
+        // sidebar (globals.css). Must not be `fixed` or it detaches from it.
+        "absolute inset-0 z-30 touch-none bg-black/40 md:hidden",
         // Only clickable once committed open, so a drag cannot land a tap.
         openMobile ? "pointer-events-auto" : "pointer-events-none"
       )}

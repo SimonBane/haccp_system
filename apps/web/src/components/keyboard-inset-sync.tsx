@@ -2,7 +2,7 @@
 
 import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
 
-/** Mounts the one visual-viewport listener for the whole app. */
+/** Mounts the one visual-viewport sync for the whole app (shell + keyboard). */
 export function KeyboardInsetSync() {
   useKeyboardInset();
   return null;

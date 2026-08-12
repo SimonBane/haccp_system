@@ -2,8 +2,10 @@
 
 import * as React from "react";
 
-/** Published on <html> so portalled sheets and popups can read it too. */
+/** Published on <html> so portalled sheets and the shell can read them. */
 const KEYBOARD_INSET_VAR = "--keyboard-inset";
+const VV_TOP_VAR = "--app-vv-top";
+const VV_HEIGHT_VAR = "--app-vv-height";
 
 /**
  * Below this, a visual-viewport change is browser chrome moving rather than the
@@ -35,13 +37,17 @@ function measureKeyboardInset(win: Window): number {
 }
 
 /**
- * Publishes `--keyboard-inset`: how much of the screen the software keyboard is
- * covering, measured from the bottom of the layout viewport.
+ * Publishes the visual-viewport geometry the mobile shell must track, plus
+ * `--keyboard-inset` for anything portalled to the layout viewport.
  *
- * Mount exactly once, at the top of the client tree. There is one visual
- * viewport, so a per-surface copy would mean N listeners racing to write one
- * variable — and consumers that are not inside any sheet, like the list's
- * floating search, would get nothing.
+ * iOS will shift `visualViewport.offsetTop` after focusing the drawer (and
+ * sometimes leave it there after blur). Fixed layers then sit against the
+ * layout viewport while the user is looking at a cropped slice — the gray
+ * letterbox bands above and below the app. Pinning the shell to
+ * `--app-vv-top` / `--app-vv-height` keeps chrome painted edge-to-edge on
+ * what is actually on screen.
+ *
+ * Mount exactly once, at the top of the client tree.
  */
 export function useKeyboardInset(): void {
   React.useEffect(() => {
@@ -50,14 +56,29 @@ export function useKeyboardInset(): void {
     const viewport = win.visualViewport;
 
     let frame = 0;
-    let last = -1;
+    let lastInset = Number.NaN;
+    let lastTop = Number.NaN;
+    let lastHeight = Number.NaN;
 
     const write = () => {
       frame = 0;
-      const next = measureKeyboardInset(win);
-      if (next === last) return;
-      last = next;
-      root.style.setProperty(KEYBOARD_INSET_VAR, `${next}px`);
+
+      const nextInset = measureKeyboardInset(win);
+      if (nextInset !== lastInset) {
+        lastInset = nextInset;
+        root.style.setProperty(KEYBOARD_INSET_VAR, `${nextInset}px`);
+      }
+
+      const top = Math.max(0, viewport?.offsetTop ?? 0);
+      const height = Math.round(viewport?.height ?? win.innerHeight);
+      if (top !== lastTop) {
+        lastTop = top;
+        root.style.setProperty(VV_TOP_VAR, `${top}px`);
+      }
+      if (height !== lastHeight) {
+        lastHeight = height;
+        root.style.setProperty(VV_HEIGHT_VAR, `${height}px`);
+      }
     };
 
     const schedule = () => {
@@ -76,8 +97,8 @@ export function useKeyboardInset(): void {
       if (win.scrollY !== 0 || win.scrollX !== 0) win.scrollTo(0, 0);
     };
 
-    // Sets the property even when there is no visualViewport, so every
-    // `var(--keyboard-inset, 0px)` consumer resolves against a real value.
+    // Sets the properties even when there is no visualViewport, so every
+    // `var(--…, fallback)` consumer resolves against a real value.
     write();
 
     viewport?.addEventListener("resize", schedule);
@@ -85,6 +106,7 @@ export function useKeyboardInset(): void {
     win.addEventListener("focusin", schedule);
     win.addEventListener("focusout", schedule);
     win.addEventListener("orientationchange", schedule);
+    win.addEventListener("resize", schedule);
     win.addEventListener("scroll", unscroll, { passive: true });
 
     return () => {
@@ -94,8 +116,11 @@ export function useKeyboardInset(): void {
       win.removeEventListener("focusin", schedule);
       win.removeEventListener("focusout", schedule);
       win.removeEventListener("orientationchange", schedule);
+      win.removeEventListener("resize", schedule);
       win.removeEventListener("scroll", unscroll);
       root.style.removeProperty(KEYBOARD_INSET_VAR);
+      root.style.removeProperty(VV_TOP_VAR);
+      root.style.removeProperty(VV_HEIGHT_VAR);
     };
   }, []);
 }
