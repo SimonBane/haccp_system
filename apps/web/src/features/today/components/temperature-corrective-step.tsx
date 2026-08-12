@@ -35,9 +35,9 @@ type Props = {
 /**
  * Step two, reached only after the worker commits an out-of-range reading.
  *
- * It is a separate step rather than a section that unfolds under the keypad:
- * typing "-1" on the way to "-18" used to make this whole block appear and push
- * the keys off the screen.
+ * It is a separate step rather than a section that unfolds below the reading:
+ * typing "-1" on the way to "-18" used to make this whole block appear and shove
+ * the rest of the form around mid-entry.
  *
  * The recap carries the allowed range as well as the reading, so the worker can
  * see how far out it is without going back a step.

@@ -31,21 +31,20 @@ type Props = {
   settledValue: number | null;
   priorReading: PriorReading | null;
   timeZone: string;
-  desktopInputRef: RefObject<HTMLInputElement | null>;
+  inputRef: RefObject<HTMLInputElement | null>;
 };
 
 /**
  * Step one: what does the thermometer say.
  *
- * Four rows above the keypad instead of six. The sign moved into the readout and
- * the field error moved into the status row, which gave about 56px back to the
- * digits and the keys on a phone. Everything above the keypad still has a fixed
- * height and the keypad takes whatever is left, so the layout cannot move while
- * a reading is being typed.
+ * Four rows, the same four on every platform: prior reading, the number, the
+ * gauge, the verdict. The sign lives inside the readout and the field error
+ * inside the status row, which is what keeps it to four.
  *
- * Mobile and desktop controls are swapped by CSS rather than by a media-query
- * hook, which keeps the inactive one out of the tab order and unaffected by the
- * hydration flip. Only the desktop variant carries the id.
+ * Nothing here is sized against the space a keyboard leaves. The sheet itself
+ * shortens when the keyboard opens (see the `[data-side=bottom]` rule in
+ * globals.css), so this column simply gets less room and scrolls if it has to,
+ * rather than every row having to know the keyboard exists.
  */
 export function TemperatureReadingStep({
   idPrefix,
@@ -63,7 +62,7 @@ export function TemperatureReadingStep({
   settledValue,
   priorReading,
   timeZone,
-  desktopInputRef,
+  inputRef,
 }: Props) {
   const t = useTranslations("TodayPage");
   const locale = useLocale();
@@ -97,24 +96,13 @@ export function TemperatureReadingStep({
           : t("temperatureDialog.noPriorReading")}
       </p>
 
-      {/* Capped as well as flexible. Sharing the spare height evenly with the
-          keypad left a 60px number floating in 260px of air while the keys
-          stayed cramped; the keys are what gets aimed at with cold hands, so
-          they win the surplus. */}
       <TemperatureReadout
         {...readoutProps}
-        variant="display"
-        className="min-h-20 max-h-40 flex-1 md:hidden landscape:min-h-14 landscape:max-h-24"
-      />
-
-      <TemperatureReadout
-        {...readoutProps}
-        variant="input"
-        className="hidden shrink-0 md:flex"
+        className="shrink-0 py-2 md:py-0"
         id={`${idPrefix}-recorded-c`}
         describedById={statusId}
         invalid={Boolean(error)}
-        inputRef={desktopInputRef}
+        inputRef={inputRef}
       />
 
       <TemperatureGauge

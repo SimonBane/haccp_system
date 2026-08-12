@@ -38,12 +38,9 @@
     "completing": "Влизане в системата…"
   },
   "DashboardPage": {
-    "breadcrumbApp": "SafeCheck",
-    "breadcrumbDashboard": "Табло",
     "placeholder": "Примерно съдържание на таблото"
   },
   "TodayPage": {
-    "breadcrumb": "Днес",
     "title": "Днес",
     "loading": "Зареждане",
     "actions": {
@@ -78,11 +75,6 @@
       "completedAt": "Изпълнено в",
       "completedBy": "Изпълнено от",
       "taskType": "Тип"
-    },
-    "keypad": {
-      "label": "Цифрова клавиатура",
-      "decimal": "Десетичен знак",
-      "backspace": "Изтрий"
     },
     "allDone": {
       "title": "Всичко е изпълнено",
@@ -201,11 +193,12 @@
       "pageCount": "Страница {current} от {total}",
       "previousPage": "Предишна страница",
       "nextPage": "Следваща страница"
+    },
+    "rowActions": {
+      "more": "Действия за {name}"
     }
   },
   "EquipmentPage": {
-    "breadcrumb": "Хладилна техника",
-    "breadcrumbSettings": "Настройки",
     "title": "Хладилна техника",
     "description": "Регистрирайте хладилници, фризери и витрини с допустими температурни граници.",
     "emptyTitle": "Няма хладилна техника",
@@ -270,8 +263,6 @@
     }
   },
   "TasksPage": {
-    "breadcrumb": "Задачи",
-    "breadcrumbSettings": "Настройки",
     "title": "Задачи",
     "description": "Дефинирайте повтарящи се HACCP задачи с дни от седмицата и часове от вашия план.",
     "emptyTitle": "Няма задачи",
@@ -398,8 +389,6 @@
     "placeholder": "Изберете локация"
   },
   "LocationsPage": {
-    "breadcrumbOrganization": "Организация",
-    "breadcrumb": "Локации",
     "title": "Локации",
     "description": "Управлявайте обектите на организацията и изберете коя локация е основна.",
     "emptyTitle": "Все още няма локации",
@@ -451,8 +440,6 @@
     }
   },
   "EmployeesPage": {
-    "breadcrumbOrganization": "Организация",
-    "breadcrumb": "Служители",
     "title": "Служители",
     "description": "Управлявайте членовете на организацията, поканите и достъпа до локации.",
     "emptyTitle": "Все още няма служители",
@@ -538,7 +525,6 @@
     }
   },
   "SettingsPage": {
-    "breadcrumb": "Организация",
     "title": "Организация",
     "description": "Управлявайте идентичността, регионалните предпочитания и настройките за локации.",
     "name": "Име",

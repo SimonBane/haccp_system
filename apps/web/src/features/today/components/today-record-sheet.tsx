@@ -59,8 +59,6 @@ export function TodayRecordSheet({
     <ResponsiveFormDialog
       open={open}
       onOpenChange={onOpenChange}
-      // Read-only detail with two buttons — a whole screen would be overkill.
-      mobileVariant="sheet"
       title={task.title}
       description={
         <>
@@ -68,6 +66,20 @@ export function TodayRecordSheet({
           {task.scheduledTime}
         </>
       }
+      closeLabel={t("record.close")}
+      // Read-only, so the only action worth a bar is the destructive one; the
+      // nav bar's X is the way out.
+      actions={{
+        items: [
+          {
+            label: t("actions.undo"),
+            variant: "destructive",
+            icon: <RotateCcwIcon data-icon="inline-start" />,
+            isLoading: isUndoing,
+            onClick: () => onUndo(item),
+          },
+        ],
+      }}
       footer={
         <DialogFooter className="gap-2 sm:gap-2">
           <Button

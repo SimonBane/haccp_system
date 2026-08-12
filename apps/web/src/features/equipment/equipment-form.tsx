@@ -12,8 +12,8 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useZodErrorMap } from "@/lib/forms/zod-error-map";
 import { useTranslations } from "next-intl";
-import { CopyPlusIcon, PlusIcon, SaveIcon } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { PlusIcon, SaveIcon } from "lucide-react";
+import { useEffect, useMemo, useRef } from "react";
 import { Controller, useForm, useFormState } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -55,7 +55,6 @@ type EquipmentFormProps = {
   duplicateSource?: EquipmentResponse | null;
   suggestedDuplicateName?: string;
   existingItems?: Pick<EquipmentResponse, "id" | "name">[];
-  onDuplicate?: () => void;
   onSubmit: (values: EquipmentFieldsInput) => Promise<void>;
 };
 
@@ -146,12 +145,12 @@ export function EquipmentForm({
   duplicateSource,
   suggestedDuplicateName,
   existingItems = [],
-  onDuplicate,
   onSubmit,
 }: EquipmentFormProps) {
   const t = useTranslations("EquipmentPage");
   const isEditing = Boolean(equipment);
   const isDuplicating = Boolean(duplicateSource) && !isEditing;
+  const nameRef = useRef<HTMLInputElement | null>(null);
 
   const equipmentFormSchema = useMemo(() => {
     const tempSchema = z.string().superRefine((value, ctx) => {
@@ -238,16 +237,6 @@ export function EquipmentForm({
     form.reset(defaultValues);
   }, [open, defaultValues, form]);
 
-  useEffect(() => {
-    if (!open || !duplicateSource || equipment) return;
-
-    const timeoutId = window.setTimeout(() => {
-      form.setFocus("name", { shouldSelect: true });
-    }, 0);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [open, equipment, duplicateSource, suggestedDuplicateName, form]);
-
   const typeLabels: Record<EquipmentType, string> = {
     fridge: t("types.fridge"),
     freezer: t("types.freezer"),
@@ -313,39 +302,24 @@ export function EquipmentForm({
 
   const hasChanges = !isEditing || !equipment || isDirty;
 
+  // One action on both platforms. Duplicate used to sit alongside Save here on
+  // desktop only; it lives in the row's action menu, which is where it is
+  // reached from on a phone and where you already are when you decide to copy
+  // something.
+  const submitLabel = isEditing ? t("save") : t("add");
+  const SubmitIcon = isEditing ? SaveIcon : PlusIcon;
+
   const formFooter = (
     <DialogFooter>
-      {isEditing ? (
-        <>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={isSubmitting}
-            onClick={onDuplicate}
-          >
-            <CopyPlusIcon data-icon="inline-start" />
-            {t("duplicate")}
-          </Button>
-          <Button
-            type="submit"
-            form={EQUIPMENT_FORM_ID}
-            isLoading={isSubmitting}
-            disabled={!hasChanges}
-          >
-            <SaveIcon data-icon="inline-start" />
-            {t("save")}
-          </Button>
-        </>
-      ) : (
-        <Button
-          type="submit"
-          form={EQUIPMENT_FORM_ID}
-          isLoading={isSubmitting}
-        >
-          <PlusIcon data-icon="inline-start" />
-          {t("add")}
-        </Button>
-      )}
+      <Button
+        type="submit"
+        form={EQUIPMENT_FORM_ID}
+        isLoading={isSubmitting}
+        disabled={isEditing && !hasChanges}
+      >
+        <SubmitIcon data-icon="inline-start" />
+        {submitLabel}
+      </Button>
     </DialogFooter>
   );
 
@@ -370,11 +344,21 @@ export function EquipmentForm({
       className="sm:min-h-[24rem]"
       initialFocus={isEditing || isDuplicating ? undefined : false}
       closeLabel={t("cancel")}
-      submit={{
-        label: isEditing ? t("save") : t("add"),
-        formId: EQUIPMENT_FORM_ID,
-        isLoading: isSubmitting,
-        disabled: isEditing && !hasChanges,
+      // Land on the name with the keyboard already up. Selected when there is
+      // something there to replace — an edit, or a duplicate's suggested name.
+      autoFocusField={{
+        ref: nameRef,
+        selection: isEditing || isDuplicating ? "select" : "none",
+      }}
+      actions={{
+        items: [
+          {
+            label: submitLabel,
+            formId: EQUIPMENT_FORM_ID,
+            isLoading: isSubmitting,
+            disabled: isEditing && !hasChanges,
+          },
+        ],
       }}
       footer={formFooter}
     >
@@ -397,6 +381,10 @@ export function EquipmentForm({
                   </FieldLabel>
                   <Input
                     {...field}
+                    ref={(node) => {
+                      field.ref(node);
+                      nameRef.current = node;
+                    }}
                     id={`${EQUIPMENT_FORM_ID}-name`}
                     aria-invalid={fieldState.invalid}
                     placeholder={t("namePlaceholder")}

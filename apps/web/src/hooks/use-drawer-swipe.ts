@@ -35,6 +35,8 @@ type Drag = {
   pointerId: number;
   startX: number;
   startY: number;
+  /** Where the finger went down. Pointer capture retargets later events. */
+  target: EventTarget | null;
   /** Progress when the finger went down — a drag can start mid-animation. */
   startProgress: number;
   /** Committed state at gesture start; pointercancel reverts to this. */
@@ -45,11 +47,31 @@ type Drag = {
 };
 
 /**
+ * Sub-pixel slack. Layout rounding routinely leaves `scrollWidth` a fraction
+ * over `clientWidth` on a box that cannot actually scroll.
+ */
+const OVERFLOW_SLOP_PX = 1;
+
+/**
  * Yields to a horizontally scrollable ancestor that still has room to move in
  * the drag direction, and to anything explicitly opted out. Without this the
- * drawer steals the gesture from tables, carousels and the temperature keypad.
+ * drawer steals the gesture from tables and carousels.
+ *
+ * Two things this has to get right, because `ShellScroll` sets only
+ * `overflow-y: auto` — which makes the *computed* `overflow-x` `auto` as well,
+ * so the app's one scroll region matches the "scrollable" test on every drag:
+ *
+ * - a rounding-error overflow is not an overflow, hence the slop, and
+ * - a box already scrolled hard against the edge the drag is pulling from has
+ *   no room to move and must not claim the gesture.
+ *
+ * Without both, a single stray pixel of horizontal content anywhere on the page
+ * silently kills the drawer everywhere.
  */
-function startsInProtectedRegion(target: EventTarget | null): boolean {
+function startsInProtectedRegion(
+  target: EventTarget | null,
+  direction: 1 | -1,
+): boolean {
   if (!(target instanceof Element)) return false;
   if (target.closest("[data-no-swipe]")) return true;
 
@@ -60,7 +82,19 @@ function startsInProtectedRegion(target: EventTarget | null): boolean {
   ) {
     const overflowX = getComputedStyle(node).overflowX;
     const scrollable = overflowX === "auto" || overflowX === "scroll";
-    if (scrollable && node.scrollWidth > node.clientWidth) return true;
+    if (!scrollable) continue;
+
+    const maxScroll = node.scrollWidth - node.clientWidth;
+    if (maxScroll <= OVERFLOW_SLOP_PX) continue;
+
+    // scrollLeft is negative in RTL; magnitude is what matters either way.
+    const scrolled = Math.abs(node.scrollLeft);
+    // Dragging right reveals content to the left, so it needs scrollLeft > 0.
+    const room =
+      direction > 0
+        ? scrolled > OVERFLOW_SLOP_PX
+        : scrolled < maxScroll - OVERFLOW_SLOP_PX;
+    if (room) return true;
   }
 
   return false;
@@ -184,7 +218,15 @@ export function useDrawerSwipe({
       // not always synthesise one, and a flag left standing would eat the
       // next genuine tap.
       swallowClickRef.current = false;
-      if (startsInProtectedRegion(event.target)) return;
+      // Only the direction-independent half here — whether a scrollable
+      // ancestor is protected depends on which way the finger goes, which is
+      // not known until the axis is claimed in onPointerMove.
+      if (
+        event.target instanceof Element &&
+        event.target.closest("[data-no-swipe]")
+      ) {
+        return;
+      }
 
       const isOpen = openRef.current;
       if (!isOpen && mode === "edge") {
@@ -196,6 +238,7 @@ export function useDrawerSwipe({
         pointerId: event.pointerId,
         startX: event.clientX,
         startY: event.clientY,
+        target: event.target,
         startProgress: progressRef.current,
         startOpen: isOpen,
         axis: "none",
@@ -228,6 +271,13 @@ export function useDrawerSwipe({
         // claiming them and clamping to zero, which is what leaves room for
         // swipe-left row actions underneath.
         if (!drag.startOpen && dx < 0) {
+          dragRef.current = null;
+          return;
+        }
+
+        // Now the direction is known, so a horizontally scrollable ancestor
+        // can be asked whether it still has room to move this way.
+        if (startsInProtectedRegion(drag.target, dx > 0 ? 1 : -1)) {
           dragRef.current = null;
           return;
         }

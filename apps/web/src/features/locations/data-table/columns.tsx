@@ -3,11 +3,10 @@
 import type { LocationResponse } from "@haccp/shared";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { useTranslations } from "next-intl";
-import { Loader2Icon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
-import { LocationsTableRowActions } from "@/features/locations/data-table/row-actions";
+import { DataTableRowActions } from "@/components/ui/data-table/data-table-row-actions";
+import type { GetRowActions } from "@/components/ui/data-table/row-action";
 
 type LocationsTranslations = ReturnType<
   typeof useTranslations<"LocationsPage">
@@ -15,20 +14,12 @@ type LocationsTranslations = ReturnType<
 
 type GetColumnsParams = {
   t: LocationsTranslations;
-  totalCount: number;
-  settingDefaultId: string | null;
-  onRename: (location: LocationResponse) => void;
-  onDelete: (location: LocationResponse) => void;
-  onSetDefault: (location: LocationResponse) => void;
+  getRowActions: GetRowActions<LocationResponse>;
 };
 
 export function getColumns({
   t,
-  totalCount,
-  settingDefaultId,
-  onRename,
-  onDelete,
-  onSetDefault,
+  getRowActions,
 }: GetColumnsParams): ColumnDef<LocationResponse>[] {
   return [
     {
@@ -47,33 +38,15 @@ export function getColumns({
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title={t("columns.default")} />
       ),
-      cell: ({ row }) => {
-        const location = row.original;
-        const isSettingDefault = settingDefaultId === location.id;
-
-        if (location.isDefault) {
-          return <Badge variant="secondary">{t("status.default")}</Badge>;
-        }
-
-        return (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 px-2"
-            disabled={isSettingDefault}
-            onClick={(event) => {
-              event.stopPropagation();
-              onSetDefault(location);
-            }}
-          >
-            {isSettingDefault ? (
-              <Loader2Icon className="animate-spin" />
-            ) : null}
-            {t("setAsDefault")}
-          </Button>
-        );
-      },
+      // Status only. Promoting a location moved into the row's actions, which
+      // is the one place both platforms can reach — the mobile card never
+      // rendered this column, so a phone could not set a default at all.
+      cell: ({ row }) =>
+        row.original.isDefault ? (
+          <Badge variant="secondary">{t("status.default")}</Badge>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
       sortingFn: (rowA, rowB) =>
         Number(rowB.original.isDefault) - Number(rowA.original.isDefault),
     },
@@ -82,12 +55,9 @@ export function getColumns({
       enableSorting: false,
       enableHiding: false,
       cell: ({ row }) => (
-        <LocationsTableRowActions
-          row={row}
-          t={t}
-          totalCount={totalCount}
-          onRename={onRename}
-          onDelete={onDelete}
+        <DataTableRowActions
+          srLabel={t("openMenu")}
+          actions={getRowActions(row.original)}
         />
       ),
     },

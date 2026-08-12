@@ -1,31 +1,101 @@
 "use client";
 
 import { MoreHorizontalIcon } from "lucide-react";
-import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  visibleRowActions,
+  type RowAction,
+} from "@/components/ui/data-table/row-action";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+function ActionItem({ action }: { action: RowAction }) {
+  const item = (
+    <DropdownMenuItem
+      disabled={action.disabled}
+      variant={action.role === "destructive" ? "destructive" : undefined}
+      onClick={action.onSelect}
+    >
+      {action.icon}
+      {action.label}
+    </DropdownMenuItem>
+  );
+
+  // A disabled item swallows pointer events, so the tooltip has to hang off a
+  // wrapper — otherwise "why is delete greyed out" has no answer on desktop.
+  if (!action.disabled || !action.disabledReason) return item;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<span className="block w-full">{item}</span>} />
+      <TooltipContent side="left">{action.disabledReason}</TooltipContent>
+    </Tooltip>
+  );
+}
 
 /**
- * The chrome around a row's action menu: trigger sizing, the accessible label,
- * and the three stopPropagation handlers that keep a menu tap from also
- * activating the row behind it.
+ * The menu body: primary actions, a rule, then the destructive one.
  *
- * Only the shell is shared — each feature's menu items differ enough (status
- * gates, a tooltip-wrapped disabled delete, a duplicate action) that a generic
- * item list would take more props than it saves. This is the part that was
- * character-identical across all four.
+ * Shared so the desktop kebab and the mobile long-press menu are the same list
+ * in the same order — the point of the whole `RowAction[]` shape.
+ */
+export function RowActionMenuItems({ actions }: { actions: RowAction[] }) {
+  const items = visibleRowActions(actions);
+  const primary = items.filter((action) => action.role !== "destructive");
+  const destructive = items.filter((action) => action.role === "destructive");
+
+  return (
+    <>
+      {primary.length ? (
+        <DropdownMenuGroup>
+          {primary.map((action) => (
+            <ActionItem key={action.id} action={action} />
+          ))}
+        </DropdownMenuGroup>
+      ) : null}
+
+      {primary.length && destructive.length ? <DropdownMenuSeparator /> : null}
+
+      {destructive.length ? (
+        <DropdownMenuGroup>
+          {destructive.map((action) => (
+            <ActionItem key={action.id} action={action} />
+          ))}
+        </DropdownMenuGroup>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * A row's overflow menu on the desktop grid, rendered from the same
+ * `RowAction[]` the mobile long-press menu uses.
+ *
+ * It used to be a bare shell each feature filled with its own menu items, which
+ * is how four near-identical row-action components came to exist. The
+ * differences between them — a status gate, a tooltip on a disabled delete —
+ * are all expressible as data, so they are.
  */
 export function DataTableRowActions({
   srLabel,
-  children,
+  actions,
 }: {
   srLabel: string;
-  children: ReactNode;
+  actions: RowAction[];
 }) {
+  if (!visibleRowActions(actions).length) return null;
+
   return (
     <div
       className="flex justify-end"
@@ -52,7 +122,7 @@ export function DataTableRowActions({
           className="w-max min-w-0"
           onClick={(event) => event.stopPropagation()}
         >
-          {children}
+          <RowActionMenuItems actions={actions} />
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

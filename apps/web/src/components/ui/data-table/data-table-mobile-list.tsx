@@ -1,9 +1,10 @@
 "use client";
 
-import { ChevronRightIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+
+export type MobileListVariant = "row" | "card";
 
 /**
  * An inset grouped list — one rounded surface, rows divided by hairlines that
@@ -13,19 +14,28 @@ import { cn } from "@/lib/utils";
  * list and something that reads as a table with borders on a phone. The rule
  * itself lives in globals.css, keyed off the row's inner slot, because it has
  * to know where the leading element ends.
+ *
+ * `variant="card"` breaks the group apart into separate elevated cards instead,
+ * for a page whose records need more than a title and one line under it. Same
+ * component either way, so the two densities cannot drift.
  */
 export function MobileList({
   children,
+  variant = "row",
   className,
 }: {
   children: ReactNode;
+  variant?: MobileListVariant;
   className?: string;
 }) {
   return (
     <div
       data-slot="mobile-list"
+      data-variant={variant}
       className={cn(
-        "overflow-hidden rounded-xl bg-card ring-1 ring-border",
+        variant === "card"
+          ? "flex flex-col gap-2"
+          : "overflow-hidden rounded-xl bg-card ring-1 ring-border",
         className,
       )}
     >
@@ -47,86 +57,110 @@ export function MobileListSectionHeader({ children }: { children: ReactNode }) {
 }
 
 export type MobileListRowProps = {
+  /**
+   * "row" is one line plus a subtitle, the density a list of names wants.
+   * "card" gives the record room to breathe and unlocks `details`.
+   */
+  variant?: MobileListVariant;
   /** Avatar or icon. Also sets where the hairline above the row begins. */
   leading?: ReactNode;
   title: ReactNode;
   /** One line under the title — the secondary detail, not a label/value dump. */
   subtitle?: ReactNode;
-  /** Right-aligned value or status, before the chevron. */
+  /** Right-aligned value or status. */
   trailing?: ReactNode;
-  /** Overflow menu. Kept as the accessible equivalent of the swipe actions. */
-  actions?: ReactNode;
-  showChevron?: boolean;
+  /** Card variant only: a free-form block under the title, allowed to wrap. */
+  details?: ReactNode;
   className?: string;
 };
 
+/**
+ * One record in the mobile list.
+ *
+ * Carries no controls of its own. A tap runs the row's primary action, a long
+ * press opens every action, and a swipe-left reveals delete — all wired by
+ * `DataTableCardList`, which is also what makes those three the same everywhere
+ * instead of a kebab here and a chevron there.
+ */
 export function MobileListRow({
+  variant = "row",
   leading,
   title,
   subtitle,
   trailing,
-  actions,
-  showChevron = true,
+  details,
   className,
 }: MobileListRowProps) {
+  const isCard = variant === "card";
+
   return (
     <div
       data-slot="mobile-list-row"
+      data-variant={variant}
       className={cn(
-        "flex items-stretch bg-card ps-4 transition-colors active:bg-muted/60",
+        "flex items-stretch bg-card transition-colors active:bg-muted/60",
+        // `border`, not `ring`: a ring paints outside the border box, and the
+        // swipe wrapper this sits inside is `overflow: hidden`, which clipped
+        // every straight edge and left just the four corner arcs.
+        isCard ? "rounded-xl border border-border p-4" : "ps-4",
         className,
       )}
     >
       {leading ? (
-        <div className="flex shrink-0 items-center pe-3">{leading}</div>
+        <div className="flex shrink-0 items-start pe-3 [[data-variant=row]>&]:items-center">
+          {leading}
+        </div>
       ) : null}
 
       <div
         data-slot="mobile-list-row-inner"
-        className="flex min-w-0 flex-1 items-center gap-3 py-3 pe-2"
+        className={cn(
+          "flex min-w-0 flex-1 gap-3",
+          isCard ? "flex-col" : "items-center py-3 pe-2",
+        )}
       >
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[15px] leading-tight font-medium">
-            {title}
+        {/* flex-1 so `trailing` is pushed to the far edge rather than sitting
+            immediately after the title. */}
+        <div
+          className={cn(
+            "flex min-w-0 flex-1 gap-3",
+            isCard ? "items-start" : "items-center",
+          )}
+        >
+          <div className="min-w-0 flex-1">
+            <div
+              className={cn(
+                "truncate font-medium",
+                isCard ? "text-base leading-snug" : "text-[15px] leading-tight",
+              )}
+            >
+              {title}
+            </div>
+            {subtitle ? (
+              <div className="mt-0.5 truncate text-[13px] leading-tight text-muted-foreground">
+                {subtitle}
+              </div>
+            ) : null}
           </div>
-          {subtitle ? (
-            <div className="mt-0.5 truncate text-[13px] leading-tight text-muted-foreground">
-              {subtitle}
+
+          {trailing ? (
+            <div className="shrink-0 text-[13px] text-muted-foreground">
+              {trailing}
             </div>
           ) : null}
         </div>
 
-        {trailing ? (
-          <div className="shrink-0 text-[13px] text-muted-foreground">
-            {trailing}
-          </div>
-        ) : null}
-
-        {actions ? (
-          <div
-            className="shrink-0"
-            onClick={(event) => event.stopPropagation()}
-          >
-            {actions}
-          </div>
-        ) : null}
-
-        {showChevron ? (
-          <ChevronRightIcon
-            className="size-4 shrink-0 text-muted-foreground/60"
-            aria-hidden
-          />
-        ) : null}
+        {isCard && details ? <div className="min-w-0">{details}</div> : null}
       </div>
     </div>
   );
 }
 
 /**
- * A button in a row's swipe-revealed action tray.
+ * The button in a row's swipe-revealed tray.
  *
  * Full-bleed and full-height, the way native trays look — the tray is sized by
- * `SwipeableRow`, and these divide it between them.
+ * `SwipeableRow` and this fills it.
  */
 export function MobileListSwipeAction({
   label,

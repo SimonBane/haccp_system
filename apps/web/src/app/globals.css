@@ -115,6 +115,23 @@
   --drawer-progress: 0;
   --drawer-ease: cubic-bezier(0.32, 0.72, 0, 1);
   --drawer-duration: 400ms;
+
+  /*
+   * How much of the screen the software keyboard covers, from the bottom of the
+   * layout viewport. Written by `useKeyboardInset`; declared here so consumers
+   * resolve against a real value on first paint rather than a fallback.
+   *
+   * Two variables because they are measured from different edges. Use
+   * `--keyboard-inset` in anything portalled to the body — a Sheet, a Dialog —
+   * which is positioned against the layout viewport. Use `--keyboard-gap`
+   * inside `SidebarInset`, which already carries the bottom safe-area inset as
+   * padding, so the raw value would lift a box by the safe area twice.
+   */
+  --keyboard-inset: 0px;
+  --keyboard-gap: max(
+    0px,
+    calc(var(--keyboard-inset) - var(--safe-area-inset-bottom, 0px))
+  );
 }
 
 @media (width >= 48rem) {
@@ -194,11 +211,20 @@
   }
 
   /* Chrome should not offer a text-selection callout on long-press — that is
-     a document affordance, and this is an app shell. Content keeps it. */
+     a document affordance, and this is an app shell. Content keeps it.
+     A list row is included because long-press is its actions gesture: without
+     this, iOS raises the selection bubble on top of the action sheet every
+     time. */
   [data-slot="sidebar"],
   [data-slot="sidebar-inset"] > header,
+  [data-slot="mobile-list-row"],
   button {
     -webkit-touch-callout: none;
+  }
+
+  [data-slot="mobile-list-row"] {
+    -webkit-user-select: none;
+    user-select: none;
   }
   body {
     height: 100%;
@@ -216,6 +242,50 @@
     --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
     --safe-area-inset-left: env(safe-area-inset-left, 0px);
   }
+}
+
+/*
+ * The app canvas, as a real box.
+ *
+ * The root element's background is propagated to the canvas by spec, but WebKit
+ * stops repainting that region after a compositing change — which is exactly
+ * what the drawer is (an always-on `translate` on the inset, plus `will-change`
+ * while dragging) — leaving the notch and home-indicator strips showing the
+ * black window behind the web view. A real fixed box repaints like any other
+ * element.
+ *
+ * `body` carries no transform, filter or opacity, so this stays anchored to the
+ * viewport and is not clipped by `body { overflow: hidden }`. It also covers the
+ * auth pages, the loader and the error routes, none of which mount the shell
+ * that currently paints those strips.
+ */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  /* Resolved height and both edges would leave `bottom` ignored; this makes the
+     box grow past a short layout viewport instead of leaving a gap. */
+  min-height: 100dvh;
+  z-index: -1;
+  background-color: var(--background);
+  pointer-events: none;
+}
+
+/*
+ * A bottom sheet stops where the keyboard starts.
+ *
+ * Raising the whole popup rather than translating a pinned bar inside it keeps
+ * the scroll region and the action bar in one flow: the sheet gets shorter, its
+ * scroller shrinks with it, and the bar — an ordinary last flex child — ends up
+ * sitting directly on top of the keyboard. A translated bar would instead float
+ * over the last field.
+ *
+ * No transition. iOS dispatches `visualViewport.resize` at the *end* of its
+ * ~250ms keyboard animation, so a duration here stacks on a delay that is
+ * already visible.
+ */
+[data-slot="sheet-content"][data-side="bottom"] {
+  bottom: var(--keyboard-inset, 0px);
 }
 
 /*
@@ -263,12 +333,14 @@
  * running the full width. That single detail is most of what separates a
  * native-looking list from a bordered table.
  */
-[data-slot="mobile-list"] > * + * [data-slot="mobile-list-row-inner"] {
+[data-slot="mobile-list"][data-variant="row"]
+  > * + *
+  [data-slot="mobile-list-row-inner"] {
   border-top: 1px solid var(--border);
 }
 
 /* A section header restarts the group, so the row under it needs no rule. */
-[data-slot="mobile-list"]
+[data-slot="mobile-list"][data-variant="row"]
   > [data-slot="mobile-list-section"]
   + *
   [data-slot="mobile-list-row-inner"] {

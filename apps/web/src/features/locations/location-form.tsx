@@ -3,9 +3,9 @@
 import type { LocationResponse } from "@haccp/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useZodErrorMap } from "@/lib/forms/zod-error-map";
-import { CheckIcon, PlusIcon, SaveIcon } from "lucide-react";
+import { PlusIcon, SaveIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useForm, useFormState } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,6 @@ import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
 import { FieldGroup } from "@/components/ui/field";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 type LocationFormProps = {
   open: boolean;
@@ -32,8 +31,8 @@ export function LocationForm({
   onSubmit,
 }: LocationFormProps) {
   const t = useTranslations("LocationsPage");
-  const isMobile = useIsMobile();
   const isEditing = Boolean(location);
+  const nameRef = useRef<HTMLInputElement | null>(null);
 
   const locationFormSchema = useMemo(
     () =>
@@ -72,6 +71,9 @@ export function LocationForm({
     onOpenChange(false);
   });
 
+  const submitLabel = isEditing ? t("save") : t("add");
+  const SubmitIcon = isEditing ? SaveIcon : PlusIcon;
+
   const formFooter = (
     <DialogFooter>
       <Button
@@ -87,22 +89,8 @@ export function LocationForm({
         isLoading={isSubmitting}
         disabled={isEditing && !hasChanges}
       >
-        {isMobile ? (
-          <>
-            <CheckIcon data-icon="inline-start" />
-            {isEditing ? t("save") : t("add")}
-          </>
-        ) : isEditing ? (
-          <>
-            <SaveIcon data-icon="inline-start" />
-            {t("save")}
-          </>
-        ) : (
-          <>
-            <PlusIcon data-icon="inline-start" />
-            {t("add")}
-          </>
-        )}
+        <SubmitIcon data-icon="inline-start" />
+        {submitLabel}
       </Button>
     </DialogFooter>
   );
@@ -111,11 +99,21 @@ export function LocationForm({
     <ResponsiveFormDialog
       open={open}
       onOpenChange={onOpenChange}
-      // One field — a content-height sheet, not a whole screen.
-      mobileVariant="sheet"
       title={isEditing ? t("editTitle") : t("addTitle")}
       description={isEditing ? t("editDescription") : t("addDescription")}
       closeLabel={t("cancel")}
+      // The whole form is one field, so it opens ready to type into.
+      autoFocusField={{ ref: nameRef, selection: isEditing ? "select" : "none" }}
+      actions={{
+        items: [
+          {
+            label: submitLabel,
+            formId: LOCATION_FORM_ID,
+            isLoading: isSubmitting,
+            disabled: isEditing && !hasChanges,
+          },
+        ],
+      }}
       footer={formFooter}
     >
       <form id={LOCATION_FORM_ID} className="space-y-4" onSubmit={handleSubmit}>
@@ -130,6 +128,10 @@ export function LocationForm({
               {({ field, id }) => (
                 <Input
                   {...field}
+                  ref={(node) => {
+                    field.ref(node);
+                    nameRef.current = node;
+                  }}
                   id={id}
                   autoComplete="off"
                   enterKeyHint="done"

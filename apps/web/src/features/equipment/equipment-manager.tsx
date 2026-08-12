@@ -83,17 +83,12 @@ export function EquipmentManager({
     }
   }, [deleteTarget, isDeleting, refetch, remove, t]);
 
+  // Only the open flag. Clearing the record here too would change the form's
+  // `key` mid-exit, remounting it and killing the slide-out — every open path
+  // below already sets the record explicitly, so there is nothing to reset.
   const handleFormOpenChange = useCallback((open: boolean) => {
-    if (!open) {
-      setFormOpen(false);
-      setEditingEquipment(null);
-      setDuplicateSource(null);
-    }
+    if (!open) setFormOpen(false);
   }, []);
-
-  const handleDuplicateFromForm = useCallback(() => {
-    if (editingEquipment) openDuplicateForm(editingEquipment);
-  }, [editingEquipment, openDuplicateForm]);
 
   const handleSubmit = useCallback(
     async (values: Parameters<typeof create.mutateAsync>[0]) => {
@@ -146,30 +141,25 @@ export function EquipmentManager({
         onConfirm={confirmDelete}
       />
 
-      {formOpen ? (
-        <EquipmentForm
-          key={
-            duplicateSource
-              ? `duplicate-${duplicateSource.id}`
-              : (editingEquipment?.id ?? "create")
-          }
-          open
-          onOpenChange={handleFormOpenChange}
-          equipment={editingEquipment}
-          duplicateSource={duplicateSource}
-          suggestedDuplicateName={
-            duplicateSource
-              ? t("duplicateSuggestedName", { name: duplicateSource.name })
-              : undefined
-          }
-          existingItems={items.map((item) => ({
-            id: item.id,
-            name: item.name,
-          }))}
-          onDuplicate={handleDuplicateFromForm}
-          onSubmit={handleSubmit}
-        />
-      ) : null}
+      {/* Always mounted, `open` toggled: Base UI runs the sheet's exit
+          transition on the popup it already owns, so unmounting the form here
+          would cut the slide-out and make it vanish instead. */}
+      <EquipmentForm
+        open={formOpen}
+        onOpenChange={handleFormOpenChange}
+        equipment={editingEquipment}
+        duplicateSource={duplicateSource}
+        suggestedDuplicateName={
+          duplicateSource
+            ? t("duplicateSuggestedName", { name: duplicateSource.name })
+            : undefined
+        }
+        existingItems={items.map((item) => ({
+          id: item.id,
+          name: item.name,
+        }))}
+        onSubmit={handleSubmit}
+      />
     </div>
   );
 }

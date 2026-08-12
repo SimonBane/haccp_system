@@ -24,16 +24,13 @@ type Props = {
 /**
  * The commit row, and the reason the whole surface was rebuilt.
  *
- * On a phone the primary is full width and 56px tall, directly under the keypad
- * — the thumb is already there. It used to be a 44px icon in the top-right
- * corner, deliberately far from the keys, which made the most repeated action in
- * the app a diagonal one-handed reach on every single reading.
+ * On a phone the primary is full width and 56px tall, sitting directly on top of
+ * the software keyboard — the thumb is already there. It used to be a 44px icon
+ * in the top-right corner, which made the most repeated action in the app a
+ * diagonal one-handed reach on every single reading.
  *
- * The mis-tap that placement was guarding against is survivable here: the key
- * immediately above the primary's right edge is backspace, so overshooting
- * upward deletes a digit and, if the draft stops parsing, disables the primary.
- * A separator, a filled-versus-ghost contrast and the 5s undo toast cover the
- * rest.
+ * Overshooting upward from here lands on the keyboard's top row rather than on
+ * anything destructive, and the 5s undo toast covers the rest.
  *
  * Skip sits on the left so the thumb's natural arc lands on the primary. It
  * carries a border rather than sitting borderless like a ghost button — with

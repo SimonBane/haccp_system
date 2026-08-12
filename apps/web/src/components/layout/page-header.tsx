@@ -19,8 +19,8 @@ type PageHeaderProps = {
 };
 
 /**
- * Title, description and primary action for a page — and the single source of
- * the mobile title, which is why `DashboardPageHeader` no longer portals one.
+ * Title, description and primary action for a page — and the top of every page
+ * on desktop, now that the breadcrumb bar above it is gone.
  *
  * On mobile nothing renders inline: the title and actions are portalled into
  * the shared top bar, so the page starts at its content instead of repeating a
