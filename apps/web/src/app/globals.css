@@ -117,21 +117,24 @@
   --drawer-duration: 400ms;
 
   /*
-   * How much of the screen the software keyboard covers, from the bottom of the
-   * layout viewport. Written by `useKeyboardInset`; declared here so consumers
-   * resolve against a real value on first paint rather than a fallback.
+   * Visual-viewport geometry, written by `useKeyboardInset`.
    *
-   * Two variables because they are measured from different edges. Use
-   * `--keyboard-inset` in anything portalled to the body — a Sheet, a Dialog —
-   * which is positioned against the layout viewport. Use `--keyboard-gap`
-   * inside `SidebarInset`, which already carries the bottom safe-area inset as
-   * padding, so the raw value would lift a box by the safe area twice.
+   * `--keyboard-inset`: how much of the *layout* viewport the software
+   * keyboard covers. Use in anything portalled to the body — a Sheet, a
+   * Dialog — which is positioned against the layout viewport.
+   *
+   * `--app-vv-top` / `--app-vv-height`: the slice of the layout viewport the
+   * user can actually see. The mobile shell pins itself to these so an iOS
+   * focus-scroll cannot letterbox the drawer.
+   *
+   * `--keyboard-gap` stays 0: the shell tracks the visual viewport, so a
+   * bottom-anchored control inside `SidebarInset` is already above the
+   * keyboard. Adding the inset again would lift it twice.
    */
   --keyboard-inset: 0px;
-  --keyboard-gap: max(
-    0px,
-    calc(var(--keyboard-inset) - var(--safe-area-inset-bottom, 0px))
-  );
+  --keyboard-gap: 0px;
+  --app-vv-top: 0px;
+  --app-vv-height: 100%;
 }
 
 @media (width >= 48rem) {
@@ -204,6 +207,9 @@
    */
   html {
     height: 100%;
+    /* Fill the covered viewport on iOS even when `100%` resolves short. */
+    min-height: 100dvh;
+    min-height: -webkit-fill-available;
     overflow: hidden;
     overscroll-behavior: none;
     -webkit-tap-highlight-color: transparent;
@@ -228,6 +234,8 @@
   }
   body {
     height: 100%;
+    min-height: 100%;
+    min-height: -webkit-fill-available;
     overflow: hidden;
     overscroll-behavior: none;
     @apply bg-background text-foreground;
@@ -254,18 +262,18 @@
  * black window behind the web view. A real fixed box repaints like any other
  * element.
  *
- * `body` carries no transform, filter or opacity, so this stays anchored to the
- * viewport and is not clipped by `body { overflow: hidden }`. It also covers the
- * auth pages, the loader and the error routes, none of which mount the shell
- * that currently paints those strips.
+ * `100lvh` always covers the area under collapsing browser chrome. The mobile
+ * shell separately pins itself to the visual viewport; this layer is the
+ * fallback for routes that never mount that shell.
  */
 body::before {
   content: "";
   position: fixed;
-  inset: 0;
-  /* Resolved height and both edges would leave `bottom` ignored; this makes the
-     box grow past a short layout viewport instead of leaving a gap. */
-  min-height: 100dvh;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100lvh;
+  min-height: -webkit-fill-available;
   z-index: -1;
   background-color: var(--background);
   pointer-events: none;
@@ -299,8 +307,21 @@ body::before {
  * `translate` and `opacity` are transitioned, never `--drawer-progress`: an
  * unregistered custom property is not interpolable, so animating it directly
  * would teleport rather than slide.
+ *
+ * The wrapper is pinned to the visual viewport (`--app-vv-*`, written by
+ * `useKeyboardInset`). Sidebar and scrim are `absolute` inside it so they
+ * share that box — `position: fixed` would ignore it and re-open the
+ * letterbox gap above/below the drawer.
  */
 @media (width < 48rem) {
+  [data-slot="sidebar-wrapper"] {
+    position: fixed;
+    top: var(--app-vv-top, 0px);
+    left: 0;
+    width: 100%;
+    height: var(--app-vv-height, 100%);
+  }
+
   [data-slot="sidebar-inset"],
   [data-slot="sidebar-scrim"] {
     translate: calc(var(--drawer-progress) * var(--sidebar-width, 16rem)) 0;

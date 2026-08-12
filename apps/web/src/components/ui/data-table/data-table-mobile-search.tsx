@@ -63,8 +63,8 @@ export function DataTableMobileSearch<TData>({
       <div
         // The overlay resolves against the inset's padding box, which already
         // carries the bottom safe-area inset — adding env() here would lift it
-        // by the home indicator twice. --keyboard-gap is the same value for the
-        // keyboard, measured from inside that padding.
+        // by the home indicator twice. The shell tracks the visual viewport, so
+        // --keyboard-gap is 0 (no second keyboard lift inside the inset).
         className="pointer-events-auto absolute inset-x-0 bottom-0 px-4 pb-[calc(1.25rem+var(--keyboard-gap,0px))]"
         // A horizontal drag inside a text field is text selection, not a
         // request to open the nav drawer.
