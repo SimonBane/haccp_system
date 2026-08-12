@@ -4,7 +4,8 @@ import type { EquipmentResponse, EquipmentType } from "@haccp/shared";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { useTranslations } from "next-intl";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
-import { EquipmentTableRowActions } from "@/features/equipment/data-table/row-actions";
+import { DataTableRowActions } from "@/components/ui/data-table/data-table-row-actions";
+import type { GetRowActions } from "@/components/ui/data-table/row-action";
 import { formatTemp } from "@/features/equipment/lib/format";
 
 type EquipmentTranslations = ReturnType<
@@ -14,17 +15,13 @@ type EquipmentTranslations = ReturnType<
 type GetColumnsParams = {
   t: EquipmentTranslations;
   typeLabels: Record<EquipmentType, string>;
-  onEdit: (equipment: EquipmentResponse) => void;
-  onDuplicate: (equipment: EquipmentResponse) => void;
-  onDelete: (equipment: EquipmentResponse) => void;
+  getRowActions: GetRowActions<EquipmentResponse>;
 };
 
 export function getColumns({
   t,
   typeLabels,
-  onEdit,
-  onDuplicate,
-  onDelete,
+  getRowActions,
 }: GetColumnsParams): ColumnDef<EquipmentResponse>[] {
   return [
     {
@@ -73,12 +70,9 @@ export function getColumns({
       enableSorting: false,
       enableHiding: false,
       cell: ({ row }) => (
-        <EquipmentTableRowActions
-          row={row}
-          t={t}
-          onEdit={onEdit}
-          onDuplicate={onDuplicate}
-          onDelete={onDelete}
+        <DataTableRowActions
+          srLabel={t("openMenu")}
+          actions={getRowActions(row.original)}
         />
       ),
     },

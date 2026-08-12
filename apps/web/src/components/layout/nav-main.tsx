@@ -56,7 +56,6 @@ function NavMainItem({ item }: { item: NavItem }) {
     return (
       <SidebarMenuItem>
         <SidebarMenuButton
-          tooltip={item.title}
           isActive={item.isActive}
           render={<Link href={item.url} />}
           onClick={closeMobileSidebar}
@@ -75,7 +74,6 @@ function NavMainItem({ item }: { item: NavItem }) {
     >
       <SidebarMenuItem>
         <SidebarMenuButton
-          tooltip={item.title}
           isActive={item.isActive}
           render={<Link href={item.url} />}
           onClick={closeMobileSidebar}

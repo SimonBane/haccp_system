@@ -6,6 +6,10 @@ export { DataTableSearch } from "@/components/ui/data-table/data-table-search";
 export { DataTableViewOptions } from "@/components/ui/data-table/data-table-view-options";
 export { createSelectColumn } from "@/components/ui/data-table/data-table-select-column";
 export type {
+  GetRowActions,
+  RowAction,
+} from "@/components/ui/data-table/row-action";
+export type {
   DataTableSection,
   DataTableSectionHeader,
 } from "@/components/ui/data-table/types";

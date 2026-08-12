@@ -38,12 +38,9 @@
     "completing": "Signing you in…"
   },
   "DashboardPage": {
-    "breadcrumbApp": "SafeCheck",
-    "breadcrumbDashboard": "Dashboard",
     "placeholder": "Sample dashboard content"
   },
   "TodayPage": {
-    "breadcrumb": "Today",
     "title": "Today",
     "loading": "Loading",
     "actions": {
@@ -78,11 +75,6 @@
       "completedAt": "Completed at",
       "completedBy": "Completed by",
       "taskType": "Type"
-    },
-    "keypad": {
-      "label": "Number pad",
-      "decimal": "Decimal separator",
-      "backspace": "Backspace"
     },
     "allDone": {
       "title": "All done",
@@ -201,11 +193,12 @@
       "pageCount": "Page {current} of {total}",
       "previousPage": "Previous page",
       "nextPage": "Next page"
+    },
+    "rowActions": {
+      "more": "Actions for {name}"
     }
   },
   "EquipmentPage": {
-    "breadcrumb": "Cold storage",
-    "breadcrumbSettings": "Settings",
     "title": "Cold storage",
     "description": "Register fridges, freezers, and display cases with allowed temperature ranges.",
     "emptyTitle": "No cold storage yet",
@@ -270,8 +263,6 @@
     }
   },
   "TasksPage": {
-    "breadcrumb": "Tasks",
-    "breadcrumbSettings": "Settings",
     "title": "Tasks",
     "description": "Define recurring HACCP tasks with weekdays and scheduled times from your plan.",
     "emptyTitle": "No tasks yet",
@@ -398,8 +389,6 @@
     "placeholder": "Select location"
   },
   "LocationsPage": {
-    "breadcrumbOrganization": "Organization",
-    "breadcrumb": "Locations",
     "title": "Locations",
     "description": "Manage sites for your organization and choose which location is the default.",
     "emptyTitle": "No locations yet",
@@ -451,8 +440,6 @@
     }
   },
   "EmployeesPage": {
-    "breadcrumbOrganization": "Organization",
-    "breadcrumb": "Employees",
     "title": "Employees",
     "description": "Manage organization members, invitations, and location access.",
     "emptyTitle": "No employees yet",
@@ -538,7 +525,6 @@
     }
   },
   "SettingsPage": {
-    "breadcrumb": "Organization",
     "title": "Organization",
     "description": "Manage your organization identity, regional preferences, and location settings.",
     "name": "Name",

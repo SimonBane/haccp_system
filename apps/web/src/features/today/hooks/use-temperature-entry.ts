@@ -28,9 +28,9 @@ type Params = {
 /**
  * One reading: its value, its sign, and which step of the entry it is on.
  *
- * Deliberately plain state rather than react-hook-form. The three fields here
- * are driven by a custom keypad, so the form library was already reduced to
- * `setValue` plus `useWatch`, and its `reset` cannot run during render — which
+ * Deliberately plain state rather than react-hook-form. Three fields, sanitised
+ * on every change, reduce the form library to `setValue` plus `useWatch`, and
+ * its `reset` cannot run during render — which
  * is exactly what advancing to the next check in a round needs to do. Three
  * rules derived inline are shorter than the resolver they replace, and the
  * schema that actually guards the data still lives in `@haccp/shared`.

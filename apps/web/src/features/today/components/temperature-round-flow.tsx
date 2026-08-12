@@ -4,18 +4,18 @@ import { classifyTemperatureResult } from "@haccp/shared";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef } from "react";
 import { useOrgTimeZone } from "@/features/tenant/use-org-timezone";
+import { handOffKeyboard } from "@/lib/keyboard-primer";
 import { cn } from "@/lib/utils";
 import { useTemperatureEntry } from "../hooks/use-temperature-entry";
 import type { TodayTimelineItem } from "../lib/today-timeline";
 import { TemperatureCorrectiveStep } from "./temperature-corrective-step";
 import { TemperatureEntryShell } from "./temperature-entry-shell";
-import { NumericKeypad } from "./numeric-keypad";
 import { TemperatureReadingStep } from "./temperature-reading-step";
 import { TemperatureRoundFooter } from "./temperature-round-footer";
 
 const ID_PREFIX = "temperature-check";
 
-type Props = {
+export type TemperatureCheck = {
   item: TodayTimelineItem;
   /** Stable identity of the check on screen; changing it starts a fresh entry. */
   occurrenceKey: string;
@@ -23,6 +23,17 @@ type Props = {
   maxTempC: number;
   position: number;
   size: number;
+};
+
+type Props = {
+  /** Stays mounted while false so the sheet can slide in and out. */
+  open: boolean;
+  /**
+   * Null before any check has been opened. The component still mounts then, so
+   * the sheet exists in its closed state and the first open has something to
+   * transition from — the admin forms are mounted the same way.
+   */
+  check: TemperatureCheck | null;
   onSubmit: (recordedC: number, correctiveAction?: string) => Promise<boolean>;
   onSkip: () => void;
   onClose: () => void;
@@ -36,12 +47,8 @@ type Props = {
  * contents rather than replaying the sheet's slide-up.
  */
 export function TemperatureRoundFlow({
-  item,
-  occurrenceKey,
-  minTempC,
-  maxTempC,
-  position,
-  size,
+  open,
+  check,
   onSubmit,
   onSkip,
   onClose,
@@ -49,7 +56,16 @@ export function TemperatureRoundFlow({
   const t = useTranslations("TodayPage");
   const timeZone = useOrgTimeZone();
 
-  const desktopInputRef = useRef<HTMLInputElement>(null);
+  // Placeholders while there is no check: the hooks below run on every render,
+  // and nothing they produce is shown until `check` is real.
+  const item = check?.item ?? null;
+  const occurrenceKey = check?.occurrenceKey ?? "";
+  const minTempC = check?.minTempC ?? 0;
+  const maxTempC = check?.maxTempC ?? 0;
+  const position = check?.position ?? 1;
+  const size = check?.size ?? 1;
+
+  const readingInputRef = useRef<HTMLInputElement>(null);
   const readingStepRef = useRef<HTMLDivElement>(null);
   const correctiveStepRef = useRef<HTMLDivElement>(null);
   const hasChangedStep = useRef(false);
@@ -89,23 +105,21 @@ export function TemperatureRoundFlow({
     target?.focus();
   }, [isReading]);
 
-  // Advancing to the next check has to move focus too, or a keyboard lands
+  // Advancing to the next check has to move focus too, or the keyboard lands
   // nowhere and a screen reader never learns the equipment changed. Skipped on
-  // first open, where the sheet and the dialog's initialFocus already handle it.
+  // first open, where the shell's initialFocus already handles it.
+  //
+  // Advancing is itself a tap, and the keyboard is already up from the previous
+  // check, so moving focus between two inputs keeps it there — no priming.
   useEffect(() => {
     if (!hasAdvanced.current) {
       hasAdvanced.current = true;
       return;
     }
-    // The desktop field is display:none on a phone rather than unmounted, so
-    // the ref is set on both platforms and cannot be the test on its own —
-    // offsetParent is null exactly while it is hidden. Focusing it there would
-    // silently do nothing and swallow the phone's fallback.
-    const input = desktopInputRef.current;
-    if (input && input.offsetParent !== null) {
-      input.focus();
+    const input = readingInputRef.current;
+    if (input) {
       // Selecting means an immediate retype overwrites instead of appending.
-      input.select();
+      handOffKeyboard(input, "select");
       return;
     }
     readingStepRef.current?.focus();
@@ -137,13 +151,15 @@ export function TemperatureRoundFlow({
 
   return (
     <TemperatureEntryShell
-      open
+      open={open}
       onOpenChange={handleOpenChange}
-      title={item.task.equipmentName ?? item.task.title}
+      title={item ? (item.task.equipmentName ?? item.task.title) : ""}
       subtitle={
-        item.task.equipmentName
-          ? `${item.task.title} · ${item.task.scheduledTime}`
-          : item.task.scheduledTime
+        item
+          ? item.task.equipmentName
+            ? `${item.task.title} · ${item.task.scheduledTime}`
+            : item.task.scheduledTime
+          : ""
       }
       leading={isReading ? "close" : "back"}
       leadingLabel={
@@ -151,17 +167,7 @@ export function TemperatureRoundFlow({
       }
       onLeading={() => (isReading ? onClose() : entry.goToReading())}
       round={isRound ? { position, size } : null}
-      mobileActionPanel={
-        isReading ? (
-          <NumericKeypad
-            embedded
-            digits={entry.digits}
-            separator={entry.separator}
-            onDigitsChange={entry.changeDigits}
-          />
-        ) : undefined
-      }
-      desktopInitialFocus={desktopInputRef}
+      initialFocus={readingInputRef}
       footer={
         <TemperatureRoundFooter
           primaryIcon={primaryIcon}
@@ -171,7 +177,7 @@ export function TemperatureRoundFlow({
           onPrimary={() => void entry.pressPrimary()}
           canSkip={isRound && isReading}
           skipLabel={t("temperatureDialog.skipLabel", {
-            title: item.task.equipmentName ?? item.task.title,
+            title: item ? (item.task.equipmentName ?? item.task.title) : "",
           })}
           onSkip={onSkip}
           showBack={!isReading}
@@ -216,9 +222,9 @@ export function TemperatureRoundFlow({
             error={entry.readingError}
             verdict={verdict}
             settledValue={entry.parsed}
-            priorReading={item.priorReading}
+            priorReading={item?.priorReading ?? null}
             timeZone={timeZone}
-            desktopInputRef={desktopInputRef}
+            inputRef={readingInputRef}
           />
         </div>
 

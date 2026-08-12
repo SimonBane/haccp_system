@@ -5,7 +5,8 @@ import type { ColumnDef } from "@tanstack/react-table";
 import type { useTranslations } from "next-intl";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 import { formatScheduleSummary } from "@/features/task-templates/lib/format-schedule";
-import { TaskTemplatesTableRowActions } from "@/features/task-templates/data-table/row-actions";
+import { DataTableRowActions } from "@/components/ui/data-table/data-table-row-actions";
+import type { GetRowActions } from "@/components/ui/data-table/row-action";
 
 type TasksTranslations = ReturnType<typeof useTranslations<"TasksPage">>;
 
@@ -17,18 +18,14 @@ type GetColumnsParams = {
     weekdays: string;
     formatShort: (weekday: import("@haccp/shared").TaskTemplateWeekday) => string;
   };
-  onEdit: (task: TaskTemplateResponse) => void;
-  onDuplicate: (task: TaskTemplateResponse) => void;
-  onDelete: (task: TaskTemplateResponse) => void;
+  getRowActions: GetRowActions<TaskTemplateResponse>;
 };
 
 export function getColumns({
   t,
   typeLabels,
   scheduleLabels,
-  onEdit,
-  onDuplicate,
-  onDelete,
+  getRowActions,
 }: GetColumnsParams): ColumnDef<TaskTemplateResponse>[] {
   return [
     {
@@ -83,12 +80,9 @@ export function getColumns({
       enableSorting: false,
       enableHiding: false,
       cell: ({ row }) => (
-        <TaskTemplatesTableRowActions
-          row={row}
-          t={t}
-          onEdit={onEdit}
-          onDuplicate={onDuplicate}
-          onDelete={onDelete}
+        <DataTableRowActions
+          srLabel={t("openMenu")}
+          actions={getRowActions(row.original)}
         />
       ),
     },

@@ -21,7 +21,7 @@ type Props = {
 
 /**
  * Fixed height in every state, because this row sits between the reading and the
- * keypad: anything that grows here pushes the keys off a phone screen.
+ * commit bar: anything that grows here pushes the button under the keyboard.
  *
  * It keeps showing the allowed range after a verdict arrives. The range used to
  * be replaced by the words "within the allowed range", which is what the badge
