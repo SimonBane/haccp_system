@@ -40,10 +40,10 @@ function measureKeyboardInset(win: Window): number {
  * mobile shell can follow an iOS visual-viewport offset without shrinking to
  * `visualViewport.height`.
  *
- * Height must stay on CSS fill units (`100lvh` / `-webkit-fill-available`).
- * Driving it from `visualViewport.height` is what left a dead band above the
- * home indicator in installed iOS PWAs — that API is routinely shorter than
- * the covered screen.
+ * Height stays in CSS as a dvh. Driving it from `visualViewport.height` left
+ * a dead band above the home indicator in installed iOS PWAs, and `lvh` /
+ * `-webkit-fill-available` overshoot the other way — both measure the
+ * viewport as if Safari's toolbars were hidden.
  *
  * Mount exactly once, at the top of the client tree.
  */
