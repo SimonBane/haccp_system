@@ -123,18 +123,21 @@
    * keyboard covers. Use in anything portalled to the body — a Sheet, a
    * Dialog — which is positioned against the layout viewport.
    *
-   * `--app-vv-top` / `--app-vv-height`: the slice of the layout viewport the
-   * user can actually see. The mobile shell pins itself to these so an iOS
-   * focus-scroll cannot letterbox the drawer.
+   * `--app-vv-top`: iOS sometimes shifts the visual viewport down after
+   * focus (and leaves it there). The mobile shell follows that offset so
+   * chrome is not letterboxed. Height is deliberately *not* taken from
+   * `visualViewport` — that value is short of the covered screen in iOS
+   * PWAs and was leaving a dead band above the home indicator.
    *
-   * `--keyboard-gap` stays 0: the shell tracks the visual viewport, so a
-   * bottom-anchored control inside `SidebarInset` is already above the
-   * keyboard. Adding the inset again would lift it twice.
+   * `--keyboard-gap`: same inset, measured from inside `SidebarInset`,
+   * which already carries the bottom safe-area as padding.
    */
   --keyboard-inset: 0px;
-  --keyboard-gap: 0px;
+  --keyboard-gap: max(
+    0px,
+    calc(var(--keyboard-inset) - var(--safe-area-inset-bottom, 0px))
+  );
   --app-vv-top: 0px;
-  --app-vv-height: 100%;
 }
 
 @media (width >= 48rem) {
@@ -206,10 +209,11 @@
    * usual body-to-viewport propagation no longer applies.
    */
   html {
+    /* Prefer fill-available over percentage: on iOS standalone, `100%` is
+       routinely short of the covered screen and leaves a dead bottom band. */
     height: 100%;
-    /* Fill the covered viewport on iOS even when `100%` resolves short. */
+    height: -webkit-fill-available;
     min-height: 100dvh;
-    min-height: -webkit-fill-available;
     overflow: hidden;
     overscroll-behavior: none;
     -webkit-tap-highlight-color: transparent;
@@ -234,8 +238,8 @@
   }
   body {
     height: 100%;
-    min-height: 100%;
-    min-height: -webkit-fill-available;
+    height: -webkit-fill-available;
+    min-height: 100dvh;
     overflow: hidden;
     overscroll-behavior: none;
     @apply bg-background text-foreground;
@@ -308,10 +312,10 @@ body::before {
  * unregistered custom property is not interpolable, so animating it directly
  * would teleport rather than slide.
  *
- * The wrapper is pinned to the visual viewport (`--app-vv-*`, written by
- * `useKeyboardInset`). Sidebar and scrim are `absolute` inside it so they
- * share that box — `position: fixed` would ignore it and re-open the
- * letterbox gap above/below the drawer.
+ * The wrapper follows `--app-vv-top` when iOS shifts the visual viewport,
+ * but its height comes from CSS fill units — never `visualViewport.height`,
+ * which ends above the home indicator in installed iOS PWAs. Sidebar and
+ * scrim are `absolute` inside it so they share that box.
  */
 @media (width < 48rem) {
   [data-slot="sidebar-wrapper"] {
@@ -319,7 +323,11 @@ body::before {
     top: var(--app-vv-top, 0px);
     left: 0;
     width: 100%;
-    height: var(--app-vv-height, 100%);
+    /* Large viewport + fill-available: covers the PWA home-indicator band
+       that `100%` / `visualViewport.height` leave empty. Subtract the offset
+       so a non-zero `--app-vv-top` does not overflow the bottom. */
+    height: calc(100lvh - var(--app-vv-top, 0px));
+    min-height: -webkit-fill-available;
   }
 
   [data-slot="sidebar-inset"],
