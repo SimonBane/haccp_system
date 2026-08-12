@@ -97,9 +97,9 @@ function SidebarProvider({
           // fixed overlay from the viewport.
           //
           // Desktop: h-full against the html/body percentage chain.
-          // Mobile: globals.css pins this box to the visual viewport
-          // (`--app-vv-top` / `--app-vv-height`) so iOS toolbar / focus
-          // shifts cannot letterbox the drawer and content.
+          // Mobile: globals.css fixes this box to the covered viewport
+          // (`100lvh` / `-webkit-fill-available`, plus `--app-vv-top` when
+          // iOS shifts the visual viewport) so the drawer cannot letterbox.
           "group/sidebar-wrapper relative flex h-full w-full overflow-hidden",
           "has-data-[variant=inset]:bg-sidebar max-md:bg-sidebar",
           className
