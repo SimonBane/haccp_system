@@ -36,5 +36,5 @@ coverage/
 .vercel
 .env*
 
-# .claude
-.claude/
+# Claude Code — project config is shared; personal overrides stay local
+.claude/settings.local.json
