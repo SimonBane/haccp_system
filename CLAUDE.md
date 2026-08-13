@@ -20,6 +20,12 @@ supabase/       config only (hosted Postgres); local dev uses docker-compose
 
 Deployed on Vercel (web + api as separate projects). Sentry only when `VERCEL_ENV=production`.
 
+**When implementation depends on a library's or API's current behavior or syntax, consult
+Context7 documentation rather than relying on memory.** Much of this stack is new enough that
+recalled APIs are likely to describe a previous major version — Next.js 16, React 19, Tailwind v4,
+Zod v4, Clerk v7, next-intl v4, Base UI and `@hono/zod-openapi` v1 all moved in ways that are easy
+to get subtly wrong. Check before writing the code, not after the failure.
+
 ## Commands
 
 | Task | Command |
@@ -107,8 +113,7 @@ Postgres, never throw.
 
 ## Web architecture (`apps/web`)
 
-Feature modules live in `src/features/<name>/` — see `apps/web/FEATURES.md` for the full
-convention (its file listings have drifted from reality; trust the directory, not the doc).
+Feature modules live in `src/features/<name>/`:
 
 ```
 features/<name>/
@@ -117,8 +122,13 @@ features/<name>/
   components/  hooks/  lib/  data-table/{columns,data,mobile-card,row-actions}
 ```
 
-No barrel `index.ts` — import direct paths via the `@/` alias. Types and schemas come from
+Create `components/` / `hooks/` / `lib/` only once they hold something — no empty scaffolding. No
+barrel `index.ts` — import direct paths via the `@/` alias. Types and schemas come from
 `@haccp/shared`, never redefined locally.
+
+The rest of `src/`: `app/` is routes only (thin pages that compose features), `components/ui/` is
+shadcn primitives with no business logic, `components/layout/` is the app shell, `components/auth/`
+is auth UI, and `hooks/` holds shared UI hooks (`use-mobile`, `use-now`).
 
 **Data flow**: Server Component pages fetch through `src/lib/api/server.ts` (Clerk token +
 `cache: "no-store"`; `getTenantContext` is React-`cache`d per render) and pass results as
