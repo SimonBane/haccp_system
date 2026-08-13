@@ -65,7 +65,7 @@ API `/` serves Swagger UI in development only.
 
 ## API architecture (`apps/api`)
 
-**Strict layering** — enforced by `.cursor/rules/api-performance-and-clean-code.mdc`:
+**Strict layering:**
 
 ```
 <module>.routes.ts      HTTP only: OpenAPI route defs, parse input, call service
@@ -74,8 +74,22 @@ API `/` serves Swagger UI in development only.
 <module>.mapper.ts      db row -> API response shape (numeric -> Number, Date -> ISO string)
 ```
 
-Routes never touch the db; repositories never throw domain errors. No N+1 — batch with joins or
-`inArray`, filter/sort/paginate in SQL, build lookup `Map`s when joining two result sets.
+Routes never touch the db and carry no business logic. Services orchestrate use cases and own the
+domain errors. Repositories hold every query, return rows or `null`, and throw only on DB failure.
+
+**Query performance** — the standing rules:
+
+- **No N+1.** Never fetch a list then loop with per-item queries; use a join, a subquery, or a
+  batched `inArray`. When joining two result sets in memory, build a lookup `Map` once — O(n + m),
+  not O(n × m).
+- **Filter, sort, paginate and count in SQL**, not in memory after over-fetching. Select only the
+  columns you need, and never load an unbounded result set.
+- **Prefer one conditional write to read-then-write**: an `updateById` that returns `null` tells
+  you the row was missing in one roundtrip instead of two.
+- Wrap multi-statement writes in a transaction. Structure `where`/`join` conditions to match
+  existing indexes; don't wrap an indexed column in a function.
+- Name methods for what they do (`findManyByLocation`, `assertLocationBelongsToOrganization`), and
+  reuse existing repository methods rather than duplicating a query.
 
 **Request pipeline** (`src/routes/index.ts`): `dbMiddleware` → `requireAuth` (verifies the Clerk
 JWT, sets `userId`/`orgId`/`orgRole`) → `requestContextMiddleware` (resolves tenant + user +
@@ -147,11 +161,19 @@ for tables). Mobile chrome is filled via the portal slots in `components/layout/
 (`MobileHeaderTitle`, `MobileHeaderActions`, `ShellOverlay`) — use `ShellOverlay` instead of
 `position: fixed`, which resolves against the drawer-transformed panel on mobile.
 
-**UI rules** (`.cursor/rules/no-native-components.mdc`, `ui-ux-best-practices.mdc`): compose from
-`@/components/ui/*` (shadcn, style `base-vega`, icons `lucide-react`) — no raw `<button>`,
-`<input>`, `<select>`, custom modals. Missing primitive? `pnpm dlx shadcn@latest add <component>`
-from `apps/web`. Always handle loading / empty / error states. Use design tokens
-(`bg-background`, `text-muted-foreground`) over one-off styles.
+**UI rules**: compose from `@/components/ui/*` (shadcn, style `base-vega`, icons `lucide-react`).
+Never reach for a native element for interactive or styled UI — `<button>`→`Button`,
+`<input>`→`Input`, `<textarea>`→`Textarea`, `<select>`→`Select`/`Combobox`, checkbox→`Checkbox`,
+toggle→`Switch`, custom modal→`Dialog`/`AlertDialog`, `title` tooltip→`Tooltip`, custom
+dropdown→`DropdownMenu`/`Popover`, `<a>` styled as a button→`Button asChild`. Semantic-only
+elements (`<main>`, `<section>`, `<nav>`, headings, `<p>`) are fine. Missing primitive? Look in
+`src/components/ui/` first, then `pnpm dlx shadcn@latest add <component>` from `apps/web` — don't
+hand-roll an equivalent.
+
+Always handle loading / empty / error / success states (`Skeleton`, `Empty`, `Alert`, Sonner
+toasts). Use design tokens (`bg-background`, `text-muted-foreground`, `border`) over one-off
+styles. One primary action per view; destructive actions use `variant="destructive"` behind a
+confirmation. Pair every input with a label and surface inline validation.
 
 **i18n**: `next-intl`, locales `bg` (default) and `en`, `localePrefix: "as-needed"`. All routes
 live under `src/app/[locale]/`. **Any user-facing string must be added to both
@@ -188,11 +210,27 @@ Vitest, colocated `*.test.ts`. Coverage is deliberately thin and unit-level — 
 `src/env.ts` validates at import; **nothing here opens a real DB, Redis or Clerk connection** —
 keep it that way and put anything needing real infrastructure in a separate integration suite.
 
+## Git workflow
+
+Never work directly on `main`. Branch first — `git checkout main && git pull`, then
+`git checkout -b <type>/<short-description>`, lowercase and hyphenated, prefixed `feat`, `fix`,
+`chore`, `refactor`, `docs` or `test` (`feat/employee-invites`, `fix/login-redirect-loop`).
+
+Commits follow Conventional Commits: `<type>(<optional scope>): <summary>` — imperative mood, no
+trailing period, ≤72 chars, one logical change each. Types add `perf`, `ci` and `build` to the
+branch prefixes; scope is a module or area (`employees`, `web`, `api`, `ci`).
+
+```
+feat(employees): add bulk invite endpoint
+fix(auth): redirect unauthenticated users to sign-in
+```
+
+Land everything through a PR against `main` — never a local merge. PR title takes the same shape
+as a commit summary; the body gets a short summary, a test plan, and any related issue. Commit
+only when the user asks; offer to push and open the PR once the work is done.
+
 ## Conventions & gotchas
 
-- **Branches + conventional commits** (`.cursor/rules/git-workflow-branches-prs.mdc`): never work
-  on `main`. Branch `feat|fix|chore|refactor|docs|test/<short-description>`; commit
-  `type(scope): imperative summary` ≤72 chars. Land changes via PR, never a local merge.
 - Adding a schema to `@haccp/shared` requires a **manual entry in `packages/shared/src/index.ts`**
   — it's an explicit re-export barrel, not `export *`.
 - Timezone-sensitive logic (task status, "today") must take the organisation's `timeZone`
