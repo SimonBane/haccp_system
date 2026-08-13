@@ -1,5 +1,9 @@
 # AGENTS.md
 
+Architecture, stack conventions, and coding rules live in `CLAUDE.md` — that's the source of
+truth for both agents. This file only covers Cursor Cloud VM caveats that don't apply anywhere
+else.
+
 ## Cursor Cloud specific instructions
 
 HACCP System — a Turborepo + pnpm monorepo. Two apps: `apps/web` (Next.js 16, port 3000) and `apps/api` (Hono REST API, port 3001). Shared code in `packages/shared`. Standard commands live in the root `README.md` and `package.json` / per-app `package.json` scripts — use those; the notes below only cover non-obvious cloud caveats.
