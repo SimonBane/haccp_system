@@ -5,9 +5,10 @@ import type {
   TaskTemplateFieldsInput,
   TaskTemplateResponse,
 } from "@haccp/shared";
+import type { RowSelectionState } from "@tanstack/react-table";
 import { Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
 import {
@@ -54,6 +55,13 @@ export function TaskTemplatesManager({
     null,
   );
   const [isDeleting, setIsDeleting] = useState(false);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const selectedIds = useMemo(
+    () => Object.keys(rowSelection).filter((id) => rowSelection[id]),
+    [rowSelection],
+  );
 
   const openCreateForm = useCallback(() => {
     setEditingTask(null);
@@ -96,6 +104,29 @@ export function TaskTemplatesManager({
     }
   }, [deleteTarget, isDeleting, refetch, remove, t]);
 
+  const handleBulkDelete = useCallback(() => {
+    setDeleteTarget(null);
+    setBulkDeleteOpen(true);
+  }, []);
+
+  const confirmBulkDelete = useCallback(async () => {
+    if (isBulkDeleting || selectedIds.length === 0) return;
+    setIsBulkDeleting(true);
+    try {
+      await Promise.all(selectedIds.map((id) => remove.mutateAsync(id)));
+      await refetch();
+      toast.success(
+        t("toast.bulkDeleteSuccess", { count: selectedIds.length }),
+      );
+      setRowSelection({});
+      setBulkDeleteOpen(false);
+    } catch (error) {
+      toast.error(getErrorMessage(error, t("toast.bulkDeleteError")));
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  }, [isBulkDeleting, refetch, remove, selectedIds, t]);
+
   // Only the open flag. Clearing the record here too would change the form's
   // `key` mid-exit, remounting it and killing the slide-out — every open path
   // below already sets the record explicitly, so there is nothing to reset.
@@ -133,6 +164,9 @@ export function TaskTemplatesManager({
         onEdit={openEditForm}
         onDuplicate={openDuplicateForm}
         onDelete={handleDelete}
+        onBulkDelete={handleBulkDelete}
+        rowSelection={rowSelection}
+        onRowSelectionChange={setRowSelection}
       />
 
       <ResponsiveAlertDialog
@@ -152,6 +186,21 @@ export function TaskTemplatesManager({
         isLoading={isDeleting}
         cancelDisabled={isDeleting}
         onConfirm={confirmDelete}
+      />
+
+      <ResponsiveAlertDialog
+        open={bulkDeleteOpen}
+        onOpenChange={(open) => {
+          if (!open && !isBulkDeleting) setBulkDeleteOpen(false);
+        }}
+        title={t("deleteDialog.bulkTitle")}
+        description={t("bulkDeleteConfirm", { count: selectedIds.length })}
+        cancelLabel={t("deleteDialog.cancel")}
+        confirmLabel={t("deleteDialog.confirm")}
+        confirmIcon={<Trash2Icon data-icon="inline-start" />}
+        isLoading={isBulkDeleting}
+        cancelDisabled={isBulkDeleting}
+        onConfirm={confirmBulkDelete}
       />
 
       {/* Always mounted, `open` toggled: Base UI runs the sheet's exit

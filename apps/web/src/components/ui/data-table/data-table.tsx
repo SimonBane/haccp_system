@@ -212,7 +212,8 @@ export function DataTable<TData, TValue>({
   // Search floats over the bottom of the screen on the card list, so on mobile
   // the toolbar row usually has nothing left in it and the list starts flush at
   // the top. Only a custom `Toolbar` keeps it.
-  const useFloatingSearch = useCardList && enableSearch && Boolean(searchColumn);
+  const useFloatingSearch =
+    useCardList && enableSearch && Boolean(searchColumn);
   const showToolbar =
     (enableSearch && !useFloatingSearch) ||
     (showInlineToolbar && !useCardList) ||
@@ -235,13 +236,15 @@ export function DataTable<TData, TValue>({
           <div
             className={cn(
               "flex flex-col gap-2",
-              !useCardList && "sm:flex-row sm:flex-wrap sm:items-center sm:justify-between",
+              !useCardList &&
+                "sm:flex-row sm:flex-wrap sm:items-center sm:justify-between",
             )}
           >
             <div
               className={cn(
                 "flex w-full flex-col gap-2",
-                !useCardList && "sm:w-auto sm:flex-row sm:flex-wrap sm:items-center",
+                !useCardList &&
+                  "sm:w-auto sm:flex-row sm:flex-wrap sm:items-center",
               )}
             >
               {enableSearch && searchColumn && !useFloatingSearch ? (
@@ -280,120 +283,122 @@ export function DataTable<TData, TValue>({
           className={className}
         />
       ) : (
-      <div
-        className={cn(
-          "min-h-0 overflow-auto rounded-md border bg-card shadow-xs",
-          className,
-        )}
-      >
-        <Table className="[&_[data-slot=table-head]]:min-h-7 [&_[data-slot=table-head]]:px-1.5 [&_[data-slot=table-head]]:pt-1 [&_[data-slot=table-head]]:pb-1 [&_[data-slot=table-head]]:text-xs [&_[data-slot=table-cell]]:px-1.5 [&_[data-slot=table-cell]]:py-0.5 [&_[data-slot=table-cell]]:text-xs md:[&_[data-slot=table-head]]:min-h-10 md:[&_[data-slot=table-head]]:px-6 md:[&_[data-slot=table-head]]:pt-2 md:[&_[data-slot=table-head]]:pb-2 md:[&_[data-slot=table-head]]:text-sm md:[&_[data-slot=table-cell]]:px-6 md:[&_[data-slot=table-cell]]:py-2 md:[&_[data-slot=table-cell]]:text-sm">
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead
-                    key={header.id}
-                    className={cn(
-                      header.column.id === "select" ||
-                        header.column.id === "expand" ||
-                        header.column.id === "actions"
-                        ? "w-10"
-                        : "",
-                      header.column.columnDef.meta?.className,
-                      "group sticky top-0 z-40 bg-card",
-                      header.column.columnDef.meta?.sticky && "left-0 z-50",
-                      header.column.columnDef.meta?.hidden && "hidden",
-                    )}
-                  >
-                    {header.isPlaceholder ? null : (
-                      <div className="inline-flex w-fit max-w-full items-center gap-0.5">
-                        {flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
-                        )}
-                        {showColumnVisibility ? (
-                          <DataTableColumnHideButton column={header.column} />
-                        ) : null}
-                      </div>
-                    )}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {visibleRows.length ? (
-              visibleRows.map((row) => {
-                const isRowClickable = Boolean(onRowClick);
-
-                return (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() ? "selected" : undefined}
-                  className={cn(
-                    "group h-8 md:h-auto",
-                    isRowClickable && "cursor-pointer",
-                  )}
-                  tabIndex={isRowClickable ? 0 : undefined}
-                  role={isRowClickable ? "button" : undefined}
-                  onKeyDown={(event) => {
-                    if (!onRowClick) return;
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      onRowClick(row);
-                    }
-                  }}
-                  onClick={(event) => {
-                    if (!onRowClick) return;
-                    const target = event.target as HTMLElement;
-                    if (
-                      target.closest("button") ||
-                      target.closest('[data-slot="dropdown-menu"]')
-                    ) {
-                      return;
-                    }
-                    onRowClick(row);
-                  }}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell
-                      key={cell.id}
+        <div
+          className={cn(
+            "min-h-0 overflow-auto rounded-md border bg-card shadow-xs",
+            className,
+          )}
+        >
+          <Table className="[&_[data-slot=table-head]]:min-h-7 [&_[data-slot=table-head]]:px-1 [&_[data-slot=table-head]]:pt-1 [&_[data-slot=table-head]]:pb-1 [&_[data-slot=table-head]]:text-xs [&_[data-slot=table-cell]]:px-1 [&_[data-slot=table-cell]]:py-0.5 [&_[data-slot=table-cell]]:text-xs md:[&_[data-slot=table-head]]:min-h-10 md:[&_[data-slot=table-head]]:px-4 md:[&_[data-slot=table-head]]:pt-2 md:[&_[data-slot=table-head]]:pb-2 md:[&_[data-slot=table-head]]:text-sm md:[&_[data-slot=table-cell]]:px-4 md:[&_[data-slot=table-cell]]:py-2 md:[&_[data-slot=table-cell]]:text-sm">
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => (
+                    <TableHead
+                      key={header.id}
                       className={cn(
-                        truncateCellValue
-                          ? "max-w-[300px] truncate"
-                          : "whitespace-pre-wrap",
-                        cell.column.columnDef.meta?.sticky && "left-0 z-20",
-                        cell.column.columnDef.meta?.className,
-                        cell.column.columnDef.meta?.hidden && "hidden",
+                        header.column.id === "select" ||
+                          header.column.id === "expand" ||
+                          header.column.id === "actions"
+                          ? "w-10"
+                          : "",
+                        header.column.id === "select" && "text-center",
+                        header.column.columnDef.meta?.className,
+                        "group sticky top-0 z-40 bg-card",
+                        header.column.columnDef.meta?.sticky && "left-0 z-50",
+                        header.column.columnDef.meta?.hidden && "hidden",
                       )}
-                      title={
-                        typeof cell.getContext().getValue() === "string"
-                          ? (cell.getContext().getValue() as string)
-                          : ""
-                      }
                     >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
+                      {header.isPlaceholder ? null : (
+                        <div className="inline-flex w-fit max-w-full items-center gap-0.5 align-middle">
+                          {flexRender(
+                            header.column.columnDef.header,
+                            header.getContext(),
+                          )}
+                          {showColumnVisibility ? (
+                            <DataTableColumnHideButton column={header.column} />
+                          ) : null}
+                        </div>
                       )}
-                    </TableCell>
+                    </TableHead>
                   ))}
                 </TableRow>
-              );
-              })
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={tableColumns.length}
-                  className="h-24 text-center"
-                >
-                  {displayEmptyMessage}
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {visibleRows.length ? (
+                visibleRows.map((row) => {
+                  const isRowClickable = Boolean(onRowClick);
+
+                  return (
+                    <TableRow
+                      key={row.id}
+                      data-state={row.getIsSelected() ? "selected" : undefined}
+                      className={cn(
+                        "group h-8 md:h-auto",
+                        isRowClickable && "cursor-pointer",
+                      )}
+                      tabIndex={isRowClickable ? 0 : undefined}
+                      role={isRowClickable ? "button" : undefined}
+                      onKeyDown={(event) => {
+                        if (!onRowClick) return;
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          onRowClick(row);
+                        }
+                      }}
+                      onClick={(event) => {
+                        if (!onRowClick) return;
+                        const target = event.target as HTMLElement;
+                        if (
+                          target.closest("button") ||
+                          target.closest('[role="checkbox"]') ||
+                          target.closest('[data-slot="dropdown-menu"]')
+                        ) {
+                          return;
+                        }
+                        onRowClick(row);
+                      }}
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell
+                          key={cell.id}
+                          className={cn(
+                            truncateCellValue
+                              ? "max-w-[300px] truncate"
+                              : "whitespace-pre-wrap",
+                            cell.column.columnDef.meta?.sticky && "left-0 z-20",
+                            cell.column.columnDef.meta?.className,
+                            cell.column.columnDef.meta?.hidden && "hidden",
+                          )}
+                          title={
+                            typeof cell.getContext().getValue() === "string"
+                              ? (cell.getContext().getValue() as string)
+                              : ""
+                          }
+                        >
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext(),
+                          )}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  );
+                })
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={tableColumns.length}
+                    className="h-24 text-center"
+                  >
+                    {displayEmptyMessage}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       )}
 
       {/* No pager on the mobile list: native lists scroll, and these sets are
