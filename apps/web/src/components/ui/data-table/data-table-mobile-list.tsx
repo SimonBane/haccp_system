@@ -156,40 +156,6 @@ export function MobileListRow({
   );
 }
 
-/**
- * The button in a row's swipe-revealed tray.
- *
- * Full-bleed and full-height, the way native trays look — the tray is sized by
- * `SwipeableRow` and this fills it.
- */
-export function MobileListSwipeAction({
-  label,
-  icon,
-  onClick,
-  variant = "default",
-}: {
-  label: string;
-  icon?: ReactNode;
-  onClick: () => void;
-  variant?: "default" | "destructive";
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "flex flex-1 flex-col items-center justify-center gap-1 px-3 text-xs font-medium",
-        variant === "destructive"
-          ? "bg-destructive text-white"
-          : "bg-muted text-foreground",
-      )}
-    >
-      {icon}
-      {label}
-    </button>
-  );
-}
-
 /** Compact status pill for a row's `trailing` slot. */
 export function MobileListBadge({
   children,
