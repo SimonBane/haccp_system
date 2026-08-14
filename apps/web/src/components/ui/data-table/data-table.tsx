@@ -152,6 +152,10 @@ export function DataTable<TData, TValue>({
   const rowSelection = rowSelectionProp ?? internalRowSelection;
   const setRowSelection = onRowSelectionChange ?? setInternalRowSelection;
 
+  // Where a shift-click range starts from. A ref so extending a range never
+  // rebuilds the memoised column list.
+  const rangeAnchorRef = React.useRef<string | null>(null);
+
   const hasSelectColumn = columns.some((column) => column.id === "select");
   const tableColumns = React.useMemo(() => {
     if (!enableRowSelection || hasSelectColumn) {
@@ -160,8 +164,8 @@ export function DataTable<TData, TValue>({
 
     return [
       createSelectColumn<TData>({
-        selectAll: t("selectAll"),
-        selectRow: t("selectRow"),
+        labels: { selectAll: t("selectAll"), selectRow: t("selectRow") },
+        anchorRef: rangeAnchorRef,
       }),
       ...columns,
     ];
