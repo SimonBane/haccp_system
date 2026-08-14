@@ -1,17 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { useScrollContainer } from "@/components/layout/shell-scroll";
 import { tapFeedback } from "@/features/today/lib/haptics";
 
 /** Matches the platform's own press-and-hold delay. */
 const LONG_PRESS_MS = 500;
 
-/**
- * Deliberately below the 8px at which both `useDrawerSwipe` and `SwipeableRow`
- * claim the pointer: the press has to be dead before either of them commits, or
- * a swipe could also open the sheet.
- */
+/** Tight enough that any real drag cancels the press before it fires. */
 const MOVE_CANCEL_PX = 6;
 
 /**
@@ -27,10 +22,7 @@ const CLICK_SUPPRESS_MS = 400;
 /**
  * Press and hold a row to see what you can do to it.
  *
- * This shares an element with two other gesture handlers — the nav drawer's
- * rightward swipe and the row's leftward swipe — so it has to lose races rather
- * than win them, hence the tight movement threshold. It also cancels on the
- * shell scrolling, because iOS momentum scroll does not reliably deliver
+ * Cancels on scroll, because iOS momentum scroll does not reliably deliver
  * `pointercancel` and a press that survives a flick fires under the user's
  * thumb half a screen later.
  *
@@ -42,7 +34,6 @@ export function useLongPress(
   onLongPress: (node: HTMLElement) => void,
   enabled = true,
 ) {
-  const scroller = useScrollContainer();
   const onLongPressRef =
     React.useRef<(node: HTMLElement) => void>(onLongPress);
 
@@ -121,7 +112,7 @@ export function useLongPress(
     node.addEventListener("lostpointercapture", cancel, { passive: true });
     node.addEventListener("contextmenu", onContextMenu);
     document.addEventListener("click", onClickCapture, true);
-    scroller?.addEventListener("scroll", cancel, { passive: true });
+    window.addEventListener("scroll", cancel, { passive: true });
 
     return () => {
       cancel();
@@ -132,9 +123,9 @@ export function useLongPress(
       node.removeEventListener("lostpointercapture", cancel);
       node.removeEventListener("contextmenu", onContextMenu);
       document.removeEventListener("click", onClickCapture, true);
-      scroller?.removeEventListener("scroll", cancel);
+      window.removeEventListener("scroll", cancel);
     };
-  }, [enabled, node, scroller]);
+  }, [enabled, node]);
 
   // The node comes back out so a caller can anchor a popup to what was pressed
   // without adding a second ref. Two refs on one element means an inline

@@ -5,11 +5,11 @@ import { mergeProps } from "@base-ui/react/merge-props"
 import { useRender } from "@base-ui/react/use-render"
 import { cva, type VariantProps } from "class-variance-authority"
 
-import { useDrawerSwipe } from "@/hooks/use-drawer-swipe"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 
 const SIDEBAR_WIDTH = "16rem"
@@ -17,9 +17,8 @@ const SIDEBAR_WIDTH = "16rem"
 /**
  * There is no desktop collapse. Six flat nav items do not earn a hide/show
  * affordance, and the one that existed never persisted — it wrote a cookie
- * nothing ever read. What remains is the mobile drawer, which is a different
- * mechanism entirely: a panel behind the content, revealed by translating the
- * content off it.
+ * nothing ever read. What remains is the mobile drawer, which is an ordinary
+ * left-side Sheet.
  */
 type SidebarContextProps = {
   openMobile: boolean
@@ -58,16 +57,6 @@ function SidebarProvider({
     setOpenMobile((open) => !open)
   }, [isMobile, setOpenMobile])
 
-  // The gesture writes the panel position straight to this element, so the
-  // context no longer carries per-frame drag state — and no longer re-renders
-  // every `useSidebar()` consumer sixty times a second while dragging.
-  const { rootRef } = useDrawerSwipe({
-    open: openMobile,
-    onOpenChange: setOpenMobile,
-    enabled: isMobile,
-    mode: "anywhere",
-  })
-
   const contextValue = React.useMemo<SidebarContextProps>(
     () => ({
       isMobile,
@@ -81,7 +70,6 @@ function SidebarProvider({
   return (
     <SidebarContext.Provider value={contextValue}>
       <div
-        ref={rootRef}
         data-slot="sidebar-wrapper"
         style={
           {
@@ -90,18 +78,8 @@ function SidebarProvider({
           } as React.CSSProperties
         }
         className={cn(
-          // Fixed height, never scrolls: the shell's scroll region lives
-          // inside SidebarInset. Nothing here may set transform, filter,
-          // backdrop-filter, will-change, contain or perspective — any of
-          // them makes this a containing block and detaches every portalled
-          // fixed overlay from the viewport.
-          //
-          // Desktop: h-full against the html/body height chain.
-          // Mobile: globals.css fixes this box to `--app-viewport-height`,
-          // offset by `--app-vv-top` when iOS shifts the visual viewport, so
-          // the drawer cannot letterbox or run under the URL bar.
-          "group/sidebar-wrapper relative flex h-full w-full overflow-hidden",
-          "has-data-[variant=inset]:bg-sidebar max-md:bg-sidebar",
+          "group/sidebar-wrapper flex min-h-dvh w-full flex-1",
+          "has-data-[variant=inset]:bg-sidebar",
           className
         )}
         {...props}
@@ -118,18 +96,42 @@ function Sidebar({
   className,
   children,
   dir,
+  mobileTitle,
   ...props
 }: React.ComponentProps<"div"> & {
   side?: "left" | "right"
   variant?: "sidebar" | "floating" | "inset"
+  /** Names the mobile drawer for screen readers. */
+  mobileTitle?: string
 }) {
-  const { isMobile } = useSidebar()
+  const { isMobile, openMobile, setOpenMobile } = useSidebar()
 
   if (isMobile) {
     return (
-      <MobileSidebar side={side} variant={variant} {...props}>
-        {children}
-      </MobileSidebar>
+      <Sheet open={openMobile} onOpenChange={setOpenMobile}>
+        <SheetContent
+          side={side}
+          // The header's own controls sit in that corner, and a drawer is
+          // dismissed by tapping outside it, Escape, or picking a destination.
+          showCloseButton={false}
+          data-sidebar="sidebar"
+          data-slot="sidebar"
+          data-mobile="true"
+          data-variant={variant}
+          className={cn(
+            "w-(--sidebar-width) gap-0 bg-sidebar p-0 text-sidebar-foreground sm:max-w-(--sidebar-width)",
+            className
+          )}
+        >
+          <SheetTitle className="sr-only">{mobileTitle}</SheetTitle>
+          <div
+            data-slot="sidebar-inner"
+            className="flex size-full flex-col overflow-y-auto"
+          >
+            {children}
+          </div>
+        </SheetContent>
+      </Sheet>
     )
   }
 
@@ -152,10 +154,7 @@ function Sidebar({
         data-slot="sidebar-container"
         data-side={side}
         className={cn(
-          // Height from the shared token, not `h-svh`: WebKit under-reports
-          // the small viewport in an installed app, which would leave this
-          // panel short of the screen on an iPad home-screen app.
-          "fixed inset-y-0 z-10 hidden h-(--app-viewport-height) w-(--sidebar-width) data-[side=left]:left-0 data-[side=right]:right-0 md:flex",
+          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) data-[side=left]:left-0 data-[side=right]:right-0 md:flex",
           // Adjust the padding for floating and inset variants.
           variant === "floating" || variant === "inset"
             ? "p-2"
@@ -176,131 +175,16 @@ function Sidebar({
   )
 }
 
-function MobileSidebar({
-  side = "left",
-  variant = "sidebar",
-  className,
-  children,
-  ...props
-}: React.ComponentProps<"div"> & {
-  side?: "left" | "right"
-  variant?: "sidebar" | "floating" | "inset"
-}) {
-  const { openMobile } = useSidebar()
-  const ref = React.useRef<HTMLDivElement>(null)
-  const restoreTo = React.useRef<HTMLElement | null>(null)
-
-  React.useEffect(() => {
-    if (openMobile) {
-      restoreTo.current = document.activeElement as HTMLElement | null
-      // Next frame: `inert` clears in this same commit, and focus() on a
-      // still-inert element is silently dropped.
-      //
-      // preventScroll, because iOS scrolls the layout viewport to reveal a
-      // focus target even with `html { overflow: hidden }` — which slides every
-      // fixed layer off the top and is one of the ways the safe-area strips end
-      // up unpainted.
-      const frame = requestAnimationFrame(() =>
-        ref.current?.focus({ preventScroll: true }),
-      )
-      return () => cancelAnimationFrame(frame)
-    }
-
-    restoreTo.current?.focus?.()
-    restoreTo.current = null
-  }, [openMobile])
-
-  return (
-    <div
-      ref={ref}
-      role="dialog"
-      aria-modal="true"
-      tabIndex={-1}
-      // The panel is always mounted, sitting behind the content. Without this
-      // its links stay in the tab order and are read out by screen readers
-      // while invisible. `inert` covers aria-hidden too — setting both is how
-      // you get "aria-hidden on a focused ancestor" warnings.
-      inert={!openMobile}
-      data-sidebar="sidebar"
-      data-slot="sidebar"
-      data-mobile="true"
-      data-state={openMobile ? "open" : "closed"}
-      data-variant={variant}
-      data-side={side}
-      className={cn(
-        // Absolute on mobile: the wrapper is the visual-viewport-locked shell
-        // (see globals.css). Fixed would ignore that box and re-letterbox.
-        "absolute inset-y-0 z-10 flex w-(--sidebar-width) flex-col bg-sidebar text-sidebar-foreground outline-none md:hidden",
-        side === "left" ? "left-0" : "right-0",
-        className
-      )}
-      {...props}
-    >
-      <div
-        data-slot="sidebar-inner"
-        className="flex size-full flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
-      >
-        {children}
-      </div>
-    </div>
-  )
-}
-
 function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
-  const { isMobile, openMobile } = useSidebar()
-
   return (
     <main
       data-slot="sidebar-inset"
-      // Focus containment while the drawer is open, without a focus trap:
-      // an inert subtree is unreachable by tab, pointer and screen reader.
-      // The scrim is a sibling of this element precisely so it stays tappable.
-      inert={isMobile && openMobile}
       className={cn(
-        // No h-full: the wrapper is a stretch row, so this already resolves to
-        // the wrapper's height minus its own margins. h-full would overflow by
-        // the 8px of md:m-2 on the desktop inset card.
-        "relative flex w-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background",
-        // The drawer reveal itself — translate, transition and the
-        // drag-time suppression — lives in globals.css under
-        // [data-slot="sidebar-inset"], so the panel and the scrim cannot
-        // drift apart.
-        "max-md:z-20 max-md:rounded-l-xl",
+        "relative flex w-full min-w-0 flex-1 flex-col bg-background",
         "md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:ring-1 md:peer-data-[variant=inset]:ring-border",
         className
       )}
       {...props}
-    />
-  )
-}
-
-/**
- * Dims the content panel as the drawer comes out, and closes it on tap.
- *
- * A sibling of `SidebarInset` rather than a child: the inset goes `inert`
- * while the drawer is open, and an inert subtree is not hit-testable, so a
- * scrim inside it would pass taps straight through to the sidebar behind.
- * It carries the same transform as the panel so it covers exactly that and
- * never the drawer.
- */
-function SidebarScrim({ label }: { label: string }) {
-  const { isMobile, openMobile, setOpenMobile } = useSidebar()
-
-  return (
-    <button
-      type="button"
-      data-slot="sidebar-scrim"
-      aria-label={label}
-      tabIndex={isMobile && openMobile ? 0 : -1}
-      aria-hidden={!(isMobile && openMobile)}
-      onClick={() => setOpenMobile(false)}
-      className={cn(
-        // Absolute + opacity/translate: same visual-viewport shell as the
-        // sidebar (globals.css). Must not be `fixed` or it detaches from it.
-        "absolute inset-0 z-30 touch-none bg-black/40 md:hidden",
-        // Only clickable once committed open, so a drag cannot land a tap.
-        openMobile ? "pointer-events-auto" : "pointer-events-none"
-      )}
     />
   )
 }
@@ -685,7 +569,6 @@ export {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarProvider,
-  SidebarScrim,
   SidebarSeparator,
   useSidebar,
 }
