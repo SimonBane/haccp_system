@@ -227,8 +227,10 @@
     "delete": "Delete",
     "openMenu": "Open menu",
     "deleteConfirm": "Delete \"{name}\"? This cannot be undone.",
+    "bulkDeleteConfirm": "Delete {count, plural, one {# item} other {# items}}? This cannot be undone.",
     "deleteDialog": {
       "title": "Delete cold storage",
+      "bulkTitle": "Delete cold storage",
       "fallback": "This will permanently delete the cold storage.",
       "cancel": "Cancel",
       "confirm": "Delete"
@@ -239,7 +241,9 @@
       "updateSuccess": "Cold storage was updated.",
       "duplicateSuccess": "Cold storage was copied.",
       "deleteSuccess": "Cold storage was deleted.",
-      "deleteError": "Could not delete cold storage. Please try again."
+      "deleteError": "Could not delete cold storage. Please try again.",
+      "bulkDeleteSuccess": "{count, plural, one {# item was} other {# items were}} deleted.",
+      "bulkDeleteError": "Could not delete cold storage. Please try again."
     },
     "nameTaken": "Cold storage with this name already exists.",
     "validation": {
