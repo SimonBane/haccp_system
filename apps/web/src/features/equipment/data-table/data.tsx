@@ -1,8 +1,11 @@
 "use client";
 
 import type { EquipmentResponse, EquipmentType } from "@haccp/shared";
+import type { OnChangeFn, RowSelectionState } from "@tanstack/react-table";
+import { Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useMemo } from "react";
+import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { DataTableAddButton } from "@/components/ui/data-table/data-table-add-button";
 import { getColumns } from "@/features/equipment/data-table/columns";
@@ -16,6 +19,9 @@ type EquipmentDataProps = {
   onEdit: (equipment: EquipmentResponse) => void;
   onDuplicate: (equipment: EquipmentResponse) => void;
   onDelete: (equipment: EquipmentResponse) => void;
+  onBulkDelete: () => void;
+  rowSelection: RowSelectionState;
+  onRowSelectionChange: OnChangeFn<RowSelectionState>;
 };
 
 export function EquipmentData({
@@ -24,9 +30,16 @@ export function EquipmentData({
   onEdit,
   onDuplicate,
   onDelete,
+  onBulkDelete,
+  rowSelection,
+  onRowSelectionChange,
 }: EquipmentDataProps) {
   const t = useTranslations("EquipmentPage");
   const tTable = useTranslations("DataTable");
+  const selectedCount = useMemo(
+    () => Object.values(rowSelection).filter(Boolean).length,
+    [rowSelection],
+  );
 
   const typeLabels = useMemo<Record<EquipmentType, string>>(
     () => ({
@@ -89,7 +102,21 @@ export function EquipmentData({
       enablePagination
       pageSize={10}
       enableColumnVisibility
-      toolbar={<DataTableAddButton onClick={openAdd} label={t("add")} />}
+      enableRowSelection
+      getRowId={(row) => row.id}
+      rowSelection={rowSelection}
+      onRowSelectionChange={onRowSelectionChange}
+      toolbar={
+        <div className="flex items-center gap-2">
+          {selectedCount > 0 ? (
+            <Button type="button" variant="destructive" onClick={onBulkDelete}>
+              <Trash2Icon />
+              {tTable("selection.deleteSelected")}
+            </Button>
+          ) : null}
+          <DataTableAddButton onClick={openAdd} label={t("add")} />
+        </div>
+      }
       onRowClick={(row) => openEdit(row.original)}
       renderMobileRow={renderMobileRow}
       getRowActions={(row) => getRowActions(row.original)}
