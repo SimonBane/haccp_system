@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { selectionRangeIds } from "./selection-range";
 
-/**
- * Shift-click ranges are computed against the rows as rendered, so the cases
- * that matter are the ones where rendered order diverges from the caller's
- * intuition: dragging a range upwards, and an anchor a filter or page change
- * has since taken off screen.
- */
 const rows = (...ids: string[]) =>
   ids.map((id) => ({ id, getCanSelect: () => true }));
 

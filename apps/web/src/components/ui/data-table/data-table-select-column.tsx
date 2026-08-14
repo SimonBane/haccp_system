@@ -12,22 +12,9 @@ type SelectColumnLabels = {
 
 type CreateSelectColumnOptions = {
   labels: SelectColumnLabels;
-  /**
-   * The row the last plain (unshifted) click landed on. Shift-clicking a second
-   * row selects everything between the two. A ref rather than state: the anchor
-   * is only ever read from an event handler, so re-rendering the table to
-   * remember it would buy nothing.
-   */
   anchorRef: RefObject<string | null>;
 };
 
-/**
- * Applies one click to the row selection, honouring shift for ranges.
- *
- * The anchor deliberately stays put after a range click, which is what lets you
- * shift-click repeatedly to resize one range instead of walking it forward a
- * row at a time.
- */
 function applySelectionClick<TData>(
   table: Table<TData>,
   row: Row<TData>,
@@ -39,7 +26,6 @@ function applySelectionClick<TData>(
     ? selectionRangeIds(table.getRowModel().rows, anchorRef.current, row.id)
     : null;
 
-  // The first click of a run, or a range with nothing to extend from.
   if (rangeIds === null) {
     row.toggleSelected(selected);
     anchorRef.current = row.id;
@@ -77,8 +63,6 @@ export function createSelectColumn<TData>({
           }
           onCheckedChange={(value) => {
             table.toggleAllPageRowsSelected(value);
-            // Select-all rewrites the page wholesale, so no row is left that a
-            // later shift-click could sensibly extend from.
             anchorRef.current = null;
           }}
           aria-label={labels.selectAll}
@@ -86,20 +70,9 @@ export function createSelectColumn<TData>({
       </div>
     ),
     cell: ({ row, table }) => (
-      // The whole cell toggles the row, not just the 16px box — otherwise the
-      // padding around a small checkbox is a dead zone that neither checks the
-      // row nor opens it.
-      //
-      // This handler is the only place selection is applied. Base UI answers a
-      // click (and a Space press) by re-dispatching a bubbling click on the
-      // checkbox's hidden input, which is a sibling of the box and so arrives
-      // here with the modifier keys intact — also handling `onCheckedChange`
-      // would apply the same click twice.
       <div
         className="flex h-full cursor-pointer items-center justify-center select-none"
         onMouseDown={(event) => {
-          // Shift-clicking would otherwise drag a text selection across the
-          // very rows being selected.
           if (event.shiftKey) {
             event.preventDefault();
           }
@@ -112,8 +85,6 @@ export function createSelectColumn<TData>({
         <Checkbox
           checked={row.getIsSelected()}
           aria-label={labels.selectRow}
-          // Stops the box's own click, leaving only the re-dispatched one that
-          // reaches the cell; without this a single click would count twice.
           onClick={(event) => event.stopPropagation()}
         />
       </div>
