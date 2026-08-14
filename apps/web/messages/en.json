@@ -184,7 +184,8 @@
     },
     "selection": {
       "selectAll": "Select all",
-      "selectRow": "Select row"
+      "selectRow": "Select row",
+      "deleteSelected": "Delete"
     },
     "pagination": {
       "rowsCount": "{current} of {total} row(s)",
@@ -298,8 +299,10 @@
     "delete": "Delete",
     "openMenu": "Open menu",
     "deleteConfirm": "Delete \"{title}\"? This cannot be undone.",
+    "bulkDeleteConfirm": "Delete {count} tasks? This cannot be undone.",
     "deleteDialog": {
       "title": "Delete task",
+      "bulkTitle": "Delete tasks",
       "fallback": "This will permanently delete the task template.",
       "cancel": "Cancel",
       "confirm": "Delete"
@@ -310,7 +313,9 @@
       "updateSuccess": "Task was updated.",
       "duplicateSuccess": "Task was copied.",
       "deleteSuccess": "Task was deleted.",
-      "deleteError": "Could not delete task. Please try again."
+      "deleteError": "Could not delete task. Please try again.",
+      "bulkDeleteSuccess": "{count} tasks deleted.",
+      "bulkDeleteError": "Could not delete tasks. Please try again."
     },
     "presets": {
       "everyDay": "Every day",
