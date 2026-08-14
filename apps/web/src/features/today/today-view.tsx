@@ -13,7 +13,6 @@ import { useNow } from "@/hooks/use-now";
 import { useOrgTimeZone } from "@/features/tenant/use-org-timezone";
 import { getErrorMessage } from "@/lib/api/get-error-message";
 import { formatLocalDate, shiftLocalDate } from "@/lib/date";
-import { primeKeyboard } from "@/lib/keyboard-primer";
 import { cn } from "@/lib/utils";
 import {
   TemperatureRoundFlow,
@@ -339,10 +338,6 @@ export function TodayView({
       }
 
       if (item.task.type === "temperature") {
-        // First statement in the handler, before any guard that could return:
-        // iOS only raises the keyboard for a focus in the gesture's own task,
-        // and the sheet is two commits away. See lib/keyboard-primer.
-        primeKeyboard();
         if (
           item.task.minTempC === null ||
           item.task.maxTempC === null ||
