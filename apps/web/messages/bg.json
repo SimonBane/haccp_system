@@ -299,7 +299,7 @@
     "delete": "Изтрий",
     "openMenu": "Отвори меню",
     "deleteConfirm": "Изтриване на \"{title}\"? Това действие е необратимо.",
-    "bulkDeleteConfirm": "Изтриване на {count} задачи? Това действие е необратимо.",
+    "bulkDeleteConfirm": "Изтриване на {count, plural, one {# задача} other {# задачи}}? Това действие е необратимо.",
     "deleteDialog": {
       "title": "Изтриване на задача",
       "bulkTitle": "Изтриване на задачи",
@@ -314,7 +314,7 @@
       "duplicateSuccess": "Задачата беше копирана.",
       "deleteSuccess": "Задачата беше изтрита.",
       "deleteError": "Неуспешно изтриване. Опитайте отново.",
-      "bulkDeleteSuccess": "{count} задачи бяха изтрити.",
+      "bulkDeleteSuccess": "{count, plural, one {# задача беше изтрита} other {# задачи бяха изтрити}}.",
       "bulkDeleteError": "Неуспешно изтриване. Опитайте отново."
     },
     "presets": {
