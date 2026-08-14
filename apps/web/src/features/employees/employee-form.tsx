@@ -17,10 +17,7 @@ import { Controller, useForm, useFormState, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import {
-  ResponsiveFormDialog,
-  type ResponsiveFormActions,
-} from "@/components/ui/responsive-form-dialog";
+import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
 import { DialogFooter } from "@/components/ui/dialog";
 import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
 import {
@@ -343,41 +340,6 @@ export function EmployeeForm({
       </DialogFooter>
   );
 
-  // A new employee has two genuine ways to finish, neither subordinate to the
-  // other, so they split the bar evenly rather than hiding one behind a menu.
-  const formActions: ResponsiveFormActions = isEditing
-    ? {
-        items: [
-          {
-            label: t("save"),
-            icon: <SaveIcon data-icon="inline-start" />,
-            isLoading: pendingAction === "save",
-            disabled:
-              !hasChanges ||
-              (pendingAction !== null && pendingAction !== "save"),
-            onClick: () => void submitEdit(),
-          },
-        ],
-      }
-    : {
-        layout: "split",
-        items: [
-          {
-            label: t("save"),
-            variant: "outline",
-            isLoading: pendingAction === "save",
-            disabled: pendingAction !== null && pendingAction !== "save",
-            onClick: () => void submit(false),
-          },
-          {
-            label: t("saveAndInvite"),
-            isLoading: pendingAction === "invite",
-            disabled: pendingAction !== null && pendingAction !== "invite",
-            onClick: () => void submit(true),
-          },
-        ],
-      };
-
   return (
     <>
       <ResponsiveAlertDialog
@@ -396,9 +358,6 @@ export function EmployeeForm({
       onOpenChange={handleDialogOpenChange}
       title={isEditing ? t("editTitle") : t("addTitle")}
       description={isEditing ? t("editDescription") : t("addDescription")}
-      closeLabel={t("cancel")}
-      autoFocusField={isActive ? undefined : { ref: emailRef }}
-      actions={formActions}
       footer={formFooter}
     >
         <form id={EMPLOYEE_FORM_ID} className="space-y-6">

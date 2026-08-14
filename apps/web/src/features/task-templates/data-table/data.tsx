@@ -11,7 +11,6 @@ import { DataTableAddButton } from "@/components/ui/data-table/data-table-add-bu
 import { getColumns } from "@/features/task-templates/data-table/columns";
 import { TaskTemplatesMobileCard } from "@/features/task-templates/data-table/mobile-card";
 import { getTaskTemplateRowActions } from "@/features/task-templates/data-table/row-actions";
-import { primeKeyboard } from "@/lib/keyboard-primer";
 
 type TaskTemplatesDataProps = {
   items: TaskTemplateResponse[];
@@ -60,29 +59,15 @@ export function TaskTemplatesData({
     [t],
   );
 
-  // Priming has to happen inside the tap; see lib/keyboard-primer.
-  const openAdd = useCallback(() => {
-    primeKeyboard();
-    onAdd();
-  }, [onAdd]);
-
-  const openEdit = useCallback(
-    (task: TaskTemplateResponse) => {
-      primeKeyboard();
-      onEdit(task);
-    },
-    [onEdit],
-  );
-
   const getRowActions = useMemo(
     () =>
       getTaskTemplateRowActions({
         t,
-        onEdit: openEdit,
+        onEdit,
         onDuplicate,
         onDelete,
       }),
-    [t, openEdit, onDuplicate, onDelete],
+    [t, onEdit, onDuplicate, onDelete],
   );
 
   const columns = useMemo(
@@ -110,7 +95,7 @@ export function TaskTemplatesData({
       searchPlaceholder={t("searchPlaceholder")}
       emptyMessage={t("emptyTitle")}
       emptyDescription={t("emptyDescription")}
-      emptyAction={<DataTableAddButton onClick={openAdd} label={t("add")} />}
+      emptyAction={<DataTableAddButton onClick={onAdd} label={t("add")} />}
       noResultsMessage={tTable("noResults")}
       enablePagination
       pageSize={10}
@@ -127,10 +112,10 @@ export function TaskTemplatesData({
               {tTable("selection.deleteSelected")}
             </Button>
           ) : null}
-          <DataTableAddButton onClick={openAdd} label={t("add")} />
+          <DataTableAddButton onClick={onAdd} label={t("add")} />
         </div>
       }
-      onRowClick={(row) => openEdit(row.original)}
+      onRowClick={(row) => onEdit(row.original)}
       renderMobileRow={renderMobileRow}
       // A template carries a type, a weekday pattern, equipment and up to six
       // times — more than a one-line row can show without truncating.

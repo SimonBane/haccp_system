@@ -10,7 +10,6 @@ import { EmployeesMobileCard } from "@/features/employees/data-table/mobile-card
 import { getEmployeeRowActions } from "@/features/employees/data-table/row-actions";
 import { useTenant } from "@/features/tenant/tenant-provider";
 import { displayName } from "@/features/employees/utils";
-import { primeKeyboard } from "@/lib/keyboard-primer";
 
 type EmployeesDataProps = {
   items: EmployeeResponse[];
@@ -34,32 +33,16 @@ export function EmployeesData({
   const { organization } = useTenant();
   const showLocationsColumn = organization.multipleLocationsEnabled;
 
-  // Priming has to happen inside the tap; see lib/keyboard-primer.
-  const openAdd = useCallback(() => {
-    primeKeyboard();
-    onAdd();
-  }, [onAdd]);
-
-  const openEdit = useCallback(
-    (employee: EmployeeResponse) => {
-      // An active member's email field is disabled, so there is nothing for a
-      // primed keyboard to land in.
-      if (employee.status !== "active") primeKeyboard();
-      onEdit(employee);
-    },
-    [onEdit],
-  );
-
   const getRowActions = useMemo(
     () =>
       getEmployeeRowActions({
         t,
-        onEdit: openEdit,
+        onEdit,
         onInvite,
         onRevokeInvitation,
         onDelete,
       }),
-    [t, openEdit, onInvite, onRevokeInvitation, onDelete],
+    [t, onEdit, onInvite, onRevokeInvitation, onDelete],
   );
 
   const columns = useMemo(
@@ -82,12 +65,12 @@ export function EmployeesData({
       searchColumn="employee"
       searchPlaceholder={t("searchPlaceholder")}
       emptyMessage={t("emptyTitle")}
-      emptyAction={<DataTableAddButton onClick={openAdd} label={t("add")} />}
+      emptyAction={<DataTableAddButton onClick={onAdd} label={t("add")} />}
       noResultsMessage={tTable("noResults")}
       enablePagination
       pageSize={10}
-      toolbar={<DataTableAddButton onClick={openAdd} label={t("add")} />}
-      onRowClick={(row) => openEdit(row.original)}
+      toolbar={<DataTableAddButton onClick={onAdd} label={t("add")} />}
+      onRowClick={(row) => onEdit(row.original)}
       renderMobileRow={renderMobileRow}
       getRowActions={(row) => getRowActions(row.original)}
       getRowLabel={(row) => displayName(row.original)}

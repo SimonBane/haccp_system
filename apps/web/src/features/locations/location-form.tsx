@@ -101,19 +101,6 @@ export function LocationForm({
       onOpenChange={onOpenChange}
       title={isEditing ? t("editTitle") : t("addTitle")}
       description={isEditing ? t("editDescription") : t("addDescription")}
-      closeLabel={t("cancel")}
-      // The whole form is one field, so it opens ready to type into.
-      autoFocusField={{ ref: nameRef, selection: isEditing ? "select" : "none" }}
-      actions={{
-        items: [
-          {
-            label: submitLabel,
-            formId: LOCATION_FORM_ID,
-            isLoading: isSubmitting,
-            disabled: isEditing && !hasChanges,
-          },
-        ],
-      }}
       footer={formFooter}
     >
       <form id={LOCATION_FORM_ID} className="space-y-4" onSubmit={handleSubmit}>

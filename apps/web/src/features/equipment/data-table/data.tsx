@@ -11,7 +11,6 @@ import { DataTableAddButton } from "@/components/ui/data-table/data-table-add-bu
 import { getColumns } from "@/features/equipment/data-table/columns";
 import { EquipmentMobileCard } from "@/features/equipment/data-table/mobile-card";
 import { getEquipmentRowActions } from "@/features/equipment/data-table/row-actions";
-import { primeKeyboard } from "@/lib/keyboard-primer";
 
 type EquipmentDataProps = {
   items: EquipmentResponse[];
@@ -50,30 +49,15 @@ export function EquipmentData({
     [t],
   );
 
-  // The form's first field wants the keyboard up, and iOS only grants that
-  // inside the tap itself — so it has to be primed here, not in the form.
-  const openAdd = useCallback(() => {
-    primeKeyboard();
-    onAdd();
-  }, [onAdd]);
-
-  const openEdit = useCallback(
-    (equipment: EquipmentResponse) => {
-      primeKeyboard();
-      onEdit(equipment);
-    },
-    [onEdit],
-  );
-
   const getRowActions = useMemo(
     () =>
       getEquipmentRowActions({
         t,
-        onEdit: openEdit,
+        onEdit,
         onDuplicate,
         onDelete,
       }),
-    [t, openEdit, onDuplicate, onDelete],
+    [t, onEdit, onDuplicate, onDelete],
   );
 
   const columns = useMemo(
@@ -97,7 +81,7 @@ export function EquipmentData({
       searchPlaceholder={t("searchPlaceholder")}
       emptyMessage={t("emptyTitle")}
       emptyDescription={t("emptyDescription")}
-      emptyAction={<DataTableAddButton onClick={openAdd} label={t("add")} />}
+      emptyAction={<DataTableAddButton onClick={onAdd} label={t("add")} />}
       noResultsMessage={tTable("noResults")}
       enablePagination
       pageSize={10}
@@ -114,10 +98,10 @@ export function EquipmentData({
               {tTable("selection.deleteSelected")}
             </Button>
           ) : null}
-          <DataTableAddButton onClick={openAdd} label={t("add")} />
+          <DataTableAddButton onClick={onAdd} label={t("add")} />
         </div>
       }
-      onRowClick={(row) => openEdit(row.original)}
+      onRowClick={(row) => onEdit(row.original)}
       renderMobileRow={renderMobileRow}
       getRowActions={(row) => getRowActions(row.original)}
       getRowLabel={(row) => row.original.name}

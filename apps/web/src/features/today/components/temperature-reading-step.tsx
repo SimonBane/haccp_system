@@ -81,7 +81,10 @@ export function TemperatureReadingStep({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 md:flex-none md:gap-4">
+    // Centred, because the sheet is sized by the taller corrective step so
+    // neither can resize the other mid-round — which leaves these four rows
+    // with space to spare. Clumped at the top they read as a truncated form.
+    <div className="flex min-h-0 flex-1 flex-col justify-center gap-3 md:flex-none md:justify-start md:gap-4">
       {/* Context, never an action: the worker reads the thermometer and types
           what it says. A tap-to-reuse chip here would make copying the previous
           number the fastest path through a log that has to be trustworthy. */}
