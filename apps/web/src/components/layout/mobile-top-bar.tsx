@@ -22,10 +22,7 @@ export function MobileTopBar() {
   }
 
   return (
-    // Not sticky: the shell is a fixed-height flex column, so this is simply a
-    // sibling of the scroll region and cannot scroll at all. relative z-10
-    // keeps it painting above the region that follows it.
-    <header className="relative z-10 shrink-0 bg-background pt-[var(--safe-area-inset-top,env(safe-area-inset-top,0px))] md:hidden">
+    <header className="sticky top-0 z-30 shrink-0 border-b bg-background md:hidden">
       <div className="flex h-14 items-center gap-1 px-2">
         <Button
           variant="outline"
