@@ -184,7 +184,8 @@
     },
     "selection": {
       "selectAll": "Избери всички",
-      "selectRow": "Избери ред"
+      "selectRow": "Избери ред",
+      "deleteSelected": "Изтрий"
     },
     "pagination": {
       "rowsCount": "{current} от {total} ред(а)",
@@ -226,8 +227,10 @@
     "delete": "Изтрий",
     "openMenu": "Отвори меню",
     "deleteConfirm": "Изтриване на \"{name}\"? Това действие е необратимо.",
+    "bulkDeleteConfirm": "Изтриване на {count, plural, one {# елемент} other {# елемента}}? Това действие е необратимо.",
     "deleteDialog": {
       "title": "Изтриване на хладилна техника",
+      "bulkTitle": "Изтриване на хладилна техника",
       "fallback": "Това ще изтрие хладилната техника завинаги.",
       "cancel": "Отказ",
       "confirm": "Изтрий"
@@ -238,7 +241,9 @@
       "updateSuccess": "Хладилната техника беше актуализирана.",
       "duplicateSuccess": "Хладилната техника беше копирана.",
       "deleteSuccess": "Хладилната техника беше изтрита.",
-      "deleteError": "Неуспешно изтриване. Опитайте отново."
+      "deleteError": "Неуспешно изтриване. Опитайте отново.",
+      "bulkDeleteSuccess": "{count, plural, one {# елемент беше изтрит} other {# елемента бяха изтрити}}.",
+      "bulkDeleteError": "Неуспешно изтриване. Опитайте отново."
     },
     "nameTaken": "Хладилна техника с това име вече съществува.",
     "validation": {
@@ -298,8 +303,10 @@
     "delete": "Изтрий",
     "openMenu": "Отвори меню",
     "deleteConfirm": "Изтриване на \"{title}\"? Това действие е необратимо.",
+    "bulkDeleteConfirm": "Изтриване на {count, plural, one {# задача} other {# задачи}}? Това действие е необратимо.",
     "deleteDialog": {
       "title": "Изтриване на задача",
+      "bulkTitle": "Изтриване на задачи",
       "fallback": "Това ще изтрие шаблона на задачата завинаги.",
       "cancel": "Отказ",
       "confirm": "Изтрий"
@@ -310,7 +317,9 @@
       "updateSuccess": "Задачата беше актуализирана.",
       "duplicateSuccess": "Задачата беше копирана.",
       "deleteSuccess": "Задачата беше изтрита.",
-      "deleteError": "Неуспешно изтриване. Опитайте отново."
+      "deleteError": "Неуспешно изтриване. Опитайте отново.",
+      "bulkDeleteSuccess": "{count, plural, one {# задача беше изтрита} other {# задачи бяха изтрити}}.",
+      "bulkDeleteError": "Неуспешно изтриване. Опитайте отново."
     },
     "presets": {
       "everyDay": "Всеки ден",
