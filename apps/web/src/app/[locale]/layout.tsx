@@ -3,7 +3,6 @@ import { getMessages, getTranslations, setRequestLocale } from "next-intl/server
 import { hasLocale } from "next-intl";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
-import { KeyboardInsetSync } from "@/components/keyboard-inset-sync";
 import { LocaleHtmlLang } from "@/components/locale-html-lang";
 import { ThemeColorSync } from "@/components/theme-color-sync";
 import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
@@ -34,9 +33,9 @@ export async function generateMetadata({
     manifest: "/manifest.webmanifest",
     appleWebApp: {
       capable: true,
-      // Transparent status bar so the PWA paints behind the notch/Dynamic Island
-      // (ChatGPT-style). Content must use safe-area insets — headers already do.
-      statusBarStyle: "black-translucent",
+      // Opaque status bar: iOS then keeps the app out of the notch and the home
+      // indicator itself, so nothing here has to reason about safe areas.
+      statusBarStyle: "default",
       title: t("title"),
     },
     icons: {
@@ -65,11 +64,6 @@ export function generateViewport() {
     // and can differ. `ThemeColorSync` owns this from mount onward; this is only
     // the pre-hydration value.
     themeColor: "#ffffff",
-    viewportFit: "cover",
-    // The shell is a locked, fixed-height column, so the software keyboard has
-    // nothing to scroll out of its way. Resizing the viewport instead keeps a
-    // focused field — and a pinned form footer — above it.
-    interactiveWidget: "resizes-content",
   };
 }
 
@@ -96,13 +90,12 @@ export default async function LocaleLayout({
       <NextIntlClientProvider messages={messages}>
         <LocaleHtmlLang />
         <ThemeColorSync />
-        <KeyboardInsetSync />
         <ServiceWorkerRegistration />
         <QueryProvider>
           <TooltipProvider>
-            {/* Neutral full-height column: wraps both the dashboard and the
-                auth pages, each of which decides for itself what scrolls. */}
-            <div className="flex h-full min-h-0 flex-col bg-background">
+            {/* Neutral full-height column, wrapping both the dashboard and the
+                auth pages. */}
+            <div className="flex min-h-dvh flex-col bg-background">
               {children}
             </div>
             <Toaster position="bottom-right" />
