@@ -35,7 +35,9 @@
   "AcceptInvitationPage": {
     "noToken": "No invitation token found. Use the link from your invitation email.",
     "processing": "Processing your invitation…",
-    "completing": "Signing you in…"
+    "completing": "Signing you in…",
+    "invalidTicket": "This invitation link is no longer valid. Ask your administrator for a new one.",
+    "backToSignIn": "Go to sign in"
   },
   "DashboardPage": {
     "placeholder": "Sample dashboard content"

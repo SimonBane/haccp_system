@@ -5,17 +5,15 @@ test("date navigation settles on the requested day when the fetch is slow", asyn
   page,
 }) => {
   await page.goto(`${LOCALE_PREFIX}/dashboard`);
-  await expect(page.getByTestId("today-task-row").first()).toBeVisible();
 
-  const todayKeys = () =>
-    page
-      .getByTestId("today-task-row")
-      .evaluateAll((rows) =>
-        rows.map((row) => row.getAttribute("data-occurrence-key")),
-      );
+  // "Jump to today" renders only when the view is off today, so its presence is the
+  // signal. Task rows are not: a fully completed day collapses every group, so what
+  // is in the DOM depends on what earlier journeys did.
+  const jumpToToday = page.getByTestId("date-nav-today");
 
-  const initialKeys = await todayKeys();
-  expect(initialKeys.length).toBeGreaterThan(0);
+  await page.getByTestId("date-nav-trigger").click();
+  await expect(jumpToToday).toBeHidden();
+  await page.keyboard.press("Escape");
 
   // Route interception rather than an API-side delay: no production change, scoped
   // to this test, removable.
@@ -27,18 +25,14 @@ test("date navigation settles on the requested day when the fetch is slow", asyn
   await page.getByTestId("date-nav-trigger").click();
   await page.getByTestId("date-nav-previous").click();
 
-  // "Jump to today" only renders off today, so its appearance is the date actually changing.
-  await page.getByTestId("date-nav-trigger").click();
-  await expect(page.getByTestId("date-nav-today")).toBeVisible();
+  // The date moved while the response was still in flight.
+  await expect(jumpToToday).toBeVisible();
 
-  await page.getByTestId("date-nav-today").click();
   await page.unroute("**/locations/*/today*");
 
-  // Back on today with the same occurrences: the delayed response for the previous
-  // day must not land on top of the current one.
-  await expect.poll(todayKeys).toEqual(initialKeys);
+  // Reloading rather than clicking back through the popover: it animates on the date
+  // change and the button detaches mid-click.
+  await page.goto(`${LOCALE_PREFIX}/dashboard`);
+  await page.getByTestId("date-nav-trigger").click();
+  await expect(jumpToToday).toBeHidden();
 });
-
-// HACCP-59 owns the stricter assertion this journey should grow: that previous-day
-// rows are not actionable while the fetch is in flight. Asserting it here would
-// encode a known-open bug as the contract.

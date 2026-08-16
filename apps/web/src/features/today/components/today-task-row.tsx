@@ -75,7 +75,9 @@ export const TodayTaskRow = memo(function TodayTaskRow({
       : t("actions.complete");
 
   const recordedLabel =
-    isCompleted && reading ? formatTemperature(reading.recordedC, locale) : null;
+    isCompleted && reading
+      ? formatTemperature(reading.recordedC, locale)
+      : null;
   const readingLabel =
     recordedLabel ??
     (!isCompleted && priorReading
@@ -106,6 +108,9 @@ export const TodayTaskRow = memo(function TodayTaskRow({
 
   return (
     <Card
+      data-testid="today-task-row"
+      data-occurrence-key={occurrenceKey(task)}
+      data-completed={isCompleted || undefined}
       data-syncing={isSyncing || undefined}
       className={cn(
         "relative gap-0 p-0 shadow-xs transition-all",
@@ -314,9 +319,7 @@ export const TodayTaskRow = memo(function TodayTaskRow({
         variant="ghost"
         className="absolute inset-0 h-auto w-full rounded-xl p-0 hover:bg-transparent active:translate-y-0 dark:hover:bg-transparent"
         aria-label={ariaLabel}
-        data-testid="today-task-row"
-        data-occurrence-key={occurrenceKey(task)}
-        data-completed={item.isCompleted || undefined}
+        data-testid="today-task-activate"
         disabled={isSyncing}
         onClick={() => onActivate(item)}
       />

@@ -4,51 +4,39 @@ import { LOCALE_PREFIX, storageStatePath } from "../../support/env.js";
 test.describe("no organization", () => {
   test.use({ storageState: storageStatePath("noOrg") });
 
-  test("a user with no organization is redirected and can get out", async ({
+  test("a user with no organization is given a way forward", async ({
     page,
   }) => {
     await page.goto(`${LOCALE_PREFIX}/dashboard`);
-    await expect(page).toHaveURL(
-      new RegExp(`${LOCALE_PREFIX}/no-organization`),
-    );
+
+    // Clerk's session task intercepts before the dashboard layout's own
+    // /no-organization redirect can run, so that redirect is unreachable while
+    // "force organization" is enabled on the instance.
+    await expect(page).toHaveURL(/\/sign-in\/tasks\/choose-organization/);
+    await expect(page.getByText(/sign out/i).first()).toBeVisible();
+  });
+
+  test("the no-organization page itself offers an exit", async ({ page }) => {
+    await page.goto(`${LOCALE_PREFIX}/no-organization`);
     await expect(page.getByTestId("no-organization-card")).toBeVisible();
 
     // The exit used to link to "/", which sends a signed-in user to /dashboard and
-    // straight back here. Signing out is the only thing that actually breaks the cycle.
+    // straight back. Signing out is the only thing that breaks the cycle.
     await page.getByTestId("no-organization-sign-out").click();
-    await expect(page).toHaveURL(new RegExp(`${LOCALE_PREFIX}/sign-in`));
+    await expect(page).toHaveURL(/\/sign-in/);
   });
 });
 
-test.describe("invitation failures", () => {
-  test("a rejected invitation ticket ends in a recoverable state", async ({
-    page,
-  }) => {
-    // Force the failure: a real expired ticket cannot be minted on demand.
-    await page.route("**/v1/client/sign_ins**", (route) =>
-      route.fulfill({
-        status: 422,
-        contentType: "application/json",
-        body: JSON.stringify({
-          errors: [
-            { code: "invalid_ticket", message: "Invitation is invalid" },
-          ],
-        }),
-      }),
-    );
+test("an invalid invitation ticket ends somewhere recoverable", async ({
+  page,
+}) => {
+  await page.goto(
+    `${LOCALE_PREFIX}/accept-invitation?__clerk_ticket=expired-ticket`,
+  );
 
-    await page.goto(
-      `${LOCALE_PREFIX}/accept-invitation?__clerk_ticket=expired-ticket`,
-    );
-
-    // The failure mode this guards is an endless spinner, or a replace() loop
-    // between accept-invitation and the dashboard.
-    await expect
-      .poll(() => page.url(), { timeout: 15_000 })
-      .not.toMatch(/\/dashboard/);
-
-    await expect(
-      page.getByRole("link", { name: /sign in/i }).or(page.getByRole("button")),
-    ).toBeVisible();
-  });
+  // Without __clerk_status no branch of the accept flow can advance; this used to
+  // render a loader indefinitely.
+  await expect(page.getByTestId("invitation-invalid")).toBeVisible();
+  await page.getByRole("link", { name: /sign in/i }).click();
+  await expect(page).toHaveURL(/\/sign-in/);
 });

@@ -18,6 +18,7 @@
     "@haccp/web": "workspace:*",
     "@playwright/test": "^1.50.0",
     "@types/node": "^24",
+    "dotenv": "^17.4.2",
     "eslint": "^9.28.0",
     "typescript": "^5.8.3"
   }

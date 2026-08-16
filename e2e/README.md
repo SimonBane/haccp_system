@@ -14,14 +14,14 @@ The suite signs in against a Clerk **development** instance — never production
 Clerk dashboard access has to create these once, because accounts cannot be provisioned from
 the test run:
 
-1. Enable the **password** sign-in strategy on the dev instance.
-2. Create one organization.
-3. Create three users:
-   - an **admin** member of that organization,
-   - an ordinary **member** of it,
-   - a user belonging to **no organization**.
-4. Put their emails and passwords in the environment (below). Use throwaway passwords; these
-   accounts hold no real data.
+1. Create one organization.
+2. Create three users: an **admin** member of it, an ordinary **member**, and one belonging to
+   **no organization**.
+3. Put their email addresses in the environment (below).
+
+No passwords are needed. `clerk.signIn` mints a server-side token from `CLERK_SECRET_KEY`, which
+also sidesteps the device-trust step that leaves a password sign-in stuck on
+`needs_client_trust`.
 
 Everything else the journeys need — the tenant row, the annex location, 11 equipment rows and
 two task templates — is created by `tests/setup/seed.setup.ts` through the API on each run.
@@ -33,9 +33,9 @@ database seeding is required.
 | Variable | Purpose |
 |---|---|
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` | Clerk **dev** instance |
-| `E2E_CLERK_ADMIN_EMAIL` / `_PASSWORD` | org admin |
-| `E2E_CLERK_EMPLOYEE_EMAIL` / `_PASSWORD` | org member |
-| `E2E_CLERK_NO_ORG_EMAIL` / `_PASSWORD` | user with no organization |
+| `E2E_CLERK_ADMIN_EMAIL` | org admin |
+| `E2E_CLERK_EMPLOYEE_EMAIL` | org member |
+| `E2E_CLERK_NO_ORG_EMAIL` | user with no organization |
 | `E2E_WEB_URL`, `E2E_API_URL` | override the default localhost ports |
 
 `playwright.config.ts` starts both servers itself (`@haccp/api start:ci` and

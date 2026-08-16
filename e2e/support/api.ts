@@ -12,6 +12,12 @@ type ClerkGlobal = {
 
 /** The session's real Clerk token, so seeding goes through the same auth as the app. */
 export async function sessionToken(page: Page): Promise<string> {
+  // Clerk hydrates after the page load event, so reading straight after goto() is a race.
+  await page.waitForFunction(() => {
+    const { Clerk } = globalThis as unknown as ClerkGlobal;
+    return Boolean(Clerk?.session);
+  });
+
   const token = await page.evaluate(async () => {
     const { Clerk } = globalThis as unknown as ClerkGlobal;
     return (await Clerk?.session?.getToken()) ?? null;
@@ -47,5 +53,7 @@ export async function json<T>(
     );
   }
 
-  return (await response.json()) as T;
+  // Deletes answer 204 with no body.
+  const text = await response.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
