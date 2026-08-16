@@ -150,11 +150,10 @@ jobs:
     name: Browser smoke
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    # Forks get no secrets, and the suite is a no-op until the Clerk dev instance
-    # is configured — skip rather than fail in either case (see e2e/README.md).
-    if: >-
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      secrets.E2E_CLERK_SECRET_KEY != ''
+    # Forks get no secrets — the `secrets` context itself isn't readable in a job
+    # `if:`, so this only screens the fork case; the "no dev instance yet" case is
+    # screened per-step below via the `check-secrets` output.
+    if: github.event.pull_request.head.repo.full_name == github.repository
 
     services:
       postgres:
@@ -199,23 +198,35 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Runs before Setup: no point installing a workspace to skip it a step later.
+      - name: Check whether the Clerk dev instance is configured
+        id: check-secrets
+        env:
+          E2E_CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+        run: echo "configured=${{ env.E2E_CLERK_SECRET_KEY != '' }}" >> "$GITHUB_OUTPUT"
+
       - name: Setup
+        if: steps.check-secrets.outputs.configured == 'true'
         uses: ./.github/actions/setup
 
       - name: Apply migrations
+        if: steps.check-secrets.outputs.configured == 'true'
         run: pnpm --filter @haccp/api db:migrate:deploy
 
       - name: Build
+        if: steps.check-secrets.outputs.configured == 'true'
         run: pnpm turbo build --filter=@haccp/e2e...
 
       - name: Install Chromium
+        if: steps.check-secrets.outputs.configured == 'true'
         run: pnpm --filter @haccp/e2e exec playwright install --with-deps chromium
 
       - name: Run browser smoke suite
+        if: steps.check-secrets.outputs.configured == 'true'
         run: pnpm turbo test:e2e --filter=@haccp/e2e
 
       - name: Upload Playwright report
-        if: failure()
+        if: steps.check-secrets.outputs.configured == 'true' && failure()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
