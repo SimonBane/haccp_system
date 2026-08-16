@@ -385,6 +385,7 @@ export function TaskTemplatesForm({
             : t("addDescription")
       }
       initialFocus={isEditing || isDuplicating ? undefined : false}
+      closeLabel={t("cancel")}
       footer={formFooter}
     >
         <form

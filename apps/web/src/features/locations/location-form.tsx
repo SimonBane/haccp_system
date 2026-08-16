@@ -79,6 +79,7 @@ export function LocationForm({
       <Button
         type="button"
         variant="outline"
+        className="max-md:hidden"
         onClick={() => onOpenChange(false)}
       >
         {t("cancel")}
@@ -101,6 +102,7 @@ export function LocationForm({
       onOpenChange={onOpenChange}
       title={isEditing ? t("editTitle") : t("addTitle")}
       description={isEditing ? t("editDescription") : t("addDescription")}
+      closeLabel={t("cancel")}
       footer={formFooter}
     >
       <form id={LOCATION_FORM_ID} className="space-y-4" onSubmit={handleSubmit}>

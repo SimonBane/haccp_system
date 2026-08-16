@@ -4,7 +4,6 @@ import { ArrowLeftIcon, XIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { ReactNode, RefObject } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -13,13 +12,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  SHEET_FOOTER,
+  SHEET_SURFACE,
+  SheetAppBar,
+} from "@/components/ui/responsive-form-dialog";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 type Props = {
   /** Kept mounted while false so the exit transition can run. */
@@ -98,36 +98,25 @@ export function TemperatureEntryShell({
           // The close control lives in the app bar instead.
           showCloseButton={false}
           initialFocus={initialFocus}
-          className="max-h-[90dvh] gap-0 rounded-t-xl border-t p-0"
+          className={cn("gap-0 p-0", SHEET_SURFACE)}
         >
-          <header className="grid h-14 shrink-0 grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-2 bg-popover px-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-11 justify-self-start rounded-full"
-              aria-label={leadingLabel}
-              onClick={onLeading}
-            >
-              <LeadingIcon className="size-5" />
-            </Button>
-
-            <div className="min-w-0 text-center">
-              <SheetTitle className="truncate text-base">{title}</SheetTitle>
-              <SheetDescription className="truncate text-xs">
-                {subtitle}
-              </SheetDescription>
-            </div>
-
-            {/* Matches the leading button's width so the title stays optically
-                centred on a lone check, where there is no counter. */}
-            {counter ?? <span className="w-11" aria-hidden />}
-          </header>
+          {/* Keeps its subtitle, unlike the admin forms: which fridge, at what
+              time, is what the worker is confirming — not a restatement of the
+              fields below. */}
+          <SheetAppBar
+            icon={<LeadingIcon className="size-5" />}
+            label={leadingLabel}
+            onPress={onLeading}
+            title={title}
+            subtitle={subtitle}
+            trailing={counter}
+          />
 
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-3">
             {children}
           </div>
 
-          <div className="shrink-0 bg-popover px-4 pt-3 pb-3">{footer}</div>
+          <div className={SHEET_FOOTER}>{footer}</div>
         </SheetContent>
       </Sheet>
     );

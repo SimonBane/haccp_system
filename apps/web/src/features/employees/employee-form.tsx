@@ -302,10 +302,11 @@ export function EmployeeForm({
   const formFooter = (
       <DialogFooter>
         {!isEditing ? (
-          <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <div className="flex w-full flex-row gap-2 sm:justify-end">
             <Button
               type="button"
               variant="outline"
+              className="flex-1 sm:flex-none"
               isLoading={pendingAction === "save"}
               disabled={pendingAction !== null && pendingAction !== "save"}
               onClick={() => void submit(false)}
@@ -315,6 +316,7 @@ export function EmployeeForm({
             </Button>
             <Button
               type="button"
+              className="flex-1 sm:flex-none"
               isLoading={pendingAction === "invite"}
               disabled={pendingAction !== null && pendingAction !== "invite"}
               onClick={() => void submit(true)}
@@ -358,6 +360,7 @@ export function EmployeeForm({
       onOpenChange={handleDialogOpenChange}
       title={isEditing ? t("editTitle") : t("addTitle")}
       description={isEditing ? t("editDescription") : t("addDescription")}
+      closeLabel={t("cancel")}
       footer={formFooter}
     >
         <form id={EMPLOYEE_FORM_ID} className="space-y-6">
