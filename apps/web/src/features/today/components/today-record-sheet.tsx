@@ -66,18 +66,17 @@ export function TodayRecordSheet({
           {task.scheduledTime}
         </>
       }
+      closeLabel={t("record.close")}
       footer={
         <DialogFooter className="gap-2 sm:gap-2">
           <Button
             variant="outline"
-            className="min-h-11 sm:min-h-9"
             onClick={() => onOpenChange(false)}
           >
             {t("record.close")}
           </Button>
           <Button
             variant="destructive"
-            className="min-h-11 sm:min-h-9"
             isLoading={isUndoing}
             onClick={() => onUndo(item)}
           >

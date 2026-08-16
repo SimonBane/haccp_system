@@ -342,6 +342,7 @@ export function EquipmentForm({
             : t("addDescription")
       }
       className="sm:min-h-[24rem]"
+      closeLabel={t("cancel")}
       initialFocus={isEditing || isDuplicating ? undefined : false}
       footer={formFooter}
     >
