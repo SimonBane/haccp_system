@@ -19,7 +19,7 @@
   "NoOrganizationPage": {
     "title": "Няма достъп до организация",
     "description": "Вашият акаунт не е свързан с организация. Свържете се с администратора, за да получите покана.",
-    "backHome": "Към началната страница"
+    "signOut": "Изход"
   },
   "DashboardErrorPage": {
     "title": "Възникна грешка",
@@ -35,7 +35,9 @@
   "AcceptInvitationPage": {
     "noToken": "Не е намерен токен за покана. Използвайте връзката от имейла с поканата.",
     "processing": "Обработване на поканата…",
-    "completing": "Влизане в системата…"
+    "completing": "Влизане в системата…",
+    "invalidTicket": "Тази покана вече не е валидна. Поискайте нова от вашия администратор.",
+    "backToSignIn": "Към входа"
   },
   "DashboardPage": {
     "placeholder": "Примерно съдържание на таблото"
@@ -144,7 +146,8 @@
       "notesCharacterCount": "{current} / {max}",
       "charactersLeft": "{count, plural, one {Остава # знак} other {Остават # знака}}",
       "srVerdictOk": "{value} °C, в допустимите граници",
-      "srVerdictOutOfRange": "{value} °C, извън допустимите граници"
+      "srVerdictOutOfRange": "{value} °C, извън допустимите граници",
+      "readingLabel": "Отчетена температура в градуси Целзий"
     },
     "a11y": {
       "completed": "{title} е изпълнена",

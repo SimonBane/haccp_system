@@ -53,6 +53,7 @@ export function TemperatureRoundFooter({
           variant="outline"
           className="min-h-14 flex-1 rounded-2xl px-4 text-muted-foreground shadow-xs md:min-h-10 md:flex-1 md:rounded-md md:shadow-none"
           aria-label={skipLabel}
+          data-testid="temperature-skip"
           disabled={primaryLoading}
           onClick={() => {
             tapFeedback();
@@ -68,6 +69,7 @@ export function TemperatureRoundFooter({
           "min-h-14 rounded-2xl text-base font-semibold shadow-xs md:min-h-10 md:flex-1 md:rounded-md md:text-sm md:shadow-none",
           canSkip ? "flex-[1.4]" : "flex-1",
         )}
+        data-testid="temperature-save"
         disabled={primaryDisabled}
         isLoading={primaryLoading}
         onClick={onPrimary}

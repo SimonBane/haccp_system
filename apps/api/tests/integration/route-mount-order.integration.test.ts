@@ -1,3 +1,4 @@
+import { todayResponseSchema } from "@haccp/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../../src/core/db/client.js";
 import { seedOrganization, type SeededOrg } from "./harness/fixtures.js";
@@ -22,6 +23,11 @@ describe("route mount order", () => {
     );
 
     expect(response.status).toBe(200);
+
+    // The API does not validate its own responses, so a status check alone would
+    // miss a payload the web client's Zod parse rejects — which is a blank screen.
+    const parsed = todayResponseSchema.safeParse(await response.json());
+    expect(parsed.error?.issues ?? []).toEqual([]);
   });
 
   it("still guards the admin locations collection against a non-admin", async () => {

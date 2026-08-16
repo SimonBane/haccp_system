@@ -76,6 +76,7 @@ export function DataTablePagination<TData>({
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
             aria-label={t("nextPage")}
+            data-testid="data-table-next-page"
           >
             <ChevronRightIcon className="size-4" />
           </Button>

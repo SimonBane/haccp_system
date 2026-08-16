@@ -19,7 +19,7 @@
   "NoOrganizationPage": {
     "title": "No organization access",
     "description": "Your account is not linked to an organization. Contact your administrator to receive an invitation.",
-    "backHome": "Back to home"
+    "signOut": "Sign out"
   },
   "DashboardErrorPage": {
     "title": "Something went wrong",
@@ -35,7 +35,9 @@
   "AcceptInvitationPage": {
     "noToken": "No invitation token found. Use the link from your invitation email.",
     "processing": "Processing your invitation…",
-    "completing": "Signing you in…"
+    "completing": "Signing you in…",
+    "invalidTicket": "This invitation link is no longer valid. Ask your administrator for a new one.",
+    "backToSignIn": "Go to sign in"
   },
   "DashboardPage": {
     "placeholder": "Sample dashboard content"
@@ -144,7 +146,8 @@
       "notesCharacterCount": "{current} / {max}",
       "charactersLeft": "{count, plural, one {# character left} other {# characters left}}",
       "srVerdictOk": "{value} °C, within the allowed range",
-      "srVerdictOutOfRange": "{value} °C, outside the allowed range"
+      "srVerdictOutOfRange": "{value} °C, outside the allowed range",
+      "readingLabel": "Temperature reading in degrees Celsius"
     },
     "a11y": {
       "completed": "{title} completed",
