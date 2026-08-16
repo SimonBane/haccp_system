@@ -92,6 +92,60 @@ jobs:
       - name: Assert each source test is discovered exactly once
         run: pnpm test:discovery
 
+  integration-tests:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Same images as docker-compose.yml.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: haccp
+          POSTGRES_PASSWORD: haccp
+          POSTGRES_DB: haccp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U haccp -d haccp"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      # Dropped and recreated per run; never the `haccp` database the service starts with.
+      TEST_DATABASE_URL: postgresql://haccp:haccp@localhost:5432/haccp_test
+      TEST_REDIS_URL: redis://localhost:6379/15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Run integration tests
+        run: pnpm turbo test:integration --filter=@haccp/api
+
+      - name: Upload integration logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-logs
+          path: apps/api/tests/integration/artifacts/**
+          if-no-files-found: ignore
+
   validate-migrations:
     name: Validate migrations
     runs-on: ubuntu-latest

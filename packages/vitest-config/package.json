@@ -7,6 +7,10 @@
     "./unit": {
       "types": "./unit.d.ts",
       "default": "./unit.js"
+    },
+    "./integration": {
+      "types": "./integration.d.ts",
+      "default": "./integration.js"
     }
   },
   "peerDependencies": {

@@ -36,8 +36,9 @@ code, not after the failure.
 | Format | `pnpm format` (Prettier defaults, no config file) |
 | Scope any turbo task | `pnpm turbo build --filter=@haccp/web...` |
 
-CI (`.github/workflows/ci.yml`) runs on PRs to `main`: build api, build web, `turbo test`, and
-`validate-migrations`. `migrate.yml` applies migrations on push to `main`. **`@haccp/shared` is
+CI (`.github/workflows/ci.yml`) runs on PRs to `main` as separate checks: lint, typecheck, build
+api, build web, unit tests (+ `test:discovery`), integration tests, and `validate-migrations`.
+`migrate.yml` applies migrations on push to `main`. **`@haccp/shared` is
 consumed from `dist/`** — turbo's `^build` handles this for `build`/`lint`/`typecheck`/`test`,
 but if you edit shared and then run `tsc` or `vitest` directly in an app, rebuild first:
 `pnpm --filter @haccp/shared build`.
@@ -166,6 +167,18 @@ the only time the regression exists). `build` uses `tsconfig.build.json` (tests 
 they never ship in `dist`); `typecheck` uses `tsconfig.json` and still covers them — add new test
 globs to **both** the vitest preset and `tsconfig.build.json`'s `exclude`.
 
+`apps/api/tests/integration/` runs against **real Postgres and Redis**, only the Clerk network
+boundary mocked: `pnpm docker:up`, then `pnpm --filter @haccp/api test:integration`. **Add
+failure-mode tests to this harness rather than new infrastructure** — `harness/` provides tenant
+fixtures, `apiRequest`/`asAdmin`/`asEmployee`, a Clerk fake with injectable failure modes,
+`failRedisCommands`, and `PG_ERROR` for asserting constraints by SQLSTATE. Traps: fixture
+identifiers are minted per call because `users.email` is unique **globally, not per tenant**; the
+actor's role rides on the token, since `requireOrgAdmin` reads the raw `org_role` claim rather
+than the database row; the suite is single-worker because the db/Redis clients are module-scope
+singletons and `single-flight` is process-global. Global setup drops and recreates `haccp_test`
+from the committed migrations (the name must end in `_test`). Logs are silenced — set
+`INTEGRATION_LOG_LEVEL=debug`.
+
 ## Git workflow
 
 Never work directly on `main`. Branch first — `git checkout main && git pull`, then
@@ -194,6 +207,7 @@ once the work is done.
   unmounting them cuts the animation.
 - **Comments**: only add one when the **WHY** is non-obvious — a hidden constraint, a subtle
   invariant, a workaround for a specific bug, or behavior that would surprise a reader. Never
-  comment what the code does; well-named identifiers already do that. When touching existing
-  code, judge its existing comments by the same bar — rewrite or delete ones that are stale,
-  restate the code, or no longer meet it; don't leave them unexamined.
+  comment what the code does; well-named identifiers already do that. Keep it to one short
+  line — never a multi-line or paragraph comment. When touching existing code, judge its
+  existing comments by the same bar — rewrite or delete ones that are stale, restate the code,
+  are overlong, or no longer meet it; don't leave them unexamined.
