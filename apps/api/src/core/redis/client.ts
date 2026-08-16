@@ -15,7 +15,15 @@ export async function getRedis(): Promise<RedisClientType> {
     return redisClient;
   }
 
-  connectPromise ??= redisClient.connect().then(() => redisClient);
+  // Cleared on failure, or one blip pins every later caller to the same rejected
+  // promise for the life of the process — and callers swallow cache errors.
+  connectPromise ??= redisClient
+    .connect()
+    .then(() => redisClient)
+    .catch((error: unknown) => {
+      connectPromise = null;
+      throw error;
+    });
 
   return connectPromise;
 }
