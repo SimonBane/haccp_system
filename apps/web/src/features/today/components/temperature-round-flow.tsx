@@ -4,7 +4,6 @@ import { classifyTemperatureResult } from "@haccp/shared";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef } from "react";
 import { useOrgTimeZone } from "@/features/tenant/use-org-timezone";
-import { handOffKeyboard } from "@/lib/keyboard-primer";
 import { cn } from "@/lib/utils";
 import { useTemperatureEntry } from "../hooks/use-temperature-entry";
 import type { TodayTimelineItem } from "../lib/today-timeline";
@@ -118,8 +117,9 @@ export function TemperatureRoundFlow({
     }
     const input = readingInputRef.current;
     if (input) {
+      input.focus();
       // Selecting means an immediate retype overwrites instead of appending.
-      handOffKeyboard(input, "select");
+      input.select();
       return;
     }
     readingStepRef.current?.focus();

@@ -11,15 +11,10 @@ import {
 import { createPortal } from "react-dom";
 
 /**
- * Named regions of the app shell that a page can render into from anywhere in
+ * The mobile top bar's regions, which a page can render into from anywhere in
  * its tree.
- *
- * `title` / `center` / `actions` are the mobile top bar. `overlay` is the
- * layer above the scroll region inside the content panel — floating controls
- * belong there rather than `position: fixed`, which on mobile resolves against
- * the drawer-transformed panel and drifts with it.
  */
-type SlotName = "title" | "center" | "actions" | "overlay";
+type SlotName = "title" | "center" | "actions";
 
 type SlotTargets = Partial<Record<SlotName, HTMLElement | null>>;
 
@@ -84,25 +79,4 @@ export function MobileHeaderCenter({ children }: { children: ReactNode }) {
 
 export function MobileHeaderActions({ children }: { children: ReactNode }) {
   return <ShellSlot name="actions">{children}</ShellSlot>;
-}
-
-export function ShellOverlay({ children }: { children: ReactNode }) {
-  return <ShellSlot name="overlay">{children}</ShellSlot>;
-}
-
-/**
- * Host for `ShellOverlay` content. Rendered as a sibling of the scroll region
- * so its children are positioned against the content panel, and stay put while
- * the region scrolls under them.
- */
-export function ShellOverlaySlot() {
-  const ref = useShellSlotRef("overlay");
-
-  return (
-    <div
-      ref={ref}
-      data-slot="shell-overlay"
-      className="pointer-events-none absolute inset-0 z-40"
-    />
-  );
 }

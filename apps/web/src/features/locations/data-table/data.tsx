@@ -8,7 +8,6 @@ import { DataTableAddButton } from "@/components/ui/data-table/data-table-add-bu
 import { getColumns } from "@/features/locations/data-table/columns";
 import { LocationsMobileCard } from "@/features/locations/data-table/mobile-card";
 import { getLocationRowActions } from "@/features/locations/data-table/row-actions";
-import { primeKeyboard } from "@/lib/keyboard-primer";
 
 type LocationsDataProps = {
   items: LocationResponse[];
@@ -30,31 +29,17 @@ export function LocationsData({
   const t = useTranslations("LocationsPage");
   const tTable = useTranslations("DataTable");
 
-  // Priming has to happen inside the tap; see lib/keyboard-primer.
-  const openAdd = useCallback(() => {
-    primeKeyboard();
-    onAdd();
-  }, [onAdd]);
-
-  const openRename = useCallback(
-    (location: LocationResponse) => {
-      primeKeyboard();
-      onRename(location);
-    },
-    [onRename],
-  );
-
   const getRowActions = useMemo(
     () =>
       getLocationRowActions({
         t,
         totalCount: items.length,
         settingDefaultId,
-        onRename: openRename,
+        onRename,
         onSetDefault,
         onDelete,
       }),
-    [t, items.length, settingDefaultId, openRename, onSetDefault, onDelete],
+    [t, items.length, settingDefaultId, onRename, onSetDefault, onDelete],
   );
 
   const columns = useMemo(
@@ -77,12 +62,12 @@ export function LocationsData({
       searchColumn="name"
       searchPlaceholder={t("searchPlaceholder")}
       emptyMessage={t("emptyTitle")}
-      emptyAction={<DataTableAddButton onClick={openAdd} label={t("add")} />}
+      emptyAction={<DataTableAddButton onClick={onAdd} label={t("add")} />}
       noResultsMessage={tTable("noResults")}
       enablePagination={false}
       initialSorting={[{ id: "default", desc: false }]}
-      toolbar={<DataTableAddButton onClick={openAdd} label={t("add")} />}
-      onRowClick={(row) => openRename(row.original)}
+      toolbar={<DataTableAddButton onClick={onAdd} label={t("add")} />}
+      onRowClick={(row) => onRename(row.original)}
       renderMobileRow={renderMobileRow}
       getRowActions={(row) => getRowActions(row.original)}
       getRowLabel={(row) => row.original.name}

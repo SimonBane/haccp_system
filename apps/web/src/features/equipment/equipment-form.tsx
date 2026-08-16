@@ -342,24 +342,8 @@ export function EquipmentForm({
             : t("addDescription")
       }
       className="sm:min-h-[24rem]"
-      initialFocus={isEditing || isDuplicating ? undefined : false}
       closeLabel={t("cancel")}
-      // Land on the name with the keyboard already up. Selected when there is
-      // something there to replace — an edit, or a duplicate's suggested name.
-      autoFocusField={{
-        ref: nameRef,
-        selection: isEditing || isDuplicating ? "select" : "none",
-      }}
-      actions={{
-        items: [
-          {
-            label: submitLabel,
-            formId: EQUIPMENT_FORM_ID,
-            isLoading: isSubmitting,
-            disabled: isEditing && !hasChanges,
-          },
-        ],
-      }}
+      initialFocus={isEditing || isDuplicating ? undefined : false}
       footer={formFooter}
     >
         <form

@@ -92,15 +92,6 @@
   --foreground: oklch(0.145 0 0);
 
   /*
-   * Mobile drawer reveal, 0 closed to 1 open. Declared here rather than as an
-   * inline style so a React re-render mid-drag cannot reset it — the gesture
-   * writes it directly to the shell element and inline wins.
-   *
-   * Note the panel transitions `transform`, never this property: an
-   * unregistered custom property is not interpolable, so animating it would
-   * silently teleport instead of slide.
-   */
-  /*
    * One height for every form control — input, select, combobox, input group,
    * search — so a form reads as a single clean column rather than a ragged one.
    * 44px on touch, 36px from md up.
@@ -111,92 +102,11 @@
    * unqualified utility per component keeps every existing override working.
    */
   --control-h: 2.75rem;
-
-  --drawer-progress: 0;
-  --drawer-ease: cubic-bezier(0.32, 0.72, 0, 1);
-  --drawer-duration: 400ms;
-
-  /*
-   * The height of the screen area the app is painting into. Every full-height
-   * surface — the document, the canvas layer, the mobile shell — measures
-   * itself with this and nothing else, so there is one answer to change.
-   *
-   * In a browser tab that answer is `dvh`. The document never scrolls, so the
-   * toolbars never collapse and the dynamic viewport is exactly what the user
-   * can see; `vh` would reach under Safari's URL bar. The installed app
-   * overrides this below.
-   */
-  --app-viewport-height: 100dvh;
-
-  /*
-   * Visual-viewport geometry, written by `useKeyboardInset`.
-   *
-   * `--keyboard-inset`: how much of the *layout* viewport the software
-   * keyboard covers. Use in anything portalled to the body — a Sheet, a
-   * Dialog — which is positioned against the layout viewport.
-   *
-   * `--app-vv-top`: iOS sometimes shifts the visual viewport down after
-   * focus (and leaves it there). The mobile shell follows that offset so
-   * chrome is not letterboxed. Height is deliberately *not* taken from
-   * `visualViewport.height`, which is one of the values WebKit under-reports
-   * in an installed app; the shell uses `--app-viewport-height` instead.
-   *
-   * `--keyboard-gap`: same inset, measured from inside `SidebarInset`,
-   * which already carries the bottom safe-area as padding.
-   */
-  --keyboard-inset: 0px;
-  --keyboard-gap: max(
-    0px,
-    calc(var(--keyboard-inset) - var(--safe-area-inset-bottom, 0px))
-  );
-  --app-vv-top: 0px;
-}
-
-/*
- * Installed app: `vh`, not `dvh`.
- *
- * With `viewport-fit=cover` WebKit reports the dynamic and small viewports —
- * along with `-webkit-fill-available` and `visualViewport.height` — short of
- * the screen the web view actually covers, by the safe-area insets
- * (webkit.org/b/254868, open since Safari 16). That shortfall is the white
- * band under the app on an iPhone: the shell ends where `dvh` says the
- * viewport does, and the home-indicator strip below it is bare canvas.
- *
- * `vh` is measured correctly there, and it is safe here for the same reason
- * it is wrong in a tab: an installed window has no collapsing browser chrome,
- * so the large viewport *is* the visible one.
- *
- * Matching `standalone` and `fullscreen` by name rather than "anything
- * installed": `minimal-ui` — which this app's `display_override` also asks
- * for — keeps collapsible chrome, and there `dvh` remains the right answer.
- */
-@media all and (display-mode: standalone), all and (display-mode: fullscreen) {
-  :root {
-    --app-viewport-height: 100vh;
-  }
-}
-
-/*
- * The same override, from the one signal iOS is dependable about.
- *
- * `(display-mode: standalone)` is not guaranteed to match in a home-screen app
- * on iOS — several builds report `browser` while visibly running with no
- * Safari chrome — and this fix is worth nothing if it misses. `RootLayout`
- * writes the attribute from `navigator.standalone`, before first paint.
- */
-:root[data-standalone] {
-  --app-viewport-height: 100vh;
 }
 
 @media (width >= 48rem) {
   :root {
     --control-h: 2.25rem;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  :root {
-    --drawer-duration: 0ms;
   }
 }
 
@@ -243,153 +153,21 @@
     @apply border-border outline-ring/50;
   }
 
-  /*
-   * The document does not scroll — each shell owns its own scroll region.
-   *
-   * This is what stops iOS rubber-band from sliding the content panel off the
-   * fixed drawer painted behind it, and what lets chrome be a flex sibling of
-   * the scroller instead of `position: sticky` against a box that never moves.
-   *
-   * It must be declared on `html`, not only `body`: Base UI's dialog scroll
-   * lock bails out entirely when html computes to `overflow: hidden`, and
-   * otherwise takes a path that assigns body height/width/position and fights
-   * this. `overscroll-behavior` goes on both, because with html hidden the
-   * usual body-to-viewport propagation no longer applies.
-   */
   html {
-    height: var(--app-viewport-height);
-    overflow: hidden;
-    overscroll-behavior: none;
     -webkit-tap-highlight-color: transparent;
     @apply bg-background font-sans;
   }
 
-  /* Chrome should not offer a text-selection callout on long-press — that is
-     a document affordance, and this is an app shell. Content keeps it.
-     A list row is included because long-press is its actions gesture: without
-     this, iOS raises the selection bubble on top of the action sheet every
-     time. */
-  [data-slot="sidebar"],
-  [data-slot="sidebar-inset"] > header,
-  [data-slot="mobile-list-row"],
-  button {
-    -webkit-touch-callout: none;
-  }
-
+  /* Long-press is the row's actions gesture, and without this iOS raises the
+     text-selection bubble on top of the action sheet every time. */
   [data-slot="mobile-list-row"] {
+    -webkit-touch-callout: none;
     -webkit-user-select: none;
     user-select: none;
   }
+
   body {
-    height: 100%;
-    overflow: hidden;
-    overscroll-behavior: none;
     @apply bg-background text-foreground;
-  }
-}
-
-/* iOS PWA: extend the app canvas behind the notch/home indicator. */
-@supports (padding: env(safe-area-inset-top)) {
-  :root {
-    --safe-area-inset-top: env(safe-area-inset-top, 0px);
-    --safe-area-inset-right: env(safe-area-inset-right, 0px);
-    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
-    --safe-area-inset-left: env(safe-area-inset-left, 0px);
-  }
-}
-
-/*
- * The app canvas, as a real box.
- *
- * The root element's background is propagated to the canvas by spec, but WebKit
- * stops repainting that region after a compositing change — which is exactly
- * what the drawer is (an always-on `translate` on the inset, plus `will-change`
- * while dragging) — leaving the notch and home-indicator strips showing the
- * black window behind the web view. A real fixed box repaints like any other
- * element.
- *
- * Sized like the shell, so it paints exactly the screen area the app covers
- * rather than reaching under Safari's toolbars.
- */
-body::before {
-  content: "";
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: var(--app-viewport-height);
-  z-index: -1;
-  background-color: var(--background);
-  pointer-events: none;
-}
-
-/*
- * A bottom sheet stops where the keyboard starts.
- *
- * Raising the whole popup rather than translating a pinned bar inside it keeps
- * the scroll region and the action bar in one flow: the sheet gets shorter, its
- * scroller shrinks with it, and the bar — an ordinary last flex child — ends up
- * sitting directly on top of the keyboard. A translated bar would instead float
- * over the last field.
- *
- * No transition. iOS dispatches `visualViewport.resize` at the *end* of its
- * ~250ms keyboard animation, so a duration here stacks on a delay that is
- * already visible.
- */
-[data-slot="sheet-content"][data-side="bottom"] {
-  bottom: var(--keyboard-inset, 0px);
-}
-
-/*
- * Mobile drawer reveal.
- *
- * Written as CSS rather than utility classes because the whole mechanism is
- * one contract — the panel and the scrim must move by exactly the same amount,
- * on the same curve, and stop transitioning at exactly the same moment — and
- * because Tailwind's arbitrary-value parser rejects `calc(a*b)`.
- *
- * `translate` and `opacity` are transitioned, never `--drawer-progress`: an
- * unregistered custom property is not interpolable, so animating it directly
- * would teleport rather than slide.
- *
- * The wrapper follows `--app-vv-top` when iOS shifts the visual viewport,
- * but its height comes from `--app-viewport-height`, never
- * `visualViewport.height` — that value stops above the home indicator in
- * installed iOS PWAs. Sidebar and scrim are `absolute` inside it so they
- * share that box.
- */
-@media (width < 48rem) {
-  [data-slot="sidebar-wrapper"] {
-    position: fixed;
-    top: var(--app-vv-top, 0px);
-    left: 0;
-    width: 100%;
-    /* The offset is subtracted so a non-zero `--app-vv-top` cannot push the
-       bottom off screen. */
-    height: calc(var(--app-viewport-height) - var(--app-vv-top, 0px));
-  }
-
-  [data-slot="sidebar-inset"],
-  [data-slot="sidebar-scrim"] {
-    translate: calc(var(--drawer-progress) * var(--sidebar-width, 16rem)) 0;
-    transition:
-      translate var(--drawer-duration) var(--drawer-ease),
-      opacity var(--drawer-duration) var(--drawer-ease);
-  }
-
-  [data-slot="sidebar-scrim"] {
-    opacity: calc(var(--drawer-progress) * 1);
-  }
-
-  /* While the finger is down the panel tracks it exactly — any transition
-     here makes each frame chase the last and the drag feels laggy. */
-  [data-drawer-dragging] [data-slot="sidebar-inset"],
-  [data-drawer-dragging] [data-slot="sidebar-scrim"] {
-    transition: none;
-  }
-
-  [data-drawer-dragging] [data-slot="sidebar-inset"] {
-    will-change: translate;
   }
 }
 
@@ -413,13 +191,4 @@ body::before {
   + *
   [data-slot="mobile-list-row-inner"] {
   border-top: 0;
-}
-
-@layer utilities {
-  .p-safe {
-    padding-top: max(4rem, var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
-    padding-right: max(1.5rem, var(--safe-area-inset-right, env(safe-area-inset-right, 0px)));
-    padding-bottom: max(4rem, var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
-    padding-left: max(1.5rem, var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
-  }
 }
