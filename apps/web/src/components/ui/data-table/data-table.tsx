@@ -399,7 +399,11 @@ export function DataTable<TData, TValue>({
         </div>
       )}
 
-      {enablePagination && !useCardList ? (
+      {/* Card lists paginate too. The table is paginated either way, so gating the
+          controls on `!useCardList` left a phone truncated at `pageSize` with no way
+          to reach row 11. `DataTablePagination` has had a mobile layout since it was
+          written. */}
+      {enablePagination ? (
         <div className="shrink-0">
           <DataTablePagination
             table={table}

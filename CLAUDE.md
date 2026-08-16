@@ -177,7 +177,7 @@ confirmation. Pair every input with a label and surface inline validation.
 
 **i18n**: `next-intl`, locales `bg` (default) and `en`, `localePrefix: "as-needed"`. All routes
 live under `src/app/[locale]/`. **Any user-facing string must be added to both
-`messages/en.json` and `messages/bg.json`** — they're currently at exact key parity (429 each).
+`messages/en.json` and `messages/bg.json`** — they're currently at exact key parity (438 each).
 Pages call `setRequestLocale(locale)` before rendering. Middleware is `src/proxy.ts`
 (Clerk + intl), not `middleware.ts`.
 
@@ -209,6 +209,17 @@ Vitest, colocated `*.test.ts`. Coverage is deliberately thin and unit-level — 
 (`auth`, `provisioning`). `apps/api/vitest.config.ts` injects placeholder env vars because
 `src/env.ts` validates at import; **nothing here opens a real DB, Redis or Clerk connection** —
 keep it that way and put anything needing real infrastructure in a separate integration suite.
+
+Every package's `vitest.config` builds on `defineUnitConfig` from `@haccp/vitest-config/unit`,
+which anchors discovery to `src/**/*.test.ts` and excludes build output. This matters: Vitest 4's
+default `exclude` is only `node_modules` and `.git`, so a bare config collects the compiled tests
+in `dist` as a second, stale copy of every suite. `pnpm test:discovery` compares what Vitest
+collects against what git tracks and fails on duplicates or build artifacts — run it after a
+build, since that is the only time the regression exists.
+
+`build` uses `tsconfig.build.json` (tests excluded, so they never ship in `dist`); `typecheck`
+uses `tsconfig.json` and still covers them. Add new test globs to **both** the vitest preset and
+`tsconfig.build.json`'s `exclude`.
 
 ## Git workflow
 
