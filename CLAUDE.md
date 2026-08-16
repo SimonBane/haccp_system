@@ -153,31 +153,32 @@ the schema change, the `.sql`, and `meta/` together.
 
 ## Testing
 
-Vitest, colocated `*.test.ts`. Coverage is deliberately thin and unit-level — pure logic
-(`today.mapper`, `optimistic`, `today-timeline`, `timezone`) and mocked-boundary tests (`auth`,
-`provisioning`). `apps/api/vitest.config.ts` injects placeholder env vars since `src/env.ts`
-validates at import; **nothing here opens a real DB, Redis or Clerk connection** — keep it that
-way, and put anything needing real infrastructure in a separate integration suite. Every
-package's `vitest.config` builds on `defineUnitConfig` from `@haccp/vitest-config/unit`,
-anchoring discovery to `src/**/*.test.ts` and excluding build output — Vitest 4's default
-`exclude` is only `node_modules` and `.git`, so a bare config would collect the compiled tests in
-`dist` as a second, stale copy of every suite. `pnpm test:discovery` compares what Vitest
-collects against what git tracks and fails on duplicates or build artifacts (run after a build,
-the only time the regression exists). `build` uses `tsconfig.build.json` (tests excluded, so
-they never ship in `dist`); `typecheck` uses `tsconfig.json` and still covers them — add new test
-globs to **both** the vitest preset and `tsconfig.build.json`'s `exclude`.
+**Tests are part of the change, not a follow-up.** New behaviour ships with tests. Changing
+existing behaviour means revising the tests that cover it — if none do, that gap is part of the
+work. A bug fix starts with a test that fails for the stated reason, so the fix is proven rather
+than asserted. Match the layer to the claim: pure logic and mocked boundaries in the unit suites,
+anything crossing the database, cache or Clerk in the integration harness. If a change genuinely
+needs no test, say why in the PR.
 
-`apps/api/tests/integration/` runs against **real Postgres and Redis**, only the Clerk network
-boundary mocked: `pnpm docker:up`, then `pnpm --filter @haccp/api test:integration`. **Add
-failure-mode tests to this harness rather than new infrastructure** — `harness/` provides tenant
-fixtures, `apiRequest`/`asAdmin`/`asEmployee`, a Clerk fake with injectable failure modes,
-`failRedisCommands`, and `PG_ERROR` for asserting constraints by SQLSTATE. Traps: fixture
-identifiers are minted per call because `users.email` is unique **globally, not per tenant**; the
-actor's role rides on the token, since `requireOrgAdmin` reads the raw `org_role` claim rather
-than the database row; the suite is single-worker because the db/Redis clients are module-scope
-singletons and `single-flight` is process-global. Global setup drops and recreates `haccp_test`
-from the committed migrations (the name must end in `_test`). Logs are silenced — set
-`INTEGRATION_LOG_LEVEL=debug`.
+Vitest, colocated `*.test.ts`. `apps/api/vitest.config.ts` injects placeholder env vars since
+`src/env.ts` validates at import; **no unit test opens a real DB, Redis or Clerk connection** —
+keep it that way. Every package's `vitest.config` builds on `defineUnitConfig` from
+`@haccp/vitest-config/unit`, anchoring discovery to `src/**/*.test.ts` and excluding build output:
+Vitest 4's default `exclude` is only `node_modules` and `.git`, so a bare config collects the
+compiled tests in `dist` as a second, stale copy of every suite. `pnpm test:discovery` compares
+what Vitest collects against what git tracks (run after a build, the only time that regression
+exists). `build` uses `tsconfig.build.json` so tests never ship in `dist`; `typecheck` uses
+`tsconfig.json` and still covers them — add new test globs to **both**.
+
+`apps/api/tests/integration/` uses **real Postgres and Redis**, only Clerk mocked: `pnpm
+docker:up`, then `pnpm --filter @haccp/api test:integration`. **Extend this harness rather than
+build new infrastructure** — `harness/` has tenant fixtures, `apiRequest`/`asAdmin`/`asEmployee`,
+a Clerk fake with injectable failure modes, `failRedisCommands`, and `PG_ERROR`. Traps: fixture
+ids are minted per call because `users.email` is unique **globally, not per tenant**; the actor's
+role rides on the token, since `requireOrgAdmin` reads the raw `org_role` claim, not the database
+row; the suite is single-worker because the db/Redis clients are module-scope singletons and
+`single-flight` is process-global. Global setup drops and recreates `haccp_test` (name must end
+in `_test`). Logs are silenced — set `INTEGRATION_LOG_LEVEL=debug`.
 
 ## Git workflow
 
