@@ -3,13 +3,18 @@ import { defineConfig } from "drizzle-kit";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+// Captured before dotenv: .env.local loads with override: true, which would
+// otherwise replace an explicitly exported URL (a test database, or CI's service).
+const exportedDatabaseUrl = process.env.DIRECT_DATABASE_URL;
+
 config({ path: resolve(dirname(fileURLToPath(import.meta.url)), ".env") });
 config({
   path: resolve(dirname(fileURLToPath(import.meta.url)), ".env.local"),
   override: true,
 });
 
-const directDatabaseUrl = process.env.DIRECT_DATABASE_URL;
+const directDatabaseUrl =
+  exportedDatabaseUrl ?? process.env.DIRECT_DATABASE_URL;
 
 if (!directDatabaseUrl) {
   throw new Error(

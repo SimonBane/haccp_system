@@ -2,8 +2,10 @@
   "extends": "@haccp/typescript-config/node.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "src"
+    // `.` so tests/ type-checks: TS6059 fires even under --noEmit. Emit is
+    // narrowed back to src/ by tsconfig.build.json.
+    "rootDir": "."
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "tests/**/*"],
   "exclude": ["node_modules", "dist"]
 }
