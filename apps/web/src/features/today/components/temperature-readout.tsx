@@ -109,6 +109,9 @@ export function TemperatureReadout({
         inputMode="decimal"
         autoComplete="off"
         enterKeyHint={enterKeyHint}
+        // No visible label: the sign toggle and the °C suffix carry the meaning visually.
+        aria-label={t("temperatureDialog.readingLabel")}
+        data-testid="temperature-reading"
         aria-invalid={invalid}
         aria-describedby={describedById}
         value={digits}
