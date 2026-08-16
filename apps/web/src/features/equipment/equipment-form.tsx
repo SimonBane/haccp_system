@@ -302,10 +302,6 @@ export function EquipmentForm({
 
   const hasChanges = !isEditing || !equipment || isDirty;
 
-  // One action on both platforms. Duplicate used to sit alongside Save here on
-  // desktop only; it lives in the row's action menu, which is where it is
-  // reached from on a phone and where you already are when you decide to copy
-  // something.
   const submitLabel = isEditing ? t("save") : t("add");
   const SubmitIcon = isEditing ? SaveIcon : PlusIcon;
 

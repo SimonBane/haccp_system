@@ -10,10 +10,6 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
-/**
- * The mobile top bar's regions, which a page can render into from anywhere in
- * its tree.
- */
 type SlotName = "title" | "center" | "actions";
 
 type SlotTargets = Partial<Record<SlotName, HTMLElement | null>>;
@@ -43,7 +39,6 @@ export function ShellSlotProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** Callback ref for the shell to publish one of its slot containers. */
 export function useShellSlotRef(name: SlotName) {
   const context = useContext(ShellSlotContext);
   const setTarget = context?.setTarget;

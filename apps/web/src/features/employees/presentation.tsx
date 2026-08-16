@@ -11,16 +11,6 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { displayName, initials, statusVariant } from "./utils";
 
-/**
- * The four things an employee renders as, wherever it is rendered.
- *
- * The desktop table and the mobile card show the same facts in different
- * layouts, and were written twice — which had already drifted (locations chips
- * were `secondary` in one and `outline` in the other) and forced every rule
- * change to be applied in both places. The layouts stay separate; only what a
- * status or a set of locations *looks like* lives here.
- */
-
 export function EmployeeAvatar({
   employee,
   size = "sm",
@@ -102,11 +92,7 @@ export function EmployeeRoleBadge({
   );
 }
 
-/**
- * An admin reaches every location, so it reads "all locations" rather than
- * listing them — the assignment list is genuinely empty for admins, and showing
- * "none" would be actively misleading.
- */
+/** Admin assignment is empty on purpose — listing "none" would be wrong. */
 export function EmployeeLocationsBadges({
   employee,
 }: {

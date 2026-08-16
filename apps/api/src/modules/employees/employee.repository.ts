@@ -106,8 +106,7 @@ export const employeeRepository = {
     return row ?? null;
   },
 
-  // The provisioning finders below deliberately do NOT filter deletedAt: they have
-  // to see tombstones in order to restore them when Clerk says the member is live.
+  // Provisioning finders must see tombstones so they can restore them.
   async findMembershipContextByClerkUserId(
     db: Db,
     organizationId: string,

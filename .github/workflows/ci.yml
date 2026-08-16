@@ -85,8 +85,7 @@ jobs:
       - name: Run tests
         run: pnpm turbo test
 
-      # Deliberately after a build: Vitest only over-collects once dist is
-      # populated, so running this on a clean tree would prove nothing.
+      # After a build: Vitest only over-collects once dist is populated.
       - name: Build emitting packages
         run: pnpm turbo build --filter=@haccp/api... --filter=@haccp/shared...
 
@@ -125,11 +124,7 @@ jobs:
         env:
           DIRECT_DATABASE_URL: postgresql://haccp:haccp@localhost:5432/haccp
 
-      # Guards both failure modes that let drizzle/meta drift out of sync with
-      # the TS schema: a schema change committed without a migration, and a
-      # hand-written migration the snapshots never learned about. Either one
-      # makes the *next* generate diff against a stale snapshot and emit
-      # destructive SQL, so catch it at the PR that introduces it.
+      # db:check guards snapshot drift (schema without a migration, or a hand-written migration).
       - name: Check for uncommitted schema drift
         run: pnpm --filter @haccp/api db:check
         env:

@@ -84,8 +84,7 @@ export function OrganizationSettingsForm({
 
   const [showMultipleLocationsDisableWarning, setShowMultipleLocationsDisableWarning] =
     useState(false);
-  // One flag per card, not react-hook-form's single `isSubmitting`: the three
-  // sections save independently and must be able to be in flight separately.
+  // Per card: react-hook-form has one `isSubmitting`, but the three sections save independently.
   const [submittingSections, setSubmittingSections] = useState<
     Record<SettingsSection, boolean>
   >({
@@ -131,8 +130,6 @@ export function OrganizationSettingsForm({
       return;
     }
 
-    // Validate only this card's fields — a half-filled field in another
-    // section must not block the one being saved.
     if (!(await form.trigger(SECTION_FIELDS[section]))) {
       return;
     }
@@ -155,8 +152,7 @@ export function OrganizationSettingsForm({
       }
 
       await reloadTenant();
-      // Re-baseline just this section, so saving one card does not clear the
-      // unsaved-changes state of another.
+      // Re-baseline this section only so saving one card does not clear another's dirty state.
       for (const field of SECTION_FIELDS[section]) {
         form.resetField(field, { defaultValue: values[field] });
       }
@@ -290,9 +286,6 @@ export function OrganizationSettingsForm({
                   id="multiple-locations"
                   checked={field.value}
                   onCheckedChange={(checked) => {
-                    // Turning this off with more than one location would
-                    // orphan the extras, so refuse and explain rather than
-                    // letting the save fail server-side.
                     if (!checked && locations.length > 1) {
                       setShowMultipleLocationsDisableWarning(true);
                       return;

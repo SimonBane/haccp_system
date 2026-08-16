@@ -56,8 +56,6 @@ async function writeLocationAssignments(
   return target;
 }
 
-// Links the Clerk identity onto an existing row: an admin-created draft, a
-// previously removed member, or a membership we already have but that is stale.
 export async function activateMembership(
   tx: DbClient,
   input: ProvisionInput & { row: MembershipContextRow },
@@ -84,8 +82,7 @@ export async function activateMembership(
     throw new InternalError("Failed to activate membership");
   }
 
-  // input.row.locationIds is what the admin assigned at invite time — preserved
-  // as-is; the default is only backfilled when there is nothing at all.
+  // Preserve invite-time assignments; backfill the default only when there are none.
   const locationIds = await writeLocationAssignments(tx, {
     membershipId: membership.id,
     organizationId: input.organizationId,

@@ -29,12 +29,6 @@ export function useHasLocationSwitcher(): boolean {
   return organization.multipleLocationsEnabled && locations.length > 1;
 }
 
-/**
- * Sidebar identity block. When more than one location exists this replaces the
- * static brand row entirely rather than stacking under it — org and location
- * are the context everything below is scoped to, and two stacked identity
- * blocks read as duplication.
- */
 export function LocationSwitcherSidebarItem() {
   const t = useTranslations("LocationPicker");
   const tSidebar = useTranslations("Sidebar");

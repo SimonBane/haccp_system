@@ -14,15 +14,7 @@ import { errorResponse, jsonResponse, defineRouteHandler, bearerSecurity } from 
 
 export { errorResponse, jsonResponse, defineRouteHandler } from "./responses.js";
 
-/**
- * Reads input @hono/zod-openapi has already validated against the route
- * definition's schema.
- *
- * The generic exists because this factory's schemas are type parameters, so
- * `c.req.valid` has nothing concrete to infer from — the same reason
- * `defineRouteHandler` casts. Validation itself is entirely the framework's;
- * this only names the resulting shape.
- */
+/** Names the already-validated body/params; do not re-parse (Zod v4 handler cast). */
 function validated<T>(
   c: { req: { valid: (target: never) => unknown } },
   target: "json" | "param",
@@ -156,10 +148,6 @@ export function registerAdminCrudRoutes<
     createRouteDef,
     defineRouteHandler(createRouteDef, async (c) => {
       const { id: locationId } = getCurrentLocation(c);
-      // Already validated against schemas.create by @hono/zod-openapi from the
-      // route definition above — re-parsing here ran every schema twice. The
-      // cast is only to name the shape: TCreate is generic here, so c.req.valid
-      // cannot infer it, and defineRouteHandler already casts for the same reason.
       const input = validated<z.output<TCreate>>(c, "json");
       const created = await options.service.create(getDb(c), locationId, input);
       return c.json(created, 201);

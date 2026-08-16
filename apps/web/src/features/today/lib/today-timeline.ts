@@ -11,20 +11,9 @@ import {
   parseScheduledTimeToMinutes,
 } from "./today-grouping";
 
-/**
- * The Today page has a single axis: the clock.
- *
- * Tasks hang off their exact scheduled time, and a task never changes group when
- * it is completed — only its own state changes. That keeps the worker's spatial
- * memory of the list intact and removes the need for any layout animation.
- */
 export type TimeGroupState = "done" | "overdue" | "now" | "upcoming";
 
-/**
- * `completedAt` is when the reading was actually taken; `scheduledTime` is the
- * round it belonged to. The entry dialog shows the former and falls back to the
- * latter, which is all a pending row needs.
- */
+/** `completedAt` is when the reading was taken; `scheduledTime` is the round it belonged to. */
 export type TodayPriorReading = {
   scheduledTime: string;
   completedAt: string | null;
@@ -34,24 +23,14 @@ export type TodayPriorReading = {
 export type TodayTimelineItem = {
   task: TodayTaskItem;
   isCompleted: boolean;
-  /** Completed, but the reading fell outside the equipment's allowed range. */
   isDeviation: boolean;
-  /**
-   * The most recent reading taken earlier the same day for the same equipment.
-   * Derived from the payload we already have — no extra request.
-   */
+  /** Most recent same-day reading for this equipment, from the payload we already have. */
   priorReading: TodayPriorReading | null;
 };
 
-/**
- * A round and its tasks, with everything the clock does not affect.
- *
- * Split out from `TodayTimeGroup` so it can be memoised on the response alone.
- * The clock ticks every minute; rebuilding these objects on each tick gave every
- * row a new `item` identity and made `TodayTaskRow`'s memo permanently useless.
- */
+/** Clock-independent round; memoised on the response so ticks do not rebuild item identity. */
 export type TodayTaskGroup = {
-  /** Also the DOM anchor id, so header chips can scroll to a group. */
+  /** Also the DOM anchor id for header-chip scroll. */
   id: string;
   scheduledTime: string;
   items: TodayTimelineItem[];
@@ -63,11 +42,10 @@ export type TodayTaskGroup = {
 
 export type TodayTimeGroup = TodayTaskGroup & {
   state: TimeGroupState;
-  /** Signed minutes from now to this group. Negative means it has passed. */
+  /** Signed minutes from now. Negative means it has passed. */
   minutesUntil: number;
 };
 
-/** The clock-independent half of the timeline. */
 export type TodayTaskGroups = {
   groups: TodayTaskGroup[];
   total: number;
@@ -85,21 +63,12 @@ export type TodayTimeline = {
   remainingCount: number;
   overdueCount: number;
   deviationCount: number;
-  /** Group to scroll to when the page opens. Null when there is nothing left. */
   focusGroupId: string | null;
   firstOverdueGroupId: string | null;
   firstDeviationGroupId: string | null;
   isAllDone: boolean;
-  /**
-   * Where the live "now" marker sits: render it before `groups[nowLineIndex]`,
-   * or after every group when it equals `groups.length`. Null on any day that
-   * is not today, where a now marker would be meaningless.
-   *
-   * Placing it *between* groups rather than inside one keeps it out of the
-   * middle of a round that is still live work at 15:12.
-   */
+  /** Index to render the now marker before, or `groups.length` when every round has passed. Null when not today. */
   nowLineIndex: number | null;
-  /** Minutes since midnight in the org zone, for the marker's label. */
   nowMinutes: number;
 };
 
@@ -107,14 +76,7 @@ export function timeGroupId(scheduledTime: string): string {
   return `time-group-${scheduledTime.replace(":", "-")}`;
 }
 
-/**
- * Resolves an occurrence key against the current timeline.
- *
- * Anything holding on to a task across renders holds the key rather than the
- * item: the clock ticks every minute and rebuilds the timeline, so a captured
- * item would keep serving the prior reading it happened to see. Null once the
- * key stops resolving — a day that rolled over, or a template that was removed.
- */
+/** Resolve a key against the current timeline — hold the key, not the item, because ticks rebuild it. */
 export function findTimelineItem(
   timeline: TodayTimeline,
   key: string | null,
@@ -130,7 +92,6 @@ export function findTimelineItem(
   return null;
 }
 
-/** The round an occurrence belongs to, for queueing the rest of its group. */
 export function findTimelineGroup(
   timeline: TodayTimeline,
   key: string | null,
@@ -151,10 +112,7 @@ function isDeviation(task: TodayTaskItem): boolean {
   );
 }
 
-/**
- * Walks the day in chronological order keeping the last reading seen per piece
- * of equipment, so a pending 15:00 check can show what 07:00 measured.
- */
+/** Last same-equipment reading earlier in the day, so a pending 15:00 can show what 07:00 measured. */
 function buildPriorReadings(
   tasksInTimeOrder: TodayTaskItem[],
 ): Map<string, TodayPriorReading> {
@@ -184,10 +142,7 @@ function buildPriorReadings(
   return priorByTaskKey;
 }
 
-/**
- * Signed minutes from now to an occurrence, across dates — comparing only the
- * clock would report "in 13h" for tomorrow 07:00 when it is 20:00 tonight.
- */
+/** Across dates — comparing only the clock would report "in 13h" for tomorrow 07:00 at 20:00 tonight. */
 function minutesUntilOccurrence(
   date: string,
   scheduledTime: string,
@@ -219,12 +174,7 @@ function deriveGroupState(params: {
     : "upcoming";
 }
 
-/**
- * Everything derivable from the day's tasks alone: grouping, per-item state and
- * the counts. Memoise this on the response and the item objects stay
- * referentially stable across clock ticks, which is what lets `TodayTaskRow`'s
- * memo actually bail out.
- */
+/** Grouping and counts from the response alone so item identity survives clock ticks. */
 export function buildTodayTaskGroups(tasks: TodayTaskItem[]): TodayTaskGroups {
   const inTimeOrder = [...tasks].sort(
     (a, b) =>
@@ -278,13 +228,7 @@ export function buildTodayTaskGroups(tasks: TodayTaskItem[]): TodayTaskGroups {
   };
 }
 
-/**
- * Layers the clock over the task groups: which rounds are live, overdue or still
- * ahead, and where the now marker sits.
- *
- * `items` is carried through by reference — this is the whole point of the
- * split, and the reason a tick no longer re-renders every row.
- */
+/** Layers live state on the groups; `items` is carried by reference so a tick does not re-render every row. */
 export function applyClock(
   base: TodayTaskGroups,
   now: Date,
@@ -312,8 +256,7 @@ export function applyClock(
     .filter((group) => group.state === "overdue")
     .reduce((sum, group) => sum + group.remainingCount, 0);
 
-  // The marker belongs before the first round still ahead of the clock. When
-  // findIndex comes back empty every round has passed, so it goes at the end.
+  // Before the first round still ahead of the clock, or at the end when every round has passed.
   const nowMinutes = zonedMinutesOfDay(now, timeZone);
   const isToday = selectedDate === zonedDateString(now, timeZone);
   const upcomingIndex = groups.findIndex(

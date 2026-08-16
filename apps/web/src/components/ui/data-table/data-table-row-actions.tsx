@@ -32,8 +32,7 @@ function ActionItem({ action }: { action: RowAction }) {
     </DropdownMenuItem>
   );
 
-  // A disabled item swallows pointer events, so the tooltip has to hang off a
-  // wrapper — otherwise "why is delete greyed out" has no answer on desktop.
+  // Disabled items swallow pointer events, so the tooltip hangs off a wrapper.
   if (!action.disabled || !action.disabledReason) return item;
 
   return (
@@ -44,12 +43,6 @@ function ActionItem({ action }: { action: RowAction }) {
   );
 }
 
-/**
- * The menu body: primary actions, a rule, then the destructive one.
- *
- * Shared so the desktop kebab and the mobile long-press menu are the same list
- * in the same order — the point of the whole `RowAction[]` shape.
- */
 export function RowActionMenuItems({ actions }: { actions: RowAction[] }) {
   const items = visibleRowActions(actions);
   const primary = items.filter((action) => action.role !== "destructive");
@@ -78,15 +71,6 @@ export function RowActionMenuItems({ actions }: { actions: RowAction[] }) {
   );
 }
 
-/**
- * A row's overflow menu on the desktop grid, rendered from the same
- * `RowAction[]` the mobile long-press menu uses.
- *
- * It used to be a bare shell each feature filled with its own menu items, which
- * is how four near-identical row-action components came to exist. The
- * differences between them — a status gate, a tooltip on a disabled delete —
- * are all expressible as data, so they are.
- */
 export function DataTableRowActions({
   srLabel,
   actions,
@@ -107,8 +91,6 @@ export function DataTableRowActions({
             <Button
               type="button"
               variant="ghost"
-              // 40px on touch, 32px from md up: a wet-gloved tap target on a
-              // tablet, a conventional icon button on a desktop table.
               className="h-10 w-10 p-0 md:h-8 md:w-8"
               onClick={(event) => event.stopPropagation()}
             />

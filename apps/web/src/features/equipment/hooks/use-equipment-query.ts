@@ -35,7 +35,6 @@ export function useEquipmentQuery(options?: UseEquipmentQueryOptions) {
   });
 }
 
-/** Equipment reduced to what a form's select needs. */
 export function useEquipmentOptions(options?: UseEquipmentQueryOptions) {
   const { data: equipment = [] } = useEquipmentQuery(options);
   return equipment.map((item) => ({

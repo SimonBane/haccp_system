@@ -60,14 +60,7 @@ async function fetchJson<T>(
   return schema.parse(body);
 }
 
-/**
- * Deduped per render pass.
- *
- * The dashboard shell fetches the tenant and so does every page beneath it.
- * Next's own fetch memoization does not apply here — `cache: "no-store"` opts
- * out of it — so without this each render pays two `/tenant/current` round
- * trips and mints two Clerk tokens for identical data.
- */
+/** Deduped per render: `cache: "no-store"` opts out of Next fetch memoization. */
 export const getTenantContext = cache(
   async (): Promise<TenantContextResponse> =>
     fetchJson("/tenant/current", tenantContextResponseSchema),
@@ -108,11 +101,7 @@ export async function listTaskTemplates(
   );
 }
 
-/**
- * `date` is required: this runs in the deploy region's zone (UTC on Vercel), so
- * a local-zone default would silently disagree with the browser and discard the
- * SSR payload. The caller resolves "today" in the organisation's zone.
- */
+/** `date` is required: this runs in UTC on Vercel, so a local-zone default would discard the SSR payload. */
 export async function getToday(
   locationId: string,
   date: string,

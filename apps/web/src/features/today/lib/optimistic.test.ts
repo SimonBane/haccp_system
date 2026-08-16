@@ -6,12 +6,6 @@ import {
   applyOptimisticUncompletion,
 } from "./optimistic";
 
-/**
- * The optimistic patches are what make a tap feel instant on a kitchen tablet,
- * and they are the reason Today cannot simply be put on a refetch interval: a
- * poll landing between the local patch and the server confirm would flash a
- * completed row back to incomplete. Pin the behaviour before touching refetch.
- */
 const SOFIA = "Europe/Sofia";
 const DATE = "2026-01-15";
 const USER = "00000000-0000-4000-8000-00000000user";

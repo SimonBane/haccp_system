@@ -16,11 +16,6 @@ export type InviteEmployeeParams = {
   lastName: string;
 };
 
-/**
- * Sends a Clerk invitation and records it on the membership. Passing
- * `previousInvitationId` reissues an existing invitation instead of creating
- * the first one, which also changes the status the membership must be in.
- */
 export async function issueMembershipInvitation(
   db: Db | DbClient,
   organizationId: string,

@@ -2,14 +2,7 @@ import { ORG_ROLE } from "@haccp/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MEMBERSHIP_STATUS } from "../../core/db/schema/organization-memberships.js";
 
-/**
- * Query-count regression guard for the authenticated request path.
- *
- * resolveRequestContext runs before every protected handler, so a redundant
- * SELECT here is paid on every request. The counts below are the point of the
- * hot-path work; they are asserted rather than described because the sequencing
- * that produces them is subtle — see the comments in provisioning.service.
- */
+/** Query-count guard: a redundant SELECT here is paid on every authenticated request. */
 const ORG = "00000000-0000-4000-8000-00000000000o";
 const USER = "00000000-0000-4000-8000-00000000000u";
 const LOCATION = "00000000-0000-4000-8000-00000000000l";
@@ -126,9 +119,7 @@ beforeEach(() => {
     c.set.mockResolvedValue(undefined);
   }
 
-  // The user cache is modelled statefully rather than as a constant null: a
-  // write during the request is exactly what lets the later read avoid a query,
-  // so a stateless stub would hide the behaviour under test.
+  // Stateful: a write during the request is what lets the later read skip SQL.
   let stored: unknown = null;
   userCache.get.mockImplementation(async () => stored);
   userCache.set.mockImplementation(async (_key: string, value: unknown) => {
@@ -160,8 +151,6 @@ describe("resolveRequestContext query cost", () => {
   });
 
   it("issues ONE query when membership and user are both cold", async () => {
-    // The membership query inner-joins users, so the user row is already in hand.
-    // Re-selecting it would double the cost of the most common cold request.
     const ctx = await provisioningService.resolveRequestContext(db, identity);
 
     expect(sqlQueryCount()).toBe(1);
@@ -191,7 +180,6 @@ describe("resolveRequestContext query cost", () => {
 
     await provisioningService.resolveRequestContext(db, identity);
 
-    // Nothing populated it in between, so a second read is a guaranteed miss.
     expect(userCache.get).toHaveBeenCalledTimes(1);
   });
 
@@ -213,8 +201,7 @@ describe("resolveRequestContext query cost", () => {
       .resolveRequestContext(db, identity)
       .catch(() => undefined);
 
-    // provisionTenantOnMiss skips the leading read; the one inside singleFlight
-    // is load-bearing (a queued caller arrives after the leader wrote it).
+    // The singleFlight re-read is load-bearing: a queued caller arrives after the leader wrote the cache.
     expect(tenantCache.get).toHaveBeenCalledTimes(2);
   });
 });

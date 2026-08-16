@@ -1,7 +1,6 @@
 import type { TodayResponse, TodayTaskItem } from "@haccp/shared";
 import { zonedMinutesOfDay } from "@haccp/shared";
 
-/** Minutes after scheduled time that count as "due now". Easy to tune. */
 export const DUE_NOW_WINDOW_MINUTES = 30;
 
 export function parseScheduledTimeToMinutes(time: string): number {
@@ -9,7 +8,6 @@ export function parseScheduledTimeToMinutes(time: string): number {
   return hours * 60 + minutes;
 }
 
-/** Stable identity for a single occurrence of a recurring template. */
 export function occurrenceKey(task: TodayTaskItem): string {
   return `${task.templateId}:${task.scheduledTime}:${task.date}`;
 }

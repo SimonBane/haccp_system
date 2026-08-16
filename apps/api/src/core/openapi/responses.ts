@@ -3,11 +3,7 @@ import type { RouteConfig, RouteHandler } from "@hono/zod-openapi";
 import type { z } from "zod";
 import type { AppEnv } from "../../types.js";
 
-/**
- * Bridges handler implementations to @hono/zod-openapi's RouteHandler type.
- * Required for Zod v4 schemas from workspace packages under stricter TS checks
- * (e.g. Vercel's Hono entrypoint typecheck).
- */
+/** Zod v4 handler cast — workspace schemas fail the RouteHandler check otherwise. */
 export function defineRouteHandler<R extends RouteConfig>(
   _route: R,
   handler: (c: Parameters<RouteHandler<R, AppEnv>>[0]) => unknown,
@@ -15,7 +11,6 @@ export function defineRouteHandler<R extends RouteConfig>(
   return handler as unknown as RouteHandler<R, AppEnv>;
 }
 
-/** Every protected route's OpenAPI security block. */
 export const bearerSecurity = [{ Bearer: [] }];
 
 export function errorResponse(description: string) {

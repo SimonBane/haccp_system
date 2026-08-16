@@ -1,8 +1,6 @@
 import type { LocationResponse, OrgRole } from "@haccp/shared";
 import { pickDefaultLocation, requiresLocationAssignments } from "@haccp/shared";
 
-// The single point where the admins-see-everything invariant is enforced on writes:
-// admins get no assignment rows, employees always end up with at least one.
 export function resolveLocationAssignments(
   role: OrgRole,
   requested: string[] | undefined,

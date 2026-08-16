@@ -1,11 +1,5 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
-/**
- * Loading placeholder for a resource list.
- *
- * Renders as cards on mobile and rows on desktop, matching what DataTable
- * actually swaps in, so the layout does not jump when the data lands.
- */
 export function DataTableSkeleton({
   rows = 6,
   columns = 3,
@@ -28,7 +22,6 @@ export function DataTableSkeleton({
           <Skeleton className="h-9 w-28" />
         </div>
 
-        {/* Desktop rows */}
         <div className="hidden md:block">
           {rowKeys.map((row) => (
             <div
@@ -47,7 +40,6 @@ export function DataTableSkeleton({
           ))}
         </div>
 
-        {/* Mobile cards */}
         <div className="space-y-3 md:hidden">
           {rowKeys.map((row) => (
             <div key={row} className="space-y-3 rounded-lg border p-4">

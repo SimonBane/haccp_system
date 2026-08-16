@@ -17,20 +17,9 @@ function emptyTally(): RoundTally {
 }
 
 /**
- * Walks a worker through one round of temperature checks without returning to
- * the list between them.
- *
- * Three things make this survive a timeline that rebuilds under it:
- *
- * 1. The key list is frozen when the round opens and only the index moves. The
- *    clock ticks every minute and the optimistic patch flips the row you just
- *    saved to completed — a queue recomputed from "still pending" would drop the
- *    check you are standing on and renumber the counter behind you.
- * 2. `advance` reads the timeline and the round through refs. It runs after an
- *    awaited mutation, so the closure it was created in is a render behind the
- *    cache patch; refs are what let it see the world as it is now.
- * 3. The tally is a ref rather than state. It is never rendered, only read once
- *    inside the same handler tick that bumped it, where state would be stale.
+ * Walks one round of temperature checks. The key list is frozen on open (a
+ * recomputed queue would drop the current check); `advance` and the tally use
+ * refs because they run after an awaited mutation.
  */
 export function useTemperatureRound(timeline: TodayTimeline) {
   const [state, setState] = useState<RoundState | null>(null);
@@ -39,13 +28,7 @@ export function useTemperatureRound(timeline: TodayTimeline) {
 
   const timelineRef = useRef(timeline);
 
-  // Assigned after commit rather than during render — writing a ref while rendering
-  // is what `react-hooks/refs` forbids, and here it costs nothing. Neither reader can
-  // observe a stale timeline: `open` runs from the tap that starts a round, and React
-  // flushes pending passive effects before dispatching a discrete event, so the ref
-  // already holds the timeline the worker actually tapped. `advance` runs after an
-  // awaited mutation whose optimistic patch committed a network call earlier, and it
-  // only inspects indices past the current one, which that patch cannot touch.
+  // After commit — writing a ref during render is forbidden by react-hooks/refs.
   useEffect(() => {
     timelineRef.current = timeline;
   }, [timeline]);
@@ -66,11 +49,7 @@ export function useTemperatureRound(timeline: TodayTimeline) {
     [commit],
   );
 
-  /**
-   * Moves to the next check still worth recording, skipping any that were
-   * completed on another device or stopped resolving. Returns the tally once
-   * nothing is left, so the caller can summarise the round in one toast.
-   */
+  /** Next pending check, or the tally once nothing is left. */
   const advance = useCallback((): AdvanceResult => {
     const current = stateRef.current;
     if (!current) return { done: true, ...tallyRef.current };
@@ -106,9 +85,7 @@ export function useTemperatureRound(timeline: TodayTimeline) {
   const currentKey = state ? (state.keys[state.index] ?? null) : null;
   const item = findTimelineItem(timeline, currentKey);
 
-  // The occurrence stopped resolving — the day rolled over mid-round, or the
-  // template was removed. Move on rather than holding a surface open over a
-  // check that no longer exists. The index only ever grows, so this cannot loop.
+  // Day rolled over or the template was removed; the index only grows so this cannot loop.
   useEffect(() => {
     if (state && !item) advance();
   }, [state, item, advance]);
@@ -118,7 +95,6 @@ export function useTemperatureRound(timeline: TodayTimeline) {
     currentKey,
     position: state ? state.index + 1 : 0,
     size: state ? state.keys.length : 0,
-    /** A round of one is the old one-task-per-open flow, with no round chrome. */
     isRound: (state?.keys.length ?? 0) > 1,
     open,
     recordSaved,

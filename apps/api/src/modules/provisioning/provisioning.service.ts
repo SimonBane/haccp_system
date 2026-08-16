@@ -48,10 +48,7 @@ export function toBlob(row: MembershipContextRow): MembershipCacheBlob {
   };
 }
 
-// Role is deliberately not part of this check. Correcting drift here would let a
-// stale token (valid for up to ~60s after a demotion through our own UI) rewrite
-// the role back on every request. The organizationMembership.updated webhook is
-// the correction channel instead.
+// Do not heal role from the JWT: a stale token after demotion would rewrite it on every request. Webhook is the correction channel.
 export function isHealthy(row: MembershipContextRow): boolean {
   if (
     row.membership.deletedAt !== null ||
@@ -62,7 +59,7 @@ export function isHealthy(row: MembershipContextRow): boolean {
     return false;
   }
 
-  // Admins reach every location, so they legitimately carry no assignments.
+  // Admin `[]` is healthy — admins reach every location.
   return (
     row.membership.role === ORG_ROLE.ADMIN || row.locationIds.length > 0
   );
@@ -112,9 +109,7 @@ export const provisioningService = {
 
         if (row && isHealthy(row)) {
           const blob = toBlob(row);
-          // The user row came back on this query's inner join, so cache it here
-          // rather than letting resolveRequestContext re-SELECT what we already
-          // hold. isHealthy guarantees a non-null clerkUserId.
+          // Inner join already fetched the user; cache it so resolveRequestContext does not re-SELECT.
           await Promise.all([
             membershipCache.set(clerkOrgId, clerkUserId, blob),
             userService.cacheUser(row.user),
@@ -124,8 +119,7 @@ export const provisioningService = {
 
         const profileData = await fetchClerkProfile(clerkUserId);
 
-        // Falls back to email because an admin-created draft has no clerkUserId
-        // yet — that is the only link between the invite and the person signing in.
+        // Email fallback: an admin-created draft has no clerkUserId yet.
         row ??= await employeeRepository.findMembershipContextByEmail(
           db,
           tenant.organizationId,
@@ -152,8 +146,7 @@ export const provisioningService = {
             throw error;
           }
 
-          // Lost the race. Postgres blocks the loser until the winner commits, so
-          // the winning row is guaranteed visible now. Re-read once, never loop.
+          // Lost unique-index race: winner is committed, so one re-read, never a loop.
           const settled =
             await employeeRepository.findMembershipContextByClerkUserId(
               db,
@@ -194,16 +187,13 @@ export const provisioningService = {
   ): Promise<ResolvedRequestContext> {
     const { clerkOrgId, clerkUserId, orgRole } = identity;
 
-    // One pipelined Redis round trip. Every key is derivable from the JWT alone,
-    // which is why all three can be read before anything else resolves.
+    // One pipelined Redis round trip — every key is on the JWT.
     const [tenantBlob, userBlob, membershipBlob] = await Promise.all([
       tenantCache.get(clerkOrgId),
       userCache.get(clerkUserId),
       membershipCache.get(clerkOrgId, clerkUserId),
     ]);
 
-    // The cold entry points, since the cache reads above already missed —
-    // ensureTenant/resolveUser would each re-read and miss again.
     const tenant = tenantBlob
       ? toTenantContext(tenantBlob)
       : await tenantService.provisionTenantOnMiss(db, clerkOrgId);
@@ -216,14 +206,7 @@ export const provisioningService = {
         orgRole,
       }));
 
-    // Deliberately sequential. These look independent, but ensureMembership's
-    // query inner-joins users and now caches that row, so running them together
-    // would issue a second SELECT for something the first one already fetched.
-    //
-    // Which resolver to use therefore depends on whether membership was warm:
-    // if it was, nothing has populated the user cache and reading it again is a
-    // guaranteed miss; if it was cold, ensureMembership has very likely just
-    // filled it, and the cache-aware path turns a query into a Redis hit.
+    // Sequential so membership's join can fill the user cache; parallel would re-SELECT the same row.
     let user =
       userBlob ??
       (membershipBlob
@@ -231,8 +214,7 @@ export const provisioningService = {
         : await userService.resolveUser(db, clerkUserId));
 
     if (!user) {
-      // Membership cache was warm but the user row is gone or tombstoned.
-      // Provisioning restores it rather than failing a request Clerk vouches for.
+      // Warm membership cache but the user row is gone; restore rather than fail a Clerk-vouched request.
       await provisioningService.ensureMembership(db, {
         tenant,
         clerkUserId,

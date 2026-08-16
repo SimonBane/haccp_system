@@ -9,9 +9,7 @@ import type { TemperatureVerdict } from "../lib/temperature";
 
 type Props = {
   id?: string;
-  /** Settled verdict — null while nothing complete has been entered yet. */
   verdict: TemperatureVerdict | null;
-  /** The value the verdict was judged on, so the two can never disagree. */
   value: number | null;
   minTempC: number;
   maxTempC: number;
@@ -19,21 +17,7 @@ type Props = {
   className?: string;
 };
 
-/**
- * Fixed height in every state, because this row sits between the reading and the
- * commit bar: anything that grows here pushes the button under the keyboard.
- *
- * It keeps showing the allowed range after a verdict arrives. The range used to
- * be replaced by the words "within the allowed range", which is what the badge
- * beside it already says — so the worker lost the numbers they were comparing
- * against at exactly the moment they wanted to check them.
- *
- * It is also the one live region on the screen, and the only place the field
- * error appears. It speaks the settled verdict as a whole sentence, so a screen
- * reader hears one utterance per finished reading rather than one per digit,
- * and because it renders an error *or* a verdict and is atomic, there is exactly
- * one utterance either way.
- */
+/** Fixed height so growth cannot push the commit bar under the keyboard. One live region for the settled verdict. */
 export function TemperatureStatusRow({
   id,
   verdict,
@@ -78,8 +62,6 @@ export function TemperatureStatusRow({
             {t("temperatureDialog.rangeInline", { min, max })}
           </span>
 
-          {/* The visible badge is an icon plus two words; this is the sentence
-              a screen reader should actually hear. */}
           <span className="sr-only">
             {value === null
               ? null

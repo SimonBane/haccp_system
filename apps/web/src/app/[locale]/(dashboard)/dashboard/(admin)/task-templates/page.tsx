@@ -19,9 +19,6 @@ export default async function TaskTemplatesPage({
 
   const tenant = await getTenantContext();
   const locationId = await resolveActiveLocationId(tenant);
-  // Genuinely parallel: both need only the location. Equipment is fetched here
-  // rather than left to the client because the form's dropdown otherwise fires a
-  // request on mount for a dialog that is closed.
   const [taskTemplates, equipment] = await Promise.all([
     listTaskTemplates(locationId),
     listEquipment(locationId),

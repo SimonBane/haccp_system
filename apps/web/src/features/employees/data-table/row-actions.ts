@@ -16,11 +16,6 @@ type Params = {
   onDelete: (employee: EmployeeResponse) => void;
 };
 
-/**
- * Invite and revoke are mutually exclusive and both status-gated, so they are
- * `hidden` rather than disabled — there is nothing to explain about an action
- * that does not apply to this employee's state.
- */
 export function getEmployeeRowActions({
   t,
   onEdit,
