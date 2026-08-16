@@ -38,7 +38,17 @@ export function useTemperatureRound(timeline: TodayTimeline) {
   const tallyRef = useRef<RoundTally>(emptyTally());
 
   const timelineRef = useRef(timeline);
-  timelineRef.current = timeline;
+
+  // Assigned after commit rather than during render — writing a ref while rendering
+  // is what `react-hooks/refs` forbids, and here it costs nothing. Neither reader can
+  // observe a stale timeline: `open` runs from the tap that starts a round, and React
+  // flushes pending passive effects before dispatching a discrete event, so the ref
+  // already holds the timeline the worker actually tapped. `advance` runs after an
+  // awaited mutation whose optimistic patch committed a network call earlier, and it
+  // only inspects indices past the current one, which that patch cannot touch.
+  useEffect(() => {
+    timelineRef.current = timeline;
+  }, [timeline]);
 
   const commit = useCallback((next: RoundState | null) => {
     stateRef.current = next;
