@@ -138,6 +138,8 @@ export const TodayTimeGroup = memo(function TodayTimeGroup({
     <Collapsible open={open} onOpenChange={setOpen}>
       <section
         id={group.id}
+        data-testid="today-time-group"
+        data-scheduled-time={group.scheduledTime}
         aria-labelledby={headingId}
         className="relative scroll-mt-4 pb-2 pl-9 sm:pl-11 md:scroll-mt-16"
       >
@@ -175,6 +177,7 @@ export const TodayTimeGroup = memo(function TodayTimeGroup({
         {/* Sibling targets — a button nested inside the trigger would be invalid HTML. */}
         <div className="flex items-center gap-2">
           <CollapsibleTrigger
+            data-testid="today-time-group-toggle"
             aria-label={`${group.scheduledTime}, ${summaryText}`}
             className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-md py-1.5 pr-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           >

@@ -3,7 +3,7 @@ import { test as setup, expect } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import {
-  clerkCredentials,
+  clerkEmails,
   LOCALE_PREFIX,
   storageStatePath,
 } from "../../support/env.js";
@@ -20,13 +20,10 @@ async function signInAndSave(
   role: "admin" | "employee" | "noOrg",
   landingPath: string,
 ) {
-  const { email, password } = clerkCredentials[role]();
-
-  await page.goto(`${LOCALE_PREFIX}/sign-in`);
-  await clerk.signIn({
-    page,
-    signInParams: { strategy: "password", identifier: email, password },
-  });
+  // An unprotected page that loads Clerk but renders no Clerk component: signing in
+  // from /sign-in fails silently, because the mounted <SignIn> owns the flow.
+  await page.goto(`${LOCALE_PREFIX}/forbidden`);
+  await clerk.signIn({ page, emailAddress: clerkEmails[role]() });
 
   await page.goto(landingPath);
   await page.waitForURL(`**${landingPath}`);

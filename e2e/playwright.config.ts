@@ -1,5 +1,22 @@
 import { defineConfig, devices } from "@playwright/test";
-import { API_BASE_URL, storageStatePath, WEB_BASE_URL } from "./support/env.js";
+import { config as loadEnv } from "dotenv";
+import path from "node:path";
+import {
+  API_BASE_URL,
+  e2eRoot,
+  storageStatePath,
+  WEB_BASE_URL,
+} from "./support/env.js";
+
+// Local runs only: `start:ci` deliberately reads no env files, and CI sets these at
+// the job level. Never overrides what is already exported.
+for (const file of [
+  path.join(e2eRoot, ".env.local"),
+  path.join(e2eRoot, "../apps/api/.env"),
+  path.join(e2eRoot, "../apps/api/.env.local"),
+]) {
+  loadEnv({ path: file, override: false, quiet: true });
+}
 
 const isCI = Boolean(process.env.CI);
 
