@@ -92,7 +92,7 @@ export type CompleteTodayTemperatureTaskInput = z.infer<
 function jsDayToWeekday(
   day: number,
 ): z.infer<typeof taskTemplateWeekdaySchema> {
-  // JS: 0=Sunday..6=Saturday
+  // JS weekday 0=Sunday.
   const map: Array<z.infer<typeof taskTemplateWeekdaySchema>> = [
     "sunday",
     "monday",
@@ -113,7 +113,7 @@ export function getWeekdayFromDate(
   const month = Number(monthS);
   const day = Number(dayS);
 
-  // Use UTC to avoid server timezone shifting the weekday.
+  // Parse the calendar date in UTC so the server zone cannot shift the weekday.
   const utcDate = new Date(Date.UTC(year, month - 1, day));
   const weekday = jsDayToWeekday(utcDate.getUTCDay());
 
@@ -124,12 +124,7 @@ export function getWeekdayFromDate(
   return weekday;
 }
 
-/**
- * `timeZone` is the organisation's zone, and it is required on purpose: a
- * scheduled time is a wall clock at the site, so reading `now` in the server's
- * or the phone's zone silently mis-reports status for anyone not sitting in it.
- * Making the parameter mandatory lets the compiler find every caller.
- */
+/** `timeZone` is required: a scheduled time is a wall clock at the site. */
 export function computeTodayTaskStatus(params: {
   date: string;
   scheduledTime: string;

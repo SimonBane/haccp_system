@@ -34,11 +34,8 @@ export function AcceptInvitationContent() {
     acceptStarted.current = true;
 
     async function completeAcceptance() {
-      // Forces the session to pick up the org claim. The API provisions the user,
-      // membership and location assignment on the first authenticated request.
       await getToken({ skipCache: true });
-
-      // Full page load so the server receives Clerk session cookies before dashboard RSC runs.
+      // Full page load so Clerk cookies exist before dashboard RSC runs.
       window.location.replace(getClerkLocalePath(locale, "/dashboard"));
     }
 

@@ -12,7 +12,6 @@ export function getTracePropagationTargets(): Array<string | RegExp> {
     const { host } = new URL(apiUrl);
     targets.push(host);
   } catch {
-    // Ignore invalid API URL at build time.
   }
 
   return targets;

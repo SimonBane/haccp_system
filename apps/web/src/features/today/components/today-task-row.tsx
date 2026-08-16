@@ -22,12 +22,7 @@ import type { TimeGroupState, TodayTimelineItem } from "../lib/today-timeline";
 type Props = {
   item: TodayTimelineItem;
   groupState: TimeGroupState;
-  /**
-   * Passed down rather than read from tenant context. A context consumer
-   * re-renders whenever the provider's value changes no matter what `memo`
-   * says, and this is the one component in the app rendered ~40 times on the
-   * primary screen — so it stays fully decoupled from tenant state.
-   */
+  /** Prop, not tenant context: a context consumer would bypass `memo`. */
   timeZone: string;
   isSyncing: boolean;
   currentUserId: string | null;
@@ -55,16 +50,6 @@ function formatUserName(
   return parts.length > 0 ? parts.join(" ") : user.id.slice(-6);
 }
 
-/**
- * The whole row is the target: one interactive element, a 56px tap area, and a
- * single rule the worker learns once — tap a row to do the thing it describes.
- * The overlay button keeps that promise without nesting controls inside it.
- *
- * Three zones, left to right: status disc, title with its metadata chips, and a
- * right-aligned data column. The column is what the eye scans down — readings
- * line up across cards instead of trailing off the end of a sentence — and it
- * is also what fills the dead space a wide card used to leave in the middle.
- */
 export const TodayTaskRow = memo(function TodayTaskRow({
   item,
   groupState,
@@ -104,9 +89,6 @@ export const TodayTaskRow = memo(function TodayTaskRow({
       ? formatUserName(task.completedBy, t("audit.you"), currentUserId)
       : null;
 
-  // The equipment chip is the only chip that survives on a phone, so the chip
-  // row collapses entirely when there is none — a cleaning task stays a single
-  // dense line rather than reserving space for a desktop-only badge.
   const hasChipRow = Boolean(task.equipmentName);
   const hasAuditLine = Boolean(completedTime) || Boolean(completedByLabel);
   const hasDataColumn = Boolean(readingLabel) || hasAuditLine;
@@ -170,14 +152,9 @@ export const TodayTaskRow = memo(function TodayTaskRow({
           <div
             className={cn(
               "mt-1.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1",
-              // Nothing here renders on a phone without equipment.
               !hasChipRow && "hidden sm:flex",
             )}
           >
-            {/* Category on every type, not just cleaning — the disc icon is the
-                only type cue left on mobile, so desktop spells it out.
-                Temperature tasks put equipment first so the cold-storage chip
-                leads on the shop floor. */}
             {!isTemperature ? (
               <Badge
                 variant="outline"
@@ -206,8 +183,6 @@ export const TodayTaskRow = memo(function TodayTaskRow({
               </Badge>
             ) : null}
 
-            {/* On mobile the tinted card, the alert disc, the red reading and
-                the corrective action strip already carry this. */}
             {isDeviation ? (
               <Badge variant="destructive" className="hidden sm:inline-flex">
                 <CircleAlertIcon />
@@ -217,15 +192,10 @@ export const TodayTaskRow = memo(function TodayTaskRow({
           </div>
         </div>
 
-        {/* One column for numbers, whatever the card's state: a recorded value
-            when there is one, otherwise the round before it. Readings line up
-            down the list, and a wide card stops ending in dead space. */}
         {hasDataColumn ? (
           <div
             className={cn(
-              // Capped on mobile so a long name can never crowd out the title.
               "max-w-[42%] shrink-0 flex-col items-end gap-0.5 text-right sm:flex sm:w-44 sm:max-w-none",
-              // A prior reading is context, not the task — desktop only.
               isCompleted ? "flex" : "hidden",
             )}
           >
@@ -339,7 +309,6 @@ export const TodayTaskRow = memo(function TodayTaskRow({
         </div>
       ) : null}
 
-      {/* Stretched target: the row's single interactive element. */}
       <Button
         variant="ghost"
         className="absolute inset-0 h-auto w-full rounded-xl p-0 hover:bg-transparent active:translate-y-0 dark:hover:bg-transparent"

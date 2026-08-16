@@ -15,8 +15,6 @@ export function MobileTopBar() {
   const centerRef = useShellSlotRef("center");
   const actionsRef = useShellSlotRef("actions");
 
-  // Kept out of the desktop tree entirely so pages can render their slot
-  // content unconditionally without it landing in a hidden duplicate bar.
   if (!isMobile) {
     return null;
   }

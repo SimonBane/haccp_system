@@ -3,34 +3,14 @@
 import * as React from "react";
 import { tapFeedback } from "@/features/today/lib/haptics";
 
-/** Matches the platform's own press-and-hold delay. */
 const LONG_PRESS_MS = 500;
-
-/** Tight enough that any real drag cancels the press before it fires. */
 const MOVE_CANCEL_PX = 6;
 
-/**
- * How long after a fired press a click is treated as its leftover.
- *
- * A window rather than a "swallow the next click" flag, because a touch release
- * does not reliably synthesise a click at all — and a flag left standing then
- * eats the user's next real tap, which here is whichever action they picked in
- * the sheet that just opened.
- */
+/** Window, not a sticky flag: a touch release may not synthesise a click, and a leftover flag would eat the next tap. */
 const CLICK_SUPPRESS_MS = 400;
 
-/**
- * Press and hold a row to see what you can do to it.
- *
- * Cancels on scroll, because iOS momentum scroll does not reliably deliver
- * `pointercancel` and a press that survives a flick fires under the user's
- * thumb half a screen later.
- *
- * Touch only. A mouse gets `onContextMenu` on the row, which reaches the same
- * actions, and a keyboard gets the row's own actions button.
- */
+/** Cancels on scroll: iOS momentum scroll does not reliably deliver `pointercancel`. Touch only. */
 export function useLongPress(
-  /** Receives the pressed element, so a caller can anchor a popup to it. */
   onLongPress: (node: HTMLElement) => void,
   enabled = true,
 ) {
@@ -51,8 +31,6 @@ export function useLongPress(
     let fired = false;
     let suppressClicksUntil = 0;
 
-    // Also the pointerup/pointercancel handler: once the press has fired, the
-    // release that ends it is the one whose click must not reach the row.
     const cancel = () => {
       clearTimeout(timer);
       timer = undefined;
@@ -71,7 +49,6 @@ export function useLongPress(
         if (!start) return;
         fired = true;
         start = null;
-        // The only confirmation the press landed — nothing has moved yet.
         tapFeedback(12);
         onLongPressRef.current(node);
       }, LONG_PRESS_MS);
@@ -87,12 +64,7 @@ export function useLongPress(
       }
     };
 
-    /*
-     * The release that ends a long press must not also activate the row.
-     * Capture phase on the document, because the click can be retargeted to a
-     * child — and scoped to a short window after the release, so a press that
-     * synthesises no click cannot leave a flag standing that eats the next one.
-     */
+    // Capture-phase click window after a fired press so the release does not also activate the row.
     const onClickCapture = (event: MouseEvent) => {
       if (Date.now() > suppressClicksUntil) return;
       suppressClicksUntil = 0;
@@ -100,9 +72,7 @@ export function useLongPress(
       event.stopPropagation();
     };
 
-    // iOS raises a selection callout on long press and Android a context menu.
-    // -webkit-touch-callout in globals.css handles the first; this handles the
-    // second, and both would otherwise land on top of the sheet.
+    // iOS selection callout is handled in globals.css; this blocks Android's context menu.
     const onContextMenu = (event: Event) => event.preventDefault();
 
     node.addEventListener("pointerdown", onPointerDown, { passive: true });
@@ -127,10 +97,6 @@ export function useLongPress(
     };
   }, [enabled, node]);
 
-  // The node comes back out so a caller can anchor a popup to what was pressed
-  // without adding a second ref. Two refs on one element means an inline
-  // callback, which React re-attaches on every render — and re-attaching a
-  // `useState` setter ref detaches to null and back on each pass, tearing these
-  // listeners down and rebuilding them continuously.
+  // One callback ref: an inline setter-ref re-attaches every render and tears the listeners down.
   return { ref: setNode, node };
 }

@@ -9,15 +9,6 @@ import {
   isWeekdaysPreset,
 } from "@/features/task-templates/lib/format-schedule";
 
-/**
- * Pure helpers behind the task template form: preset detection, default value
- * construction, duplicate-time validation and the dirty check.
- *
- * Split out because the form was 814 lines with ~130 of them sitting above the
- * component — none of which needed React, and all of which are testable on
- * their own.
- */
-
 export type WeekdayPreset = "everyDay" | "weekdays" | "custom" | "none";
 
 export function getWeekdayPreset(weekdays: TaskTemplateWeekday[]): WeekdayPreset {

@@ -27,25 +27,13 @@ type Props = {
   onDraftChange: (next: string) => void;
   error?: string | null;
   verdict: TemperatureVerdict | null;
-  /** The reading the verdict was judged on — lags the display while typing. */
+  /** Settled verdict — lags the display while typing. */
   settledValue: number | null;
   priorReading: PriorReading | null;
   timeZone: string;
   inputRef: RefObject<HTMLInputElement | null>;
 };
 
-/**
- * Step one: what does the thermometer say.
- *
- * Four rows, the same four on every platform: prior reading, the number, the
- * gauge, the verdict. The sign lives inside the readout and the field error
- * inside the status row, which is what keeps it to four.
- *
- * Nothing here is sized against the space a keyboard leaves. The sheet itself
- * shortens when the keyboard opens (see the `[data-side=bottom]` rule in
- * globals.css), so this column simply gets less room and scrolls if it has to,
- * rather than every row having to know the keyboard exists.
- */
 export function TemperatureReadingStep({
   idPrefix,
   minTempC,
@@ -81,13 +69,7 @@ export function TemperatureReadingStep({
   };
 
   return (
-    // Centred, because the sheet is sized by the taller corrective step so
-    // neither can resize the other mid-round — which leaves these four rows
-    // with space to spare. Clumped at the top they read as a truncated form.
     <div className="flex min-h-0 flex-1 flex-col justify-center gap-3 md:flex-none md:justify-start md:gap-4">
-      {/* Context, never an action: the worker reads the thermometer and types
-          what it says. A tap-to-reuse chip here would make copying the previous
-          number the fastest path through a log that has to be trustworthy. */}
       <p className="flex h-5 shrink-0 items-center justify-center text-xs text-muted-foreground landscape:hidden md:landscape:flex">
         {priorReading
           ? t("temperatureDialog.lastReading", {

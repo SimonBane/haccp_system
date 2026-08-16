@@ -4,13 +4,6 @@ import { MEMBERSHIP_STATUS } from "../../core/db/schema/organization-memberships
 import type { MembershipContextRow } from "../employees/employee.repository.js";
 import { isHealthy, toBlob } from "./provisioning.service.js";
 
-/**
- * `isHealthy` is the gate that decides whether a request can be served straight
- * from an existing membership row or has to fall through to Clerk and a
- * provisioning transaction. Getting it wrong in either direction is expensive:
- * too strict and every request hits Clerk, too loose and a removed employee
- * keeps working. Pure predicates, no database.
- */
 const ORG = "00000000-0000-4000-8000-00000000000o";
 const USER = "00000000-0000-4000-8000-00000000000u";
 const MEMBERSHIP = "00000000-0000-4000-8000-00000000000m";
@@ -58,7 +51,6 @@ describe("isHealthy", () => {
   });
 
   it("accepts an active admin carrying no location assignments", () => {
-    // Admins reach every location, so an empty assignment list is legitimate.
     expect(
       isHealthy(
         row({ membership: { role: ORG_ROLE.ADMIN }, locationIds: [] }),
@@ -81,7 +73,6 @@ describe("isHealthy", () => {
   });
 
   it("rejects a user with no Clerk identity linked yet", () => {
-    // An admin-created draft, waiting for the invitee to sign in.
     expect(isHealthy(row({ user: { clerkUserId: null } }))).toBe(false);
   });
 
@@ -92,9 +83,7 @@ describe("isHealthy", () => {
   });
 
   it("ignores role drift entirely", () => {
-    // Deliberate: a token stays valid ~60s after a demotion, so healing role
-    // here would let a stale token rewrite the demotion away on every request.
-    // The organizationMembership.updated webhook is the correction channel.
+    // Do not heal role from the JWT: a stale token after demotion would rewrite it.
     expect(isHealthy(row({ membership: { role: "org:something_else" } }))).toBe(
       true,
     );

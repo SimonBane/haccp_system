@@ -3,14 +3,7 @@ import { todayRepository } from "./today.repository.js";
 import { buildCompletionKey, sortItemsByScheduledTime } from "./today.mapper.js";
 import type { TodayTaskItem } from "@haccp/shared";
 
-/**
- * The completion key joins a day's completion rows back onto the templates that
- * generated them. `today.repository.buildCompletionMap` builds that key inline
- * while `today.mapper.buildCompletionKey` exists for exactly the same purpose —
- * two independent copies of one format. If they ever drift, completed tasks
- * silently render as incomplete, which on a HACCP log is a compliance failure
- * rather than a cosmetic bug. These tests pin them together.
- */
+/** Repository key format must match the mapper — drift silently shows completed tasks as pending. */
 const TEMPLATE = "00000000-0000-4000-8000-00000000000t";
 const USER = "00000000-0000-4000-8000-00000000000u";
 
@@ -49,8 +42,6 @@ describe("buildCompletionKey", () => {
 
 describe("buildCompletionMap", () => {
   it("keys rows the same way buildCompletionKey does", () => {
-    // The assertion that actually matters: the repository's inline key format
-    // and the mapper's helper must agree.
     const map = todayRepository.buildCompletionMap([completionRow()]);
 
     expect([...map.keys()]).toEqual([buildCompletionKey(TEMPLATE, "07:00")]);
@@ -127,7 +118,7 @@ describe("sortItemsByScheduledTime", () => {
     ({ scheduledTime }) as TodayTaskItem;
 
   it("orders by clock time, not string order", () => {
-    // "09:00" > "12:00" lexically only if you compare wrong; 9am must come first.
+    // Lexical "09:00" > "12:00"; clock order must put 9am first.
     const sorted = sortItemsByScheduledTime([
       item("12:00"),
       item("09:00"),

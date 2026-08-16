@@ -1,20 +1,14 @@
 import { EQUIPMENT_TEMP_MAX_C, EQUIPMENT_TEMP_MIN_C } from "@haccp/shared";
 
-/**
- * A reading is at most two integer digits and one decimal — the same grammar the
- * equipment form enforces on min/max. Anything wider is a typo, not a fridge.
- */
 export const TEMP_MAX_INT_DIGITS = 2;
 export const TEMP_MAX_FRACTION_DIGITS = 1;
 
-/** Largest magnitude the grammar can express, and the schema's hard bound. */
 export const TEMP_MAX_MAGNITUDE = 99.9;
 
 const PRESET_DELIMITER = ", ";
 
 export type TemperatureVerdict = "ok" | "out_of_range";
 
-/** The corrective actions offered as one-tap options on a deviation. */
 export const CORRECTIVE_PRESET_KEYS = [
   "movedProduct",
   "adjustedThermostat",
@@ -24,17 +18,12 @@ export const CORRECTIVE_PRESET_KEYS = [
 
 export type CorrectivePresetKey = (typeof CORRECTIVE_PRESET_KEYS)[number];
 
-/** Leaves headroom for the presets inside the API's 1000-character field. */
+/** Headroom for presets inside the API's 1000-character field. */
 export const NOTES_MAX_LENGTH = 900;
 
 /**
- * Coerces anything — keystrokes, pastes, autofill — into the nearest legal draft
- * rather than rejecting it. The equipment form drops invalid input on the floor,
- * which leaves a paste of "−19,2" (Unicode minus) doing nothing at all with no
- * explanation. Coercing always lands somewhere the worker can see and correct.
- *
- * Because the result can never hold an exponent, a hex prefix or "Infinity",
- * every downstream `Number()` is safe by construction.
+ * Coerce input into a legal draft rather than rejecting it (a paste of "−19,2"
+ * otherwise does nothing). The result can never hold an exponent or Infinity.
  */
 export function sanitizeTemperatureDraft(raw: string, separator: string): string {
   const unified = raw
@@ -63,8 +52,7 @@ export function sanitizeTemperatureDraft(raw: string, separator: string): string
     if (integerPart.length < TEMP_MAX_INT_DIGITS) integerPart += character;
   }
 
-  // "08" is a mistyped "8"; "0,5" is a real reading, so only strip the zero when
-  // another integer digit follows it.
+  // "08" is a mistype; "0,5" is a real reading — only strip a leading zero when another digit follows.
   if (integerPart.length > 1 && integerPart.startsWith("0")) {
     integerPart = integerPart.replace(/^0+(?=\d)/, "");
   }
@@ -75,10 +63,7 @@ export function sanitizeTemperatureDraft(raw: string, separator: string): string
   return negative ? `-${body}` : body;
 }
 
-/**
- * Finite value for a complete draft, null while it is still being typed
- * ("", "-", "0,") or otherwise unusable.
- */
+/** Finite value for a complete draft; null while still being typed ("", "-", "0,"). */
 export function parseTemperatureDraft(value: string): number | null {
   const normalized = value.trim().replace(",", ".");
   if (!/^-?(?:\d+(?:\.\d+)?|\.\d+)$/.test(normalized)) return null;
@@ -87,20 +72,12 @@ export function parseTemperatureDraft(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-/** Number back to a draft in the active locale — -19.2 becomes "-19,2" in bg. */
 export function formatTemperatureDraft(value: number, separator: string): string {
   const rounded = Math.round(value * 10) / 10;
   return String(rounded).replace(".", separator);
 }
 
-/**
- * Which sign a fresh reading for this equipment most likely carries, so a
- * freezer worker taps "1" then "8" and gets -18 without hunting for a minus.
- *
- * A band that straddles zero goes to whichever side owns more of it; a tie
- * (-2…+2) resolves positive, because a band centred on zero is a chilled unit
- * whose everyday reading is above it.
- */
+/** Sign a fresh reading most likely carries; a band centred on zero resolves positive. */
 export function inferTemperatureSign(minTempC: number, maxTempC: number): 1 | -1 {
   if (
     !Number.isFinite(minTempC) ||
@@ -115,30 +92,19 @@ export function inferTemperatureSign(minTempC: number, maxTempC: number): 1 | -1
   return Math.abs(minTempC) > Math.abs(maxTempC) ? -1 : 1;
 }
 
-/**
- * Rebuilds the canonical draft from the two things the mobile control tracks
- * separately: the sign (which survives an empty field) and the digits.
- */
+/** Rebuild the draft from sign (survives an empty field) and digits. */
 export function composeSignedDraft(sign: 1 | -1, digits: string): string {
   if (digits === "") return "";
   return sign < 0 ? `-${digits}` : digits;
 }
 
-/**
- * Flags readings outside what any monitored unit can physically be, as a hint
- * only. A failed freezer really can read +20 °C and recording that is the entire
- * point of the log, so this must never block or clamp the value.
- */
+/** Hint only — a failed freezer can read +20 °C, so this must never block or clamp. */
 export function temperaturePlausibility(value: number): "ok" | "below" | "above" {
   if (value < EQUIPMENT_TEMP_MIN_C) return "below";
   if (value > EQUIPMENT_TEMP_MAX_C) return "above";
   return "ok";
 }
 
-/**
- * Presets and free text are separate fields in the form but a single string on
- * the wire, which is what the record sheet and the task row already render.
- */
 export function composeCorrectiveAction(
   presetLabels: string[],
   notes: string,

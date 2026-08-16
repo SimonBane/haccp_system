@@ -92,14 +92,8 @@
   --foreground: oklch(0.145 0 0);
 
   /*
-   * One height for every form control — input, select, combobox, input group,
-   * search — so a form reads as a single clean column rather than a ragged one.
-   * 44px on touch, 36px from md up.
-   *
-   * A token rather than a responsive `h-11 md:h-9` pair on each component:
-   * that pair silently breaks call sites that override the height, because
-   * tailwind-merge lets a plain `h-auto` beat `h-11` but not `md:h-9`. One
-   * unqualified utility per component keeps every existing override working.
+   * Unqualified --control-h: a `h-11 md:h-9` pair cannot be overridden by a plain `h-auto`
+   * on desktop (tailwind-merge beats `h-11` but not `md:h-9`).
    */
   --control-h: 2.75rem;
 }
@@ -158,8 +152,7 @@
     @apply bg-background font-sans;
   }
 
-  /* Long-press is the row's actions gesture, and without this iOS raises the
-     text-selection bubble on top of the action sheet every time. */
+  /* iOS long-press otherwise raises the text-selection callout over the action sheet. */
   [data-slot="mobile-list-row"] {
     -webkit-touch-callout: none;
     -webkit-user-select: none;
@@ -171,21 +164,14 @@
   }
 }
 
-/*
- * Inset grouped list.
- *
- * The hairline hangs off the row's inner element, which starts after the
- * leading avatar or icon — so the rule lines up with the title instead of
- * running the full width. That single detail is most of what separates a
- * native-looking list from a bordered table.
- */
+/* Hairline hangs off the inner element so it lines up with the title, not the full width. */
 [data-slot="mobile-list"][data-variant="row"]
   > * + *
   [data-slot="mobile-list-row-inner"] {
   border-top: 1px solid var(--border);
 }
 
-/* A section header restarts the group, so the row under it needs no rule. */
+/* A section header restarts the group. */
 [data-slot="mobile-list"][data-variant="row"]
   > [data-slot="mobile-list-section"]
   + *

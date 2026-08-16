@@ -140,7 +140,6 @@ function ComboboxItem({
     <ComboboxPrimitive.Item
       data-slot="combobox-item"
       className={cn(
-        // Matches SelectItem — see the note there on touch sizing.
         "relative flex min-h-(--control-h) w-full cursor-default items-center gap-2 rounded-sm py-2 pr-8 pl-2 text-base outline-hidden select-none md:min-h-8 md:py-1.5 md:text-sm data-highlighted:bg-accent data-highlighted:text-accent-foreground not-data-[variant=destructive]:data-highlighted:**:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className
       )}

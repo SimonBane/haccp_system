@@ -28,21 +28,17 @@ export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
 
   let payload;
   try {
-    // verifyToken fetches JWKS on a cold cache, and @clerk/backend sets no fetch
-    // timeout — without this a hung connection hangs the request indefinitely.
+    // JWKS fetch has no timeout in @clerk/backend; without this a hung connection hangs the request.
     payload = await withClerkTimeout(
       verifyToken(token, { secretKey: env.CLERK_SECRET_KEY }),
     );
   } catch (error) {
-    // Only a genuinely bad token is 401. The web app reads 401 as "signed out",
-    // so blanket-catching here would turn a Clerk JWKS blip into a mass sign-out
-    // of every tablet on the floor. Everything else is an upstream failure.
+    // 401 only for a bad token — the web app treats 401 as signed out, so a JWKS blip must not mass-sign-out tablets.
     if (isInvalidTokenError(error)) {
       throw new UnauthorizedError("Invalid or expired token");
     }
 
     if (isClerkMisconfiguration(error)) {
-      // Ours to fix, and silent otherwise — every request fails identically.
       logger.error({ err: error }, "Clerk secret key rejected during verification");
       throw new ServiceUnavailableError(
         "Could not verify your session. Please try again.",

@@ -127,9 +127,7 @@ export function TaskTemplatesManager({
     }
   }, [isBulkDeleting, refetch, remove, selectedIds, t]);
 
-  // Only the open flag. Clearing the record here too would change the form's
-  // `key` mid-exit, remounting it and killing the slide-out — every open path
-  // below already sets the record explicitly, so there is nothing to reset.
+  // Only clear `open` — clearing the record remounts the form via `key` and kills the slide-out.
   const handleFormOpenChange = useCallback((open: boolean) => {
     if (!open) setFormOpen(false);
   }, []);
@@ -203,9 +201,6 @@ export function TaskTemplatesManager({
         onConfirm={confirmBulkDelete}
       />
 
-      {/* Always mounted, `open` toggled: Base UI runs the sheet's exit
-          transition on the popup it already owns, so unmounting the form here
-          would cut the slide-out and make it vanish instead. */}
       <TaskTemplatesForm
         open={formOpen}
         onOpenChange={handleFormOpenChange}

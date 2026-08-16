@@ -17,14 +17,6 @@ type Params = {
   onDelete: (location: LocationResponse) => void;
 };
 
-/**
- * "Set as default" moved in here from a button inside the table cell, which is
- * why a phone had no way to do it at all — the mobile card never rendered that
- * column.
- *
- * Delete is disabled rather than hidden when it cannot run, with the reason
- * attached: a control that vanishes teaches nothing about why.
- */
 export function getLocationRowActions({
   t,
   totalCount,

@@ -38,9 +38,6 @@ export function getColumns({
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title={t("columns.default")} />
       ),
-      // Status only. Promoting a location moved into the row's actions, which
-      // is the one place both platforms can reach — the mobile card never
-      // rendered this column, so a phone could not set a default at all.
       cell: ({ row }) =>
         row.original.isDefault ? (
           <Badge variant="secondary">{t("status.default")}</Badge>

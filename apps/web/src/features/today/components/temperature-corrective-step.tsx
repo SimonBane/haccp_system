@@ -32,16 +32,7 @@ type Props = {
   className?: string;
 };
 
-/**
- * Step two, reached only after the worker commits an out-of-range reading.
- *
- * It is a separate step rather than a section that unfolds below the reading:
- * typing "-1" on the way to "-18" used to make this whole block appear and shove
- * the rest of the form around mid-entry.
- *
- * The recap carries the allowed range as well as the reading, so the worker can
- * see how far out it is without going back a step.
- */
+/** Separate step: unfolding below the reading shoved the form while typing "-1" on the way to "-18". */
 export function TemperatureCorrectiveStep({
   idPrefix,
   recordedC,
@@ -85,12 +76,6 @@ export function TemperatureCorrectiveStep({
       <Field data-invalid={Boolean(presetsError)} className="shrink-0">
         <FieldTitle>{t("temperatureDialog.correctiveTitle")}</FieldTitle>
 
-        {/* Full-width rows on a phone: the Bulgarian labels are longer than the
-            English ones and used to reflow a two-column grid, and a row
-            spanning the screen is a far easier target with cold hands. Desktop
-            keeps two columns — a mouse is precise, and four stacked rows push
-            the shared step cell tall enough to leave the reading step floating
-            in dead space. */}
         <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
           {CORRECTIVE_PRESET_KEYS.map((key) => {
             const active = presets.includes(key);
@@ -132,9 +117,7 @@ export function TemperatureCorrectiveStep({
           maxLength={NOTES_MAX_LENGTH}
           aria-invalid={Boolean(notesError)}
           placeholder={t("temperatureDialog.correctiveActionPlaceholder")}
-          // Fills the phone's spare height, but never content-sized: this step
-          // shares a grid cell with the reading step, and a textarea that grew
-          // with its text would resize both.
+          // Shared grid cell with the reading step — a growing textarea would resize both.
           className="min-h-20 flex-1 resize-none field-sizing-fixed md:h-24 md:min-h-0 md:flex-none"
           onChange={(event) => onNotesChange(event.target.value)}
         />

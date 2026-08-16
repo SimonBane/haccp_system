@@ -117,8 +117,6 @@ export function TaskTemplatesData({
       }
       onRowClick={(row) => onEdit(row.original)}
       renderMobileRow={renderMobileRow}
-      // A template carries a type, a weekday pattern, equipment and up to six
-      // times — more than a one-line row can show without truncating.
       mobileVariant="card"
       getRowActions={(row) => getRowActions(row.original)}
       getRowLabel={(row) => row.original.title}

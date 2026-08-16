@@ -6,8 +6,6 @@ import { logger } from "../../lib/logger.js";
 const KEY_PREFIX = "membership:clerk:";
 const DEFAULT_TTL_SECONDS = 2 * 24 * 60 * 60;
 
-// Keyed on the two Clerk ids because both come straight off the JWT, so the
-// middleware can read tenant, user and membership in one pipelined batch.
 export const membershipCacheBlobSchema = z.object({
   membershipId: z.uuid(),
   organizationId: z.uuid(),
@@ -22,8 +20,7 @@ function cacheKey(clerkOrgId: string, clerkUserId: string): string {
   return `${KEY_PREFIX}${clerkOrgId}:${clerkUserId}`;
 }
 
-// Only ever holds active, non-deleted memberships. Absence means "unknown, go
-// cold" — never "no membership", so there is nothing to negatively cache.
+// Absence means unknown, never "no membership" — do not negatively cache.
 export const membershipCache = {
   async get(
     clerkOrgId: string,

@@ -27,9 +27,7 @@ export const locations = pgTable(
       .notNull(),
   },
   (table) => [
-    // No standalone organization_id index: it is an exact left prefix of
-    // locations_organization_id_name_unique below, so one would only add write
-    // cost without serving a lookup that index cannot already answer.
+    // No standalone organization_id index: it is a left prefix of the unique below.
     unique("locations_id_organization_id_unique").on(
       table.id,
       table.organizationId,

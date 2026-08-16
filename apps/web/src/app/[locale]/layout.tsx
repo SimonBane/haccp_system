@@ -33,8 +33,7 @@ export async function generateMetadata({
     manifest: "/manifest.webmanifest",
     appleWebApp: {
       capable: true,
-      // Opaque status bar: iOS then keeps the app out of the notch and the home
-      // indicator itself, so nothing here has to reason about safe areas.
+      // Opaque: iOS then keeps the app out of the notch and home indicator.
       statusBarStyle: "default",
       title: t("title"),
     },
@@ -59,10 +58,7 @@ export async function generateMetadata({
 
 export function generateViewport() {
   return {
-    // One entry, deliberately not media-scoped: a `prefers-color-scheme` query
-    // resolves against the OS, while the app's own theme comes from next-themes
-    // and can differ. `ThemeColorSync` owns this from mount onward; this is only
-    // the pre-hydration value.
+    // Not media-scoped: `prefers-color-scheme` follows the OS, not next-themes. ThemeColorSync owns this after mount.
     themeColor: "#ffffff",
   };
 }
@@ -93,8 +89,6 @@ export default async function LocaleLayout({
         <ServiceWorkerRegistration />
         <QueryProvider>
           <TooltipProvider>
-            {/* Neutral full-height column, wrapping both the dashboard and the
-                auth pages. */}
             <div className="flex min-h-dvh flex-col bg-background">
               {children}
             </div>

@@ -20,23 +20,13 @@ export const orgRoleSchema = z.enum([ORG_ROLE.ADMIN, ORG_ROLE.EMPLOYEE]);
 
 export type OrgRole = z.infer<typeof orgRoleSchema>;
 
-// Admins reach every location in their org, so an admin membership carries no
-// assignments at all and [] means "all". Employees always need at least one.
+// Admin `[]` means all locations; employees always need at least one.
 const employeeLocationIdsSchema = z.array(z.uuid());
 
 export function requiresLocationAssignments(role: OrgRole | string): boolean {
   return role !== ORG_ROLE.ADMIN;
 }
 
-/**
- * Whether a submission is missing a location selection it needs.
- *
- * The rule differs by side and that is intentional — the API always enforces it,
- * while the form additionally waives it for single-location organisations, where
- * there is nothing to choose and the assignment is filled in for the user. Only
- * the condition is shared, so the two cannot drift apart; the message stays with
- * whoever is showing it.
- */
 export function needsLocationSelection(input: {
   role: OrgRole | string;
   locationIds: readonly string[];
@@ -61,8 +51,7 @@ export function normalizeOrgRole(role: string): OrgRole {
   return orgRoleSchema.parse(role);
 }
 
-// Never throws. Provisioning runs on every request, so an unrecognized Clerk
-// role must degrade to the least-privileged one rather than fail the request.
+// Unrecognized Clerk role degrades to employee — never throws (provisioning runs on every request).
 export function safeNormalizeOrgRole(role: string | null | undefined): OrgRole {
   if (role === ORG_ROLE.ADMIN) {
     return ORG_ROLE.ADMIN;
@@ -108,8 +97,7 @@ export const createEmployeeSchema = z
       ctx.issues.push({
         code: "custom",
         path: ["locationIds"],
-        // `params.rule` is what lets the web app's error map translate this;
-        // a literal message here would outrank the map and stay English.
+        // `params.rule` for i18n; a literal message here would outrank the web error map.
         params: { rule: "locationsRequired" },
         message: "Select at least one location.",
         input: ctx.value.locationIds,

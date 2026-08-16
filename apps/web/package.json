@@ -40,6 +40,7 @@
   "devDependencies": {
     "@haccp/eslint-config": "workspace:*",
     "@haccp/typescript-config": "workspace:*",
+    "@haccp/vitest-config": "workspace:*",
     "@tailwindcss/postcss": "^4",
     "@tanstack/react-query-devtools": "^5.101.4",
     "@types/node": "^24",
