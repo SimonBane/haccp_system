@@ -36,8 +36,9 @@ code, not after the failure.
 | Format | `pnpm format` (Prettier defaults, no config file) |
 | Scope any turbo task | `pnpm turbo build --filter=@haccp/web...` |
 
-CI (`.github/workflows/ci.yml`) runs on PRs to `main`: build api, build web, `turbo test`, and
-`validate-migrations`. `migrate.yml` applies migrations on push to `main`. **`@haccp/shared` is
+CI (`.github/workflows/ci.yml`) runs on PRs to `main` as separate checks: lint, typecheck, build
+api, build web, unit tests (+ `test:discovery`), integration tests, and `validate-migrations`.
+`migrate.yml` applies migrations on push to `main`. **`@haccp/shared` is
 consumed from `dist/`** — turbo's `^build` handles this for `build`/`lint`/`typecheck`/`test`,
 but if you edit shared and then run `tsc` or `vitest` directly in an app, rebuild first:
 `pnpm --filter @haccp/shared build`.
@@ -152,19 +153,32 @@ the schema change, the `.sql`, and `meta/` together.
 
 ## Testing
 
-Vitest, colocated `*.test.ts`. Coverage is deliberately thin and unit-level — pure logic
-(`today.mapper`, `optimistic`, `today-timeline`, `timezone`) and mocked-boundary tests (`auth`,
-`provisioning`). `apps/api/vitest.config.ts` injects placeholder env vars since `src/env.ts`
-validates at import; **nothing here opens a real DB, Redis or Clerk connection** — keep it that
-way, and put anything needing real infrastructure in a separate integration suite. Every
-package's `vitest.config` builds on `defineUnitConfig` from `@haccp/vitest-config/unit`,
-anchoring discovery to `src/**/*.test.ts` and excluding build output — Vitest 4's default
-`exclude` is only `node_modules` and `.git`, so a bare config would collect the compiled tests in
-`dist` as a second, stale copy of every suite. `pnpm test:discovery` compares what Vitest
-collects against what git tracks and fails on duplicates or build artifacts (run after a build,
-the only time the regression exists). `build` uses `tsconfig.build.json` (tests excluded, so
-they never ship in `dist`); `typecheck` uses `tsconfig.json` and still covers them — add new test
-globs to **both** the vitest preset and `tsconfig.build.json`'s `exclude`.
+**Tests are part of the change, not a follow-up.** New behaviour ships with tests. Changing
+existing behaviour means revising the tests that cover it — if none do, that gap is part of the
+work. A bug fix starts with a test that fails for the stated reason, so the fix is proven rather
+than asserted. Match the layer to the claim: pure logic and mocked boundaries in the unit suites,
+anything crossing the database, cache or Clerk in the integration harness. If a change genuinely
+needs no test, say why in the PR.
+
+Vitest, colocated `*.test.ts`. `apps/api/vitest.config.ts` injects placeholder env vars since
+`src/env.ts` validates at import; **no unit test opens a real DB, Redis or Clerk connection** —
+keep it that way. Every package's `vitest.config` builds on `defineUnitConfig` from
+`@haccp/vitest-config/unit`, anchoring discovery to `src/**/*.test.ts` and excluding build output:
+Vitest 4's default `exclude` is only `node_modules` and `.git`, so a bare config collects the
+compiled tests in `dist` as a second, stale copy of every suite. `pnpm test:discovery` compares
+what Vitest collects against what git tracks (run after a build, the only time that regression
+exists). `build` uses `tsconfig.build.json` so tests never ship in `dist`; `typecheck` uses
+`tsconfig.json` and still covers them — add new test globs to **both**.
+
+`apps/api/tests/integration/` uses **real Postgres and Redis**, only Clerk mocked: `pnpm
+docker:up`, then `pnpm --filter @haccp/api test:integration`. **Extend this harness rather than
+build new infrastructure** — `harness/` has tenant fixtures, `apiRequest`/`asAdmin`/`asEmployee`,
+a Clerk fake with injectable failure modes, `failRedisCommands`, and `PG_ERROR`. Traps: fixture
+ids are minted per call because `users.email` is unique **globally, not per tenant**; the actor's
+role rides on the token, since `requireOrgAdmin` reads the raw `org_role` claim, not the database
+row; the suite is single-worker because the db/Redis clients are module-scope singletons and
+`single-flight` is process-global. Global setup drops and recreates `haccp_test` (name must end
+in `_test`). Logs are silenced — set `INTEGRATION_LOG_LEVEL=debug`.
 
 ## Git workflow
 
@@ -194,6 +208,7 @@ once the work is done.
   unmounting them cuts the animation.
 - **Comments**: only add one when the **WHY** is non-obvious — a hidden constraint, a subtle
   invariant, a workaround for a specific bug, or behavior that would surprise a reader. Never
-  comment what the code does; well-named identifiers already do that. When touching existing
-  code, judge its existing comments by the same bar — rewrite or delete ones that are stale,
-  restate the code, or no longer meet it; don't leave them unexamined.
+  comment what the code does; well-named identifiers already do that. Keep it to one short
+  line — never a multi-line or paragraph comment. When touching existing code, judge its
+  existing comments by the same bar — rewrite or delete ones that are stale, restate the code,
+  are overlong, or no longer meet it; don't leave them unexamined.
