@@ -42,7 +42,7 @@ export type SeededOrg = {
   equipment: { fridge: { id: string; name: string } };
   templates: {
     temperature: { id: string; title: string };
-    checklist: { id: string; title: string };
+    cleaning: { id: string; title: string };
   };
 };
 
@@ -193,7 +193,7 @@ export async function seedOrganization(
         {
           locationId: main.id,
           title: "Clean prep surface",
-          type: "checklist",
+          type: "cleaning",
           weekdays: ALL_WEEKDAYS,
           scheduledTimes: ["09:00"],
         },
@@ -203,8 +203,8 @@ export async function seedOrganization(
     const temperatureTemplate = insertedTemplates.find(
       (row) => row.type === "temperature",
     )!;
-    const checklistTemplate = insertedTemplates.find(
-      (row) => row.type === "checklist",
+    const cleaningTemplate = insertedTemplates.find(
+      (row) => row.type === "cleaning",
     )!;
 
     // Clerk must agree, or a cache miss sends provisioning to the fake and 404s.
@@ -257,7 +257,7 @@ export async function seedOrganization(
           id: temperatureTemplate.id,
           title: temperatureTemplate.title,
         },
-        checklist: { id: checklistTemplate.id, title: checklistTemplate.title },
+        cleaning: { id: cleaningTemplate.id, title: cleaningTemplate.title },
       },
     } satisfies SeededOrg;
   });
