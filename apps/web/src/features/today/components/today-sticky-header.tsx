@@ -145,6 +145,7 @@ function DateNavigation({
             size="sm"
             className="shrink-0 gap-1 px-1.5 text-muted-foreground"
             aria-label={t("dateNavigation.ariaLabel")}
+            data-testid="date-nav-trigger"
           />
         }
       >
@@ -157,6 +158,7 @@ function DateNavigation({
             variant="ghost"
             size="icon-sm"
             aria-label={t("dateNavigation.previous")}
+            data-testid="date-nav-previous"
             onClick={onPreviousDay}
           >
             <ChevronLeftIcon />
@@ -168,13 +170,19 @@ function DateNavigation({
             variant="ghost"
             size="icon-sm"
             aria-label={t("dateNavigation.next")}
+            data-testid="date-nav-next"
             onClick={onNextDay}
           >
             <ChevronRightIcon />
           </Button>
         </div>
         {!isToday ? (
-          <Button variant="secondary" size="sm" onClick={onToday}>
+          <Button
+            variant="secondary"
+            size="sm"
+            data-testid="date-nav-today"
+            onClick={onToday}
+          >
             {t("dateNavigation.jumpToToday")}
           </Button>
         ) : null}

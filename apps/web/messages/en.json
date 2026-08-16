@@ -19,7 +19,7 @@
   "NoOrganizationPage": {
     "title": "No organization access",
     "description": "Your account is not linked to an organization. Contact your administrator to receive an invitation.",
-    "backHome": "Back to home"
+    "signOut": "Sign out"
   },
   "DashboardErrorPage": {
     "title": "Something went wrong",
@@ -144,7 +144,8 @@
       "notesCharacterCount": "{current} / {max}",
       "charactersLeft": "{count, plural, one {# character left} other {# characters left}}",
       "srVerdictOk": "{value} °C, within the allowed range",
-      "srVerdictOutOfRange": "{value} °C, outside the allowed range"
+      "srVerdictOutOfRange": "{value} °C, outside the allowed range",
+      "readingLabel": "Temperature reading in degrees Celsius"
     },
     "a11y": {
       "completed": "{title} completed",

@@ -63,6 +63,7 @@ function CardListRow<TData>({
   return (
     <div
       ref={longPressRef}
+      data-testid="data-table-card"
       className="relative"
       onContextMenu={(event) => {
         if (!hasActions) return;

@@ -227,6 +227,7 @@ export const TodayTimeGroup = memo(function TodayTimeGroup({
               variant="secondary"
               size="sm"
               className="min-h-11 shrink-0 gap-1.5 px-2.5 sm:min-h-8"
+              data-testid="today-record-round"
               aria-label={t("timeline.recordRound", {
                 time: group.scheduledTime,
                 count: roundItems.length,

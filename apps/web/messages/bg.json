@@ -19,7 +19,7 @@
   "NoOrganizationPage": {
     "title": "Няма достъп до организация",
     "description": "Вашият акаунт не е свързан с организация. Свържете се с администратора, за да получите покана.",
-    "backHome": "Към началната страница"
+    "signOut": "Изход"
   },
   "DashboardErrorPage": {
     "title": "Възникна грешка",
@@ -144,7 +144,8 @@
       "notesCharacterCount": "{current} / {max}",
       "charactersLeft": "{count, plural, one {Остава # знак} other {Остават # знака}}",
       "srVerdictOk": "{value} °C, в допустимите граници",
-      "srVerdictOutOfRange": "{value} °C, извън допустимите граници"
+      "srVerdictOutOfRange": "{value} °C, извън допустимите граници",
+      "readingLabel": "Отчетена температура в градуси Целзий"
     },
     "a11y": {
       "completed": "{title} е изпълнена",

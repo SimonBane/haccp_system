@@ -37,10 +37,10 @@ code, not after the failure.
 | Scope any turbo task | `pnpm turbo build --filter=@haccp/web...` |
 
 CI (`.github/workflows/ci.yml`) runs on PRs to `main` as separate checks: lint, typecheck, build
-api, build web, unit tests (+ `test:discovery`), integration tests, and `validate-migrations`.
-`migrate.yml` applies migrations on push to `main`. **`@haccp/shared` is
-consumed from `dist/`** — turbo's `^build` handles this for `build`/`lint`/`typecheck`/`test`,
-but if you edit shared and then run `tsc` or `vitest` directly in an app, rebuild first:
+api, build web, unit tests (+ `test:discovery`), integration tests, browser smoke, and
+`validate-migrations`. `migrate.yml` applies migrations on push to `main`. **`@haccp/shared` is
+consumed from `dist/`** — turbo's `^build` handles this for `build`/`lint`/`typecheck`/`test`, but
+if you edit shared and then run `tsc` or `vitest` directly in an app, rebuild first:
 `pnpm --filter @haccp/shared build`.
 
 ## Environment setup
@@ -160,15 +160,14 @@ than asserted. Match the layer to the claim: pure logic and mocked boundaries in
 anything crossing the database, cache or Clerk in the integration harness. If a change genuinely
 needs no test, say why in the PR.
 
-Vitest, colocated `*.test.ts`. `apps/api/vitest.config.ts` injects placeholder env vars since
-`src/env.ts` validates at import; **no unit test opens a real DB, Redis or Clerk connection** —
-keep it that way. Every package's `vitest.config` builds on `defineUnitConfig` from
-`@haccp/vitest-config/unit`, anchoring discovery to `src/**/*.test.ts` and excluding build output:
-Vitest 4's default `exclude` is only `node_modules` and `.git`, so a bare config collects the
-compiled tests in `dist` as a second, stale copy of every suite. `pnpm test:discovery` compares
-what Vitest collects against what git tracks (run after a build, the only time that regression
-exists). `build` uses `tsconfig.build.json` so tests never ship in `dist`; `typecheck` uses
-`tsconfig.json` and still covers them — add new test globs to **both**.
+Vitest, colocated `*.test.ts`; `apps/api/vitest.config.ts` injects placeholder env vars since
+`src/env.ts` validates at import, and **no unit test opens a real DB, Redis or Clerk connection**.
+Every `vitest.config` builds on `defineUnitConfig` from `@haccp/vitest-config/unit`, anchoring
+discovery to `src/**/*.test.ts`: Vitest 4's default `exclude` is only `node_modules` and `.git`,
+so a bare config also collects the compiled copies in `dist`. `pnpm test:discovery` compares what
+Vitest collects against what git tracks (run it after a build). `build` uses
+`tsconfig.build.json` so tests never ship in `dist`, while `typecheck` still covers them — add new
+test globs to **both**.
 
 `apps/api/tests/integration/` uses **real Postgres and Redis**, only Clerk mocked: `pnpm
 docker:up`, then `pnpm --filter @haccp/api test:integration`. **Extend this harness rather than
@@ -179,6 +178,12 @@ role rides on the token, since `requireOrgAdmin` reads the raw `org_role` claim,
 row; the suite is single-worker because the db/Redis clients are module-scope singletons and
 `single-flight` is process-global. Global setup drops and recreates `haccp_test` (name must end
 in `_test`). Logs are silenced — set `INTEGRATION_LOG_LEVEL=debug`.
+
+`e2e/` is a focused Playwright smoke suite over the journeys protecting compliance writes,
+signing in against a Clerk **dev** instance via `@clerk/testing` — it needs one-time users seeded
+there (`e2e/README.md`) and skips in CI until the secrets exist. `data-testid` is an E2E anchor
+only; prefer role/label queries, and never assert on translated strings — the config pins `en`
+because `localePrefix` is "as-needed" with `bg` as default.
 
 ## Git workflow
 
