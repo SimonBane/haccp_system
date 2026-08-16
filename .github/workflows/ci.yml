@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -32,7 +32,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -47,7 +47,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -62,7 +62,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -77,7 +77,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -130,7 +130,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -140,10 +140,101 @@ jobs:
 
       - name: Upload integration logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: integration-logs
           path: apps/api/tests/integration/artifacts/**
+          if-no-files-found: ignore
+
+  browser-smoke:
+    name: Browser smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # Forks get no secrets — the `secrets` context itself isn't readable in a job
+    # `if:`, so this only screens the fork case; the "no dev instance yet" case is
+    # screened per-step below via the `check-secrets` output.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: haccp
+          POSTGRES_PASSWORD: haccp
+          POSTGRES_DB: haccp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U haccp -d haccp"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgresql://haccp:haccp@localhost:5432/haccp
+      DIRECT_DATABASE_URL: postgresql://haccp:haccp@localhost:5432/haccp
+      REDIS_URL: redis://localhost:6379/1
+      CORS_ORIGIN: http://localhost:3000
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      # A Clerk development instance — never production credentials.
+      CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+      CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
+      E2E_CLERK_ADMIN_EMAIL: ${{ secrets.E2E_CLERK_ADMIN_EMAIL }}
+      E2E_CLERK_EMPLOYEE_EMAIL: ${{ secrets.E2E_CLERK_EMPLOYEE_EMAIL }}
+      E2E_CLERK_NO_ORG_EMAIL: ${{ secrets.E2E_CLERK_NO_ORG_EMAIL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # Runs before Setup: no point installing a workspace to skip it a step later.
+      - name: Check whether the Clerk dev instance is configured
+        id: check-secrets
+        env:
+          E2E_CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+        run: echo "configured=${{ env.E2E_CLERK_SECRET_KEY != '' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup
+        if: steps.check-secrets.outputs.configured == 'true'
+        uses: ./.github/actions/setup
+
+      - name: Apply migrations
+        if: steps.check-secrets.outputs.configured == 'true'
+        run: pnpm --filter @haccp/api db:migrate:deploy
+
+      - name: Build
+        if: steps.check-secrets.outputs.configured == 'true'
+        run: pnpm turbo build --filter=@haccp/e2e...
+
+      - name: Install Chromium
+        if: steps.check-secrets.outputs.configured == 'true'
+        run: pnpm --filter @haccp/e2e exec playwright install --with-deps chromium
+
+      - name: Run browser smoke suite
+        if: steps.check-secrets.outputs.configured == 'true'
+        run: pnpm turbo test:e2e --filter=@haccp/e2e
+
+      - name: Upload Playwright report
+        if: steps.check-secrets.outputs.configured == 'true' && failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report/**
+            e2e/test-results/**
+            e2e/results/**
+          retention-days: 7
           if-no-files-found: ignore
 
   validate-migrations:
@@ -168,7 +259,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -186,3 +277,21 @@ jobs:
 
       - name: Fail if a migration was generated
         run: git diff --exit-code --stat -- apps/api/drizzle
+
+      # A migration that seeds or backfills rows would pass the drift check while
+      # silently shipping data into every fresh environment. Counted exactly rather
+      # than from pg_stat_user_tables, whose n_live_tup is an estimate that lags.
+      - name: Assert the migrated database is empty
+        run: |
+          rows=$(psql "$DIRECT_DATABASE_URL" -tAc "
+            select coalesce(sum(cnt), 0) from (
+              select (xpath('/row/c/text()', query_to_xml(
+                format('select count(*) as c from %I.%I', table_schema, table_name),
+                false, true, '')))[1]::text::bigint as cnt
+              from information_schema.tables
+              where table_schema = 'public' and table_type = 'BASE TABLE'
+            ) t")
+          echo "rows after migration: $rows"
+          test "$rows" -eq 0
+        env:
+          DIRECT_DATABASE_URL: postgresql://haccp:haccp@localhost:5432/haccp
