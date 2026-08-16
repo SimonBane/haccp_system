@@ -25,18 +25,7 @@ export const membershipService = {
     await membershipCache.invalidate(clerkOrgId, clerkUserId);
   },
 
-  /**
-   * Correction channel for role changes made directly in the Clerk Dashboard.
-   * The request path never rewrites role on its own, to avoid a stale token
-   * flapping a change our own UI just made.
-   *
-   * The event is treated as a trigger, not as data: Svix gives no ordering
-   * guarantee, so trusting the role in the payload lets a promote delivered
-   * after a demote reinstate an admin permanently. Re-reading Clerk means both
-   * deliveries converge on the same answer whichever order they arrive in.
-   * Comparing the event's `updated_at` against our row's would not work — those
-   * are two different clocks, and our write always lands after the event.
-   */
+  /** Trigger only: re-read Clerk for the role so out-of-order Svix deliveries converge. Request path never heals role from the JWT. */
   async syncRoleByClerkIds(
     db: Db,
     clerkOrgId: string,
@@ -48,8 +37,6 @@ export const membershipService = {
       clerkUserId,
     );
 
-    // Nothing to correct yet. The request path provisions with the role off the
-    // caller's own token, so an out-of-order `.updated` needs no handling here.
     if (!row) {
       return;
     }

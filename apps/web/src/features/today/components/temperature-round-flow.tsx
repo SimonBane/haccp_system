@@ -16,7 +16,6 @@ const ID_PREFIX = "temperature-check";
 
 export type TemperatureCheck = {
   item: TodayTimelineItem;
-  /** Stable identity of the check on screen; changing it starts a fresh entry. */
   occurrenceKey: string;
   minTempC: number;
   maxTempC: number;
@@ -25,26 +24,15 @@ export type TemperatureCheck = {
 };
 
 type Props = {
-  /** Stays mounted while false so the sheet can slide in and out. */
+  /** Kept mounted while false so the exit transition can run. */
   open: boolean;
-  /**
-   * Null before any check has been opened. The component still mounts then, so
-   * the sheet exists in its closed state and the first open has something to
-   * transition from — the admin forms are mounted the same way.
-   */
+  /** Null until a check is opened; still mounted so the first open can transition. */
   check: TemperatureCheck | null;
   onSubmit: (recordedC: number, correctiveAction?: string) => Promise<boolean>;
   onSkip: () => void;
   onClose: () => void;
 };
 
-/**
- * One check inside a round: picks the primary action, gates the deviation step,
- * and hands the surface its header and action bar.
- *
- * The shell around it stays mounted for the whole round, so advancing swaps the
- * contents rather than replaying the sheet's slide-up.
- */
 export function TemperatureRoundFlow({
   open,
   check,
@@ -55,8 +43,7 @@ export function TemperatureRoundFlow({
   const t = useTranslations("TodayPage");
   const timeZone = useOrgTimeZone();
 
-  // Placeholders while there is no check: the hooks below run on every render,
-  // and nothing they produce is shown until `check` is real.
+  // Hooks must run every render; placeholders are unused until `check` is set.
   const item = check?.item ?? null;
   const occurrenceKey = check?.occurrenceKey ?? "";
   const minTempC = check?.minTempC ?? 0;
@@ -89,10 +76,7 @@ export function TemperatureRoundFlow({
   const isReading = entry.step === "reading";
   const isRound = size > 1;
 
-  // Marking the outgoing step inert evicts whatever held focus, and the browser
-  // hands it to the next control it finds — the notes textarea, which opens the
-  // phone keyboard over the corrective options nobody asked to skip. Land on the
-  // step itself instead, so the keyboard only appears once notes are tapped.
+  // Focus the step, not the notes textarea — otherwise the phone keyboard covers the options.
   useEffect(() => {
     if (!hasChangedStep.current) {
       hasChangedStep.current = true;
@@ -104,12 +88,7 @@ export function TemperatureRoundFlow({
     target?.focus();
   }, [isReading]);
 
-  // Advancing to the next check has to move focus too, or the keyboard lands
-  // nowhere and a screen reader never learns the equipment changed. Skipped on
-  // first open, where the shell's initialFocus already handles it.
-  //
-  // Advancing is itself a tap, and the keyboard is already up from the previous
-  // check, so moving focus between two inputs keeps it there — no priming.
+  // Move focus on advance so the keyboard and screen reader follow; skipped on first open.
   useEffect(() => {
     if (!hasAdvanced.current) {
       hasAdvanced.current = true;
@@ -118,8 +97,7 @@ export function TemperatureRoundFlow({
     const input = readingInputRef.current;
     if (input) {
       input.focus();
-      // Selecting means an immediate retype overwrites instead of appending.
-      input.select();
+      input.select(); // Retype overwrites instead of appending.
       return;
     }
     readingStepRef.current?.focus();
@@ -138,9 +116,6 @@ export function TemperatureRoundFlow({
       maxTempC,
     }) === "out_of_range";
 
-  // Always the plain "Save" — a "· next" suffix read as a promise that the
-  // round pauses to show what got saved, which it deliberately does not; the
-  // round counter is what already says another check is coming.
   const primaryIcon = isReading && isDeviationAhead ? "continue" : "confirm";
   const primaryLabel = (() => {
     if (isReading && isDeviationAhead)
@@ -186,12 +161,7 @@ export function TemperatureRoundFlow({
         />
       }
     >
-      {/* Both steps share one grid cell on a phone so neither can resize the
-          other while the worker types. On desktop the inactive step is hidden
-          so the dialog fits whichever step is showing. */}
-      {/* min-w-0 throughout: a grid item defaults to min-width:auto, so without
-          it the deviation step's preset columns floor the whole dialog at their
-          min-content width and push the content out past the edge. */}
+      {/* Shared grid cell so steps cannot resize each other; min-w-0 so preset columns cannot floor the dialog. */}
       <form
         className="grid min-h-0 w-full min-w-0 flex-1 grid-cols-1 grid-rows-1 md:flex-none"
         onSubmit={(event) => {

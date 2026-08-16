@@ -14,12 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 
 const SIDEBAR_WIDTH = "16rem"
 
-/**
- * There is no desktop collapse. Six flat nav items do not earn a hide/show
- * affordance, and the one that existed never persisted — it wrote a cookie
- * nothing ever read. What remains is the mobile drawer, which is an ordinary
- * left-side Sheet.
- */
+/** No desktop collapse — the leftover cookie was never read. Mobile is an ordinary left Sheet. */
 type SidebarContextProps = {
   openMobile: boolean
   setOpenMobile: (open: boolean) => void
@@ -45,13 +40,10 @@ function SidebarProvider({
   ...props
 }: React.ComponentProps<"div">) {
   const isMobile = useIsMobile()
-  // Derived rather than reset in an effect: crossing to desktop mid-session
-  // must not strand an open drawer, and the desktop tree has no scrim to
-  // dismiss it with.
+  // Derived, not an effect: crossing to desktop must not strand an open drawer (desktop has no scrim).
   const [openMobileState, setOpenMobile] = React.useState(false)
   const openMobile = isMobile && openMobileState
 
-  // Desktop has nothing to toggle — the sidebar is always there.
   const toggleSidebar = React.useCallback(() => {
     if (!isMobile) return
     setOpenMobile((open) => !open)
@@ -101,7 +93,6 @@ function Sidebar({
 }: React.ComponentProps<"div"> & {
   side?: "left" | "right"
   variant?: "sidebar" | "floating" | "inset"
-  /** Names the mobile drawer for screen readers. */
   mobileTitle?: string
 }) {
   const { isMobile, openMobile, setOpenMobile } = useSidebar()
@@ -111,8 +102,6 @@ function Sidebar({
       <Sheet open={openMobile} onOpenChange={setOpenMobile}>
         <SheetContent
           side={side}
-          // The header's own controls sit in that corner, and a drawer is
-          // dismissed by tapping outside it, Escape, or picking a destination.
           showCloseButton={false}
           data-sidebar="sidebar"
           data-slot="sidebar"
@@ -142,7 +131,6 @@ function Sidebar({
       data-side={side}
       data-slot="sidebar"
     >
-      {/* Holds the column open in flow; the panel itself is fixed. */}
       <div
         data-slot="sidebar-gap"
         className={cn(
@@ -155,7 +143,6 @@ function Sidebar({
         data-side={side}
         className={cn(
           "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) data-[side=left]:left-0 data-[side=right]:right-0 md:flex",
-          // Adjust the padding for floating and inset variants.
           variant === "floating" || variant === "inset"
             ? "p-2"
             : "group-data-[side=left]:border-r group-data-[side=right]:border-l",
@@ -370,10 +357,7 @@ const sidebarMenuButtonVariants = cva(
   }
 )
 
-/**
- * No `tooltip` prop: it existed to name an icon that had lost its label in the
- * collapsed rail, and there is no collapsed rail. Every item shows its label.
- */
+/** No tooltip: it named an icon in a collapsed rail that no longer exists. */
 function SidebarMenuButton({
   render,
   isActive = false,
@@ -457,7 +441,6 @@ function SidebarMenuSkeleton({
 }: React.ComponentProps<"div"> & {
   showIcon?: boolean
 }) {
-  // Random width between 50 to 90%.
   const [width] = React.useState(() => {
     return `${Math.floor(Math.random() * 40) + 50}%`
   })

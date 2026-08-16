@@ -6,11 +6,7 @@ import type {
 } from "@haccp/shared";
 import { classifyTemperatureResult, computeTodayTaskStatus } from "@haccp/shared";
 
-/**
- * Pure cache patches so a tap flips the row immediately and the network catches
- * up afterwards. Each returns the same reference when nothing matched, which
- * keeps React Query from notifying subscribers for a no-op.
- */
+/** Cache patches that return the same reference on a no-op so React Query does not notify. */
 
 type OccurrenceTarget = { templateId: string; scheduledTime: string };
 
@@ -44,8 +40,6 @@ function patchOccurrence(
 }
 
 function optimisticUser(currentUserId: string): TodayTaskItem["completedBy"] {
-  // The row renders "You" whenever completedBy.id matches the current user, so
-  // the real name is never needed before the server response lands.
   return { id: currentUserId, firstName: "", lastName: "" };
 }
 
@@ -94,8 +88,7 @@ export function applyOptimisticTemperature(
     const minTempC = task.minTempC ?? task.temperatureReading?.minTempC ?? null;
     const maxTempC = task.maxTempC ?? task.temperatureReading?.maxTempC ?? null;
 
-    // Without a range we cannot classify locally; let the server response fill
-    // in the reading rather than guessing at a pass/fail.
+    // Without a range we cannot classify locally; leave the reading for the server.
     if (minTempC === null || maxTempC === null) {
       return {
         ...task,

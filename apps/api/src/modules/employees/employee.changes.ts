@@ -53,8 +53,6 @@ export function diffEmployeeChanges(
     }
   }
 
-  // Resolved against the resulting role, so a role flip rewrites assignments even
-  // when the payload omits locationIds.
   const targetLocationIds = resolveLocationAssignments(
     changes.role ?? normalizeOrgRole(detail.membership.role),
     input.locationIds ?? detail.locationIds,

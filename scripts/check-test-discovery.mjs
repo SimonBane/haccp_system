@@ -1,17 +1,9 @@
 #!/usr/bin/env node
 /**
- * Asserts that a unit run executes every source test exactly once, and nothing else.
+ * Assert each source test is collected exactly once.
  *
- * Vitest 4's default `exclude` is only node_modules and .git, so before the configs
- * in packages/vitest-config existed, a run that happened after a build also collected
- * the compiled copies emitted into dist — every suite ran twice, the second time
- * against stale JavaScript. Config alone does not keep that from coming back, so this
- * compares what Vitest actually collects against what git tracks.
- *
- * Git is the right oracle precisely because dist is ignored: a build artifact can
- * never appear in `expected`, whatever the configs say.
- *
- * Run it AFTER a build — before one, dist is empty and the regression is invisible.
+ * Vitest 4 collects `dist` copies. Git is the oracle because dist is ignored.
+ * Run AFTER a build — before one, dist is empty and the regression is invisible.
  */
 import { execFileSync } from "node:child_process";
 import path from "node:path";
@@ -31,9 +23,7 @@ function git(args) {
 }
 
 /**
- * Packages that run a unit suite, discovered from their tracked config so a new
- * workspace package cannot quietly escape this check. Integration and browser
- * suites carry their own config name and are deliberately not collected here.
+ * Packages that run a unit suite, from their tracked config so a new package cannot skip this check.
  */
 function unitPackageDirs() {
   return git([

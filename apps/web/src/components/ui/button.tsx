@@ -21,12 +21,7 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        // Deliberately a single, unqualified height. A responsive pair like
-        // `h-11 md:h-9` silently breaks every call site that overrides the
-        // height with a plain utility: tailwind-merge lets `h-auto` beat
-        // `h-11` but not `md:h-9`, so the override survives on mobile and
-        // dies on desktop. Touch sizing for form buttons is applied by the
-        // mobile form shell, where it cannot leak into layout buttons.
+        // Unqualified height: `h-11 md:h-9` cannot be overridden by a plain `h-auto` on desktop (tailwind-merge).
         default:
           "h-9 gap-1.5 px-2.5 in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
         xs: "h-6 gap-1 rounded-[min(var(--radius-md),8px)] px-2 text-xs in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",

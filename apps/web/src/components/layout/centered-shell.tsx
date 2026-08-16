@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-/** Full-height shell for a standalone page — sign-in, an error, a 404. */
 export function CenteredShell({
   children,
   className,

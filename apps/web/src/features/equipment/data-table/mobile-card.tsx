@@ -31,8 +31,6 @@ export function EquipmentMobileCard({
       }
       title={equipment.name}
       subtitle={typeLabels[equipment.type]}
-      // The allowed range is the number this list exists to show, so it goes
-      // in the trailing slot rather than into a label/value row underneath.
       trailing={
         <span className="tabular-nums">
           {formatTemp(equipment.minTempC)} – {formatTemp(equipment.maxTempC)}

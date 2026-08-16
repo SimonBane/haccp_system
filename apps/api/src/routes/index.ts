@@ -72,8 +72,7 @@ function mountLocationScoped(
 mountProtected("/tenant", tenantRoutes);
 mountAdminProtected("/organizations", organizationRoutes);
 mountAdminProtected("/employees", employeeRoutes);
-// Location-scoped routes must be registered before the admin /locations
-// router. Otherwise Hono runs admin middleware for every /locations/* path.
+// Location-scoped routers before admin `/locations`, or Hono runs admin middleware on every `/locations/*` path.
 mountLocationScoped("/locations/:locationId/equipment", equipmentRoutes, true);
 mountLocationScoped(
   "/locations/:locationId/task-templates",

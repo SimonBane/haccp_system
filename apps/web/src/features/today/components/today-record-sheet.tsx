@@ -29,10 +29,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-/**
- * Opened by tapping a completed row. Undo lives here rather than on the row
- * itself so a mis-tap can never delete a compliance record.
- */
+/** Undo lives here so a mis-tap on the row cannot delete a compliance record. */
 export function TodayRecordSheet({
   open,
   onOpenChange,

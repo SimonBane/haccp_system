@@ -3,7 +3,7 @@
 import type { TodayResponse, TodayTaskItem } from "@haccp/shared";
 import { classifyTemperatureResult, zonedDateString } from "@haccp/shared";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { pageWidthVariants } from "@/components/layout/page-container";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -55,9 +55,7 @@ export function TodayView({
   const now = useNow();
   const timeZone = useOrgTimeZone();
 
-  // Derived from the ticking clock, not memoised once: a wall-mounted tablet
-  // left open overnight used to keep reporting yesterday while the groups
-  // around it rolled over to overdue. Also picks up a timezone change live.
+  // Recalculate from the ticking clock so an overnight tablet does not keep yesterday's date.
   const todayDate = useMemo(
     () => zonedDateString(now, timeZone),
     [now, timeZone],
@@ -84,18 +82,12 @@ export function TodayView({
   const { completeTask, uncompleteTask, completeTemperatureTask } =
     useTodayMutations(currentUserId, timeZone);
 
-  // useMutation hands back a fresh result object every render, but the mutate
-  // functions themselves are stable. Depending on those keeps the handlers —
-  // and therefore the memoized rows — from re-creating on every tick.
+  // Depend on the stable mutate functions, not the result object (fresh every render).
   const runComplete = completeTask.mutateAsync;
   const runUncomplete = uncompleteTask.mutateAsync;
   const runCompleteTemperature = completeTemperatureTask.mutateAsync;
 
-  // Two stages, so the minute tick cannot reallocate the rows. Everything the
-  // clock does not affect — grouping, per-item state, the counts — is memoised
-  // on the response alone, and applyClock layers the live state on top while
-  // carrying each group's items through by reference. That is what lets the
-  // memo on TodayTaskRow actually bail out between ticks.
+  // Group on the response; applyClock layers live state so TodayTaskRow can bail out between ticks.
   const taskGroups = useMemo(
     () => buildTodayTaskGroups(response ? flatTodayTasks(response) : []),
     [response],
@@ -106,9 +98,7 @@ export function TodayView({
     [taskGroups, now, selectedDate, timeZone],
   );
 
-  // Both surfaces hold a key rather than the item itself: the clock tick
-  // rebuilds the timeline every minute, and a captured item would keep serving
-  // the prior reading it happened to see when it was opened.
+  // Hold a key, not the item: the clock rebuilds the timeline every minute.
   const recordItem = useMemo(
     () => findTimelineItem(timeline, recordKey),
     [timeline, recordKey],
@@ -123,25 +113,14 @@ export function TodayView({
     close: closeRound,
   } = round;
 
-  /*
-   * Both modal surfaces on this page are latched.
-   *
-   * Base UI runs a popup's exit transition on the element it already owns, so
-   * the component has to outlive the state that opened it. `round` and
-   * `recordItem` are already null by the time the sheet starts sliding out, so
-   * the last non-null value is kept and rendered with `open={false}` until the
-   * next one replaces it.
-   */
+  // Latch the last non-null check so Base UI can run the exit after round/recordItem go null.
   const isRoundOpen =
     round.item !== null &&
     round.currentKey !== null &&
     round.item.task.minTempC !== null &&
     round.item.task.maxTempC !== null;
 
-  // Latched during render rather than in an effect, the documented way to
-  // adjust state when a prop changes — an effect here would commit the mount
-  // and the open together, and a popup that appears already open has no closed
-  // frame to transition from.
+  // Latch during render, not an effect — an effect would mount the popup already open.
   const [lastCheck, setLastCheck] = useState<TemperatureCheck | null>(null);
 
   const liveCheck: TemperatureCheck | null = isRoundOpen
@@ -166,8 +145,7 @@ export function TodayView({
     setLastRecordItem(recordItem);
   }
 
-  // Live while open so the minute tick keeps the prior reading fresh; the
-  // latched copy only takes over while the sheet is sliding away.
+  // Live data while open; the latched copy only covers the slide-away.
   const shownCheck = liveCheck ?? lastCheck;
   const shownRecordItem = recordItem ?? lastRecordItem;
 
@@ -239,10 +217,7 @@ export function TodayView({
     [handleUndo, markSyncing, runComplete, t],
   );
 
-  /**
-   * One toast for a finished round, instead of leaving the worker to count the
-   * five per-save toasts that scrolled past while they were walking.
-   */
+  /** One toast for a finished round instead of a toast per save. */
   const summariseRound = useCallback(
     (tally: RoundTally, roundSize: number) => {
       if (roundSize <= 1 || tally.saved === 0) return;
@@ -299,7 +274,7 @@ export function TodayView({
         if (result.done) summariseRound(result, roundSize);
         return true;
       } catch (error) {
-        // The surface stays open on the same reading so it is not lost.
+        // Stay on the same reading so it is not lost.
         toast.error(getErrorMessage(error, t("toasts.doneError")));
         return false;
       } finally {
@@ -346,8 +321,7 @@ export function TodayView({
           toast.error(t("toasts.missingEquipment"));
           return;
         }
-        // Also what the time group's Record button calls, so the header can
-        // never start a round the flow would refuse.
+        // Same gate as the time group's Record button.
         openRound(item);
         return;
       }
@@ -455,9 +429,7 @@ export function TodayView({
         {announcement}
       </span>
 
-      {/* Both surfaces are mounted from first paint and toggled by `open`, so
-          Base UI has an element to run the enter and exit transitions on. The
-          latched copies keep the contents on screen while they slide away. */}
+      {/* Mounted from first paint and toggled by `open` so Base UI can run enter/exit. */}
       <TemperatureRoundFlow
         open={isRoundOpen}
         check={shownCheck}

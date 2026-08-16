@@ -29,8 +29,7 @@ export const equipment = pgTable(
       .notNull(),
   },
   (table) => [
-    // No standalone location_id index: it is an exact left prefix of this
-    // composite unique, which already serves every location-scoped lookup.
+    // No standalone location_id index: it is a left prefix of this unique.
     uniqueIndex("equipment_location_id_name_unique").on(
       table.locationId,
       table.name,

@@ -136,9 +136,7 @@ export const todayRepository = {
     const completionByKey = new Map<string, CompletionRecord>();
 
     for (const row of rows) {
-      // Shared with the mapper on purpose: this key is what joins a completion
-      // back to the template that generated it, and two independent copies of
-      // the format would fail silently as "completed tasks render as pending".
+      // Must match the mapper: a mismatched key silently renders completed tasks as pending.
       const key = buildCompletionKey(row.taskTemplateId, row.scheduledTime);
       completionByKey.set(key, {
         completedAt: row.completedAt,

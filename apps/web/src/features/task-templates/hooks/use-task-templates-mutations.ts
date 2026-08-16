@@ -24,9 +24,7 @@ export function useTaskTemplatesMutations() {
     void queryClient.invalidateQueries({
       queryKey: queryKeys.taskTemplates(locationId),
     });
-    // Templates are what Today expands into occurrences, so an edit here has to
-    // mark every cached day stale — otherwise Today keeps serving the old plan
-    // until a full page reload.
+    // Templates expand into Today's occurrences; skip this and Today keeps the old plan until reload.
     void queryClient.invalidateQueries({
       queryKey: queryKeys.todayByLocation(locationId),
     });

@@ -225,10 +225,6 @@ function FieldError({
   )
 }
 
-/**
- * The required-field marker. Lives next to FieldLabel because it is a property
- * of the label, and because four forms had drifted copies of the same string.
- */
 const REQUIRED_LABEL_CLASS = "gap-1 after:text-destructive after:content-['*']"
 
 export {

@@ -27,31 +27,16 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   title: string;
   subtitle: string;
-  /** "back" once the flow has a previous step to return to. */
   leading: "close" | "back";
   leadingLabel: string;
   onLeading: () => void;
-  /** Null for a lone check, which then looks exactly like the old flow. */
   round: { position: number; size: number } | null;
   footer: ReactNode;
-  /** The reading field, focused on open so the keyboard comes straight up. */
   initialFocus?: RefObject<HTMLInputElement | null>;
   children: ReactNode;
 };
 
-/**
- * The surface a round of temperature readings is entered on.
- *
- * A bottom sheet on a phone, a centred dialog from `md` up. Both are sized to
- * their content; the browser handles the software keyboard.
- *
- * It is mounted once per round and deliberately never remounted between checks:
- * remounting would replay the slide-up on every advance. Only the entry state
- * inside it resets.
- *
- * Deliberately not built on ResponsiveFormDialog: the app bar carries a back
- * control and the round counter, which that component has no slot for.
- */
+/** Sheet on phone, dialog from md. Not ResponsiveFormDialog: needs a back control and round counter. */
 export function TemperatureEntryShell({
   open,
   onOpenChange,
@@ -68,9 +53,7 @@ export function TemperatureEntryShell({
   const t = useTranslations("TodayPage");
   const LeadingIcon = leading === "close" ? XIcon : ArrowLeftIcon;
 
-  // The spoken and the shown forms are separate elements rather than an
-  // aria-label on the badge: a label on a plain span is unreliably announced,
-  // and "2 / 5" read literally is "two slash five".
+  // Spoken and shown forms are separate: aria-label on a span is unreliable, and "2 / 5" reads as "two slash five".
   const counter = round ? (
     <Badge variant="secondary" className="tabular-nums">
       <span aria-hidden>
@@ -95,14 +78,10 @@ export function TemperatureEntryShell({
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent
           side="bottom"
-          // The close control lives in the app bar instead.
           showCloseButton={false}
           initialFocus={initialFocus}
           className={cn("gap-0 p-0", SHEET_SURFACE)}
         >
-          {/* Keeps its subtitle, unlike the admin forms: which fridge, at what
-              time, is what the worker is confirming — not a restatement of the
-              fields below. */}
           <SheetAppBar
             icon={<LeadingIcon className="size-5" />}
             label={leadingLabel}
@@ -129,8 +108,7 @@ export function TemperatureEntryShell({
         initialFocus={initialFocus}
       >
         <DialogHeader>
-          {/* Dialog's own close button is absolutely positioned in this corner,
-              so the row has to keep clear of it or the counter lands on top. */}
+          {/* Dialog's own close button is absolutely positioned here — keep the row clear of it. */}
           <div className="flex items-start justify-between gap-3 pr-14">
             <div className="min-w-0">
               <DialogTitle className="truncate">{title}</DialogTitle>
@@ -144,10 +122,6 @@ export function TemperatureEntryShell({
 
         {children}
 
-        {/* Centered rather than the stock end-aligned footer: end-alignment
-            paired with the hint's now-removed left push used to leave the
-            hint pinned to the far edge and the buttons hugging the other,
-            never reading as one row. */}
         <DialogFooter className="gap-2 sm:w-full sm:justify-stretch sm:gap-3">
           {footer}
         </DialogFooter>

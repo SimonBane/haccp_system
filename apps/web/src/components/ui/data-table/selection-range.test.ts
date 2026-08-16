@@ -30,7 +30,6 @@ describe("selectionRangeIds", () => {
   });
 
   it("has nothing to extend from once the anchor is off screen", () => {
-    // The anchor was filtered or paged away since it was clicked.
     expect(selectionRangeIds(rows("a", "b", "c"), "z", "b")).toBeNull();
   });
 

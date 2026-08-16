@@ -97,9 +97,7 @@ export function LocationsManager({ initialItems }: LocationsManagerProps) {
     }
   }, [deleteTarget, isDeleting, reloadTenant, refetch, remove, t]);
 
-  // Only the open flag. Clearing the record here too would change the form's
-  // `key` mid-exit, remounting it and killing the slide-out — every open path
-  // below already sets the record explicitly, so there is nothing to reset.
+  // Only clear `open` — clearing the record remounts the form via `key` and kills the slide-out.
   const handleFormOpenChange = useCallback((open: boolean) => {
     if (!open) setFormOpen(false);
   }, []);
@@ -159,9 +157,6 @@ export function LocationsManager({ initialItems }: LocationsManagerProps) {
         onConfirm={confirmDelete}
       />
 
-      {/* Always mounted, `open` toggled: Base UI runs the sheet's exit
-          transition on the popup it already owns, so unmounting the form here
-          would cut the slide-out and make it vanish instead. */}
       <LocationForm
         open={formOpen}
         onOpenChange={handleFormOpenChange}

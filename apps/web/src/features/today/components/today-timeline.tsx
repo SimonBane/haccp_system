@@ -14,7 +14,7 @@ import { TodayTimeGroup } from "./today-time-group";
 type Props = {
   timeline: Timeline;
   timeZone: string;
-  /** Changes when the day changes, so the auto-scroll runs once per day. */
+  /** Changes when the day changes so auto-scroll runs once per day. */
   scrollKey: string;
   syncingKeys: ReadonlySet<string>;
   currentUserId: string | null;
@@ -37,22 +37,18 @@ export function TodayTimeline({
     scrolledFor.current = scrollKey;
 
     if (!focusGroupId) return;
-    // Early in the day the live group is already the first one, so scrolling
-    // would only push the header off screen for no reason.
+    // Skip when the live group is already first — scrolling would only hide the header.
     if (groups[0]?.id === focusGroupId) return;
 
     scrollToTimeGroup(focusGroupId);
   }, [scrollKey, focusGroupId, groups]);
 
-  // The now marker is a dot on the same axis as the rounds, so whichever of
-  // the two comes last owns the rail's fade-out.
+  // Whichever of the now marker and the last round comes last owns the rail fade-out.
   const nowLineIsTail = timeline.nowLineIndex === groups.length;
   const hasBlocks = groups.length > 0 || timeline.nowLineIndex !== null;
 
   return (
     <div className={cn("relative", hasBlocks && RAIL_LEAD_IN_SPACING_CLASSNAME)}>
-      {/* The day does not begin at its first check, so the axis runs in from
-          above rather than starting on a bare dot. */}
       {hasBlocks ? (
         <span aria-hidden className={getRailLeadInClassName()} />
       ) : null}
@@ -66,9 +62,6 @@ export function TodayTimeline({
             group={group}
             state={group.state}
             timeZone={timeZone}
-            // Only an upcoming round shows a countdown. Passing null for the
-            // rest keeps their props identical minute to minute, so the memo
-            // holds and only the groups whose label actually changed re-render.
             minutesUntil={group.state === "upcoming" ? group.minutesUntil : null}
             isLastBeforeNowLine={
               timeline.nowLineIndex !== null &&
@@ -83,7 +76,6 @@ export function TodayTimeline({
         </Fragment>
       ))}
 
-      {/* Every round has already passed, so the marker closes out the day. */}
       {nowLineIsTail ? (
         <TodayNowLine minutes={timeline.nowMinutes} isTail />
       ) : null}

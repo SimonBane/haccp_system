@@ -30,15 +30,12 @@ export function isForeignKeyViolation(error: unknown): boolean {
   return isPostgresError(error, "23503");
 }
 
-// A lost insert race, from either side of the boundary: the raw driver error, or
-// a ConflictError some helper already translated it into. Callers that recover by
-// re-reading must check this rather than isUniqueViolation alone.
+// Lost insert race: raw 23505 or a ConflictError a helper already translated. Recovery must check this, not isUniqueViolation alone.
 export function isContention(error: unknown): boolean {
   return isUniqueViolation(error) || error instanceof ConflictError;
 }
 
-// Do not call this inside a helper whose caller may need to detect contention —
-// translating 23505 into an AppError hides the race from the recovery path.
+// Do not translate 23505 inside a helper whose caller recovers from contention — that hides the race.
 export function mapDbMutationError(
   error: unknown,
   mapping: {

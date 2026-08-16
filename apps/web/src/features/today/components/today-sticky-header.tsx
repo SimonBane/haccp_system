@@ -83,11 +83,6 @@ function JumpChips({ timeline }: { timeline: TodayTimeline }) {
   );
 }
 
-/**
- * Bar and count are one unit: a tracked, rounded bar sitting right next to its
- * own numbers reads as progress, where a full-width line on the header edge
- * just read as a second separator.
- */
 function ProgressMeter({
   timeline,
   barClassName,
@@ -212,8 +207,6 @@ export function TodayStickyHeader({
     />
   );
 
-  // On mobile this page has no header of its own: its title, progress and date
-  // controls live in the shared top bar next to the drawer trigger.
   if (isMobile) {
     return (
       <>
@@ -228,9 +221,7 @@ export function TodayStickyHeader({
   }
 
   return (
-    // top-0, not top-2: the bar sticks inside the shell's scroll region, whose
-    // padding box already starts at the desktop card edge. An offset here
-    // would leave a gap for content to scroll through.
+    // top-0, not top-2: an offset would leave a gap inside the shell's already-padded scroll region.
     <header className="sticky top-0 z-30 rounded-t-xl bg-background backdrop-blur-xl supports-[backdrop-filter]:bg-background/85">
       <div className={pageWidthVariants({ width: "narrow" })}>
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-2.5">
