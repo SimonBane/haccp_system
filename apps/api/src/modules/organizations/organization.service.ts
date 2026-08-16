@@ -30,14 +30,6 @@ function assertValidLogoFile(file: { size: number; type: string }): void {
   }
 }
 
-/**
- * Applies a patch, then does the three things every organization mutation must
- * do afterwards: fail loudly if the row vanished, drop the tenant cache so the
- * next request re-reads, and project the response.
- *
- * Collapsed from four copies — the cache invalidation in particular is the kind
- * of step a fifth mutator would quietly forget.
- */
 async function applyOrganizationUpdate(
   db: Db,
   clerkOrgId: string,

@@ -65,10 +65,6 @@ export const userService = {
     return userService.resolveUserFromDb(db, clerkUserId);
   },
 
-  /**
-   * The cold half of `resolveUser`, for callers that have already missed the
-   * cache — re-reading it there is a guaranteed miss on every cold request.
-   */
   async resolveUserFromDb(
     db: Db,
     clerkUserId: string,
@@ -109,8 +105,7 @@ export const userService = {
     }
   },
 
-  // Transaction-only. Deliberately does not translate 23505 or write the cache —
-  // the caller owning the transaction does both after it commits.
+  // Transaction-only: caller translates 23505 and writes the cache after commit.
   async linkClerkProfileToDraftUser(
     db: DbClient,
     userId: string,
@@ -119,7 +114,6 @@ export const userService = {
     return persistUser(db, profileData, userId);
   },
 
-  // Transaction-only. Same contract as linkClerkProfileToDraftUser.
   async upsertUserFromClerk(
     db: DbClient,
     profileData: ClerkProfileUpsert,
@@ -133,7 +127,7 @@ export const userService = {
     return persistUser(db, profileData, existing?.id);
   },
 
-  // Transaction-only. The caller invalidates the cache after the transaction commits.
+  // Transaction-only: caller invalidates cache after commit.
   async updateProfile(
     db: DbClient,
     userId: string,

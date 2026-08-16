@@ -12,13 +12,7 @@ vi.mock("@clerk/backend", () => ({ verifyToken }));
 const { requireAuth } = await import("./auth.js");
 const { errorHandler } = await import("./error-handler.js");
 
-/**
- * The 401/503 split is the whole point of this middleware's error handling.
- *
- * The web app treats 401 as "signed out" and bounces to Clerk, so reporting one
- * for a JWKS fetch failure would sign every kitchen tablet out at once during a
- * Clerk blip. Only a genuinely bad token may be 401.
- */
+/** 401 only for a bad token — the web app treats 401 as signed out. */
 function tokenError(reason: string): TokenVerificationError {
   return new TokenVerificationError({ message: "nope", reason });
 }
@@ -75,9 +69,7 @@ describe("requireAuth", () => {
     });
 
     it("a JWT-shaped token whose segments are not valid JSON", async () => {
-      // Verified against @clerk/backend: "not.a.jwt" fails in JSON.parse during
-      // decoding and surfaces as a bare SyntaxError, never reaching Clerk's own
-      // classification. Caught live by curl during Phase 4, not by this suite.
+      // "not.a.jwt" is a SyntaxError from JSON.parse, not a Clerk TokenVerificationError.
       verifyToken.mockRejectedValue(
         new SyntaxError("Unexpected token in JSON at position 0"),
       );
@@ -101,7 +93,7 @@ describe("requireAuth", () => {
       verifyToken.mockRejectedValue(tokenError(reason));
 
       const res = await get(AUTHED);
-      // Not 401: a Clerk outage must not read as "signed out" to the web app.
+      // Not 401: a Clerk outage must not read as signed out.
       expect(res.status).toBe(503);
     });
 
@@ -122,8 +114,7 @@ describe("requireAuth", () => {
     });
 
     it("503s rather than hanging when Clerk never answers", async () => {
-      // withClerkTimeout rejects with ServiceUnavailableError after 5s; the
-      // promise here never settles, so only the timeout can end the request.
+      // Promise never settles; only withClerkTimeout can end the request.
       vi.useFakeTimers();
       verifyToken.mockReturnValue(new Promise(() => {}));
 

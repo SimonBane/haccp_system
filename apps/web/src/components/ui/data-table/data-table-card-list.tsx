@@ -26,9 +26,7 @@ import { cn } from "@/lib/utils";
 type DataTableCardListProps<TData> = {
   table: ReactTable<TData>;
   renderMobileRow: (row: Row<TData>) => ReactNode;
-  /** Everything you can do to a row. See `row-action.ts`. */
   getRowActions?: (row: Row<TData>) => RowAction[];
-  /** Names the row in the screen-reader actions button. */
   getRowLabel?: (row: Row<TData>) => string;
   onRowClick?: (row: Row<TData>) => void;
   variant?: MobileListVariant;
@@ -52,15 +50,11 @@ function CardListRow<TData>({
   actions: RowAction[];
   label: string;
   onRowClick?: (row: Row<TData>) => void;
-  /** Passes the row element up, so the menu can anchor to what was pressed. */
   onOpenActions: (anchor: HTMLElement) => void;
   moreActionsLabel: string;
 }) {
   const hasActions = visibleRowActions(actions).length > 0;
-  // The hook owns the ref and hands the node back, so the row keeps a single
-  // stable callback ref rather than an inline one that re-attaches every render
-  // — which, with a `useState` setter ref, detaches to null and back on each
-  // pass and rebuilds the listeners continuously.
+  // One stable callback ref — an inline setter-ref re-attaches every render and tears the listeners down.
   const { ref: longPressRef, node } = useLongPress(onOpenActions, hasActions);
   const openHere = () => {
     if (node) onOpenActions(node);
@@ -70,8 +64,6 @@ function CardListRow<TData>({
     <div
       ref={longPressRef}
       className="relative"
-      // Right-click is the desktop equivalent of press-and-hold; the mobile
-      // list can render at a narrow desktop viewport too.
       onContextMenu={(event) => {
         if (!hasActions) return;
         event.preventDefault();
@@ -85,8 +77,6 @@ function CardListRow<TData>({
           aria-label={label}
           className="cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
           onKeyDown={(event) => {
-            // Shift+F10 and the ContextMenu key are the platform's "show me
-            // this item's actions" — the keyboard path that replaces the kebab.
             if (
               hasActions &&
               (event.key === "ContextMenu" ||
@@ -112,13 +102,7 @@ function CardListRow<TData>({
         children
       )}
 
-      {/*
-        The keyboard and switch-control path to the actions, since the row
-        carries no visible control any more. Invisible until focused, then a
-        real button — `sr-only` alone would leave a focused element nobody can
-        see. The row's own click handler bails on `closest("button")`, so this
-        never double-fires.
-      */}
+      {/* Focus-visible actions button: `sr-only` alone would leave a focused element nobody can see. */}
       {hasActions ? (
         <button
           type="button"
@@ -133,22 +117,7 @@ function CardListRow<TData>({
   );
 }
 
-/**
- * The mobile face of a data table: one grouped list instead of a grid.
- *
- * Two gestures, the same on every page: tap runs the row's primary action, and
- * press-and-hold opens all of them in a menu anchored on the row itself. That
- * replaced a kebab button and a decorative chevron competing for the same 40px
- * of row.
- *
- * The menu is the same component the desktop kebab opens — the press just
- * anchors it to the row instead of to a trigger button, so what you get is the
- * row's menu appearing on the row, not a separate mobile surface.
- *
- * Rows carry `role="button"` on a div rather than being real buttons, because a
- * row also hosts the screen-reader actions button and nesting interactive
- * elements is invalid. Keyboard activation is wired by hand to compensate.
- */
+/** `role="button"` on a div because the row also hosts the SR actions button — nesting interactives is invalid. */
 export function DataTableCardList<TData>({
   table,
   renderMobileRow,
@@ -164,8 +133,7 @@ export function DataTableCardList<TData>({
   const t = useTranslations("DataTable.rowActions");
   const rows = table.getRowModel().rows;
   const [openActionsRowId, setOpenActionsRowId] = useState<string | null>(null);
-  // Held in state, not a ref: the Positioner has to re-read it on the render
-  // that opens the menu, and a ref write would not schedule one.
+  // State, not a ref: the Positioner has to re-read it on the render that opens the menu.
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
 
   if (!rows.length) {
@@ -212,8 +180,6 @@ export function DataTableCardList<TData>({
         })}
       </MobileList>
 
-      {/* One menu for the whole list, anchored to whichever row was pressed —
-          one per row would mean a portal per record. */}
       <DropdownMenu
         open={openRow !== null}
         onOpenChange={(next) => {
@@ -225,8 +191,6 @@ export function DataTableCardList<TData>({
           align="center"
           side="bottom"
           sideOffset={-8}
-          // Sized by its longest label. min-w-0 is needed to beat the popup's
-          // own min-w-32, which is a floor meant for trigger-anchored menus.
           className="w-max min-w-0"
         >
           <RowActionMenuItems actions={openRowActions} />

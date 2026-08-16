@@ -18,14 +18,6 @@ type TaskTemplatesMobileRowProps = {
   };
 };
 
-/**
- * The card variant, because a task template does not fit on one line.
- *
- * The times used to sit in the trailing slot as one comma-joined string, which
- * on a template with four of them took most of the row and truncated the title
- * and the equipment it applies to. They are their own wrapping row of chips
- * now, under a title and subtitle that get the full width.
- */
 export function TaskTemplatesMobileCard({
   row,
   typeLabels,
@@ -33,8 +25,6 @@ export function TaskTemplatesMobileCard({
 }: TaskTemplatesMobileRowProps) {
   const task = row.original;
 
-  // Weekdays only. `formatScheduleSummary` appends the times, which is exactly
-  // the part that overflowed — they are chips of their own below.
   const weekdays = formatWeekdaysLabel(task.weekdays, scheduleLabels);
 
   const detail = [

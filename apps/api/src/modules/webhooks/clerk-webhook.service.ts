@@ -72,8 +72,7 @@ export const clerkWebhookService = {
     await membershipService.removeByClerkIds(db, clerkOrgId, clerkUserId);
   },
 
-  // Fallback for the request path: same provisioning code, triggered by the event
-  // instead of by a request. Whichever arrives first wins; the other adopts it.
+  // Same provisioning as the request path; whichever arrives first wins.
   async handleMembershipCreated(
     db: Db,
     clerkOrgId: string,
@@ -88,9 +87,7 @@ export const clerkWebhookService = {
     });
   },
 
-  // The role is deliberately not taken from the event payload — see
-  // membershipService.syncRoleByClerkIds for why re-reading Clerk is what makes
-  // out-of-order delivery safe.
+  // Role from a Clerk re-read, not the event payload — out-of-order delivery.
   async handleMembershipUpdated(
     db: Db,
     clerkOrgId: string,

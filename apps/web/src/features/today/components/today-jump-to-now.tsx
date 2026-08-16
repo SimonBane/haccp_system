@@ -8,30 +8,16 @@ import { scrollToElementId } from "../lib/scroll";
 import { NOW_LINE_ID } from "./today-now-line";
 
 type Props = {
-  /** Null on any day that is not today, where there is no now marker at all. */
   nowLineIndex: number | null;
 };
 
-/**
- * Clearance for the sticky chrome that overlays the top of the page — the
- * mobile top bar, or the desktop sticky header. Both are 56px.
- *
- * Must stay under the marker's own `scroll-mt-*` landing position, or jumping
- * to it would immediately re-trigger the pill.
- */
+/** Must stay under the marker's `scroll-mt-*` or jumping to it immediately re-triggers the pill. */
 const TOP_INSET = 56;
-/** Keeps the pill from flickering as the marker grazes the bottom edge. */
 const BOTTOM_INSET = 64;
 
 /**
- * Mounted on a wall tablet, this page sits open while the day moves underneath
- * it. When the live moment scrolls out of view this offers the way back, and
- * points in the direction it went.
- *
- * Measured on scroll rather than with an IntersectionObserver: the marker can
- * go from below the viewport to above it without ever intersecting — a jump, or
- * a group collapsing — and an observer never fires for that, leaving the arrow
- * pointing the wrong way.
+ * Measure on scroll, not IntersectionObserver: the marker can jump from below
+ * the viewport to above it without intersecting, leaving the arrow pointing the wrong way.
  */
 export function TodayJumpToNow({ nowLineIndex }: Props) {
   const t = useTranslations("TodayPage");
@@ -62,8 +48,7 @@ export function TodayJumpToNow({ nowLineIndex }: Props) {
     schedule();
     window.addEventListener("scroll", schedule, { passive: true });
     window.addEventListener("resize", schedule);
-    // Catches what `resize` misses — a group collapsing above the marker.
-    const observer = new ResizeObserver(schedule);
+    const observer = new ResizeObserver(schedule); // Catches a group collapsing above the marker.
     observer.observe(document.body);
 
     return () => {
@@ -74,8 +59,7 @@ export function TodayJumpToNow({ nowLineIndex }: Props) {
     };
   }, [nowLineIndex]);
 
-  // Gated on the render path rather than cleared inside the effect: a stale
-  // direction simply stays hidden until the next measurement.
+  // Hide a stale direction on the render path rather than clearing it inside the effect.
   if (nowLineIndex === null || !direction) return null;
 
   return (

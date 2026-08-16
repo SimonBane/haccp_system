@@ -19,9 +19,7 @@ export default async function OrganizationLocationsPage({
     redirect("/dashboard/organization");
   }
 
-  // tenant.locations is the same list, and getTenantContext is deduped per
-  // render — so a second /locations round trip would buy nothing.
-
+  // Same list as `tenant.locations`; `getTenantContext` is already cached per render.
   return (
     <PageContainer width="content">
       <LocationsManager initialItems={tenant.locations} />

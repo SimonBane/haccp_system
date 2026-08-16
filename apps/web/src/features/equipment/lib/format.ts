@@ -1,10 +1,4 @@
-/**
- * Equipment temperature bounds as displayed in lists.
- *
- * Deliberately not the Today page's `formatTemperature`: that one is a locale
- * number formatter for a recorded reading, rendered next to a separate unit.
- * Here the bound and its unit are one inseparable label.
- */
+/** Bound + unit as one label — not Today's locale number formatter. */
 export function formatTemp(value: number): string {
   return `${value}°C`;
 }

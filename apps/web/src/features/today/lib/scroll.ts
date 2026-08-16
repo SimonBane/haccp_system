@@ -1,7 +1,4 @@
-/**
- * Scrolls a timeline anchor into view. Anchors carry `scroll-mt-*` so they land
- * below the sticky header rather than under it.
- */
+/** Anchors carry `scroll-mt-*` so they land below the sticky header. */
 export function scrollToElementId(elementId: string): void {
   const element = document.getElementById(elementId);
   if (!element) return;

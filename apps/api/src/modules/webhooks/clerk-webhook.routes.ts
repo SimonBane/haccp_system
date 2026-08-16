@@ -32,10 +32,7 @@ clerkWebhookRoutes.post("/clerk", async (c) => {
   try {
     await dispatch(db, event);
   } catch (error) {
-    // Svix retries on any non-2xx. Retrying a permanent failure — an org Clerk
-    // no longer has, a user it cannot see — just burns the delivery budget and
-    // ends in the dead-letter queue either way, so acknowledge those. Anything
-    // else is transient (a database blip, Clerk being slow) and worth a retry.
+    // Ack permanent Clerk misses so Svix does not retry them into DLQ.
     if (error instanceof ForbiddenError || error instanceof NotFoundError) {
       logger.warn(
         { err: error, eventType: event.type },

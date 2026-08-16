@@ -15,11 +15,6 @@ type Params = {
   onDelete: (equipment: EquipmentResponse) => void;
 };
 
-/**
- * Duplicate lives here and nowhere else now — it used to also sit in the edit
- * dialog's desktop footer, which is a strange place to decide you want a second
- * one of something you are in the middle of editing.
- */
 export function getEquipmentRowActions({
   t,
   onEdit,

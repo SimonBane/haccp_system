@@ -18,7 +18,6 @@ import {
 export type TemperatureEntryStep = "reading" | "deviation";
 
 type Params = {
-  /** Identity of the check being recorded. Changing it starts a fresh entry. */
   occurrenceKey: string;
   minTempC: number;
   maxTempC: number;
@@ -26,14 +25,8 @@ type Params = {
 };
 
 /**
- * One reading: its value, its sign, and which step of the entry it is on.
- *
- * Deliberately plain state rather than react-hook-form. Three fields, sanitised
- * on every change, reduce the form library to `setValue` plus `useWatch`, and
- * its `reset` cannot run during render — which
- * is exactly what advancing to the next check in a round needs to do. Three
- * rules derived inline are shorter than the resolver they replace, and the
- * schema that actually guards the data still lives in `@haccp/shared`.
+ * Reading entry as plain state: react-hook-form's reset cannot run during
+ * render, which advancing to the next check needs.
  */
 export function useTemperatureEntry({
   occurrenceKey,
@@ -55,16 +48,12 @@ export function useTemperatureEntry({
   const [showErrors, setShowErrors] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Advancing to the next check swaps every input on the screen. Resetting
-  // during render rather than in an effect puts the new equipment's name and an
-  // empty readout in the same paint; an effect would show one frame of the
-  // reading just saved against the next fridge's name.
+  // Reset during render so the next fridge never flashes the reading just saved.
   const [resetFor, setResetFor] = useState(occurrenceKey);
   if (resetFor !== occurrenceKey) {
     setResetFor(occurrenceKey);
     setStep("reading");
-    // Re-inferred from the *new* check's range: a freezer followed by a fridge
-    // in one round has to flip the pill from − to +.
+    // Infer from the new range so a freezer-then-fridge round flips the pill.
     setSign(inferTemperatureSign(minTempC, maxTempC));
     setDraft("");
     setPresets([]);
@@ -98,8 +87,7 @@ export function useTemperatureEntry({
 
   function changeDraft(next: string) {
     setDraft(next);
-    // Keeps the sign pill honest when a minus arrives from somewhere else, such
-    // as the desktop field or a paste. An empty draft keeps the last sign.
+    // A leading minus from paste/desktop flips the pill; an empty draft keeps the last sign.
     if (next.startsWith("-")) setSign(-1);
     else if (next !== "") setSign(1);
   }
@@ -109,8 +97,7 @@ export function useTemperatureEntry({
   }
 
   function changeSign(next: 1 | -1) {
-    // The sign has to be stored as well as applied: an empty field has no
-    // leading minus to read it back from.
+    // Stored separately: an empty field has no leading minus to read back.
     setSign(next);
     setDraft(composeSignedDraft(next, digits));
   }
@@ -118,17 +105,12 @@ export function useTemperatureEntry({
   async function submit(value: number, correctiveAction?: string) {
     setIsSubmitting(true);
     try {
-      // Normalises "-0" to 0.
-      await onSubmit(value + 0, correctiveAction);
+      await onSubmit(value + 0, correctiveAction); // Coerce -0 to 0.
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  /**
-   * The one commit action. On the reading step it either advances to the
-   * deviation step or saves; on the deviation step it saves.
-   */
   async function pressPrimary() {
     setShowErrors(true);
 
@@ -180,7 +162,6 @@ export function useTemperatureEntry({
     setNotes,
     isSubmitting,
     pressPrimary,
-    /** Errors surface only once the worker has asked to move on. */
     readingError: showErrors ? readingError : null,
     notesError: showErrors ? notesError : null,
     correctiveError: showErrors ? correctiveError : null,

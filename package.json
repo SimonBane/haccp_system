@@ -6,6 +6,7 @@
     "build": "turbo build",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
+    "test:discovery": "node scripts/check-test-discovery.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
     "db:generate": "turbo db:generate",
     "db:migrate": "turbo db:migrate",

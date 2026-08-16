@@ -26,10 +26,6 @@ type OptimisticContext = {
   previous: TodayResponse | undefined;
 };
 
-/**
- * Every mutation patches the cache before the request goes out, so a tap lands
- * instantly and the row reverts only if the server rejects it.
- */
 export function useTodayMutations(currentUserId: string, timeZone: string) {
   const { locationId } = useLocation();
   const { fetchJson } = useAuthenticatedFetch();

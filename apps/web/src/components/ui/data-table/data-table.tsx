@@ -43,14 +43,8 @@ interface DataTableProps<TData, TValue> {
   data: TData[];
   onRowClick?: (row: Row<TData>) => void;
   renderMobileRow?: (row: Row<TData>) => React.ReactNode;
-  /**
-   * Everything you can do to a row, declared once. Rendered as the desktop
-   * overflow menu, the mobile long-press sheet and the mobile swipe-left tray.
-   */
   getRowActions?: (row: Row<TData>) => RowAction[];
-  /** Names a row in the mobile action sheet and its screen-reader control. */
   getRowLabel?: (row: Row<TData>) => string;
-  /** Density of the mobile list. "card" for records that need more than a line. */
   mobileVariant?: MobileListVariant;
   emptyMessage?: string;
   emptyDescription?: string;
@@ -151,8 +145,7 @@ export function DataTable<TData, TValue>({
   const rowSelection = rowSelectionProp ?? internalRowSelection;
   const setRowSelection = onRowSelectionChange ?? setInternalRowSelection;
 
-  // Where a shift-click range starts from. A ref so extending a range never
-  // rebuilds the memoised column list.
+  // Ref so extending a shift-click range never rebuilds the memoised column list.
   const rangeAnchorRef = React.useRef<string | null>(null);
 
   const hasSelectColumn = columns.some((column) => column.id === "select");
@@ -222,9 +215,6 @@ export function DataTable<TData, TValue>({
   return (
     <div
       className={cn(
-        // No frame around the toolbar and grid. The table already draws its
-        // own card; a tinted, ringed box around that plus the search field
-        // was a second container doing no work.
         "flex min-h-0 flex-1 flex-col gap-3",
         classNameWrapper,
       )}
@@ -275,8 +265,6 @@ export function DataTable<TData, TValue>({
           onRowClick={onRowClick}
           emptyMessage={displayEmptyMessage}
           emptyDescription={isFiltered ? undefined : emptyDescription}
-          // Previously dropped on every mobile render, which meant the
-          // "add your first one" button never appeared on a phone at all.
           emptyAction={isFiltered ? undefined : emptyAction}
           className={className}
         />
@@ -399,7 +387,7 @@ export function DataTable<TData, TValue>({
         </div>
       )}
 
-      {enablePagination && !useCardList ? (
+      {enablePagination ? (
         <div className="shrink-0">
           <DataTablePagination
             table={table}

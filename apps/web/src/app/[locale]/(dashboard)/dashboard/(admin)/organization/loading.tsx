@@ -8,7 +8,6 @@ export default function OrganizationLoading() {
         <Skeleton className="h-8 w-48" />
         <Skeleton className="mt-2 h-4 w-72" />
       </div>
-      {/* Three independent settings sections, each its own card. */}
       {[0, 1, 2].map((section) => (
         <div key={section} className="space-y-4 rounded-lg border p-6">
           <Skeleton className="h-5 w-40" />

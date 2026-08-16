@@ -32,34 +32,21 @@ import {
 import { TodayTaskRow } from "./today-task-row";
 
 type Props = {
-  /** Clock-independent, so its identity survives the minute tick. */
+  /** Clock-independent so its identity survives the minute tick. */
   group: TodayTaskGroup;
   state: TimeGroupState;
   timeZone: string;
-  /**
-   * Only an upcoming round renders a countdown, so callers pass null for every
-   * other state. That keeps this component's props stable minute to minute and
-   * lets the memo below actually bail out.
-   */
+  /** Null except for upcoming rounds, so the memo bails out between ticks. */
   minutesUntil: number | null;
-  /** Last completed round before the live now marker — stays expanded. */
+  /** Last completed round before the now marker — stays expanded. */
   isLastBeforeNowLine: boolean;
-  /** Last block on the axis, so its rail fades out instead of reaching for a
-   * dot below that does not exist. */
+  /** Last block on the axis: fade the rail instead of reaching for a missing dot. */
   isTail: boolean;
   syncingKeys: ReadonlySet<string>;
   currentUserId: string | null;
   onActivate: (item: TodayTimelineItem) => void;
 };
 
-/**
- * Dashes are keyed off "upcoming" rather than a past/future flag: a round
- * completed early is still solid green, because completion is the stronger
- * signal than where the clock happens to be.
- *
- * Done and overdue match the "now" rail's width so the whole rail reads at a
- * glance — only "upcoming" stays a thin dashed hint of what's ahead.
- */
 function getRailClassName(
   state: TimeGroupState,
   deviationCount: number,
@@ -78,12 +65,7 @@ function getRailClassName(
   }
 }
 
-/**
- * The ring is the dot's own colour at a fraction of its strength, so the
- * marker reads as one object rather than a dot with a halo bolted on. Every
- * ring is 4px on a 14px dot — a 22px outer circle, the width the rail's
- * segments are cut to land on.
- */
+/** 4px ring on a 14px dot = 22px outer circle, matching the rail segment cut. */
 function getDotRingClassName(
   state: TimeGroupState,
   deviationCount: number,
@@ -129,8 +111,7 @@ export const TodayTimeGroup = memo(function TodayTimeGroup({
   const t = useTranslations("TodayPage");
   const durationLabel = useDurationLabel();
 
-  // A finished group folds away, unless it hides a deviation worth seeing or
-  // it is the anchor round directly above the live now marker.
+  // Fold done groups unless they hide a deviation or sit just above the now marker.
   const [open, setOpen] = useState(
     state !== "done" || group.deviationCount > 0 || isLastBeforeNowLine,
   );
@@ -138,8 +119,6 @@ export const TodayTimeGroup = memo(function TodayTimeGroup({
   const headingId = `${group.id}-heading`;
   const railClassName = getRailClassName(state, group.deviationCount);
 
-  // Offered only when there is a round to run. A single pending check is what
-  // tapping its row already does, so a button beside it would be noise.
   const roundItems = chainableTemperatureItems(group);
   const roundStart = roundItems.length >= 2 ? roundItems[0] : null;
 
@@ -162,10 +141,6 @@ export const TodayTimeGroup = memo(function TodayTimeGroup({
         aria-labelledby={headingId}
         className="relative scroll-mt-4 pb-2 pl-9 sm:pl-11 md:scroll-mt-16"
       >
-        {/* Rail from this round's own dot down to the next one, carrying this
-            round's state — a colour never starts before the dot that earned
-            it, and the whole axis still reads as one line reporting how the
-            day went at a glance. */}
         <span
           aria-hidden
           className={cn(
@@ -174,7 +149,6 @@ export const TodayTimeGroup = memo(function TodayTimeGroup({
           )}
         />
 
-        {/* Marker */}
         <span
           aria-hidden
           className={cn(
@@ -198,9 +172,7 @@ export const TodayTimeGroup = memo(function TodayTimeGroup({
           />
         </span>
 
-        {/* Two targets, so they have to be siblings — a button nested inside
-            the trigger would be invalid. The row's stretched-overlay trick
-            works only where there is genuinely one thing to tap. */}
+        {/* Sibling targets — a button nested inside the trigger would be invalid HTML. */}
         <div className="flex items-center gap-2">
           <CollapsibleTrigger
             aria-label={`${group.scheduledTime}, ${summaryText}`}
@@ -238,9 +210,6 @@ export const TodayTimeGroup = memo(function TodayTimeGroup({
               </Badge>
             ) : null}
 
-            {/* A deviation badge alongside a state badge already fills a 375px
-              header, and the count is the least important of the three — it
-              stays in the trigger's aria-label either way. */}
             {state === "done" && group.deviationCount > 0 ? null : (
               <span
                 className={cn(

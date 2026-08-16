@@ -13,8 +13,6 @@ function RowSkeleton() {
         <Skeleton className="size-10 shrink-0 rounded-full sm:size-11" />
         <div className="min-w-0 flex-1 space-y-2">
           <Skeleton className="h-3.5 w-40 max-w-full" />
-          {/* Chip row: a badge is 20px tall and pill-shaped, so the placeholder
-              matches or the card visibly grows when data lands. */}
           <Skeleton className="h-5 w-32 rounded-4xl" />
         </div>
         <Skeleton className="hidden h-6 w-20 rounded-md sm:block" />
@@ -47,7 +45,6 @@ function GroupSkeleton({ rows }: { rows: number }) {
   );
 }
 
-/** Mirrors the real timeline so the layout does not shift when data lands. */
 export function TodayPageSkeleton() {
   const t = useTranslations("TodayPage");
 
@@ -55,8 +52,6 @@ export function TodayPageSkeleton() {
     <div className="flex flex-1 flex-col" aria-busy="true">
       <span className="sr-only">{t("loading")}</span>
 
-      {/* No safe-area padding: this renders below the top bar, which already
-          clears the notch, and inside the scroll region rather than over it. */}
       <header className="sticky top-0 z-30 bg-background backdrop-blur-xl md:rounded-t-xl supports-[backdrop-filter]:bg-background/85">
         <div
           className={cn(

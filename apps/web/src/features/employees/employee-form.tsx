@@ -96,8 +96,7 @@ export function EmployeeForm({
   }, [tenantLocations, locationId]);
   const isEditing = Boolean(employee);
   const isActive = employee?.status === "active";
-  // Not focused for an active member: their email field is disabled, so a
-  // primed keyboard would come up over something that cannot take it.
+  // Do not autofocus: an active member's email is disabled, so the keyboard would cover a dead field.
   const emailRef = useRef<HTMLInputElement | null>(null);
   const isEditingSelf =
     Boolean(employee?.user.clerkUserId) &&
@@ -141,9 +140,7 @@ export function EmployeeForm({
         locationIds: z.array(z.uuid()),
       })
       .check((ctx) => {
-        // Same predicate the API enforces. The form additionally waives it for
-        // single-location organisations, where there is nothing to choose and
-        // the assignment is filled in on submit.
+        // Same predicate as the API; waived for single-location orgs (assignment filled in on submit).
         if (
           needsLocationSelection({ ...ctx.value, multipleLocationsEnabled })
         ) {
@@ -207,7 +204,6 @@ export function EmployeeForm({
   const hasChanges = !isEditing || !employee || isDirty;
 
   const selectedRole = useWatch({ control: form.control, name: "role" });
-  // Admins reach every location, so there is nothing to pick for them.
   const showLocationPicker =
     multipleLocationsEnabled && requiresLocationAssignments(selectedRole);
 

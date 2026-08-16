@@ -73,8 +73,6 @@ async function fetchClerkOrganization(clerkOrgId: string) {
   );
 }
 
-// Repairs whatever state the losing writer collided with: a live row missing its
-// default location, or a tombstoned row that Clerk says is still active.
 async function reconcileExistingTenant(
   db: Db,
   clerkOrgId: string,
@@ -101,8 +99,7 @@ async function reconcileExistingTenant(
         existing.id,
       );
 
-      // Must stay last: a unique violation aborts the whole transaction, so it has
-      // to be allowed to escape rather than be caught with tx still in use.
+      // Last: a unique violation aborts the transaction, so it must escape while tx is still usable.
       if (currentLocations.length === 0) {
         await locationRepository.insert(tx, {
           organizationId: existing.id,
@@ -167,8 +164,6 @@ export const tenantService = {
         throw error;
       }
 
-      // Someone else created it, or a partial row already existed. Either way the
-      // winning state is authoritative — adopt it instead of failing.
       blob = await reconcileExistingTenant(db, clerkOrgId);
     }
 
@@ -176,8 +171,6 @@ export const tenantService = {
     return blob;
   },
 
-  // The only way to resolve a tenant on the request path. Provisions on miss, so
-  // a missing or half-built org is repaired rather than surfaced as a 404.
   async ensureTenant(db: Db, clerkOrgId: string): Promise<ResolvedTenant> {
     const cached = await tenantCache.get(clerkOrgId);
     if (cached) {
@@ -187,18 +180,12 @@ export const tenantService = {
     return tenantService.provisionTenantOnMiss(db, clerkOrgId);
   },
 
-  /**
-   * The cold half of `ensureTenant`, for callers that have already missed the
-   * cache. Skipping the leading read there saves a guaranteed-miss round trip
-   * on every cold request.
-   */
   async provisionTenantOnMiss(
     db: Db,
     clerkOrgId: string,
   ): Promise<ResolvedTenant> {
     return singleFlight(`tenant:${clerkOrgId}`, async () => {
-      // This one is not redundant: a request that queued behind the flight leader
-      // arrives here after the leader has already written the cache.
+      // Queued callers arrive after the leader wrote the cache.
       const recheck = await tenantCache.get(clerkOrgId);
       if (recheck) {
         return toTenantContext(recheck);

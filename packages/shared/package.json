@@ -10,8 +10,8 @@
     }
   },
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
@@ -22,6 +22,7 @@
   "devDependencies": {
     "@haccp/eslint-config": "workspace:*",
     "@haccp/typescript-config": "workspace:*",
+    "@haccp/vitest-config": "workspace:*",
     "@types/node": "^24",
     "eslint": "^9.28.0",
     "typescript": "^5.8.3",

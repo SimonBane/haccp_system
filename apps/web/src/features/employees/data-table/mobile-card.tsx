@@ -28,8 +28,6 @@ export function EmployeesMobileCard({ row, t }: EmployeesMobileRowProps) {
     <MobileListRow
       leading={<EmployeeAvatar employee={employee} size="md" />}
       title={displayName(employee)}
-      // Email and role on one line: the two facts a manager scans for, without
-      // the label/value grid that made these read like table rows on a phone.
       subtitle={`${employee.email} · ${role}`}
       trailing={<EmployeeStatusBadge employee={employee} />}
     />

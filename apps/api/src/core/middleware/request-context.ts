@@ -30,8 +30,7 @@ export const requestContextMiddleware = createMiddleware<AppEnv>(
     c.set("tenant", tenant);
     c.set("user", user);
     c.set("membership", membership);
-    // null means "all locations" — filterAccessibleLocations and
-    // locationParamMiddleware both key off that.
+    // null assignments = all locations (admins).
     c.set("assignedLocationIds", isAdmin ? null : membership.locationIds);
 
     await next();

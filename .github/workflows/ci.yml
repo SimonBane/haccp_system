@@ -10,6 +10,36 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Lint
+        run: pnpm turbo lint
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Typecheck
+        run: pnpm turbo typecheck
+
   build-api:
     name: Build API
     runs-on: ubuntu-latest
@@ -19,19 +49,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.11.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup
+        uses: ./.github/actions/setup
 
       - name: Build API
         run: pnpm turbo build --filter=@haccp/api...
@@ -45,25 +64,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.11.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup
+        uses: ./.github/actions/setup
 
       - name: Build Web
         run: pnpm turbo build --filter=@haccp/web...
 
-  test:
-    name: Test
+  unit-tests:
+    name: Unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -71,22 +79,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.11.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup
+        uses: ./.github/actions/setup
 
       - name: Run tests
         run: pnpm turbo test
+
+      # After a build: Vitest only over-collects once dist is populated.
+      - name: Build emitting packages
+        run: pnpm turbo build --filter=@haccp/api... --filter=@haccp/shared...
+
+      - name: Assert each source test is discovered exactly once
+        run: pnpm test:discovery
 
   validate-migrations:
     name: Validate migrations
@@ -112,30 +116,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.11.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup
+        uses: ./.github/actions/setup
 
       - name: Apply migrations on fresh database
         run: pnpm --filter @haccp/api db:migrate:deploy
         env:
           DIRECT_DATABASE_URL: postgresql://haccp:haccp@localhost:5432/haccp
 
-      # Guards both failure modes that let drizzle/meta drift out of sync with
-      # the TS schema: a schema change committed without a migration, and a
-      # hand-written migration the snapshots never learned about. Either one
-      # makes the *next* generate diff against a stale snapshot and emit
-      # destructive SQL, so catch it at the PR that introduces it.
+      # db:check guards snapshot drift (schema without a migration, or a hand-written migration).
       - name: Check for uncommitted schema drift
         run: pnpm --filter @haccp/api db:check
         env:

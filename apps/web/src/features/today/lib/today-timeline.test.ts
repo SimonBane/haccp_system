@@ -7,21 +7,10 @@ import {
   timeGroupId,
 } from "./today-timeline";
 
-/**
- * Characterization test for the Today timeline.
- *
- * `buildTodayTimeline` is the whole of the Today page's derived state, and it is
- * about to be split so the per-task item objects stop being reallocated on every
- * clock tick. These assertions pin the current output at four clock positions so
- * the split can be proved output-identical rather than eyeballed.
- *
- * Everything is in Europe/Sofia (the product default) on a fixed winter date, so
- * the offset is a flat UTC+2 and no DST behaviour leaks into the expectations.
- */
+/** Europe/Sofia on a fixed winter date so the offset is a flat UTC+2. */
 const SOFIA = "Europe/Sofia";
 const DATE = "2026-01-15";
 
-/** 2026-01-15T{hh:mm} local == UTC-2. */
 function at(localTime: string): Date {
   const [h, m] = localTime.split(":").map(Number);
   return new Date(Date.UTC(2026, 0, 15, h - 2, m));
@@ -55,13 +44,6 @@ function task(overrides: Partial<TodayTaskItem> = {}): TodayTaskItem {
 
 const FRIDGE = uuid();
 
-/**
- * Eight occurrences over three rounds, deliberately supplied out of time order
- * so the sort is exercised:
- *   07:00 - fridge temp (done, in range), cleaning (done), cleaning (pending)
- *   12:00 - fridge temp (done, OUT OF RANGE), cleaning (pending)
- *   18:00 - fridge temp (pending), cleaning (pending), cleaning (pending)
- */
 function buildTasks(): TodayTaskItem[] {
   seq = 100;
   return [
@@ -175,9 +157,7 @@ describe("buildTodayTimeline", () => {
     const middayFridge = midday.items.find((i) => i.task.equipmentId);
     const eveningFridge = evening.items.find((i) => i.task.equipmentId);
 
-    // The first reading of the day has nothing before it.
     expect(morningFridge?.priorReading).toBeNull();
-    // Midday sees the 07:00 reading; evening sees the 12:00 one.
     expect(middayFridge?.priorReading).toEqual({
       scheduledTime: "07:00",
       completedAt: "2026-01-15T05:04:00.000Z",
@@ -351,11 +331,6 @@ describe("buildTodayTaskGroups + applyClock", () => {
       }
     });
 
-    /**
-     * The reason the split exists. `TodayTaskRow` is memoised on `item`, so an
-     * identity change every minute made the memo permanently useless — ~40 rows
-     * re-rendering on a wall-mounted tablet for no new information.
-     */
     it("keeps item identity stable across clock ticks", () => {
       const base = buildTodayTaskGroups(tasks);
       const a = applyClock(base, at("09:00"), DATE, SOFIA);
@@ -366,7 +341,6 @@ describe("buildTodayTaskGroups + applyClock", () => {
     });
 
     it("still produces a fresh timeline when the tasks change", () => {
-      // Identity must track the data, so an optimistic patch still re-renders.
       const a = applyClock(buildTodayTaskGroups(tasks), at("09:00"), DATE, SOFIA);
       const b = applyClock(
         buildTodayTaskGroups(buildTasks()),

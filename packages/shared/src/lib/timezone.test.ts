@@ -6,13 +6,7 @@ import {
   zoneOffsetMinutes,
 } from "./timezone.js";
 
-/**
- * Europe/Sofia is the product's default zone. It runs EET (UTC+2) in winter and
- * EEST (UTC+3) in summer, switching at 01:00 UTC on the last Sunday of March and
- * October — which makes it a good probe for the two cases that actually bite:
- * the date boundary (a task at 23:30 local is "yesterday" in UTC) and the DST
- * transitions (where a naive offset sampled once lands on the wrong side).
- */
+/** Europe/Sofia: EET UTC+2 / EEST UTC+3; probes the date boundary and DST transitions. */
 const SOFIA = "Europe/Sofia";
 
 describe("zonedDateString", () => {
@@ -42,8 +36,7 @@ describe("zonedDateString", () => {
   });
 
   it("falls back to the runtime zone rather than throwing on a corrupt value", () => {
-    // organizations.timezone is free text, so a bad value must not take the page
-    // down. Any well-formed date string is a pass; the point is that it returns.
+    // Corrupt IANA id must not take the page down.
     expect(zonedDateString(new Date("2026-06-15T12:00:00Z"), "Not/AZone")).toMatch(
       /^\d{4}-\d{2}-\d{2}$/,
     );
@@ -131,8 +124,7 @@ describe("wallClockToInstant", () => {
   });
 
   it("resolves a time inside the spring-forward gap to just after the jump", () => {
-    // 03:00-03:59 local does not exist on 2026-03-29 in Sofia. The documented
-    // contract is "defined rather than exact" — it must not throw or drift a day.
+    // DST spring-forward hole: 03:00–03:59 does not exist; must not throw or drift a day.
     const instant = wallClockToInstant("2026-03-29", "03:30", SOFIA);
     expect(Number.isNaN(instant.getTime())).toBe(false);
     expect(zonedDateString(instant, SOFIA)).toBe("2026-03-29");
