@@ -3,7 +3,6 @@
 import { XIcon } from "lucide-react";
 import * as React from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { handOffKeyboard } from "@/lib/keyboard-primer";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,36 +12,101 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
-/** One button in the mobile form's bottom action bar. */
-export type ResponsiveFormAction = {
+/**
+ * The mobile sheet surface, shared with the Today temperature flow so the two
+ * cannot drift apart.
+ *
+ * Full height rather than sized to content: a short form otherwise put its
+ * commit action halfway up the screen, and the height then changed with every
+ * form. The 2rem inset is what makes the top rounding read as a sheet laid over
+ * the page instead of a new screen.
+ *
+ * The slide distance itself lives in `sheet.tsx`, on the `bottom` side, because
+ * a surface this tall cannot rise the stock `2.5rem` without reading as a pop.
+ * Overriding it from here instead would leave two competing
+ * `[data-side=bottom][data-starting-style]` rules of *identical* specificity,
+ * decided only by Tailwind's emit order — and tailwind-merge cannot collapse
+ * that pair either, since the variants match and only the value differs.
+ */
+export const SHEET_SURFACE = [
+  "top-8 h-[calc(100dvh-2rem)] max-h-none rounded-t-3xl border-t",
+  // Unqualified utilities, so tailwind-merge resolves these against the stock
+  // duration deterministically rather than by emit order.
+  "duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:duration-0",
+].join(" ");
+
+/**
+ * Form controls and the buttons that submit them are the same height — the
+ * `Button` component keeps one unqualified height precisely so a shell like
+ * this can size them without the override leaking into layout buttons.
+ */
+export const SHEET_FOOTER =
+  "shrink-0 px-4 py-3 [&_[data-slot=button]]:h-(--control-h)";
+
+/**
+ * The bar across the top of every mobile sheet.
+ *
+ * Leading control, optically centred title, optional trailing slot — the shape
+ * a phone expects, and the reason the commit action is free to live at the
+ * bottom under the thumb rather than in a far corner.
+ *
+ * It owns the `SheetTitle` / `SheetDescription` wrappers rather than taking
+ * them as nodes, so the two surfaces using it cannot drift on type scale or
+ * truncation.
+ */
+export function SheetAppBar({
+  icon,
+  label,
+  onPress,
+  title,
+  subtitle,
+  trailing,
+}: {
+  /** Usually a close X; the temperature flow swaps in a back arrow. */
+  icon: React.ReactNode;
   label: string;
-  icon?: React.ReactNode;
-  variant?: React.ComponentProps<typeof Button>["variant"];
-  /** id of the `<form>` this submits, so the button can live outside it. */
-  formId?: string;
-  onClick?: () => void;
-  isLoading?: boolean;
-  disabled?: boolean;
-};
+  onPress: () => void;
+  title: React.ReactNode;
+  subtitle?: React.ReactNode;
+  trailing?: React.ReactNode;
+}) {
+  return (
+    // No background of its own: the sheet already paints one, and an opaque
+    // square-cornered box here would cover its rounded top.
+    <header className="grid h-14 shrink-0 grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-2 px-2">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        aria-label={label}
+        className="size-11 justify-self-start rounded-full"
+        onClick={onPress}
+      >
+        {icon}
+      </Button>
 
-export type ResponsiveFormActions = {
-  /**
-   * "stack" gives each action a full-width row — the default, and right for one
-   * action or for two of unequal weight. "split" divides the bar evenly, which
-   * is what two peers want: save vs. save-and-invite, neither subordinate.
-   */
-  layout?: "stack" | "split";
-  items: ResponsiveFormAction[];
-};
+      <div className="min-w-0 text-center">
+        <SheetTitle className="truncate text-base">{title}</SheetTitle>
+        {subtitle ? (
+          <SheetDescription className="truncate text-xs">
+            {subtitle}
+          </SheetDescription>
+        ) : null}
+      </div>
 
-/** The field to land on when the form opens, and what to do with its value. */
-export type ResponsiveFormAutoFocus = {
-  ref: React.RefObject<HTMLInputElement | null>;
-  /** "select" for an edit — the value is a starting point, not a prefix. */
-  selection?: "select" | "end" | "none";
-};
+      {/* Balances the leading button so the title stays optically centred when
+          there is nothing trailing. */}
+      {trailing ?? <span className="w-11" aria-hidden />}
+    </header>
+  );
+}
 
 type ResponsiveFormDialogProps = {
   open: boolean;
@@ -50,81 +114,21 @@ type ResponsiveFormDialogProps = {
   title: React.ReactNode;
   description?: React.ReactNode;
   children: React.ReactNode;
-  /** Desktop footer. Mobile uses `actions`. */
+  /** Shared by both presentations. */
   footer?: React.ReactNode;
-  /** The mobile action bar, pinned to the bottom above the keyboard. */
-  actions?: ResponsiveFormActions;
-  closeLabel?: string;
+  /** Names the mobile app bar's close control. */
+  closeLabel: string;
   className?: string;
-  /** Desktop only. Mobile focus is `autoFocusField`. */
   initialFocus?: boolean;
-  /**
-   * Pair with `primeKeyboard()` in the control that opens this form, or on iOS
-   * the field focuses silently with no keyboard.
-   */
-  autoFocusField?: ResponsiveFormAutoFocus;
 };
 
 /**
- * Slide the whole sheet up from the bottom, the way a native modal presents.
+ * One form surface, two presentations: a bottom sheet on a phone, a centred
+ * dialog from `md` up.
  *
- * Every translate here is qualified with `data-[side=bottom]:`, and that is
- * load-bearing rather than decorative. The stock sheet ships
- * `data-[side=bottom]:data-ending-style:translate-y-[2.5rem]`, which carries one
- * more variant than a bare `data-ending-style:translate-y-full` and therefore
- * wins on specificity — tailwind-merge cannot collapse the pair either, since
- * the variant prefixes differ. That is what made the sheet drop 40px, sit there
- * for the duration, and then vanish instead of sliding out.
- */
-export const SHEET_SLIDE =
-  "duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] data-[side=bottom]:data-starting-style:translate-y-full data-[side=bottom]:data-ending-style:translate-y-full data-starting-style:opacity-100 data-ending-style:opacity-100 motion-reduce:duration-0";
-
-function FormActionBar({ actions }: { actions: ResponsiveFormActions }) {
-  const split = actions.layout === "split";
-
-  return (
-    <div
-      data-slot="form-action-bar"
-      className={cn(
-        // No rule above it: the bar is part of the form, not chrome bolted to
-        // the bottom of it.
-        "flex shrink-0 gap-2 bg-background px-4 pt-3",
-        // When the keyboard is up the home indicator is behind it, so the calc
-        // goes negative and max() falls back to the plain 12px gutter — no dead
-        // band between the keys and the buttons.
-        "pb-[max(0.75rem,calc(env(safe-area-inset-bottom)-var(--keyboard-inset,0px)))]",
-        split ? "flex-row" : "flex-col",
-      )}
-    >
-      {actions.items.map((action) => (
-        <Button
-          key={action.label}
-          type={action.formId ? "submit" : "button"}
-          form={action.formId}
-          variant={action.variant}
-          isLoading={action.isLoading}
-          disabled={action.disabled}
-          onClick={action.onClick}
-          className={cn("min-h-12 text-base", split ? "flex-1" : "w-full")}
-        >
-          {action.icon}
-          {action.label}
-        </Button>
-      ))}
-    </div>
-  );
-}
-
-/**
- * One form surface, two presentations.
- *
- * On a phone it is always the whole screen: a partial-height sheet leaves a form
- * scrolling inside a letterbox, one careless swipe from dismissal, and made the
- * app feel like it had two kinds of form for no reason a user could name. The
- * actions live in a bar pinned to the bottom, which the sheet lifts clear of the
- * software keyboard — see the `[data-side=bottom]` rule in globals.css.
- *
- * On desktop it stays a centred dialog with a conventional footer.
+ * Both are sized to their content and let the browser handle the software
+ * keyboard — the body scrolls, the page scrolls it into view, and nothing here
+ * measures the viewport.
  */
 export function ResponsiveFormDialog({
   open,
@@ -133,28 +137,11 @@ export function ResponsiveFormDialog({
   description,
   children,
   footer,
-  actions,
   closeLabel,
   className,
   initialFocus,
-  autoFocusField,
 }: ResponsiveFormDialogProps) {
   const isMobile = useIsMobile();
-  const close = React.useCallback(() => onOpenChange(false), [onOpenChange]);
-
-  // A function rather than a ref: Base UI's default resolver deliberately
-  // focuses the popup itself on a touch interaction, to *suppress* the
-  // keyboard. Returning false says focus has been placed already, which also
-  // stops Base UI taking it back.
-  //
-  // Not memoised — Base UI reads it once when the popup opens, so a new
-  // identity per render costs nothing and keeps it off the stale-closure path.
-  const resolveSheetFocus = () => {
-    const node = autoFocusField?.ref.current;
-    if (!node) return true;
-    handOffKeyboard(node, autoFocusField?.selection ?? "none");
-    return false;
-  };
 
   if (isMobile) {
     return (
@@ -162,41 +149,20 @@ export function ResponsiveFormDialog({
         <SheetContent
           side="bottom"
           showCloseButton={false}
-          initialFocus={resolveSheetFocus}
-          className={cn(
-            // Edge to edge and square: this is the screen now, not a card laid
-            // over it. The safe area is padding on the nav bar, so the bar's
-            // own background reaches under the notch.
-            "inset-x-0 top-0 flex h-auto flex-col gap-0 rounded-none border-0 p-0",
-            SHEET_SLIDE,
-          )}
+          className={cn("gap-0 p-0", SHEET_SURFACE, className)}
         >
-          {/* X · Title. No rule under it — the elevation change between chrome
-              and content is enough separation, and the commit action belongs
-              under the thumb, not in the far corner. */}
-          <div className="flex shrink-0 items-center gap-2 px-3 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-lg"
-              aria-label={closeLabel}
-              className="size-(--control-h) shrink-0"
-              onClick={close}
-            >
-              <XIcon className="size-5" />
-            </Button>
-            <SheetTitle className="min-w-0 flex-1 truncate text-center text-base">
-              {title}
-            </SheetTitle>
-            {/* Balances the X so the title stays optically centred. */}
-            <span className="size-(--control-h) shrink-0" aria-hidden />
-          </div>
+          <SheetAppBar
+            icon={<XIcon className="size-5" />}
+            label={closeLabel}
+            onPress={() => onOpenChange(false)}
+            title={title}
+          />
 
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-3 pb-4">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
             {children}
           </div>
 
-          {actions?.items.length ? <FormActionBar actions={actions} /> : null}
+          {footer ? <div className={SHEET_FOOTER}>{footer}</div> : null}
         </SheetContent>
       </Sheet>
     );

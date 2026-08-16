@@ -1,17 +1,14 @@
 "use client";
 
 import type { Row, Table as ReactTable } from "@tanstack/react-table";
-import { Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState, type ReactNode } from "react";
 import {
   MobileList,
-  MobileListSwipeAction,
   type MobileListVariant,
 } from "@/components/ui/data-table/data-table-mobile-list";
 import { RowActionMenuItems } from "@/components/ui/data-table/data-table-row-actions";
 import {
-  destructiveRowAction,
   visibleRowActions,
   type RowAction,
 } from "@/components/ui/data-table/row-action";
@@ -23,7 +20,6 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { SwipeableRow } from "@/components/ui/swipeable-row";
 import { useLongPress } from "@/hooks/use-long-press";
 import { cn } from "@/lib/utils";
 
@@ -50,7 +46,6 @@ function CardListRow<TData>({
   onRowClick,
   onOpenActions,
   moreActionsLabel,
-  variant,
 }: {
   row: Row<TData>;
   children: ReactNode;
@@ -60,7 +55,6 @@ function CardListRow<TData>({
   /** Passes the row element up, so the menu can anchor to what was pressed. */
   onOpenActions: (anchor: HTMLElement) => void;
   moreActionsLabel: string;
-  variant: MobileListVariant;
 }) {
   const hasActions = visibleRowActions(actions).length > 0;
   // The hook owns the ref and hands the node back, so the row keeps a single
@@ -71,31 +65,6 @@ function CardListRow<TData>({
   const openHere = () => {
     if (node) onOpenActions(node);
   };
-  const deleteAction = destructiveRowAction(actions);
-
-  const content = deleteAction ? (
-    // One action, so a narrower tray than the two-action one this replaces.
-    // No swipe-past-threshold auto-commit: deletes here are permanent, there is
-    // no trash to recover from, and the confirm dialog stays.
-    <SwipeableRow
-      actionsWidth={88}
-      // Matches the card's own corners, or the tray revealed behind it shows
-      // square red corners poking past a rounded card.
-      className={variant === "card" ? "rounded-xl" : undefined}
-      actions={
-        <MobileListSwipeAction
-          label={deleteAction.label}
-          icon={deleteAction.icon ?? <Trash2Icon className="size-4" />}
-          variant="destructive"
-          onClick={deleteAction.onSelect}
-        />
-      }
-    >
-      {children}
-    </SwipeableRow>
-  ) : (
-    children
-  );
 
   return (
     <div
@@ -137,10 +106,10 @@ function CardListRow<TData>({
             onRowClick(row);
           }}
         >
-          {content}
+          {children}
         </div>
       ) : (
-        content
+        children
       )}
 
       {/*
@@ -167,10 +136,10 @@ function CardListRow<TData>({
 /**
  * The mobile face of a data table: one grouped list instead of a grid.
  *
- * Three gestures, the same on every page: tap runs the row's primary action,
- * press-and-hold opens all of them in a menu anchored on the row itself, and
- * swipe-left reveals delete. That replaced a kebab button, a decorative chevron
- * and a two-action swipe tray competing for the same 40px of row.
+ * Two gestures, the same on every page: tap runs the row's primary action, and
+ * press-and-hold opens all of them in a menu anchored on the row itself. That
+ * replaced a kebab button and a decorative chevron competing for the same 40px
+ * of row.
  *
  * The menu is the same component the desktop kebab opens — the press just
  * anchors it to the row instead of to a trigger button, so what you get is the
@@ -236,7 +205,6 @@ export function DataTableCardList<TData>({
                 setOpenActionsRowId(row.id);
               }}
               moreActionsLabel={t("more", { name: label })}
-              variant={variant}
             >
               {renderMobileRow(row)}
             </CardListRow>

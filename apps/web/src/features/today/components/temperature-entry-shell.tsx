@@ -4,7 +4,6 @@ import { ArrowLeftIcon, XIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { ReactNode, RefObject } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -13,15 +12,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { SHEET_SLIDE } from "@/components/ui/responsive-form-dialog";
+  SHEET_FOOTER,
+  SHEET_SURFACE,
+  SheetAppBar,
+} from "@/components/ui/responsive-form-dialog";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { handOffKeyboard } from "@/lib/keyboard-primer";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -45,22 +42,15 @@ type Props = {
 /**
  * The surface a round of temperature readings is entered on.
  *
- * On a phone it is a full-screen modal that slides up from the bottom and then
- * shortens to whatever the software keyboard leaves — see the `[data-side=bottom]`
- * rule in globals.css. The commit action rides that bottom edge, so it ends up
- * directly on top of the keys; that is what freed the app bar's trailing slot for
- * the round counter.
- *
- * On desktop it stays a conventional centred dialog with a footer; a mouse does
- * not mis-tap, and the keyboard never leaves the number field.
+ * A bottom sheet on a phone, a centred dialog from `md` up. Both are sized to
+ * their content; the browser handles the software keyboard.
  *
  * It is mounted once per round and deliberately never remounted between checks:
  * remounting would replay the slide-up on every advance. Only the entry state
  * inside it resets.
  *
- * Deliberately not built on ResponsiveFormDialog: full-screen, a custom app bar
- * and a custom action bar would need new props and a third height variant on a
- * component four admin forms depend on.
+ * Deliberately not built on ResponsiveFormDialog: the app bar carries a back
+ * control and the round counter, which that component has no slot for.
  */
 export function TemperatureEntryShell({
   open,
@@ -107,63 +97,26 @@ export function TemperatureEntryShell({
           side="bottom"
           // The close control lives in the app bar instead.
           showCloseButton={false}
-          // Base UI's default resolver focuses the popup itself on a touch
-          // interaction, precisely to keep the keyboard down. Here the keyboard
-          // is the point, so put focus on the reading field and select what is
-          // in it — a retype then overwrites rather than appends.
-          initialFocus={() => {
-            const node = initialFocus?.current;
-            if (!node) return true;
-            handOffKeyboard(node, "select");
-            return false;
-          }}
-          className={cn(
-            // top-0 with h-auto rather than a fixed 100dvh: the shell's own
-            // `bottom` is driven by --keyboard-inset, and a resolved height
-            // would make the popup overflow the top by the keyboard's height
-            // instead of getting shorter.
-            "top-0 data-[side=bottom]:h-auto max-h-none gap-0 rounded-none border-0 p-0",
-            // The same slide every other form uses, from the same constant, so
-            // the two surfaces cannot drift apart.
-            SHEET_SLIDE,
-          )}
+          initialFocus={initialFocus}
+          className={cn("gap-0 p-0", SHEET_SURFACE)}
         >
-          {/* The height has to include the inset. Tailwind's preflight makes
-              every box border-box, so a bare h-14 with a safe-area top padding
-              leaves a notched iPhone about 9px of actual app bar. */}
-          <header className="grid h-[calc(3.5rem+env(safe-area-inset-top))] shrink-0 grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-2 bg-popover px-2 pt-[env(safe-area-inset-top)]">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-11 justify-self-start rounded-full"
-              aria-label={leadingLabel}
-              onClick={onLeading}
-            >
-              <LeadingIcon className="size-5" />
-            </Button>
+          {/* Keeps its subtitle, unlike the admin forms: which fridge, at what
+              time, is what the worker is confirming — not a restatement of the
+              fields below. */}
+          <SheetAppBar
+            icon={<LeadingIcon className="size-5" />}
+            label={leadingLabel}
+            onPress={onLeading}
+            title={title}
+            subtitle={subtitle}
+            trailing={counter}
+          />
 
-            <div className="min-w-0 text-center">
-              <SheetTitle className="truncate text-base">{title}</SheetTitle>
-              <SheetDescription className="truncate text-xs">
-                {subtitle}
-              </SheetDescription>
-            </div>
-
-            {/* Matches the leading button's width so the title stays optically
-                centred on a lone check, where there is no counter. */}
-            {counter ?? <span className="w-11" aria-hidden />}
-          </header>
-
-          <div className="flex min-h-0 flex-1 flex-col px-4 pb-3">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-3">
             {children}
           </div>
 
-          {/* Sits directly on top of the software keyboard: the sheet shortens
-              by --keyboard-inset, and the home-indicator gutter collapses when
-              the keyboard is already covering it. */}
-          <div className="shrink-0 bg-popover px-4 pt-3 pb-[max(0.75rem,calc(env(safe-area-inset-bottom)-var(--keyboard-inset,0px)))]">
-            {footer}
-          </div>
+          <div className={SHEET_FOOTER}>{footer}</div>
         </SheetContent>
       </Sheet>
     );

@@ -386,20 +386,6 @@ export function TaskTemplatesForm({
       }
       initialFocus={isEditing || isDuplicating ? undefined : false}
       closeLabel={t("cancel")}
-      autoFocusField={{
-        ref: titleRef,
-        selection: isEditing || isDuplicating ? "select" : "none",
-      }}
-      actions={{
-        items: [
-          {
-            label: submitLabel,
-            formId: TASK_TEMPLATES_FORM_ID,
-            isLoading: isSubmitting,
-            disabled: isEditing && !hasChanges,
-          },
-        ],
-      }}
       footer={formFooter}
     >
         <form

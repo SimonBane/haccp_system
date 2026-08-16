@@ -51,7 +51,7 @@ export function DataTableSearch<TData>({
       placeholder={placeholder}
       value={value}
       onSearch={handleSearch}
-      className={cn("h-9 w-full bg-card sm:w-[250px]", className)}
+      className={cn("h-(--control-h) w-full bg-card sm:w-[250px]", className)}
     />
   );
 }

@@ -4,17 +4,7 @@ import { useTheme } from "next-themes"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
 
-const defaultOffset = {
-  bottom: "calc(24px + env(safe-area-inset-bottom, 0px))",
-  right: "calc(24px + env(safe-area-inset-right, 0px))",
-} satisfies ToasterProps["offset"]
-
-const defaultMobileOffset = {
-  bottom: "calc(16px + env(safe-area-inset-bottom, 0px))",
-  right: "calc(16px + env(safe-area-inset-right, 0px))",
-} satisfies ToasterProps["mobileOffset"]
-
-const Toaster = ({ offset, mobileOffset, ...props }: ToasterProps) => {
+const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme()
 
   return (
@@ -22,8 +12,6 @@ const Toaster = ({ offset, mobileOffset, ...props }: ToasterProps) => {
       theme={theme as ToasterProps["theme"]}
       richColors
       className="toaster group"
-      offset={offset ?? defaultOffset}
-      mobileOffset={mobileOffset ?? defaultMobileOffset}
       icons={{
         success: (
           <CircleCheckIcon className="size-4" />

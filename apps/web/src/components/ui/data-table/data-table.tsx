@@ -24,7 +24,6 @@ import type { MobileListVariant } from "@/components/ui/data-table/data-table-mo
 import type { RowAction } from "@/components/ui/data-table/row-action";
 import { DataTableColumnHideButton } from "@/components/ui/data-table/data-table-column-hide-button";
 import { DataTablePagination } from "@/components/ui/data-table/data-table-pagination";
-import { DataTableMobileSearch } from "@/components/ui/data-table/data-table-mobile-search";
 import { DataTableSearch } from "@/components/ui/data-table/data-table-search";
 import { createSelectColumn } from "@/components/ui/data-table/data-table-select-column";
 import { DataTableViewOptions } from "@/components/ui/data-table/data-table-view-options";
@@ -213,13 +212,8 @@ export function DataTable<TData, TValue>({
   const displayEmptyMessage = isFiltered ? noResultsMessage : emptyMessage;
   const showColumnVisibility = enableColumnVisibility && !useCardList;
   const showInlineToolbar = Boolean(Toolbar) || Boolean(toolbar);
-  // Search floats over the bottom of the screen on the card list, so on mobile
-  // the toolbar row usually has nothing left in it and the list starts flush at
-  // the top. Only a custom `Toolbar` keeps it.
-  const useFloatingSearch =
-    useCardList && enableSearch && Boolean(searchColumn);
   const showToolbar =
-    (enableSearch && !useFloatingSearch) ||
+    enableSearch ||
     (showInlineToolbar && !useCardList) ||
     Boolean(Toolbar) ||
     showColumnVisibility;
@@ -251,7 +245,7 @@ export function DataTable<TData, TValue>({
                   "sm:w-auto sm:flex-row sm:flex-wrap sm:items-center",
               )}
             >
-              {enableSearch && searchColumn && !useFloatingSearch ? (
+              {enableSearch && searchColumn ? (
                 <DataTableSearch
                   table={table}
                   column={searchColumn}
@@ -404,16 +398,6 @@ export function DataTable<TData, TValue>({
           </Table>
         </div>
       )}
-
-      {/* No pager on the mobile list: native lists scroll, and these sets are
-          tens of rows. Search still narrows them. */}
-      {useFloatingSearch && searchColumn ? (
-        <DataTableMobileSearch
-          table={table}
-          column={searchColumn}
-          placeholder={searchPlaceholder ?? ""}
-        />
-      ) : null}
 
       {enablePagination && !useCardList ? (
         <div className="shrink-0">
