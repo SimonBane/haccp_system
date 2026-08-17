@@ -13,7 +13,6 @@ import type { OrganizationMembership } from "../../core/db/schema/organization-m
 import type { User } from "../../core/db/schema/users.js";
 import {
   ConflictError,
-  ForbiddenError,
   NotFoundError,
   ValidationError,
 } from "../../core/errors/app-errors.js";
@@ -22,12 +21,11 @@ import { userService } from "../users/user.service.js";
 import type { EmployeeChanges } from "./employee.changes.js";
 import {
   diffEmployeeChanges,
-  hasInviteMetadataChanges,
   hasProfileChanges,
   isEmptyChangeSet,
 } from "./employee.changes.js";
 import {
-  applyActiveEmployeeUpdate,
+  applyActiveEmployeeProfileUpdate,
   revokeClerkInvitation,
   syncClerkMembershipRemoval,
 } from "./employee.clerk.js";
@@ -78,7 +76,6 @@ function assertUpdateAllowed(
   detail: EmployeeDetail,
   input: UpdateEmployeeInput,
   changes: EmployeeChanges,
-  actorUserDbId: string,
   tenantLocations: LocationResponse[],
 ): void {
   if (
@@ -90,10 +87,6 @@ function assertUpdateAllowed(
 
   if (input.locationIds !== undefined) {
     assertLocationIdsBelongToTenant(input.locationIds, tenantLocations);
-  }
-
-  if (changes.role !== undefined && detail.membership.userId === actorUserDbId) {
-    throw new ForbiddenError("You cannot change your own role");
   }
 }
 
@@ -159,7 +152,7 @@ async function persistEmployeeChanges(
   organizationId: string,
   detail: EmployeeDetail,
   changes: EmployeeChanges,
-): Promise<EmployeeDetail> {
+): Promise<{ user: User; locationIds: string[] }> {
   try {
     return await db.transaction(async (tx) => {
       const user = hasProfileChanges(changes)
@@ -168,16 +161,11 @@ async function persistEmployeeChanges(
             firstName: changes.firstName,
             lastName: changes.lastName,
           })
-        : null;
+        : detail.user;
 
-      const membership = changes.role
-        ? await employeeRepository.updateByIdAndOrganization(
-            tx,
-            organizationId,
-            detail.membership.id,
-            { role: changes.role },
-          )
-        : null;
+      if (!user) {
+        throw new NotFoundError("Employee not found");
+      }
 
       if (changes.locationIds) {
         await employeeRepository.replaceLocationAssignments(
@@ -189,8 +177,7 @@ async function persistEmployeeChanges(
       }
 
       return {
-        user: user ?? detail.user,
-        membership: membership ?? detail.membership,
+        user,
         locationIds: changes.locationIds ?? detail.locationIds,
       };
     });
@@ -267,7 +254,6 @@ export const employeeService = {
     organizationId: string,
     clerkOrgId: string,
     inviterClerkUserId: string,
-    actorUserDbId: string,
     orgLocale: AppLocale,
     membershipId: string,
     input: UpdateEmployeeInput,
@@ -276,7 +262,7 @@ export const employeeService = {
     const detail = await requireEmployeeDetail(db, organizationId, membershipId);
     const changes = diffEmployeeChanges(detail, input, tenantLocations);
 
-    assertUpdateAllowed(detail, input, changes, actorUserDbId, tenantLocations);
+    assertUpdateAllowed(detail, input, changes, tenantLocations);
 
     if (isEmptyChangeSet(changes)) {
       return buildEmployeeResponseFromDetail(detail, tenantLocations);
@@ -297,8 +283,7 @@ export const employeeService = {
       const { clerkInvitationId, status } = detail.membership;
 
       if (status === MEMBERSHIP_STATUS.ACTIVE && detail.user.clerkUserId) {
-        await applyActiveEmployeeUpdate(
-          clerkOrgId,
+        await applyActiveEmployeeProfileUpdate(
           detail.user.clerkUserId,
           changes,
           next.user,
@@ -308,7 +293,7 @@ export const employeeService = {
       const membership =
         status === MEMBERSHIP_STATUS.INVITED &&
         clerkInvitationId &&
-        hasInviteMetadataChanges(changes)
+        hasProfileChanges(changes)
           ? await issueMembershipInvitation(
               db,
               organizationId,
@@ -318,13 +303,13 @@ export const employeeService = {
                 clerkOrgId,
                 inviterUserId: inviterClerkUserId,
                 email: next.user.email,
-                role: next.membership.role,
+                role: detail.membership.role,
                 firstName: next.user.firstName,
                 lastName: next.user.lastName,
               },
               { previousInvitationId: clerkInvitationId },
             )
-          : next.membership;
+          : undefined;
 
       return buildEmployeeResponseFromDetail(detail, tenantLocations, {
         membership,

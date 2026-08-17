@@ -10,7 +10,10 @@ import {
   taskTemplates,
   users,
 } from "../../../src/core/db/schema/index.js";
-import { MEMBERSHIP_STATUS } from "../../../src/core/db/schema/organization-memberships.js";
+import {
+  MEMBERSHIP_STATUS,
+  type MembershipStatus,
+} from "../../../src/core/db/schema/organization-memberships.js";
 import { clerkFake } from "./clerk-fake.js";
 
 export type SeededLocation = {
@@ -225,6 +228,12 @@ export async function seedOrganization(
       ],
       primaryEmailAddressId: `idn_${employeeClerkUserId}`,
     });
+    // Clerk's membership role must agree with the seeded DB row too, or a role
+    // change test starts from an already-drifted state without meaning to.
+    clerkFake.setMembership(clerkOrgId, adminClerkUserId, { role: ORG_ROLE.ADMIN });
+    clerkFake.setMembership(clerkOrgId, employeeClerkUserId, {
+      role: ORG_ROLE.EMPLOYEE,
+    });
 
     return {
       organizationId,
@@ -261,6 +270,65 @@ export async function seedOrganization(
       },
     } satisfies SeededOrg;
   });
+}
+
+export type SeededExtraEmployee = {
+  membershipId: string;
+  userId: string;
+  email: string;
+  clerkUserId: string | null;
+};
+
+/**
+ * Adds one more membership to an already-seeded org at any status — the base
+ * fixture only ever produces one ACTIVE admin and one ACTIVE employee, so role
+ * tests that need a draft/invited row, or a second admin, build on this.
+ */
+export async function seedEmployeeWithStatus(
+  db: Db,
+  org: SeededOrg,
+  options: {
+    status: MembershipStatus;
+    role?: (typeof ORG_ROLE)[keyof typeof ORG_ROLE];
+    clerkInvitationId?: string | null;
+  },
+): Promise<SeededExtraEmployee> {
+  const runId = randomUUID().slice(0, 8);
+  const email = `extra-${runId}@${org.clerkOrgId}.test`;
+  const role = options.role ?? ORG_ROLE.EMPLOYEE;
+  // Only an ACTIVE membership has a linked Clerk identity — draft/invited rows
+  // are pre-Clerk by definition.
+  const clerkUserId =
+    options.status === MEMBERSHIP_STATUS.ACTIVE ? `user_extra_${runId}` : null;
+
+  const [user] = await db
+    .insert(users)
+    .values({ clerkUserId, firstName: "Extra", lastName: "Person", email })
+    .returning();
+
+  const [membership] = await db
+    .insert(organizationMemberships)
+    .values({
+      organizationId: org.organizationId,
+      userId: user!.id,
+      role,
+      status: options.status,
+      clerkInvitationId: options.clerkInvitationId ?? null,
+      invitedAt: options.status === MEMBERSHIP_STATUS.INVITED ? new Date() : null,
+    })
+    .returning();
+
+  if (clerkUserId) {
+    clerkFake.setUser(clerkUserId, {
+      firstName: "Extra",
+      lastName: "Person",
+      emailAddresses: [{ id: `idn_${clerkUserId}`, emailAddress: email }],
+      primaryEmailAddressId: `idn_${clerkUserId}`,
+    });
+    clerkFake.setMembership(org.clerkOrgId, clerkUserId, { role });
+  }
+
+  return { membershipId: membership!.id, userId: user!.id, email, clerkUserId };
 }
 
 /**

@@ -6,6 +6,6 @@
     // narrowed back to src/ by tsconfig.build.json.
     "rootDir": "."
   },
-  "include": ["src/**/*", "tests/**/*"],
+  "include": ["src/**/*", "tests/**/*", "scripts/**/*"],
   "exclude": ["node_modules", "dist"]
 }

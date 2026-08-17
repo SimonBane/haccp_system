@@ -14,12 +14,15 @@ import { vi } from "vitest";
 export type ClerkFailureMode =
   /** Resolve from the registry below. */
   | "success"
-  /** Never settles. `withClerkTimeout` rejects at 5s → 503. */
+  /** Never settles. `withClerkTimeout` rejects at 5s → 503 (or, for a role write,
+   *  RoleUpdateOutcomeUnknownError — the caller must re-read to find out). */
   | "timeout"
-  /** Clerk 5xx → 503. Upstream is unwell; the caller may retry. */
+  /** Clerk 5xx → 503, or for a write an ambiguous outcome. */
   | "retryable"
-  /** Clerk 404 → 403. The caller is not entitled; retrying will not help. */
+  /** Clerk 404 → 403 for a read; for a write, a definite (non-ambiguous) rejection. */
   | "permanent"
+  /** Clerk's own last-admin guard: 400 `organization_minimum_permissions_needed`. */
+  | "last-admin"
   /** Our secret key was rejected → 503, never 401. */
   | "invalid-secret"
   /** The presented token is bad → 401. */
@@ -28,7 +31,12 @@ export type ClerkFailureMode =
   | "network";
 
 export type ClerkTarget =
-  "verifyToken" | "users.getUser" | "organizations.getOrganization" | "*";
+  | "verifyToken"
+  | "users.getUser"
+  | "organizations.getOrganization"
+  | "organizations.updateOrganizationMembership"
+  | "organizations.getOrganizationMembershipList"
+  | "*";
 
 export type FakeClerkUser = {
   id: string;
@@ -52,6 +60,9 @@ export type FakeTokenClaims = {
   org_id: string | null;
   org_role: string | null;
 };
+
+/** Mirrors Clerk's OrganizationMembership shape as seen by employee.clerk.ts. */
+export type FakeClerkMembership = { role: string; updatedAt: number };
 
 const TOKEN_PREFIX = "test.";
 
@@ -88,7 +99,22 @@ function never(): Promise<never> {
 const modes = new Map<ClerkTarget, ClerkFailureMode>();
 const users = new Map<string, FakeClerkUser>();
 const organizations = new Map<string, FakeClerkOrganization>();
+const memberships = new Map<string, FakeClerkMembership>();
 const calls = new Map<ClerkTarget, number>();
+
+// Strictly increasing across a whole test run, not just per-call — the
+// clerk_role_updated_at ordering guard depends on later writes always sorting
+// after earlier ones, which Date.now() cannot promise for back-to-back calls.
+let clerkClock = Date.now();
+
+function nextClerkTimestamp(): number {
+  clerkClock += 1;
+  return clerkClock;
+}
+
+function membershipKey(clerkOrgId: string, clerkUserId: string): string {
+  return `${clerkOrgId}:${clerkUserId}`;
+}
 
 function record(target: ClerkTarget): void {
   calls.set(target, (calls.get(target) ?? 0) + 1);
@@ -109,6 +135,18 @@ function injectedFailure(target: ClerkTarget): Promise<never> | null {
       return Promise.reject(clerkApiError(500, "Clerk is unavailable"));
     case "permanent":
       return Promise.reject(clerkApiError(404, "Not Found"));
+    case "last-admin":
+      return Promise.reject(
+        new ClerkAPIResponseError("Cannot demote the last admin", {
+          status: 400,
+          data: [
+            {
+              code: "organization_minimum_permissions_needed",
+              message: "There must be at least one admin",
+            },
+          ],
+        }),
+      );
     case "invalid-secret":
       return Promise.reject(
         new TokenVerificationError({
@@ -177,7 +215,49 @@ const getOrganization = vi.fn(
   },
 );
 
-/** Mirrors the surface `clerkClient` is called through; writes resolve inertly. */
+const updateOrganizationMembership = vi.fn(
+  async (params: {
+    organizationId: string;
+    userId: string;
+    role: string;
+  }): Promise<FakeClerkMembership> => {
+    record("organizations.updateOrganizationMembership");
+
+    const failure = injectedFailure("organizations.updateOrganizationMembership");
+    if (failure) {
+      return failure;
+    }
+
+    const updated: FakeClerkMembership = {
+      role: params.role,
+      updatedAt: nextClerkTimestamp(),
+    };
+    memberships.set(membershipKey(params.organizationId, params.userId), updated);
+    return updated;
+  },
+);
+
+const getOrganizationMembershipList = vi.fn(
+  async (params: {
+    organizationId: string;
+    userId: string[];
+  }): Promise<{ data: FakeClerkMembership[]; totalCount: number }> => {
+    record("organizations.getOrganizationMembershipList");
+
+    const failure = injectedFailure("organizations.getOrganizationMembershipList");
+    if (failure) {
+      return failure;
+    }
+
+    const membership = memberships.get(
+      membershipKey(params.organizationId, params.userId[0] ?? ""),
+    );
+    const data = membership ? [membership] : [];
+    return { data, totalCount: data.length };
+  },
+);
+
+/** Mirrors the surface `clerkClient` is called through; unmodeled writes resolve inertly. */
 const client = {
   users: {
     getUser,
@@ -188,14 +268,11 @@ const client = {
     updateOrganization: vi.fn(async () => null),
     updateOrganizationLogo: vi.fn(async () => null),
     deleteOrganizationLogo: vi.fn(async () => null),
-    getOrganizationMembershipList: vi.fn(async () => ({
-      data: [],
-      totalCount: 0,
-    })),
+    getOrganizationMembershipList,
     createOrganizationInvitation: vi.fn(async () => ({ id: "inv_test" })),
     revokeOrganizationInvitation: vi.fn(async () => ({ id: "inv_test" })),
     deleteOrganizationMembership: vi.fn(async () => null),
-    updateOrganizationMembership: vi.fn(async () => null),
+    updateOrganizationMembership,
   },
 };
 
@@ -208,10 +285,14 @@ export const clerkFake = {
     modes.clear();
     users.clear();
     organizations.clear();
+    memberships.clear();
     calls.clear();
+    clerkClock = Date.now();
     verifyToken.mockClear();
     getUser.mockClear();
     getOrganization.mockClear();
+    updateOrganizationMembership.mockClear();
+    getOrganizationMembershipList.mockClear();
   },
 
   setMode(target: ClerkTarget, mode: ClerkFailureMode): void {
@@ -246,6 +327,24 @@ export const clerkFake = {
       imageUrl: "",
       hasImage: false,
       ...overrides,
+    });
+  },
+
+  /**
+   * Seeds (or overrides) what Clerk considers the current membership role — the
+   * only way to arrange "DB says X, Clerk says Y" drift, or a role that was
+   * already correct before the test's own write.
+   */
+  setMembership(
+    clerkOrgId: string,
+    clerkUserId: string,
+    overrides: Partial<FakeClerkMembership> = {},
+  ): void {
+    const key = membershipKey(clerkOrgId, clerkUserId);
+    const existing = memberships.get(key);
+    memberships.set(key, {
+      role: overrides.role ?? existing?.role ?? "org:employee",
+      updatedAt: overrides.updatedAt ?? nextClerkTimestamp(),
     });
   },
 

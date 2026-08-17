@@ -8,7 +8,7 @@
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "start": "node --env-file=.env --env-file=.env.local dist/index.js",
     "start:ci": "node dist/index.js",
-    "lint": "eslint src/ tests/",
+    "lint": "eslint src/ tests/ scripts/",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
@@ -17,7 +17,8 @@
     "db:migrate": "node --env-file=.env --env-file=.env.local ./node_modules/drizzle-kit/bin.cjs migrate",
     "db:migrate:deploy": "drizzle-kit migrate",
     "db:check": "drizzle-kit generate",
-    "db:studio": "node --env-file=.env --env-file=.env.local ./node_modules/drizzle-kit/bin.cjs studio"
+    "db:studio": "node --env-file=.env --env-file=.env.local ./node_modules/drizzle-kit/bin.cjs studio",
+    "repair:role-projection": "tsx --env-file=.env --env-file=.env.local scripts/repair-role-projection.ts"
   },
   "dependencies": {
     "@clerk/backend": "^3.11.2",

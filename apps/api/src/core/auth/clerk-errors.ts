@@ -3,7 +3,12 @@ import {
   TokenVerificationError,
   TokenVerificationErrorReason,
 } from "@clerk/backend/errors";
-import { ForbiddenError, ServiceUnavailableError } from "../errors/app-errors.js";
+import {
+  ForbiddenError,
+  RoleUpdateOutcomeUnknownError,
+  ServiceUnavailableError,
+  ValidationError,
+} from "../errors/app-errors.js";
 import { logger } from "../../lib/logger.js";
 
 const CLERK_TIMEOUT_MS = 5000;
@@ -84,5 +89,47 @@ export async function callClerk<T>(
     throw new ServiceUnavailableError(
       "Could not reach the identity provider. Please try again.",
     );
+  }
+}
+
+function isDefiniteRejection(error: unknown): boolean {
+  const status = clerkErrorStatus(error);
+  return status !== null && status >= 400 && status < 500;
+}
+
+const LAST_ADMIN_CODE = "organization_minimum_permissions_needed";
+
+function isLastAdminRejection(error: unknown): boolean {
+  return (
+    isClerkAPIResponseError(error) &&
+    error.errors.some((entry) => entry.code === LAST_ADMIN_CODE)
+  );
+}
+
+export async function callClerkWrite<T>(
+  promise: Promise<T>,
+  context: {
+    rejectionMessage: string;
+    logContext: Record<string, unknown>;
+  },
+): Promise<T> {
+  try {
+    return await withClerkTimeout(promise);
+  } catch (error) {
+    if (isDefiniteRejection(error)) {
+      if (isLastAdminRejection(error)) {
+        throw new ValidationError(
+          "The organization must keep at least one admin.",
+        );
+      }
+
+      throw new ValidationError(context.rejectionMessage);
+    }
+
+    logger.error(
+      { err: error, ...context.logContext },
+      "Clerk write outcome could not be determined",
+    );
+    throw new RoleUpdateOutcomeUnknownError();
   }
 }

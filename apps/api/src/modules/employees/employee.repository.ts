@@ -1,7 +1,9 @@
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { ORG_ROLE } from "@haccp/shared";
+import { and, eq, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
 import type { Db, DbClient } from "../../core/db/client.js";
 import { organizationMemberLocations } from "../../core/db/schema/organization-member-locations.js";
 import { organizationMemberships } from "../../core/db/schema/organization-memberships.js";
+import { MEMBERSHIP_STATUS } from "../../core/db/schema/organization-memberships.js";
 import type { MembershipStatus } from "../../core/db/schema/organization-memberships.js";
 import { organizations } from "../../core/db/schema/organizations.js";
 import { users } from "../../core/db/schema/users.js";
@@ -31,7 +33,7 @@ export type MembershipContextRow = {
   locationIds: string[];
 };
 
-function selectMembershipContext(db: Db) {
+function selectMembershipContext(db: DbClient) {
   return db
     .select({
       membership: organizationMemberships,
@@ -91,7 +93,7 @@ export const employeeRepository = {
     }));
   },
 
-  async findDetailById(db: Db, organizationId: string, membershipId: string) {
+  async findDetailById(db: DbClient, organizationId: string, membershipId: string) {
     const [row] = await selectMembershipContext(db)
       .where(
         and(
@@ -289,6 +291,61 @@ export const employeeRepository = {
         organizationId,
       })),
     );
+  },
+
+  // Excludes the membership being changed, so a caller can ask "would this
+  // organization still have an admin after this one is demoted?" in one query.
+  async countActiveAdmins(
+    db: Db,
+    organizationId: string,
+    excludeMembershipId?: string,
+  ): Promise<number> {
+    const conditions = [
+      eq(organizationMemberships.organizationId, organizationId),
+      eq(organizationMemberships.role, ORG_ROLE.ADMIN),
+      eq(organizationMemberships.status, MEMBERSHIP_STATUS.ACTIVE),
+      isNull(organizationMemberships.deletedAt),
+    ];
+
+    if (excludeMembershipId) {
+      conditions.push(ne(organizationMemberships.id, excludeMembershipId));
+    }
+
+    const [row] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(organizationMemberships)
+      .where(and(...conditions));
+
+    return row?.count ?? 0;
+  },
+
+  // Conditional on clerk_role_updated_at so an older Clerk read can never overwrite
+  // a role a newer read (or webhook) already wrote — the ordering guard for
+  // concurrent role changes and out-of-order webhook deliveries.
+  async updateRoleFromClerkByIdAndOrganization(
+    db: DbClient,
+    organizationId: string,
+    membershipId: string,
+    role: string,
+    clerkRoleUpdatedAt: Date,
+  ) {
+    const [updated] = await db
+      .update(organizationMemberships)
+      .set({ role, clerkRoleUpdatedAt, updatedAt: new Date() })
+      .where(
+        and(
+          eq(organizationMemberships.id, membershipId),
+          eq(organizationMemberships.organizationId, organizationId),
+          isNull(organizationMemberships.deletedAt),
+          or(
+            isNull(organizationMemberships.clerkRoleUpdatedAt),
+            lt(organizationMemberships.clerkRoleUpdatedAt, clerkRoleUpdatedAt),
+          ),
+        ),
+      )
+      .returning();
+
+    return updated ?? null;
   },
 
   async findMembershipByClerkIds(

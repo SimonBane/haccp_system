@@ -1,8 +1,4 @@
-import type {
-  LocationResponse,
-  OrgRole,
-  UpdateEmployeeInput,
-} from "@haccp/shared";
+import type { LocationResponse, UpdateEmployeeInput } from "@haccp/shared";
 import { normalizeEmail, normalizeOrgRole, normalizeName } from "@haccp/shared";
 import {
   resolveLocationAssignments,
@@ -14,7 +10,6 @@ export type EmployeeChanges = {
   email?: string;
   firstName?: string;
   lastName?: string;
-  role?: OrgRole;
   locationIds?: string[];
 };
 
@@ -46,15 +41,8 @@ export function diffEmployeeChanges(
     }
   }
 
-  if (input.role !== undefined) {
-    const role = normalizeOrgRole(input.role);
-    if (role !== normalizeOrgRole(detail.membership.role)) {
-      changes.role = role;
-    }
-  }
-
   const targetLocationIds = resolveLocationAssignments(
-    changes.role ?? normalizeOrgRole(detail.membership.role),
+    normalizeOrgRole(detail.membership.role),
     input.locationIds ?? detail.locationIds,
     tenantLocations,
   );
@@ -72,10 +60,6 @@ export function hasProfileChanges(changes: EmployeeChanges): boolean {
     changes.firstName !== undefined ||
     changes.lastName !== undefined
   );
-}
-
-export function hasInviteMetadataChanges(changes: EmployeeChanges): boolean {
-  return hasProfileChanges(changes) || changes.role !== undefined;
 }
 
 export function isEmptyChangeSet(changes: EmployeeChanges): boolean {

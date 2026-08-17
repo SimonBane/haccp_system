@@ -1,0 +1,1 @@
+ALTER TABLE "organization_memberships" ADD COLUMN "clerk_role_updated_at" timestamp with time zone;

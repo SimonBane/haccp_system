@@ -3,9 +3,11 @@
 import {
   createEmployeeSchema,
   employeeResponseSchema,
+  updateEmployeeRoleSchema,
   updateEmployeeSchema,
   type CreateEmployeeInput,
   type EmployeeResponse,
+  type OrgRole,
   type UpdateEmployeeInput,
 } from "@haccp/shared";
 import { useAuth, useUser } from "@clerk/nextjs";
@@ -71,6 +73,21 @@ export function useEmployeesMutations() {
     },
   });
 
+  // Separate from `update` on purpose — role changes are Clerk-first and go
+  // through their own endpoint (HACCP-56 §1). An admin can never change their own
+  // role (the API blocks it), so this never needs reloadClerkUserIfSelf.
+  const updateRole = useMutation({
+    mutationFn: async ({ id, role }: { id: string; role: OrgRole }) => {
+      const payload = updateEmployeeRoleSchema.parse({ role });
+      return fetchJson(`/employees/${id}/role`, employeeResponseSchema, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+    onSuccess: invalidateEmployees,
+  });
+
   const invite = useMutation({
     mutationFn: async (id: string) => {
       return fetchJson(`/employees/${id}/invite`, employeeResponseSchema, {
@@ -109,6 +126,7 @@ export function useEmployeesMutations() {
   return {
     create,
     update,
+    updateRole,
     invite,
     revokeInvitation,
     remove,

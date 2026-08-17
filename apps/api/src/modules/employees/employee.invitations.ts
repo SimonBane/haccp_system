@@ -46,6 +46,10 @@ export async function issueMembershipInvitation(
     isReissue ? MEMBERSHIP_STATUS.INVITED : MEMBERSHIP_STATUS.DRAFT,
     {
       status: MEMBERSHIP_STATUS.INVITED,
+      // A no-op for create()/invite() (params.role already matches the row); the
+      // write that matters is a role reissue via employee.role.service.ts, which
+      // otherwise has no other call site that persists the new role locally.
+      role: params.role,
       clerkInvitationId: invitation.id,
       invitedAt: new Date(),
     },

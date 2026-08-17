@@ -1,11 +1,23 @@
-import { getLocalizedPath, normalizeOrgRole, type AppLocale } from "@haccp/shared";
+import {
+  getLocalizedPath,
+  normalizeOrgRole,
+  type AppLocale,
+  type OrgRole,
+} from "@haccp/shared";
 import { clerkClient } from "../../core/auth/clerk-client.js";
+import {
+  callClerk,
+  callClerkWrite,
+  withClerkTimeout,
+} from "../../core/auth/clerk-errors.js";
 import { env } from "../../env.js";
 import { MEMBERSHIP_STATUS } from "../../core/db/schema/organization-memberships.js";
 import type { OrganizationMembership } from "../../core/db/schema/organization-memberships.js";
 import type { User } from "../../core/db/schema/users.js";
 import { ValidationError } from "../../core/errors/app-errors.js";
 import type { EmployeeChanges } from "./employee.changes.js";
+
+export type ClerkMembershipRole = { role: string; updatedAt: Date };
 
 function buildInvitationRedirectUrl(
   locale: AppLocale,
@@ -27,13 +39,15 @@ export async function sendClerkInvitation(
   lastName: string,
 ) {
   try {
-    return await clerkClient.organizations.createOrganizationInvitation({
-      organizationId: clerkOrgId,
-      inviterUserId,
-      emailAddress: email,
-      role: normalizeOrgRole(role),
-      redirectUrl: buildInvitationRedirectUrl(locale, firstName, lastName),
-    });
+    return await withClerkTimeout(
+      clerkClient.organizations.createOrganizationInvitation({
+        organizationId: clerkOrgId,
+        inviterUserId,
+        emailAddress: email,
+        role: normalizeOrgRole(role),
+        redirectUrl: buildInvitationRedirectUrl(locale, firstName, lastName),
+      }),
+    );
   } catch (error) {
     if (
       typeof error === "object" &&
@@ -66,42 +80,90 @@ export async function revokeClerkInvitation(
   clerkOrgId: string,
   invitationId: string,
 ): Promise<void> {
-  await clerkClient.organizations.revokeOrganizationInvitation({
-    organizationId: clerkOrgId,
-    invitationId,
-  });
+  await withClerkTimeout(
+    clerkClient.organizations.revokeOrganizationInvitation({
+      organizationId: clerkOrgId,
+      invitationId,
+    }),
+  );
 }
 
 export async function removeClerkOrganizationMembership(
   clerkOrgId: string,
   clerkUserId: string,
 ): Promise<void> {
-  await clerkClient.organizations.deleteOrganizationMembership({
-    organizationId: clerkOrgId,
-    userId: clerkUserId,
-  });
+  await withClerkTimeout(
+    clerkClient.organizations.deleteOrganizationMembership({
+      organizationId: clerkOrgId,
+      userId: clerkUserId,
+    }),
+  );
 }
 
-export async function applyActiveEmployeeUpdate(
-  clerkOrgId: string,
+export async function applyActiveEmployeeProfileUpdate(
   clerkUserId: string,
   changes: EmployeeChanges,
   nextUser: User,
 ): Promise<void> {
-  if (changes.role) {
-    await clerkClient.organizations.updateOrganizationMembership({
+  if (changes.firstName !== undefined || changes.lastName !== undefined) {
+    await withClerkTimeout(
+      clerkClient.users.updateUser(clerkUserId, {
+        firstName: nextUser.firstName,
+        lastName: nextUser.lastName,
+      }),
+    );
+  }
+}
+
+// Clerk-first role write. A 4xx (including the last-admin guard) throws a
+// ValidationError; a timeout/network/5xx throws RoleUpdateOutcomeUnknownError, which
+// the caller must resolve with fetchClerkMembershipRole rather than assume failed.
+export async function updateClerkMembershipRole(
+  clerkOrgId: string,
+  clerkUserId: string,
+  role: OrgRole,
+): Promise<ClerkMembershipRole> {
+  const membership = await callClerkWrite(
+    clerkClient.organizations.updateOrganizationMembership({
       organizationId: clerkOrgId,
       userId: clerkUserId,
-      role: changes.role,
-    });
-  }
+      role,
+    }),
+    {
+      rejectionMessage: "The selected organization role is not available",
+      logContext: { clerkOrgId, clerkUserId },
+    },
+  );
 
-  if (changes.firstName !== undefined || changes.lastName !== undefined) {
-    await clerkClient.users.updateUser(clerkUserId, {
-      firstName: nextUser.firstName,
-      lastName: nextUser.lastName,
-    });
-  }
+  // Clerk's OrganizationMembership.updatedAt is epoch milliseconds, not a Date,
+  // despite what the hosted docs say — verified against the installed SDK's .d.ts.
+  return { role: membership.role, updatedAt: new Date(membership.updatedAt) };
+}
+
+// The disambiguating re-read after an ambiguous write, and the source of truth for
+// webhook-driven convergence — never trust a webhook payload's role, re-read this.
+export async function fetchClerkMembershipRole(
+  clerkOrgId: string,
+  clerkUserId: string,
+): Promise<ClerkMembershipRole | null> {
+  const memberships = await callClerk(
+    clerkClient.organizations.getOrganizationMembershipList({
+      organizationId: clerkOrgId,
+      userId: [clerkUserId],
+      limit: 1,
+    }),
+    {
+      notFoundMessage: "This organization is no longer available",
+      notFoundLog: "Clerk organization missing while reading membership role",
+      failureLog: "Clerk membership lookup failed while reading role",
+      logContext: { clerkOrgId, clerkUserId },
+    },
+  );
+
+  const current = memberships.data[0];
+  return current
+    ? { role: current.role, updatedAt: new Date(current.updatedAt) }
+    : null;
 }
 
 export async function syncClerkMembershipRemoval(

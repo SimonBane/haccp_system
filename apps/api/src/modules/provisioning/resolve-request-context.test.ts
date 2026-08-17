@@ -75,6 +75,7 @@ const membershipRow = {
     status: MEMBERSHIP_STATUS.ACTIVE,
     clerkInvitationId: null,
     invitedAt: null,
+    clerkRoleUpdatedAt: null,
     deletedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),

@@ -4,6 +4,7 @@ import {
   createEmployeeSchema,
   employeeListResponseSchema,
   employeeResponseSchema,
+  updateEmployeeRoleSchema,
   updateEmployeeSchema,
   uuidParamSchema,
 } from "@haccp/shared";
@@ -13,6 +14,7 @@ import {
   jsonResponse,
 } from "../../core/openapi/route-factory.js";
 import { getDb, getTenant, requireOrgContext } from "../../lib/context.js";
+import { employeeRoleService } from "./employee.role.service.js";
 import { employeeService } from "./employee.service.js";
 import type { AppEnv } from "../../types.js";
 
@@ -75,6 +77,34 @@ const updateRouteDef = createRoute({
     403: errorResponse("Forbidden"),
     404: errorResponse("Not found"),
     409: errorResponse("Conflict"),
+  },
+});
+
+// Clerk-first, separate from updateRouteDef on purpose — role changes and
+// profile/location changes must never share a call site (HACCP-56 §1).
+const updateRoleRouteDef = createRoute({
+  method: "patch",
+  path: "/{id}/role",
+  tags: ["Employees"],
+  security: bearerSecurity,
+  request: {
+    params: uuidParamSchema,
+    body: {
+      content: {
+        "application/json": {
+          schema: updateEmployeeRoleSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: jsonResponse(employeeResponseSchema),
+    400: errorResponse("Validation error"),
+    401: errorResponse("Unauthorized"),
+    403: errorResponse("Forbidden"),
+    404: errorResponse("Not found"),
+    409: errorResponse("Conflict"),
+    503: errorResponse("The role change could not be confirmed"),
   },
 });
 
@@ -163,7 +193,7 @@ employeeRoutes.openapi(
 employeeRoutes.openapi(
   updateRouteDef,
   defineRouteHandler(updateRouteDef, async (c) => {
-    const { clerkOrgId, organizationId, userDbId, userId } = requireOrgContext(c);
+    const { clerkOrgId, organizationId, userId } = requireOrgContext(c);
     const tenant = getTenant(c);
     const { id } = c.req.valid("param");
     const input = c.req.valid("json");
@@ -172,10 +202,30 @@ employeeRoutes.openapi(
       organizationId,
       clerkOrgId,
       userId,
-      userDbId,
       tenant.organization.locale,
       id,
       input,
+      tenant.locations,
+    );
+    return c.json(updated, 200);
+  }),
+);
+
+employeeRoutes.openapi(
+  updateRoleRouteDef,
+  defineRouteHandler(updateRoleRouteDef, async (c) => {
+    const { clerkOrgId, organizationId, userId, userDbId } = requireOrgContext(c);
+    const tenant = getTenant(c);
+    const { id } = c.req.valid("param");
+    const input = c.req.valid("json");
+    const updated = await employeeRoleService.changeRole(
+      getDb(c),
+      organizationId,
+      clerkOrgId,
+      tenant.organization.locale,
+      { actorUserDbId: userDbId, actorClerkUserId: userId },
+      id,
+      input.role,
       tenant.locations,
     );
     return c.json(updated, 200);

@@ -34,6 +34,7 @@ export const organizationMemberships = pgTable(
     status: text("status").notNull(),
     clerkInvitationId: text("clerk_invitation_id"),
     invitedAt: timestamp("invited_at", { withTimezone: true }),
+    clerkRoleUpdatedAt: timestamp("clerk_role_updated_at", { withTimezone: true }),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()

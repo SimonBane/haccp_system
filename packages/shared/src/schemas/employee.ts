@@ -112,7 +112,6 @@ export const updateEmployeeSchema = z
     email: trimmedEmailSchema.optional(),
     firstName: optionalPersonNameSchema.nullable().optional(),
     lastName: optionalPersonNameSchema.nullable().optional(),
-    role: orgRoleSchema.optional(),
     locationIds: employeeLocationIdsSchema.optional(),
   })
   .refine(
@@ -121,3 +120,9 @@ export const updateEmployeeSchema = z
   );
 
 export type UpdateEmployeeInput = z.infer<typeof updateEmployeeSchema>;
+
+export const updateEmployeeRoleSchema = z.object({
+  role: orgRoleSchema,
+});
+
+export type UpdateEmployeeRoleInput = z.infer<typeof updateEmployeeRoleSchema>;

@@ -69,3 +69,23 @@ export class ServiceUnavailableError extends AppError {
     this.name = "ServiceUnavailableError";
   }
 }
+
+export class RoleUpdateOutcomeUnknownError extends AppError {
+  constructor(
+    message = "Could not confirm whether the role change was applied. Please try again.",
+    details?: unknown,
+  ) {
+    super("ROLE_UPDATE_OUTCOME_UNKNOWN", 503, message, details);
+    this.name = "RoleUpdateOutcomeUnknownError";
+  }
+}
+
+export class RoleProjectionFailedError extends AppError {
+  constructor(
+    message = "The role was updated but could not be saved locally yet. It will be corrected automatically.",
+    details?: unknown,
+  ) {
+    super("ROLE_PROJECTION_FAILED", 500, message, details);
+    this.name = "RoleProjectionFailedError";
+  }
+}

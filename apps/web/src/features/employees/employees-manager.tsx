@@ -41,7 +41,7 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
   const { data: items = [] } = useEmployeesQuery({
     initialData: initialItems,
   });
-  const { create, update, invite, revokeInvitation, remove } =
+  const { create, update, updateRole, invite, revokeInvitation, remove } =
     useEmployeesMutations();
 
   const [formOpen, setFormOpen] = useState(false);
@@ -107,13 +107,21 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
             editingEmployee.status === "invited" &&
             hasInviteMetadataChanges(editingEmployee, values);
 
+          // Role is Clerk-first and lives behind its own endpoint (HACCP-56 §1) —
+          // never bundled with the profile/location PATCH below.
+          if (values.role !== editingEmployee.role) {
+            await updateRole.mutateAsync({
+              id: editingEmployee.id,
+              role: values.role,
+            });
+          }
+
           await update.mutateAsync({
             id: editingEmployee.id,
             input: {
               ...(editingEmployee.status !== "active" && { email: values.email }),
               firstName: values.firstName,
               lastName: values.lastName,
-              role: values.role,
               locationIds,
             },
           });
@@ -150,6 +158,7 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
       multipleLocationsEnabled,
       t,
       update,
+      updateRole,
     ],
   );
 
