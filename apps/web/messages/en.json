@@ -533,7 +533,9 @@
       "locationsRequired": "Select at least one location."
     },
     "errors": {
-      "generic": "Something went wrong. Please try again."
+      "generic": "Something went wrong. Please try again.",
+      "roleOutcomeUnknown": "Could not confirm whether the role change went through. Please check the employee's role and try again if needed.",
+      "roleProjectionFailed": "The role was changed, but saving it here is still catching up. It will finish automatically shortly."
     }
   },
   "SettingsPage": {

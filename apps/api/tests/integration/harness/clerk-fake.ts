@@ -36,6 +36,8 @@ export type ClerkTarget =
   | "organizations.getOrganization"
   | "organizations.updateOrganizationMembership"
   | "organizations.getOrganizationMembershipList"
+  | "sessions.getSessionList"
+  | "sessions.revokeSession"
   | "*";
 
 export type FakeClerkUser = {
@@ -59,10 +61,15 @@ export type FakeTokenClaims = {
   sub: string;
   org_id: string | null;
   org_role: string | null;
+  /** Unix seconds. Omit for "never expires" — most tests don't care about expiry. */
+  exp?: number;
+  iat?: number;
 };
 
 /** Mirrors Clerk's OrganizationMembership shape as seen by employee.clerk.ts. */
 export type FakeClerkMembership = { role: string; updatedAt: number };
+
+export type FakeClerkSession = { id: string; status: string };
 
 const TOKEN_PREFIX = "test.";
 
@@ -100,6 +107,8 @@ const modes = new Map<ClerkTarget, ClerkFailureMode>();
 const users = new Map<string, FakeClerkUser>();
 const organizations = new Map<string, FakeClerkOrganization>();
 const memberships = new Map<string, FakeClerkMembership>();
+/** Keyed by clerkUserId. */
+const sessions = new Map<string, FakeClerkSession[]>();
 const calls = new Map<ClerkTarget, number>();
 
 // Strictly increasing across a whole test run, not just per-call — the
@@ -174,7 +183,18 @@ const verifyToken = vi.fn(async (token: string): Promise<FakeTokenClaims> => {
     return failure;
   }
 
-  return decodeTestToken(token);
+  const claims = decodeTestToken(token);
+
+  // Real verifyToken checks exp itself; this fake stands in for the whole
+  // function, so it has to replicate that check rather than call through.
+  if (claims.exp !== undefined && claims.exp <= Math.floor(Date.now() / 1000)) {
+    throw new TokenVerificationError({
+      message: "Token has expired",
+      reason: TokenVerificationErrorReason.TokenExpired,
+    });
+  }
+
+  return claims;
 });
 
 const getUser = vi.fn(async (clerkUserId: string): Promise<FakeClerkUser> => {
@@ -257,6 +277,48 @@ const getOrganizationMembershipList = vi.fn(
   },
 );
 
+const getSessionList = vi.fn(
+  async (params: {
+    userId?: string;
+    status?: string;
+  }): Promise<{ data: FakeClerkSession[]; totalCount: number }> => {
+    record("sessions.getSessionList");
+
+    const failure = injectedFailure("sessions.getSessionList");
+    if (failure) {
+      return failure;
+    }
+
+    const all = sessions.get(params.userId ?? "") ?? [];
+    const data = params.status
+      ? all.filter((session) => session.status === params.status)
+      : all;
+    return { data, totalCount: data.length };
+  },
+);
+
+const revokeSession = vi.fn(
+  async (sessionId: string): Promise<FakeClerkSession> => {
+    record("sessions.revokeSession");
+
+    const failure = injectedFailure("sessions.revokeSession");
+    if (failure) {
+      return failure;
+    }
+
+    for (const [clerkUserId, userSessions] of sessions) {
+      const session = userSessions.find((entry) => entry.id === sessionId);
+      if (session) {
+        session.status = "revoked";
+        sessions.set(clerkUserId, userSessions);
+        return session;
+      }
+    }
+
+    throw clerkApiError(404, `Session ${sessionId} not found`);
+  },
+);
+
 /** Mirrors the surface `clerkClient` is called through; unmodeled writes resolve inertly. */
 const client = {
   users: {
@@ -274,6 +336,10 @@ const client = {
     deleteOrganizationMembership: vi.fn(async () => null),
     updateOrganizationMembership,
   },
+  sessions: {
+    getSessionList,
+    revokeSession,
+  },
 };
 
 export const clerkFake = {
@@ -286,6 +352,7 @@ export const clerkFake = {
     users.clear();
     organizations.clear();
     memberships.clear();
+    sessions.clear();
     calls.clear();
     clerkClock = Date.now();
     verifyToken.mockClear();
@@ -293,6 +360,8 @@ export const clerkFake = {
     getOrganization.mockClear();
     updateOrganizationMembership.mockClear();
     getOrganizationMembershipList.mockClear();
+    getSessionList.mockClear();
+    revokeSession.mockClear();
   },
 
   setMode(target: ClerkTarget, mode: ClerkFailureMode): void {
@@ -346,6 +415,19 @@ export const clerkFake = {
       role: overrides.role ?? existing?.role ?? "org:employee",
       updatedAt: overrides.updatedAt ?? nextClerkTimestamp(),
     });
+  },
+
+  /** Seeds active sessions for a user, so revokeClerkUserSessions has something to revoke. */
+  setSessions(clerkUserId: string, sessionIds: string[]): void {
+    sessions.set(
+      clerkUserId,
+      sessionIds.map((id) => ({ id, status: "active" })),
+    );
+  },
+
+  /** Reads back current session status — did a revoke actually take? */
+  getSessions(clerkUserId: string): FakeClerkSession[] {
+    return sessions.get(clerkUserId) ?? [];
   },
 
   /** Proves caching, not just correctness. */

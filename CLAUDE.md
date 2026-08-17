@@ -49,8 +49,10 @@ Env files are git-ignored and **required**. The API's `dev`/`start`/`db:*` scrip
 `--env-file=.env --env-file=.env.local`, so **both files must exist in `apps/api/`** or the
 process won't start.
 - `apps/api/.env` + `.env.local` — `DATABASE_URL`, `DIRECT_DATABASE_URL`, `REDIS_URL`,
-  `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY` (validated at import in `apps/api/src/env.ts`;
-  non-empty placeholders are enough to boot, migrate and hit `/health`).
+  `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `CLERK_WEBHOOK_SIGNING_SECRET` (validated at
+  import in `apps/api/src/env.ts`; non-empty placeholders are enough to boot, migrate and hit
+  `/health`, but the webhook secret must be the real one from the Clerk Dashboard or every
+  `/webhooks/clerk` delivery 400s and role/membership drift stops converging).
 - `apps/web/.env.local` — `NEXT_PUBLIC_API_URL`, Clerk publishable/secret keys.
 - Real Clerk dev keys are needed for any authenticated flow. Everything except `/health`,
   `/webhooks` and dev docs sits behind `requireAuth`. Health check: `curl localhost:3001/health`
@@ -89,10 +91,16 @@ process won't start.
   and it generates all four documented routes. `equipment` is the smallest end-to-end example.
 - **Multi-tenancy**: Clerk org → `organizations` row (`clerkOrgId`), which owns `locations`,
   which own `equipment` / `task_templates`. `assignedLocationIds` is `null` for admins ("all
-  locations"), or an explicit list for members. Tenant/membership blobs are cached in Redis
-  (2-day TTL, `tenant:clerk:*` / `membership:clerk:*`) — **invalidate on every write that
-  changes org, locations, memberships or roles**; cache failures log and fall through to
-  Postgres, never throw.
+  locations"), or an explicit list for members. Tenant/user blobs cache in Redis (2-day TTL,
+  `tenant:clerk:*` / `user:clerk:*`); the membership blob (`membership:clerk:*`) is bounded far
+  shorter (`MEMBERSHIP_CACHE_TTL_SECONDS`, default 60s) — that TTL is a security bound on stale
+  role/location access, not a performance knob. **Invalidate on every write that changes org,
+  locations, memberships or roles**; cache failures log and fall through to Postgres, never throw.
+- **Role authority**: Clerk is authoritative for organization roles; `organization_memberships.role`
+  is a converging projection, written Clerk-first by `employee.role.service.ts`
+  (`PATCH /employees/{id}/role`) and guarded by a `clerk_role_updated_at` marker so an older
+  Clerk read can never overwrite a newer one. Admin authorization reads the JWT `org_role` claim
+  directly, never the DB row — see the Clerk-token gotcha below for the resulting revocation bound.
 - **Imports use explicit `.js` extensions** (`tsconfig` is `NodeNext`):
   `import { env } from "../env.js"`.
 
@@ -134,7 +142,7 @@ UI hooks (`use-mobile`, `use-now`).
   pair every input with a label and inline validation.
 - **i18n**: `next-intl`, locales `bg` (default) and `en`, `localePrefix: "as-needed"`, routes
   under `src/app/[locale]/`. **Any user-facing string must be added to both `messages/en.json`
-  and `messages/bg.json`** — currently at exact key parity (438 each). Pages call
+  and `messages/bg.json`** — currently at exact key parity (443 each). Pages call
   `setRequestLocale(locale)` before rendering; middleware is `src/proxy.ts` (Clerk + intl), not
   `middleware.ts`.
 
@@ -209,6 +217,9 @@ once the work is done.
   `String(...)`.
 - Clerk token verification distinguishes a bad token (401) from an upstream/JWKS failure (503) on
   purpose: the web app reads 401 as "signed out", so a Clerk blip must not sign out every tablet.
+  A role change (or any revocation) takes effect no later than the token's own expiry (Clerk
+  default: 60s lifetime, 50s refresh) — best-effort session revocation after a demotion stops
+  refresh but cannot invalidate an already-issued JWT retroactively.
 - Web dialogs/sheets stay mounted with `open` toggled (Base UI owns the exit transition) —
   unmounting them cuts the animation.
 - **Comments**: only add one when the **WHY** is non-obvious — a hidden constraint, a subtle

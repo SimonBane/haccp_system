@@ -18,6 +18,7 @@ import {
 import { logRoleChange } from "./employee.audit.js";
 import {
   fetchClerkMembershipRole,
+  revokeClerkUserSessions,
   updateClerkMembershipRole,
 } from "./employee.clerk.js";
 import { issueMembershipInvitation } from "./employee.invitations.js";
@@ -111,9 +112,10 @@ async function changeActiveRole(
   }
 
   const authoritativeRole = safeNormalizeOrgRole(confirmed.role);
+  let response: EmployeeResponse;
 
   try {
-    const response = await db.transaction(async (tx) => {
+    response = await db.transaction(async (tx) => {
       const updated = await employeeRepository.updateRoleFromClerkByIdAndOrganization(
         tx,
         organizationId,
@@ -170,7 +172,6 @@ async function changeActiveRole(
     });
 
     logRoleChange({ ...logBase, stage: "applied", authoritativeRole });
-    return response;
   } catch (error) {
     logRoleChange({ ...logBase, stage: "projection_failed", authoritativeRole });
 
@@ -184,6 +185,16 @@ async function changeActiveRole(
     // line must never leave the cache pinned to the pre-change role.
     await membershipCache.invalidate(clerkOrgId, clerkUserId);
   }
+
+  // Outside the try/catch on purpose: the projection already committed above, so
+  // a failure here (revokeClerkUserSessions never actually throws, but nothing
+  // guarantees that forever) must surface as its own error rather than being
+  // relabeled RoleProjectionFailedError against a projection that in fact succeeded.
+  if (previousRole === ORG_ROLE.ADMIN && authoritativeRole !== ORG_ROLE.ADMIN) {
+    await revokeClerkUserSessions(clerkUserId);
+  }
+
+  return response;
 }
 
 async function changeDraftRole(

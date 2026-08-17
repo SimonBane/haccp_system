@@ -15,6 +15,7 @@ import { MEMBERSHIP_STATUS } from "../../core/db/schema/organization-memberships
 import type { OrganizationMembership } from "../../core/db/schema/organization-memberships.js";
 import type { User } from "../../core/db/schema/users.js";
 import { ValidationError } from "../../core/errors/app-errors.js";
+import { logger } from "../../lib/logger.js";
 import type { EmployeeChanges } from "./employee.changes.js";
 
 export type ClerkMembershipRole = { role: string; updatedAt: Date };
@@ -164,6 +165,38 @@ export async function fetchClerkMembershipRole(
   return current
     ? { role: current.role, updatedAt: new Date(current.updatedAt) }
     : null;
+}
+
+// Best-effort: stops the user's active sessions from refreshing, so a demoted
+// admin loses access at most one refresh cycle later rather than waiting out
+// their token's full remaining lifetime. Never invalidates an already-issued,
+// stateless JWT retroactively — that is bounded by the token's own exp, not by
+// this. Failures are logged and never thrown; the caller's role change already
+// succeeded and must not fail because of this.
+export async function revokeClerkUserSessions(clerkUserId: string): Promise<void> {
+  try {
+    const { data: sessions } = await withClerkTimeout(
+      clerkClient.sessions.getSessionList({ userId: clerkUserId, status: "active" }),
+    );
+
+    await Promise.all(
+      sessions.map((session) =>
+        withClerkTimeout(clerkClient.sessions.revokeSession(session.id)).catch(
+          (err: unknown) => {
+            logger.warn(
+              { err, clerkUserId, sessionId: session.id },
+              "Failed to revoke a session after demotion",
+            );
+          },
+        ),
+      ),
+    );
+  } catch (err) {
+    logger.warn(
+      { err, clerkUserId },
+      "Failed to list sessions for revocation after demotion",
+    );
+  }
 }
 
 export async function syncClerkMembershipRemoval(

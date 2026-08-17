@@ -16,7 +16,7 @@ const envSchema = z.object({
   DIRECT_DATABASE_URL: z.url().optional(),
   CLERK_SECRET_KEY: z.string().min(1),
   CLERK_PUBLISHABLE_KEY: z.string().min(1),
-  CLERK_WEBHOOK_SIGNING_SECRET: z.string().min(1).optional(),
+  CLERK_WEBHOOK_SIGNING_SECRET: z.string().min(1),
   WEB_APP_URL: z.url().default("http://localhost:3000"),
   REDIS_URL: z
     .string()

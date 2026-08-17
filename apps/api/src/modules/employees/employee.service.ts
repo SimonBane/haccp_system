@@ -275,6 +275,9 @@ export const employeeService = {
       changes,
     );
 
+    // The DB write above already committed. Everything below can throw (Clerk calls), so
+    // invalidation runs in `finally` — a Clerk failure must never leave the cache pinned to
+    // pre-change locations for the rest of its TTL.
     try {
       if (hasProfileChanges(changes) && next.user.clerkUserId) {
         await userService.invalidateCache(next.user.clerkUserId);

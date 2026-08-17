@@ -213,3 +213,66 @@ describe("employee role change", () => {
     expect(await readRole(invited.membershipId)).toBe(ORG_ROLE.ADMIN);
   });
 });
+
+/** HACCP-56 §6: best-effort session revocation after a demotion. */
+describe("session revocation on demotion", () => {
+  let org: SeededOrg;
+
+  beforeEach(async () => {
+    org = await seedOrganization(db, { slug: "sessionkick" });
+  });
+
+  it("revokes active sessions after a demotion", async () => {
+    const secondAdmin = await seedEmployeeWithStatus(db, org, {
+      status: MEMBERSHIP_STATUS.ACTIVE,
+      role: ORG_ROLE.ADMIN,
+    });
+    clerkFake.setSessions(secondAdmin.clerkUserId!, ["sess_1", "sess_2"]);
+
+    const response = await apiRequest(`/employees/${secondAdmin.membershipId}/role`, {
+      method: "PATCH",
+      actor: asAdmin(org),
+      body: JSON.stringify({ role: ORG_ROLE.EMPLOYEE }),
+    });
+
+    expect(response.status).toBe(200);
+    const sessions = clerkFake.getSessions(secondAdmin.clerkUserId!);
+    expect(sessions.every((session) => session.status === "revoked")).toBe(true);
+  });
+
+  it("does not revoke sessions on a promotion", async () => {
+    clerkFake.setSessions(org.employee.clerkUserId, ["sess_1"]);
+
+    const response = await apiRequest(`/employees/${org.employee.membershipId}/role`, {
+      method: "PATCH",
+      actor: asAdmin(org),
+      body: JSON.stringify({ role: ORG_ROLE.ADMIN }),
+    });
+
+    expect(response.status).toBe(200);
+    const sessions = clerkFake.getSessions(org.employee.clerkUserId);
+    expect(sessions.every((session) => session.status === "active")).toBe(true);
+  });
+
+  it("still succeeds and keeps the authoritative role when session revocation itself fails", async () => {
+    const secondAdmin = await seedEmployeeWithStatus(db, org, {
+      status: MEMBERSHIP_STATUS.ACTIVE,
+      role: ORG_ROLE.ADMIN,
+    });
+    clerkFake.setSessions(secondAdmin.clerkUserId!, ["sess_1"]);
+    clerkFake.setMode("sessions.getSessionList", "retryable");
+
+    const response = await apiRequest(`/employees/${secondAdmin.membershipId}/role`, {
+      method: "PATCH",
+      actor: asAdmin(org),
+      body: JSON.stringify({ role: ORG_ROLE.EMPLOYEE }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(await readRole(secondAdmin.membershipId)).toBe(ORG_ROLE.EMPLOYEE);
+    // The failed listing means nothing was found to revoke — status is unchanged,
+    // not an error, and it must not have blocked the role change above.
+    const sessions = clerkFake.getSessions(secondAdmin.clerkUserId!);
+    expect(sessions.every((session) => session.status === "active")).toBe(true);
+  });
+});

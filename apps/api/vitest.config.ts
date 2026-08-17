@@ -8,6 +8,7 @@ export default defineUnitConfig({
       DATABASE_URL: "postgres://test:test@localhost:5432/test",
       CLERK_SECRET_KEY: "sk_test_placeholder",
       CLERK_PUBLISHABLE_KEY: "pk_test_placeholder",
+      CLERK_WEBHOOK_SIGNING_SECRET: "whsec_test_placeholder",
       REDIS_URL: "redis://localhost:6379",
     },
   },

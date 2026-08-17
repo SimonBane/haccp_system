@@ -1,9 +1,8 @@
 import type { OrgRole } from "@haccp/shared";
 import { logger } from "../../lib/logger.js";
 
-// The only durable trace of a role change today — HACCP-56 §8's non-goal excludes a
-// role-change journal/table, so this fixed field set through the app logger is it.
-// No tokens, secrets, or profile data belong here.
+// The only durable trace of a role change today — HACCP-56 §8's non-goal excludes
+// a role-change journal/table, so this fixed field set through the app logger is it.
 type RoleChangeStage =
   | "applied"
   | "rejected"

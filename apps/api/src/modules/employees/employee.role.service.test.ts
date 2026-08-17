@@ -28,6 +28,7 @@ const membershipCache = vi.hoisted(() => ({ invalidate: vi.fn() }));
 const clerkCalls = vi.hoisted(() => ({
   updateClerkMembershipRole: vi.fn(),
   fetchClerkMembershipRole: vi.fn(),
+  revokeClerkUserSessions: vi.fn(),
 }));
 const invitations = vi.hoisted(() => ({ issueMembershipInvitation: vi.fn() }));
 const audit = vi.hoisted(() => ({ logRoleChange: vi.fn() }));
@@ -107,6 +108,7 @@ beforeEach(() => {
   employeeRepository.countActiveAdmins.mockResolvedValue(5);
   employeeRepository.replaceLocationAssignments.mockResolvedValue(undefined);
   membershipCache.invalidate.mockResolvedValue(undefined);
+  clerkCalls.revokeClerkUserSessions.mockResolvedValue(undefined);
 });
 
 describe("employeeRoleService.changeRole — active membership", () => {
@@ -136,6 +138,8 @@ describe("employeeRoleService.changeRole — active membership", () => {
     expect(audit.logRoleChange).toHaveBeenCalledWith(
       expect.objectContaining({ stage: "applied", authoritativeRole: ORG_ROLE.ADMIN }),
     );
+    // A promotion, not a demotion — no session kick-out.
+    expect(clerkCalls.revokeClerkUserSessions).not.toHaveBeenCalled();
   });
 
   it("promotion leaves existing location rows untouched", async () => {
@@ -175,6 +179,28 @@ describe("employeeRoleService.changeRole — active membership", () => {
       db, MEMBERSHIP, ORG, [LOCATION],
     );
     expect(response.locationIds).toEqual([LOCATION]);
+    expect(clerkCalls.revokeClerkUserSessions).toHaveBeenCalledWith(CLERK_TARGET_USER);
+  });
+
+  it("does not misreport a successful role change as a projection failure when session revocation itself fails", async () => {
+    const current = detail({ membership: { role: ORG_ROLE.ADMIN } });
+    employeeRepository.findDetailById.mockResolvedValue(current);
+    clerkCalls.updateClerkMembershipRole.mockResolvedValue({
+      role: ORG_ROLE.EMPLOYEE,
+      updatedAt: new Date("2026-01-02T00:00:00Z"),
+    });
+    employeeRepository.updateRoleFromClerkByIdAndOrganization.mockResolvedValue(
+      membershipRow({ role: ORG_ROLE.EMPLOYEE }),
+    );
+    clerkCalls.revokeClerkUserSessions.mockRejectedValue(new Error("Clerk unavailable"));
+
+    // The projection already committed by this point — a session-revocation
+    // failure must never be relabeled RoleProjectionFailedError.
+    await expect(
+      employeeRoleService.changeRole(db, ORG, CLERK_ORG, "bg", actor, MEMBERSHIP, ORG_ROLE.EMPLOYEE, tenantLocations),
+    ).rejects.not.toBeInstanceOf(RoleProjectionFailedError);
+
+    expect(employeeRepository.updateRoleFromClerkByIdAndOrganization).toHaveBeenCalledTimes(1);
   });
 
   it("rejects and leaves the local projection untouched when Clerk definitively rejects", async () => {

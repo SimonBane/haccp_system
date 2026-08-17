@@ -6,6 +6,9 @@ export type Actor = {
   clerkUserId: string;
   clerkOrgId: string | null;
   orgRole: string | null;
+  /** Unix seconds. Omit for "never expires" — most tests don't care about expiry. */
+  exp?: number;
+  iat?: number;
 };
 
 export type RequestOptions = Omit<RequestInit, "headers"> & {
@@ -32,6 +35,8 @@ export async function apiRequest(
           sub: actor.clerkUserId,
           org_id: actor.clerkOrgId,
           org_role: actor.orgRole,
+          exp: actor.exp,
+          iat: actor.iat,
         })
       : null);
 

@@ -22,6 +22,7 @@ import {
   resolveEmployeeLocationIds,
 } from "@/features/employees/utils";
 import { useTenant } from "@/features/tenant/tenant-provider";
+import { ApiRequestError } from "@/lib/api-utils";
 import { getErrorMessage } from "@/lib/api/get-error-message";
 
 type EmployeesManagerProps = {
@@ -147,7 +148,13 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
 
         return true;
       } catch (error) {
-        toast.error(getErrorMessage(error, t("errors.generic")));
+        if (error instanceof ApiRequestError && error.code === "ROLE_UPDATE_OUTCOME_UNKNOWN") {
+          toast.error(t("errors.roleOutcomeUnknown"));
+        } else if (error instanceof ApiRequestError && error.code === "ROLE_PROJECTION_FAILED") {
+          toast.error(t("errors.roleProjectionFailed"));
+        } else {
+          toast.error(getErrorMessage(error, t("errors.generic")));
+        }
         throw error;
       }
     },
