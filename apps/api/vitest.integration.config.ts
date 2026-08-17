@@ -19,6 +19,7 @@ export default defineIntegrationConfig({
       CLERK_SECRET_KEY: "sk_test_integration",
       CLERK_PUBLISHABLE_KEY: "pk_test_integration",
       CLERK_WEBHOOK_SIGNING_SECRET: "whsec_test_integration",
+      MEMBERSHIP_CACHE_TTL_SECONDS: "2",
     },
   },
 });

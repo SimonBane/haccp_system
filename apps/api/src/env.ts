@@ -23,6 +23,9 @@ const envSchema = z.object({
     .regex(/^rediss?:\/\//, {
       error: "REDIS_URL must be a redis:// or rediss:// URL",
     }),
+  // This is the bound on how long a revoked location assignment can remain usable — not a
+  // performance knob. Keep it near Clerk's own session-token lifetime (60s default).
+  MEMBERSHIP_CACHE_TTL_SECONDS: z.coerce.number().positive().default(60),
   NODE_ENV: z
     .enum(["development", "production", "test"])
     .default("development"),
@@ -38,6 +41,7 @@ const parsedEnv = envSchema.parse({
   CLERK_WEBHOOK_SIGNING_SECRET: process.env.CLERK_WEBHOOK_SIGNING_SECRET,
   WEB_APP_URL: process.env.WEB_APP_URL,
   REDIS_URL: process.env.REDIS_URL,
+  MEMBERSHIP_CACHE_TTL_SECONDS: process.env.MEMBERSHIP_CACHE_TTL_SECONDS,
   NODE_ENV: process.env.NODE_ENV,
 });
 

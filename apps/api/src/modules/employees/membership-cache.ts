@@ -1,10 +1,14 @@
 import { orgRoleSchema } from "@haccp/shared";
 import { z } from "zod";
 import { getRedis } from "../../core/redis/client.js";
+import { env } from "../../env.js";
 import { logger } from "../../lib/logger.js";
 
 const KEY_PREFIX = "membership:clerk:";
-const DEFAULT_TTL_SECONDS = 2 * 24 * 60 * 60;
+// This TTL is the bound on how long a revoked location assignment or role can remain
+// usable from cache — it is a security control, not a performance tuning value. See
+// MEMBERSHIP_CACHE_TTL_SECONDS in env.ts.
+const DEFAULT_TTL_SECONDS = env.MEMBERSHIP_CACHE_TTL_SECONDS;
 
 export const membershipCacheBlobSchema = z.object({
   membershipId: z.uuid(),

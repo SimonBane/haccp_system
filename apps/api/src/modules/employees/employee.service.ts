@@ -289,51 +289,51 @@ export const employeeService = {
       changes,
     );
 
-    if (hasProfileChanges(changes) && next.user.clerkUserId) {
-      await userService.invalidateCache(next.user.clerkUserId);
-    }
+    try {
+      if (hasProfileChanges(changes) && next.user.clerkUserId) {
+        await userService.invalidateCache(next.user.clerkUserId);
+      }
 
-    const { clerkInvitationId, status } = detail.membership;
+      const { clerkInvitationId, status } = detail.membership;
 
-    if (status === MEMBERSHIP_STATUS.ACTIVE && detail.user.clerkUserId) {
-      await applyActiveEmployeeUpdate(
-        clerkOrgId,
-        detail.user.clerkUserId,
-        changes,
-        next.user,
-      );
-    }
+      if (status === MEMBERSHIP_STATUS.ACTIVE && detail.user.clerkUserId) {
+        await applyActiveEmployeeUpdate(
+          clerkOrgId,
+          detail.user.clerkUserId,
+          changes,
+          next.user,
+        );
+      }
 
-    const membership =
-      status === MEMBERSHIP_STATUS.INVITED &&
-      clerkInvitationId &&
-      hasInviteMetadataChanges(changes)
-        ? await issueMembershipInvitation(
-            db,
-            organizationId,
-            membershipId,
-            {
-              locale: orgLocale,
-              clerkOrgId,
-              inviterUserId: inviterClerkUserId,
-              email: next.user.email,
-              role: next.membership.role,
-              firstName: next.user.firstName,
-              lastName: next.user.lastName,
-            },
-            { previousInvitationId: clerkInvitationId },
-          )
-        : next.membership;
+      const membership =
+        status === MEMBERSHIP_STATUS.INVITED &&
+        clerkInvitationId &&
+        hasInviteMetadataChanges(changes)
+          ? await issueMembershipInvitation(
+              db,
+              organizationId,
+              membershipId,
+              {
+                locale: orgLocale,
+                clerkOrgId,
+                inviterUserId: inviterClerkUserId,
+                email: next.user.email,
+                role: next.membership.role,
+                firstName: next.user.firstName,
+                lastName: next.user.lastName,
+              },
+              { previousInvitationId: clerkInvitationId },
+            )
+          : next.membership;
 
-    if (changes.locationIds || changes.role) {
+      return buildEmployeeResponseFromDetail(detail, tenantLocations, {
+        membership,
+        user: next.user,
+        locationIds: next.locationIds,
+      });
+    } finally {
       await membershipCache.invalidate(clerkOrgId, detail.user.clerkUserId);
     }
-
-    return buildEmployeeResponseFromDetail(detail, tenantLocations, {
-      membership,
-      user: next.user,
-      locationIds: next.locationIds,
-    });
   },
 
   async invite(
@@ -429,11 +429,14 @@ export const employeeService = {
 
     await syncClerkMembershipRemoval(clerkOrgId, row);
 
-    await employeeRepository.softDeleteByIdAndOrganization(
-      db,
-      organizationId,
-      membershipId,
-    );
-    await membershipCache.invalidate(clerkOrgId, row.user.clerkUserId);
+    try {
+      await employeeRepository.softDeleteByIdAndOrganization(
+        db,
+        organizationId,
+        membershipId,
+      );
+    } finally {
+      await membershipCache.invalidate(clerkOrgId, row.user.clerkUserId);
+    }
   },
 };
