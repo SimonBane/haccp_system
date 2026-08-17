@@ -88,14 +88,6 @@ export async function applyActiveEmployeeUpdate(
   changes: EmployeeChanges,
   nextUser: User,
 ): Promise<void> {
-  if (changes.role) {
-    await clerkClient.organizations.updateOrganizationMembership({
-      organizationId: clerkOrgId,
-      userId: clerkUserId,
-      role: changes.role,
-    });
-  }
-
   if (changes.firstName !== undefined || changes.lastName !== undefined) {
     await clerkClient.users.updateUser(clerkUserId, {
       firstName: nextUser.firstName,

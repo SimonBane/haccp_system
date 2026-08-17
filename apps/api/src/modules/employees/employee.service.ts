@@ -31,6 +31,7 @@ import {
   revokeClerkInvitation,
   syncClerkMembershipRemoval,
 } from "./employee.clerk.js";
+import { changeActiveEmployeeRole } from "./employee.role.js";
 import type { EmployeeDetail } from "./employee.mapper.js";
 import {
   buildEmployeeResponseFromDetail,
@@ -282,14 +283,39 @@ export const employeeService = {
       return buildEmployeeResponseFromDetail(detail, tenantLocations);
     }
 
-    const next = await persistEmployeeChanges(
-      db,
-      organizationId,
-      detail,
-      changes,
-    );
+    let workingDetail = detail;
+    let roleHandledByClerkFirst = false;
 
-    if (hasProfileChanges(changes) && next.user.clerkUserId) {
+    if (
+      changes.role !== undefined &&
+      detail.membership.status === MEMBERSHIP_STATUS.ACTIVE &&
+      detail.user.clerkUserId
+    ) {
+      const membership = await changeActiveEmployeeRole(db, {
+        organizationId,
+        clerkOrgId,
+        clerkUserId: detail.user.clerkUserId,
+        membershipId: detail.membership.id,
+        role: changes.role,
+      });
+      workingDetail = { ...detail, membership };
+      roleHandledByClerkFirst = true;
+    }
+
+    const remainingChanges: EmployeeChanges = roleHandledByClerkFirst
+      ? { ...changes, role: undefined }
+      : changes;
+
+    const next = isEmptyChangeSet(remainingChanges)
+      ? workingDetail
+      : await persistEmployeeChanges(
+          db,
+          organizationId,
+          workingDetail,
+          remainingChanges,
+        );
+
+    if (hasProfileChanges(remainingChanges) && next.user.clerkUserId) {
       await userService.invalidateCache(next.user.clerkUserId);
     }
 
@@ -299,7 +325,7 @@ export const employeeService = {
       await applyActiveEmployeeUpdate(
         clerkOrgId,
         detail.user.clerkUserId,
-        changes,
+        remainingChanges,
         next.user,
       );
     }
@@ -325,7 +351,7 @@ export const employeeService = {
           )
         : next.membership;
 
-    if (changes.locationIds || changes.role) {
+    if (remainingChanges.locationIds || remainingChanges.role) {
       await membershipCache.invalidate(clerkOrgId, detail.user.clerkUserId);
     }
 

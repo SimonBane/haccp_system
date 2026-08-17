@@ -4,7 +4,7 @@ import { getRedis } from "../../core/redis/client.js";
 import { logger } from "../../lib/logger.js";
 
 const KEY_PREFIX = "membership:clerk:";
-const DEFAULT_TTL_SECONDS = 2 * 24 * 60 * 60;
+const DEFAULT_TTL_SECONDS = 5 * 60;
 
 export const membershipCacheBlobSchema = z.object({
   membershipId: z.uuid(),
