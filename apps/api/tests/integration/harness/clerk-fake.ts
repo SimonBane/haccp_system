@@ -28,7 +28,11 @@ export type ClerkFailureMode =
   | "network";
 
 export type ClerkTarget =
-  "verifyToken" | "users.getUser" | "organizations.getOrganization" | "*";
+  | "verifyToken"
+  | "users.getUser"
+  | "organizations.getOrganization"
+  | "organizations.updateOrganizationMembership"
+  | "*";
 
 export type FakeClerkUser = {
   id: string;
@@ -89,6 +93,8 @@ const modes = new Map<ClerkTarget, ClerkFailureMode>();
 const users = new Map<string, FakeClerkUser>();
 const organizations = new Map<string, FakeClerkOrganization>();
 const calls = new Map<ClerkTarget, number>();
+/** When set, overrides the role returned by updateOrganizationMembership — proves callers read Clerk's response rather than assuming success mirrors the request. */
+let nextMembershipRole: string | null = null;
 
 function record(target: ClerkTarget): void {
   calls.set(target, (calls.get(target) ?? 0) + 1);
@@ -177,6 +183,19 @@ const getOrganization = vi.fn(
   },
 );
 
+const updateOrganizationMembership = vi.fn(
+  async ({ role }: { organizationId: string; userId: string; role: string }) => {
+    record("organizations.updateOrganizationMembership");
+
+    const failure = injectedFailure("organizations.updateOrganizationMembership");
+    if (failure) {
+      return failure;
+    }
+
+    return { id: "orgmem_test", role: nextMembershipRole ?? role };
+  },
+);
+
 /** Mirrors the surface `clerkClient` is called through; writes resolve inertly. */
 const client = {
   users: {
@@ -195,7 +214,7 @@ const client = {
     createOrganizationInvitation: vi.fn(async () => ({ id: "inv_test" })),
     revokeOrganizationInvitation: vi.fn(async () => ({ id: "inv_test" })),
     deleteOrganizationMembership: vi.fn(async () => null),
-    updateOrganizationMembership: vi.fn(async () => null),
+    updateOrganizationMembership,
   },
 };
 
@@ -209,13 +228,20 @@ export const clerkFake = {
     users.clear();
     organizations.clear();
     calls.clear();
+    nextMembershipRole = null;
     verifyToken.mockClear();
     getUser.mockClear();
     getOrganization.mockClear();
+    updateOrganizationMembership.mockClear();
   },
 
   setMode(target: ClerkTarget, mode: ClerkFailureMode): void {
     modes.set(target, mode);
+  },
+
+  /** Makes the next updateOrganizationMembership call return a role different from the one requested. */
+  setMembershipRole(role: string): void {
+    nextMembershipRole = role;
   },
 
   /** Pass values disagreeing with the database row to exercise stale metadata. */
