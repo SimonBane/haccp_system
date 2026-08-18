@@ -9,7 +9,9 @@ import {
   MobileHeaderAddAction,
   PageHeader,
 } from "@/components/layout/page-header";
+import { DataTableQueryError } from "@/components/ui/data-table/data-table-query-error";
 import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
+import { Spinner } from "@/components/ui/spinner";
 import { LocationsData } from "@/features/locations/data-table/data";
 import { useLocationsMutations } from "@/features/locations/hooks/use-locations-mutations";
 import { useLocationsQuery } from "@/features/locations/hooks/use-locations-query";
@@ -24,7 +26,12 @@ type LocationsManagerProps = {
 export function LocationsManager({ initialItems }: LocationsManagerProps) {
   const t = useTranslations("LocationsPage");
   const { reloadTenant } = useTenant();
-  const { data: items = [], refetch } = useLocationsQuery({
+  const {
+    data: items = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useLocationsQuery({
     initialData: initialItems,
   });
   const { create, update, remove } = useLocationsMutations();
@@ -129,14 +136,22 @@ export function LocationsManager({ initialItems }: LocationsManagerProps) {
 
       <PageHeader title={t("title")} description={t("description")} />
 
-      <LocationsData
-        items={items}
-        settingDefaultId={settingDefaultId}
-        onAdd={openCreateForm}
-        onRename={openRenameForm}
-        onDelete={handleDelete}
-        onSetDefault={handleSetDefault}
-      />
+      {isLoading ? (
+        <div className="flex items-center justify-center py-24">
+          <Spinner className="size-8" />
+        </div>
+      ) : isError ? (
+        <DataTableQueryError onRetry={() => void refetch()} />
+      ) : (
+        <LocationsData
+          items={items}
+          settingDefaultId={settingDefaultId}
+          onAdd={openCreateForm}
+          onRename={openRenameForm}
+          onDelete={handleDelete}
+          onSetDefault={handleSetDefault}
+        />
+      )}
 
       <ResponsiveAlertDialog
         open={Boolean(deleteTarget)}

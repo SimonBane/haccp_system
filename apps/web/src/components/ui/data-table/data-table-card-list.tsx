@@ -76,7 +76,10 @@ function CardListRow<TData>({
           role="button"
           tabIndex={0}
           aria-label={label}
-          className="cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+          className={cn(
+            "cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+            hasActions && "pe-12",
+          )}
           onKeyDown={(event) => {
             if (
               hasActions &&
@@ -100,16 +103,18 @@ function CardListRow<TData>({
           {children}
         </div>
       ) : (
-        children
+        <div className={cn(hasActions && "pe-12")}>{children}</div>
       )}
 
-      {/* Focus-visible actions button: `sr-only` alone would leave a focused element nobody can see. */}
+      {/* Always visible, not just long-press/right-click/focus: touch users need a
+          discoverable affordance, not a hidden gesture. */}
       {hasActions ? (
         <button
           type="button"
+          data-testid="data-table-card-actions"
           aria-label={moreActionsLabel}
           onClick={openHere}
-          className="sr-only focus:not-sr-only focus:absolute focus:end-2 focus:top-1/2 focus:z-10 focus:inline-flex focus:size-10 focus:-translate-y-1/2 focus:items-center focus:justify-center focus:rounded-md focus:bg-popover focus:text-sm focus:ring-2 focus:ring-ring"
+          className="absolute end-2 top-1/2 z-10 inline-flex size-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-popover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           ⋯
         </button>
@@ -118,7 +123,7 @@ function CardListRow<TData>({
   );
 }
 
-/** `role="button"` on a div because the row also hosts the SR actions button — nesting interactives is invalid. */
+/** `role="button"` on a div because the row also hosts the actions button — nesting interactives is invalid. */
 export function DataTableCardList<TData>({
   table,
   renderMobileRow,

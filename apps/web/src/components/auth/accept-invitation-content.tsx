@@ -5,9 +5,11 @@ import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { type Locale } from "@/i18n/routing";
 import { Link } from "@/i18n/navigation";
-import { buttonVariants } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 import { getClerkLocalePath } from "@/lib/clerk-localization";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FullPageLoader } from "@/components/layout/full-page-loader";
 
 export function AcceptInvitationContent() {
@@ -16,6 +18,7 @@ export function AcceptInvitationContent() {
   const searchParams = useSearchParams();
   const { getToken, isLoaded, isSignedIn, orgId } = useAuth();
   const acceptStarted = useRef(false);
+  const [completionFailed, setCompletionFailed] = useState(false);
   const token = searchParams.get("__clerk_ticket");
   const accountStatus = searchParams.get("__clerk_status");
   const firstName = searchParams.get("firstName");
@@ -28,21 +31,56 @@ export function AcceptInvitationContent() {
     Boolean(orgId) &&
     (accountStatus === "complete" || !token);
 
+  const completeAcceptance = useCallback(async () => {
+    try {
+      await getToken({ skipCache: true });
+      // Full page load so Clerk cookies exist before dashboard RSC runs.
+      window.location.replace(getClerkLocalePath(locale, "/dashboard"));
+    } catch {
+      setCompletionFailed(true);
+    }
+  }, [getToken, locale]);
+
   useEffect(() => {
     if (!isLoaded || !invitationAccepted || acceptStarted.current) {
       return;
     }
 
     acceptStarted.current = true;
-
-    async function completeAcceptance() {
-      await getToken({ skipCache: true });
-      // Full page load so Clerk cookies exist before dashboard RSC runs.
-      window.location.replace(getClerkLocalePath(locale, "/dashboard"));
-    }
-
     void completeAcceptance();
-  }, [getToken, invitationAccepted, isLoaded, locale]);
+  }, [completeAcceptance, invitationAccepted, isLoaded]);
+
+  // A rejected token refresh leaves every branch below unmatched, so without this
+  // the page would hold FullPageLoader forever with no way out.
+  if (completionFailed) {
+    return (
+      <div
+        className="flex flex-col items-center gap-4 text-center"
+        data-testid="invitation-completion-error"
+      >
+        <Alert>
+          <AlertTitle>{t("error.title")}</AlertTitle>
+          <AlertDescription>{t("error.description")}</AlertDescription>
+        </Alert>
+        <div className="flex gap-2">
+          <Button
+            data-testid="invitation-completion-retry"
+            onClick={() => {
+              setCompletionFailed(false);
+              acceptStarted.current = true;
+              void completeAcceptance();
+            }}
+          >
+            {t("error.retry")}
+          </Button>
+          <SignOutButton
+            label={t("error.signOut")}
+            testId="invitation-completion-sign-out"
+          />
+        </div>
+      </div>
+    );
+  }
 
   if (!token && isLoaded && !(isSignedIn && orgId)) {
     return (
