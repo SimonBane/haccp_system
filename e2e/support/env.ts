@@ -39,3 +39,15 @@ export const clerkEmails = {
 };
 
 export const E2E_PREFIX = "E2E";
+
+/**
+ * A Clerk publishable key is `pk_<env>_<base64(frontendApiHost + "$")>`. Deriving the
+ * host from it lets tests intercept Clerk's own network calls (e.g. token refresh)
+ * without hardcoding a per-instance domain.
+ */
+export function clerkFrontendApiHost(): string {
+  const key = required("E2E_CLERK_PUBLISHABLE_KEY");
+  const encoded = key.replace(/^pk_(test|live)_/, "");
+  const decoded = Buffer.from(encoded, "base64").toString("utf8");
+  return decoded.replace(/\$$/, "");
+}

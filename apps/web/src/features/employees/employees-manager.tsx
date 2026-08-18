@@ -9,7 +9,9 @@ import {
   MobileHeaderAddAction,
   PageHeader,
 } from "@/components/layout/page-header";
+import { DataTableQueryError } from "@/components/ui/data-table/data-table-query-error";
 import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
+import { Spinner } from "@/components/ui/spinner";
 import { EmployeesData } from "@/features/employees/data-table/data";
 import {
   EmployeeForm,
@@ -39,7 +41,12 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
   const multipleLocationsEnabled = organization.multipleLocationsEnabled;
   const defaultLocationId =
     tenantLocations.find((location) => location.isDefault)?.id ?? locationId;
-  const { data: items = [] } = useEmployeesQuery({
+  const {
+    data: items = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useEmployeesQuery({
     initialData: initialItems,
   });
   const {
@@ -209,14 +216,22 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
 
       <PageHeader title={t("title")} description={t("description")} />
 
-      <EmployeesData
-        items={items}
-        onAdd={openCreateForm}
-        onEdit={openEditForm}
-        onInvite={handleInvite}
-        onRevokeInvitation={handleRevokeInvitation}
-        onDelete={handleDelete}
-      />
+      {isLoading ? (
+        <div className="flex items-center justify-center py-24">
+          <Spinner className="size-8" />
+        </div>
+      ) : isError ? (
+        <DataTableQueryError onRetry={() => void refetch()} />
+      ) : (
+        <EmployeesData
+          items={items}
+          onAdd={openCreateForm}
+          onEdit={openEditForm}
+          onInvite={handleInvite}
+          onRevokeInvitation={handleRevokeInvitation}
+          onDelete={handleDelete}
+        />
+      )}
 
       <EmployeeForm
         open={formOpen}

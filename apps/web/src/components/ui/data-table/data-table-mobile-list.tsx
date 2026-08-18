@@ -69,7 +69,6 @@ export function MobileListRow({
       data-variant={variant}
       className={cn(
         "flex items-stretch bg-card transition-colors active:bg-muted/60",
-        // `border`, not `ring`: a ring paints outside the box and the swipe wrapper clips it to corner arcs.
         isCard ? "rounded-xl border border-border p-4" : "ps-4",
         className,
       )}
