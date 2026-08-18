@@ -4,6 +4,7 @@ import { CheckIcon, CircleAlertIcon, RotateCcwIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DialogFooter } from "@/components/ui/dialog";
 import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
 import { useOrgTimeZone } from "@/features/tenant/use-org-timezone";
 import { cn } from "@/lib/utils";
@@ -64,7 +65,9 @@ export function TodayRecordSheet({
       }
       closeLabel={t("record.close")}
       footer={
-        <div className="flex w-full items-center gap-2 md:gap-3">
+        // flex-row overrides the base flex-col-reverse: this footer is always a
+        // 50/50 row, not just from sm: up.
+        <DialogFooter className="flex-row items-center gap-2 md:gap-3">
           <Button
             variant="outline"
             className="min-h-14 flex-1 rounded-2xl md:min-h-10 md:rounded-md"
@@ -81,7 +84,7 @@ export function TodayRecordSheet({
             <RotateCcwIcon />
             {t("actions.undo")}
           </Button>
-        </div>
+        </DialogFooter>
       }
     >
       <div className="space-y-4">
