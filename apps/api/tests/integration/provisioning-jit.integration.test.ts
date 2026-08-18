@@ -9,7 +9,7 @@ import {
 } from "../../src/core/db/schema/index.js";
 import { clerkFake } from "./harness/clerk-fake.js";
 import { seedOrganization } from "./harness/fixtures.js";
-import { failRedisCommands } from "./harness/redis.js";
+import { failRedisCommands, hangRedisCommands } from "./harness/redis.js";
 import { apiRequest, asAdmin } from "./harness/request.js";
 
 /**
@@ -150,6 +150,31 @@ describe("just-in-time provisioning", () => {
         });
 
         expect(response.status).toBe(200);
+      } finally {
+        restore();
+      }
+
+      const created = await db
+        .select()
+        .from(organizations)
+        .where(eq(organizations.clerkOrgId, clerkOrgId));
+
+      expect(created).toHaveLength(1);
+    });
+
+    it("still provisions promptly when a cache read hangs instead of failing fast", async () => {
+      const restore = await hangRedisCommands("get");
+
+      try {
+        const start = Date.now();
+        const response = await apiRequest("/tenant/current", {
+          actor: { clerkUserId, clerkOrgId, orgRole: "org:admin" },
+        });
+        const elapsedMs = Date.now() - start;
+
+        expect(response.status).toBe(200);
+        // Bounded by COMMAND_TIMEOUT_MS, not the suite's 20s test timeout.
+        expect(elapsedMs).toBeLessThan(5000);
       } finally {
         restore();
       }

@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import { getRedis } from "../../../src/core/redis/client.js";
+import { closeRedis, getRedis } from "../../../src/core/redis/client.js";
 
 /** FLUSHDB, never FLUSHALL: the test index shares a server with the dev app. */
 export async function flushTestRedis(): Promise<void> {
@@ -34,5 +34,53 @@ export async function failRedisCommands(
     for (const spy of spies) {
       spy.mockRestore();
     }
+  };
+}
+
+/**
+ * Hangs specific commands instead of rejecting them, leaving the connection
+ * marked ready. Proves withRedis's COMMAND_TIMEOUT_MS bound actually fires,
+ * rather than only exercising the fast-rejection path failRedisCommands covers.
+ */
+export async function hangRedisCommands(
+  ...commands: RedisCommand[]
+): Promise<() => void> {
+  const client = (await getRedis()) as unknown as Record<
+    RedisCommand,
+    (...args: unknown[]) => Promise<unknown>
+  >;
+
+  const spies = commands.map((command) =>
+    vi.spyOn(client, command).mockImplementation(() => new Promise(() => {})),
+  );
+
+  return () => {
+    for (const spy of spies) {
+      spy.mockRestore();
+    }
+  };
+}
+
+/**
+ * Simulates Redis being unreachable: closes the live connection and stubs
+ * .connect() to keep rejecting, so isReady/isOpen genuinely read false and
+ * withRedis's request-path check sees a real outage, not a mocked command.
+ * Goes through closeRedis() rather than a raw client.close()/destroy() call so
+ * the module-private connectPromise is cleared too — otherwise getRedis() would
+ * keep resolving the stale (now-closed) client without ever calling .connect()
+ * again, for the rest of the (single-worker, shared-singleton) suite.
+ */
+export async function simulateRedisUnavailable(): Promise<() => Promise<void>> {
+  const client = await getRedis();
+
+  const connectSpy = vi
+    .spyOn(client, "connect")
+    .mockRejectedValue(new Error("Redis unavailable (injected)"));
+
+  await closeRedis();
+
+  return async () => {
+    connectSpy.mockRestore();
+    await getRedis();
   };
 }
