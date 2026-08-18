@@ -1,6 +1,7 @@
 "use client";
 
 import type { OrganizationResponse } from "@haccp/shared";
+import { timezoneSchema } from "@haccp/shared";
 import { useTranslations } from "next-intl";
 import { TriangleAlertIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
@@ -98,7 +99,7 @@ export function OrganizationSettingsForm({
     () =>
       z.object({
         name: z.string().trim().min(1).max(256),
-        timezone: z.string().min(1),
+        timezone: timezoneSchema,
         locale: z.enum(["bg", "en"]),
         multipleLocationsEnabled: z.boolean(),
       }),

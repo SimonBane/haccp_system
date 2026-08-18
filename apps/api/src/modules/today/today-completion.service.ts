@@ -3,6 +3,8 @@ import {
   buildTodayTaskItem,
   classifyTemperatureResult,
   getWeekdayFromDate,
+  isValidTimeZone,
+  zonedDateString,
 } from "@haccp/shared";
 import type {
   CompleteTodayTaskInput,
@@ -100,8 +102,18 @@ async function withCompletionContext<T>(
   timeZone: string,
   handler: (context: CompletionContext) => Promise<T>,
 ): Promise<T> {
-  const weekday = getWeekdayFromDate(input.date);
+  if (!isValidTimeZone(timeZone)) {
+    throw new InternalError("Organization timezone configuration is invalid");
+  }
+
   const now = new Date();
+  const businessDate = zonedDateString(now, timeZone);
+
+  if (input.date > businessDate) {
+    throw new ValidationError("Cannot record a task for a future date");
+  }
+
+  const weekday = getWeekdayFromDate(input.date);
 
   const template = await resolveTemplateForCompletion(
     db,

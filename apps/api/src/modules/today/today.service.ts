@@ -2,9 +2,11 @@ import type { TodayResponse } from "@haccp/shared";
 import {
   buildTodayTaskItem,
   getWeekdayFromDate,
+  isValidTimeZone,
   sortScheduledTimes,
 } from "@haccp/shared";
 import type { Db } from "../../core/db/client.js";
+import { InternalError } from "../../core/errors/app-errors.js";
 import { taskTemplateRepository } from "../task-templates/task-template.repository.js";
 import {
   buildCompletionKey,
@@ -21,6 +23,10 @@ export const todayService = {
     currentUserId: string,
     timeZone: string,
   ): Promise<TodayResponse> {
+    if (!isValidTimeZone(timeZone)) {
+      throw new InternalError("Organization timezone configuration is invalid");
+    }
+
     const weekday = getWeekdayFromDate(date);
     const now = new Date();
 

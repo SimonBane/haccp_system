@@ -27,6 +27,8 @@ type Props = {
   timeZone: string;
   isSyncing: boolean;
   currentUserId: string | null;
+  /** True for a future-dated view — the row renders but is not interactive. */
+  disableActions: boolean;
   onActivate: (item: TodayTimelineItem) => void;
 };
 
@@ -57,6 +59,7 @@ export const TodayTaskRow = memo(function TodayTaskRow({
   timeZone,
   isSyncing,
   currentUserId,
+  disableActions,
   onActivate,
 }: Props) {
   const t = useTranslations("TodayPage");
@@ -320,7 +323,7 @@ export const TodayTaskRow = memo(function TodayTaskRow({
         className="absolute inset-0 h-auto w-full rounded-xl p-0 hover:bg-transparent active:translate-y-0 dark:hover:bg-transparent"
         aria-label={ariaLabel}
         data-testid="today-task-activate"
-        disabled={isSyncing}
+        disabled={isSyncing || disableActions}
         onClick={() => onActivate(item)}
       />
     </Card>
