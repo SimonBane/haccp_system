@@ -3,6 +3,7 @@ import {
   normalizeOrgRole,
   requiresLocationAssignments,
   type EmployeeResponse,
+  type OrgRole,
   normalizeName,
 } from "@haccp/shared";
 
@@ -88,4 +89,53 @@ export function resolveEmployeeLocationIds(
   }
 
   return locationIds.length > 0 ? locationIds : [options.defaultLocationId];
+}
+
+export function sameLocationIds(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+
+  const set = new Set(a);
+  return b.every((id) => set.has(id));
+}
+
+export type EmployeeUpdatePlan =
+  | { kind: "role"; role: OrgRole }
+  | {
+      kind: "profile";
+      email: string;
+      firstName: string;
+      lastName: string;
+      role: OrgRole;
+    }
+  | null;
+
+export function resolveEmployeeUpdatePlan(
+  employee: EmployeeResponse,
+  values: { email: string; firstName: string; lastName: string; role: string },
+): EmployeeUpdatePlan {
+  const roleChanged = normalizeOrgRole(values.role) !== normalizeOrgRole(employee.role);
+
+  if (employee.status === "active") {
+    return roleChanged ? { kind: "role", role: normalizeOrgRole(values.role) } : null;
+  }
+
+  const changed =
+    roleChanged ||
+    normalizeEmail(values.email) !== normalizeEmail(employee.email) ||
+    normalizeName(values.firstName) !== normalizeName(employee.firstName) ||
+    normalizeName(values.lastName) !== normalizeName(employee.lastName);
+
+  if (!changed) {
+    return null;
+  }
+
+  return {
+    kind: "profile",
+    email: values.email,
+    firstName: values.firstName,
+    lastName: values.lastName,
+    role: normalizeOrgRole(values.role),
+  };
 }

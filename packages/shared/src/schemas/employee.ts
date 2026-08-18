@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  locationIdsSchema,
   optionalPersonNameSchema,
   personNameSchema,
   trimmedEmailSchema,
@@ -21,7 +22,7 @@ export const orgRoleSchema = z.enum([ORG_ROLE.ADMIN, ORG_ROLE.EMPLOYEE]);
 export type OrgRole = z.infer<typeof orgRoleSchema>;
 
 // Admin `[]` means all locations; employees always need at least one.
-const employeeLocationIdsSchema = z.array(z.uuid());
+const employeeLocationIdsSchema = locationIdsSchema;
 
 export function requiresLocationAssignments(role: OrgRole | string): boolean {
   return role !== ORG_ROLE.ADMIN;
@@ -107,17 +108,32 @@ export const createEmployeeSchema = z
 
 export type CreateEmployeeInput = z.infer<typeof createEmployeeSchema>;
 
-export const updateEmployeeSchema = z
+export const updateEmployeeRoleSchema = z.object({
+  role: orgRoleSchema,
+});
+
+export type UpdateEmployeeRoleInput = z.infer<typeof updateEmployeeRoleSchema>;
+
+export const updateEmployeeLocationsSchema = z.object({
+  locationIds: employeeLocationIdsSchema,
+});
+
+export type UpdateEmployeeLocationsInput = z.infer<
+  typeof updateEmployeeLocationsSchema
+>;
+
+export const updateEmployeeProfileSchema = z
   .object({
     email: trimmedEmailSchema.optional(),
-    firstName: optionalPersonNameSchema.nullable().optional(),
-    lastName: optionalPersonNameSchema.nullable().optional(),
+    firstName: optionalPersonNameSchema.optional(),
+    lastName: optionalPersonNameSchema.optional(),
     role: orgRoleSchema.optional(),
-    locationIds: employeeLocationIdsSchema.optional(),
   })
   .refine(
     (data) => Object.values(data).some((value) => value !== undefined),
     { error: "At least one field must be provided" },
   );
 
-export type UpdateEmployeeInput = z.infer<typeof updateEmployeeSchema>;
+export type UpdateEmployeeProfileInput = z.infer<
+  typeof updateEmployeeProfileSchema
+>;

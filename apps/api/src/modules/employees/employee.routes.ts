@@ -4,7 +4,9 @@ import {
   createEmployeeSchema,
   employeeListResponseSchema,
   employeeResponseSchema,
-  updateEmployeeSchema,
+  updateEmployeeLocationsSchema,
+  updateEmployeeProfileSchema,
+  updateEmployeeRoleSchema,
   uuidParamSchema,
 } from "@haccp/shared";
 import {
@@ -53,9 +55,9 @@ const createRouteDef = createRoute({
   },
 });
 
-const updateRouteDef = createRoute({
+const updateRoleRouteDef = createRoute({
   method: "patch",
-  path: "/{id}",
+  path: "/{id}/role",
   tags: ["Employees"],
   security: bearerSecurity,
   request: {
@@ -63,7 +65,55 @@ const updateRouteDef = createRoute({
     body: {
       content: {
         "application/json": {
-          schema: updateEmployeeSchema,
+          schema: updateEmployeeRoleSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: jsonResponse(employeeResponseSchema),
+    400: errorResponse("Validation error"),
+    401: errorResponse("Unauthorized"),
+    403: errorResponse("Forbidden"),
+    404: errorResponse("Not found"),
+  },
+});
+
+const updateLocationsRouteDef = createRoute({
+  method: "patch",
+  path: "/{id}/locations",
+  tags: ["Employees"],
+  security: bearerSecurity,
+  request: {
+    params: uuidParamSchema,
+    body: {
+      content: {
+        "application/json": {
+          schema: updateEmployeeLocationsSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: jsonResponse(employeeResponseSchema),
+    400: errorResponse("Validation error"),
+    401: errorResponse("Unauthorized"),
+    403: errorResponse("Forbidden"),
+    404: errorResponse("Not found"),
+  },
+});
+
+const updateProfileRouteDef = createRoute({
+  method: "patch",
+  path: "/{id}/profile",
+  tags: ["Employees"],
+  security: bearerSecurity,
+  request: {
+    params: uuidParamSchema,
+    body: {
+      content: {
+        "application/json": {
+          schema: updateEmployeeProfileSchema,
         },
       },
     },
@@ -161,19 +211,58 @@ employeeRoutes.openapi(
 );
 
 employeeRoutes.openapi(
-  updateRouteDef,
-  defineRouteHandler(updateRouteDef, async (c) => {
-    const { clerkOrgId, organizationId, userDbId, userId } = requireOrgContext(c);
+  updateRoleRouteDef,
+  defineRouteHandler(updateRoleRouteDef, async (c) => {
+    const { clerkOrgId, organizationId, userDbId } = requireOrgContext(c);
     const tenant = getTenant(c);
     const { id } = c.req.valid("param");
     const input = c.req.valid("json");
-    const updated = await employeeService.update(
+    const updated = await employeeService.updateRole(
+      getDb(c),
+      organizationId,
+      clerkOrgId,
+      userDbId,
+      id,
+      input,
+      tenant.locations,
+    );
+    return c.json(updated, 200);
+  }),
+);
+
+employeeRoutes.openapi(
+  updateLocationsRouteDef,
+  defineRouteHandler(updateLocationsRouteDef, async (c) => {
+    const { clerkOrgId, organizationId } = requireOrgContext(c);
+    const tenant = getTenant(c);
+    const { id } = c.req.valid("param");
+    const input = c.req.valid("json");
+    const updated = await employeeService.updateLocations(
+      getDb(c),
+      organizationId,
+      clerkOrgId,
+      id,
+      input,
+      tenant.locations,
+    );
+    return c.json(updated, 200);
+  }),
+);
+
+employeeRoutes.openapi(
+  updateProfileRouteDef,
+  defineRouteHandler(updateProfileRouteDef, async (c) => {
+    const { clerkOrgId, organizationId, userId, userDbId } = requireOrgContext(c);
+    const tenant = getTenant(c);
+    const { id } = c.req.valid("param");
+    const input = c.req.valid("json");
+    const updated = await employeeService.updateProfile(
       getDb(c),
       organizationId,
       clerkOrgId,
       userId,
-      userDbId,
       tenant.organization.locale,
+      userDbId,
       id,
       input,
       tenant.locations,

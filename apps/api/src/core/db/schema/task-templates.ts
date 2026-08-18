@@ -1,4 +1,11 @@
-import { index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  foreignKey,
+  index,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { equipment } from "./equipment.js";
 import { locations } from "./locations.js";
 
@@ -13,9 +20,7 @@ export const taskTemplates = pgTable(
     type: text("type").notNull(),
     weekdays: text("weekdays").array().notNull(),
     scheduledTimes: text("scheduled_times").array().notNull(),
-    equipmentId: uuid("equipment_id").references(() => equipment.id, {
-      onDelete: "restrict",
-    }),
+    equipmentId: uuid("equipment_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -26,6 +31,10 @@ export const taskTemplates = pgTable(
   (table) => [
     index("task_templates_location_id_idx").on(table.locationId),
     index("task_templates_equipment_id_idx").on(table.equipmentId),
+    foreignKey({
+      columns: [table.equipmentId, table.locationId],
+      foreignColumns: [equipment.id, equipment.locationId],
+    }).onDelete("restrict"),
   ],
 );
 

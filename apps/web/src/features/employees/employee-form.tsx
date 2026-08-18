@@ -406,6 +406,7 @@ export function EmployeeForm({
                       {...field}
                       id="employee-first-name"
                       autoComplete="off"
+                      disabled={isActive}
                       placeholder={t("firstNamePlaceholder")}
                     />
                     {fieldState.error ? (
@@ -430,6 +431,7 @@ export function EmployeeForm({
                       {...field}
                       id="employee-last-name"
                       autoComplete="off"
+                      disabled={isActive}
                       placeholder={t("lastNamePlaceholder")}
                     />
                     {fieldState.error ? (
