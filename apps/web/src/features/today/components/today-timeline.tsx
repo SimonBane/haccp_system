@@ -14,11 +14,9 @@ import { TodayTimeGroup } from "./today-time-group";
 type Props = {
   timeline: Timeline;
   timeZone: string;
-  /** Changes when the day changes so auto-scroll runs once per day. */
   scrollKey: string;
   syncingKeys: ReadonlySet<string>;
   currentUserId: string | null;
-  /** True for a future-dated view — rows render but are not interactive. */
   disableActions: boolean;
   onActivate: (item: TodayTimelineItem) => void;
 };

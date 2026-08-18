@@ -86,8 +86,6 @@ export function TodayView({
   const { completeTask, uncompleteTask, completeTemperatureTask } =
     useTodayMutations(currentUserId, timeZone);
 
-  // Future dates may be viewed but never acted on; a stale response is still
-  // showing a previous date's rows while the new one is in flight.
   const isFutureDate = isFutureSelection(selectedDate, now, timeZone);
   const isStale = isStaleResponse(response?.date, selectedDate);
 
@@ -122,8 +120,6 @@ export function TodayView({
     close: closeRound,
   } = round;
 
-  // A date/location switch must close any open form immediately, not wait for the
-  // new fetch — the round or record sheet would otherwise keep showing the old context.
   useEffect(() => {
     closeRound();
     setRecordKey(null);
@@ -323,8 +319,6 @@ export function TodayView({
 
   const handleActivate = useCallback(
     (item: TodayTimelineItem) => {
-      // A tap that lands while stale (previous-date) data is still showing, or on a
-      // future-dated view, must be a no-op rather than write to the wrong date.
       if (isStale || isFutureDate) return;
 
       if (item.isCompleted) {
