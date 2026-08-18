@@ -4,7 +4,6 @@ import { CheckIcon, CircleAlertIcon, RotateCcwIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DialogFooter } from "@/components/ui/dialog";
 import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
 import { useOrgTimeZone } from "@/features/tenant/use-org-timezone";
 import { cn } from "@/lib/utils";
@@ -65,22 +64,24 @@ export function TodayRecordSheet({
       }
       closeLabel={t("record.close")}
       footer={
-        <DialogFooter className="gap-2 sm:gap-2">
+        <div className="flex w-full items-center gap-2 md:gap-3">
           <Button
             variant="outline"
+            className="min-h-14 flex-1 rounded-2xl md:min-h-10 md:rounded-md"
             onClick={() => onOpenChange(false)}
           >
             {t("record.close")}
           </Button>
           <Button
             variant="destructive"
+            className="min-h-14 flex-1 rounded-2xl md:min-h-10 md:rounded-md"
             isLoading={isUndoing}
             onClick={() => onUndo(item)}
           >
             <RotateCcwIcon />
             {t("actions.undo")}
           </Button>
-        </DialogFooter>
+        </div>
       }
     >
       <div className="space-y-4">

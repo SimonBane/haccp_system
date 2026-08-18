@@ -50,8 +50,6 @@ export function AcceptInvitationContent() {
     void completeAcceptance();
   }, [completeAcceptance, invitationAccepted, isLoaded]);
 
-  // A rejected token refresh leaves every branch below unmatched, so without this
-  // the page would hold FullPageLoader forever with no way out.
   if (completionFailed) {
     return (
       <div
@@ -90,9 +88,6 @@ export function AcceptInvitationContent() {
     );
   }
 
-  // Clerk drives this page with __clerk_status. A ticket without one is expired,
-  // tampered with, or opened directly — no branch below can advance it, so without
-  // this the page holds a loader forever.
   if (isLoaded && token && !accountStatus && !invitationAccepted) {
     return (
       <div
