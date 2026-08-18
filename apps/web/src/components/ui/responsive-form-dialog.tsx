@@ -19,15 +19,12 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 
-/** Shared with the temperature flow. Slide distance lives in `sheet.tsx` so two identical-specificity rules do not fight emit order. */
 export const SHEET_SURFACE = [
   "top-8 h-[calc(100dvh-2rem)] max-h-none rounded-t-3xl border-t",
   // Unqualified so tailwind-merge beats the stock duration by name, not emit order.
   "duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:duration-0",
 ].join(" ");
 
-// Extra bottom room beyond the base padding — too close to the edge on a real
-// phone otherwise — plus the device's own safe-area inset for standalone/PWA use.
 export const SHEET_FOOTER =
   "shrink-0 px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] [&_[data-slot=button]]:h-(--control-h)";
 
