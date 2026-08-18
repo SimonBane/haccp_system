@@ -460,7 +460,7 @@
     "addTitle": "Add employee",
     "addDescription": "Add an employee to your organization.",
     "editTitle": "Edit employee",
-    "editDescription": "Update employee details and location assignments.",
+    "editDescription": "Update this employee's details, role, and location access.",
     "emailLabel": "Email",
     "emailPlaceholder": "employee@example.com",
     "firstNameLabel": "First name",

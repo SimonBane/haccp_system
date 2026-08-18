@@ -12,8 +12,29 @@ import {
   NotFoundError,
 } from "../../core/errors/app-errors.js";
 import { mapDbMutationError } from "../../lib/db-errors.js";
+import { equipmentRepository } from "../equipment/equipment.repository.js";
 import { toTaskTemplateResponse } from "./task-template.mapper.js";
 import { taskTemplateRepository } from "./task-template.repository.js";
+
+async function assertEquipmentBelongsToLocation(
+  db: Db,
+  locationId: string,
+  equipmentId: string | null | undefined,
+): Promise<void> {
+  if (!equipmentId) {
+    return;
+  }
+
+  const found = await equipmentRepository.findByIdAndLocation(
+    db,
+    locationId,
+    equipmentId,
+  );
+
+  if (!found) {
+    throw new NotFoundError("Equipment not found");
+  }
+}
 
 export const taskTemplateService = {
   async list(
@@ -38,6 +59,8 @@ export const taskTemplateService = {
     locationId: string,
     input: CreateTaskTemplateInput,
   ): Promise<TaskTemplateResponse> {
+    await assertEquipmentBelongsToLocation(db, locationId, input.equipmentId);
+
     try {
       const created = await taskTemplateRepository.insert(db, {
         locationId,
@@ -66,6 +89,8 @@ export const taskTemplateService = {
     taskTemplateId: string,
     input: UpdateTaskTemplateInput,
   ): Promise<TaskTemplateResponse> {
+    await assertEquipmentBelongsToLocation(db, locationId, input.equipmentId);
+
     const updates: Partial<typeof taskTemplates.$inferInsert> = {
       updatedAt: new Date(),
       title: input.title,

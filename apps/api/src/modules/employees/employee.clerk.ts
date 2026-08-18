@@ -5,7 +5,6 @@ import { MEMBERSHIP_STATUS } from "../../core/db/schema/organization-memberships
 import type { OrganizationMembership } from "../../core/db/schema/organization-memberships.js";
 import type { User } from "../../core/db/schema/users.js";
 import { ValidationError } from "../../core/errors/app-errors.js";
-import type { EmployeeChanges } from "./employee.changes.js";
 
 function buildInvitationRedirectUrl(
   locale: AppLocale,
@@ -80,20 +79,6 @@ export async function removeClerkOrganizationMembership(
     organizationId: clerkOrgId,
     userId: clerkUserId,
   });
-}
-
-export async function applyActiveEmployeeUpdate(
-  clerkOrgId: string,
-  clerkUserId: string,
-  changes: EmployeeChanges,
-  nextUser: User,
-): Promise<void> {
-  if (changes.firstName !== undefined || changes.lastName !== undefined) {
-    await clerkClient.users.updateUser(clerkUserId, {
-      firstName: nextUser.firstName,
-      lastName: nextUser.lastName,
-    });
-  }
 }
 
 export async function syncClerkMembershipRemoval(

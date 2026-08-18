@@ -460,7 +460,7 @@
     "addTitle": "Добави служител",
     "addDescription": "Добавете служител към организацията.",
     "editTitle": "Редактирай служител",
-    "editDescription": "Обновете данните на служителя и назначените локации.",
+    "editDescription": "Обновете данните, ролята и достъпа до локации на служителя.",
     "emailLabel": "Имейл",
     "emailPlaceholder": "slujitel@example.com",
     "firstNameLabel": "Име",

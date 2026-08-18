@@ -4,9 +4,16 @@ import type {
   EmployeeListResponse,
   EmployeeResponse,
   LocationResponse,
-  UpdateEmployeeInput,
+  UpdateEmployeeLocationsInput,
+  UpdateEmployeeProfileInput,
+  UpdateEmployeeRoleInput,
 } from "@haccp/shared";
-import { normalizeEmail, normalizeOrgRole } from "@haccp/shared";
+import {
+  normalizeEmail,
+  normalizeName,
+  normalizeOrgRole,
+  requiresLocationAssignments,
+} from "@haccp/shared";
 import type { Db } from "../../core/db/client.js";
 import { MEMBERSHIP_STATUS } from "../../core/db/schema/organization-memberships.js";
 import type { OrganizationMembership } from "../../core/db/schema/organization-memberships.js";
@@ -19,18 +26,7 @@ import {
 } from "../../core/errors/app-errors.js";
 import { mapDbMutationError } from "../../lib/db-errors.js";
 import { userService } from "../users/user.service.js";
-import type { EmployeeChanges } from "./employee.changes.js";
-import {
-  diffEmployeeChanges,
-  hasInviteMetadataChanges,
-  hasProfileChanges,
-  isEmptyChangeSet,
-} from "./employee.changes.js";
-import {
-  applyActiveEmployeeUpdate,
-  revokeClerkInvitation,
-  syncClerkMembershipRemoval,
-} from "./employee.clerk.js";
+import { revokeClerkInvitation, syncClerkMembershipRemoval } from "./employee.clerk.js";
 import { changeActiveEmployeeRole } from "./employee.role.js";
 import type { EmployeeDetail } from "./employee.mapper.js";
 import {
@@ -39,7 +35,7 @@ import {
   toEmployeeResponse,
 } from "./employee.mapper.js";
 import { issueMembershipInvitation } from "./employee.invitations.js";
-import { resolveLocationAssignments } from "./employee.locations.js";
+import { resolveLocationAssignments, sameLocationIds } from "./employee.locations.js";
 import { membershipCache } from "./membership-cache.js";
 import { employeeRepository } from "./employee.repository.js";
 
@@ -72,29 +68,6 @@ function assertLocationIdsBelongToTenant(
 
   if (hasInvalidLocation) {
     throw new ValidationError("One or more locations are invalid");
-  }
-}
-
-function assertUpdateAllowed(
-  detail: EmployeeDetail,
-  input: UpdateEmployeeInput,
-  changes: EmployeeChanges,
-  actorUserDbId: string,
-  tenantLocations: LocationResponse[],
-): void {
-  if (
-    detail.membership.status === MEMBERSHIP_STATUS.ACTIVE &&
-    changes.email !== undefined
-  ) {
-    throw new ValidationError("Email cannot be changed for active employees");
-  }
-
-  if (input.locationIds !== undefined) {
-    assertLocationIdsBelongToTenant(input.locationIds, tenantLocations);
-  }
-
-  if (changes.role !== undefined && detail.membership.userId === actorUserDbId) {
-    throw new ForbiddenError("You cannot change your own role");
   }
 }
 
@@ -146,54 +119,6 @@ async function createDraftEmployee(
       );
 
       return { membership, user, locationIds };
-    });
-  } catch (error) {
-    mapDbMutationError(error, {
-      unique: () => new ConflictError("An employee with this email already exists"),
-      foreignKey: () => new ValidationError("One or more locations are invalid"),
-    });
-  }
-}
-
-async function persistEmployeeChanges(
-  db: Db,
-  organizationId: string,
-  detail: EmployeeDetail,
-  changes: EmployeeChanges,
-): Promise<EmployeeDetail> {
-  try {
-    return await db.transaction(async (tx) => {
-      const user = hasProfileChanges(changes)
-        ? await userService.updateProfile(tx, detail.user.id, {
-            email: changes.email,
-            firstName: changes.firstName,
-            lastName: changes.lastName,
-          })
-        : null;
-
-      const membership = changes.role
-        ? await employeeRepository.updateByIdAndOrganization(
-            tx,
-            organizationId,
-            detail.membership.id,
-            { role: changes.role },
-          )
-        : null;
-
-      if (changes.locationIds) {
-        await employeeRepository.replaceLocationAssignments(
-          tx,
-          detail.membership.id,
-          organizationId,
-          changes.locationIds,
-        );
-      }
-
-      return {
-        user: user ?? detail.user,
-        membership: membership ?? detail.membership,
-        locationIds: changes.locationIds ?? detail.locationIds,
-      };
     });
   } catch (error) {
     mapDbMutationError(error, {
@@ -263,97 +188,185 @@ export const employeeService = {
     );
   },
 
-  async update(
+  async updateRole(
     db: Db,
     organizationId: string,
     clerkOrgId: string,
-    inviterClerkUserId: string,
     actorUserDbId: string,
-    orgLocale: AppLocale,
     membershipId: string,
-    input: UpdateEmployeeInput,
+    input: UpdateEmployeeRoleInput,
     tenantLocations: LocationResponse[],
   ): Promise<EmployeeResponse> {
     const detail = await requireEmployeeDetail(db, organizationId, membershipId);
-    const changes = diffEmployeeChanges(detail, input, tenantLocations);
 
-    assertUpdateAllowed(detail, input, changes, actorUserDbId, tenantLocations);
-
-    if (isEmptyChangeSet(changes)) {
-      return buildEmployeeResponseFromDetail(detail, tenantLocations);
-    }
-
-    let workingDetail = detail;
-    let roleHandledByClerkFirst = false;
-
-    if (
-      changes.role !== undefined &&
-      detail.membership.status === MEMBERSHIP_STATUS.ACTIVE &&
-      detail.user.clerkUserId
-    ) {
-      const membership = await changeActiveEmployeeRole(db, {
-        organizationId,
-        clerkOrgId,
-        clerkUserId: detail.user.clerkUserId,
-        membershipId: detail.membership.id,
-        role: changes.role,
-      });
-      workingDetail = { ...detail, membership };
-      roleHandledByClerkFirst = true;
-    }
-
-    const remainingChanges: EmployeeChanges = roleHandledByClerkFirst
-      ? { ...changes, role: undefined }
-      : changes;
-
-    const next = isEmptyChangeSet(remainingChanges)
-      ? workingDetail
-      : await persistEmployeeChanges(
-          db,
-          organizationId,
-          workingDetail,
-          remainingChanges,
-        );
-
-    if (hasProfileChanges(remainingChanges) && next.user.clerkUserId) {
-      await userService.invalidateCache(next.user.clerkUserId);
-    }
-
-    const { clerkInvitationId, status } = detail.membership;
-
-    if (status === MEMBERSHIP_STATUS.ACTIVE && detail.user.clerkUserId) {
-      await applyActiveEmployeeUpdate(
-        clerkOrgId,
-        detail.user.clerkUserId,
-        remainingChanges,
-        next.user,
+    if (detail.membership.status !== MEMBERSHIP_STATUS.ACTIVE) {
+      throw new ValidationError(
+        "Only active employees can be updated through this endpoint",
       );
     }
 
-    const membership =
-      status === MEMBERSHIP_STATUS.INVITED &&
-      clerkInvitationId &&
-      hasInviteMetadataChanges(changes)
-        ? await issueMembershipInvitation(
-            db,
-            organizationId,
-            membershipId,
-            {
-              locale: orgLocale,
-              clerkOrgId,
-              inviterUserId: inviterClerkUserId,
-              email: next.user.email,
-              role: next.membership.role,
-              firstName: next.user.firstName,
-              lastName: next.user.lastName,
-            },
-            { previousInvitationId: clerkInvitationId },
-          )
-        : next.membership;
+    const role = normalizeOrgRole(input.role);
 
-    if (remainingChanges.locationIds || remainingChanges.role) {
-      await membershipCache.invalidate(clerkOrgId, detail.user.clerkUserId);
+    if (role === normalizeOrgRole(detail.membership.role)) {
+      return buildEmployeeResponseFromDetail(detail, tenantLocations);
     }
+
+    if (detail.membership.userId === actorUserDbId) {
+      throw new ForbiddenError("You cannot change your own role");
+    }
+
+    // ACTIVE always has a clerkUserId (set when the invitation is accepted).
+    const membership = await changeActiveEmployeeRole(db, {
+      organizationId,
+      clerkOrgId,
+      clerkUserId: detail.user.clerkUserId as string,
+      membershipId: detail.membership.id,
+      role,
+    });
+
+    return buildEmployeeResponseFromDetail(detail, tenantLocations, {
+      membership,
+    });
+  },
+
+  async updateLocations(
+    db: Db,
+    organizationId: string,
+    clerkOrgId: string,
+    membershipId: string,
+    input: UpdateEmployeeLocationsInput,
+    tenantLocations: LocationResponse[],
+  ): Promise<EmployeeResponse> {
+    const detail = await requireEmployeeDetail(db, organizationId, membershipId);
+    assertLocationIdsBelongToTenant(input.locationIds, tenantLocations);
+
+    if (
+      requiresLocationAssignments(detail.membership.role) &&
+      input.locationIds.length === 0
+    ) {
+      throw new ValidationError("Select at least one location.");
+    }
+
+    if (sameLocationIds(detail.locationIds, input.locationIds)) {
+      return buildEmployeeResponseFromDetail(detail, tenantLocations);
+    }
+
+    await db.transaction(async (tx) => {
+      await employeeRepository.replaceLocationAssignments(
+        tx,
+        membershipId,
+        organizationId,
+        input.locationIds,
+      );
+    });
+
+    await membershipCache.invalidate(clerkOrgId, detail.user.clerkUserId);
+
+    return buildEmployeeResponseFromDetail(detail, tenantLocations, {
+      locationIds: input.locationIds,
+    });
+  },
+
+  async updateProfile(
+    db: Db,
+    organizationId: string,
+    clerkOrgId: string,
+    inviterUserId: string,
+    orgLocale: AppLocale,
+    actorUserDbId: string,
+    membershipId: string,
+    input: UpdateEmployeeProfileInput,
+    tenantLocations: LocationResponse[],
+  ): Promise<EmployeeResponse> {
+    const detail = await requireEmployeeDetail(db, organizationId, membershipId);
+
+    if (detail.membership.status === MEMBERSHIP_STATUS.ACTIVE) {
+      throw new ValidationError(
+        "Only draft or invited employees can be updated through this endpoint",
+      );
+    }
+
+    const email = input.email !== undefined ? normalizeEmail(input.email) : undefined;
+    const firstName =
+      input.firstName !== undefined ? normalizeName(input.firstName) : undefined;
+    const lastName =
+      input.lastName !== undefined ? normalizeName(input.lastName) : undefined;
+    const role = input.role !== undefined ? normalizeOrgRole(input.role) : undefined;
+
+    const emailChanged = email !== undefined && email !== normalizeEmail(detail.user.email);
+    const firstNameChanged =
+      firstName !== undefined && firstName !== normalizeName(detail.user.firstName);
+    const lastNameChanged =
+      lastName !== undefined && lastName !== normalizeName(detail.user.lastName);
+    const roleChanged = role !== undefined && role !== normalizeOrgRole(detail.membership.role);
+
+    if (!emailChanged && !firstNameChanged && !lastNameChanged && !roleChanged) {
+      return buildEmployeeResponseFromDetail(detail, tenantLocations);
+    }
+
+    if (roleChanged && detail.membership.userId === actorUserDbId) {
+      throw new ForbiddenError("You cannot change your own role");
+    }
+
+    let next: EmployeeDetail;
+
+    try {
+      next = await db.transaction(async (tx) => {
+        const user =
+          emailChanged || firstNameChanged || lastNameChanged
+            ? await userService.updateProfile(tx, detail.user.id, {
+                email,
+                firstName,
+                lastName,
+              })
+            : null;
+
+        const membership = roleChanged
+          ? await employeeRepository.updateByIdAndOrganization(
+              tx,
+              organizationId,
+              membershipId,
+              { role },
+            )
+          : null;
+
+        return {
+          user: user ?? detail.user,
+          membership: membership ?? detail.membership,
+          locationIds: detail.locationIds,
+        };
+      });
+    } catch (error) {
+      mapDbMutationError(error, {
+        unique: () => new ConflictError("An employee with this email already exists"),
+      });
+    }
+
+    let membership = next.membership;
+
+    if (
+      detail.membership.status === MEMBERSHIP_STATUS.INVITED &&
+      detail.membership.clerkInvitationId
+    ) {
+      membership = await issueMembershipInvitation(
+        db,
+        organizationId,
+        membershipId,
+        {
+          locale: orgLocale,
+          clerkOrgId,
+          inviterUserId,
+          email: next.user.email,
+          role: next.membership.role,
+          firstName: next.user.firstName,
+          lastName: next.user.lastName,
+        },
+        { previousInvitationId: detail.membership.clerkInvitationId },
+      );
+    }
+
+    // No-op if clerkUserId is null (draft/pre-invitation employees have none yet).
+    await membershipCache.invalidate(clerkOrgId, detail.user.clerkUserId);
 
     return buildEmployeeResponseFromDetail(detail, tenantLocations, {
       membership,

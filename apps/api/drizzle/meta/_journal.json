@@ -22,6 +22,20 @@
       "when": 1786219914642,
       "tag": "0002_swift_hiroim",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787038496906,
+      "tag": "0003_add_equipment_id_location_id_unique",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787038513287,
+      "tag": "0004_add_task_templates_equipment_location_fk",
+      "breakpoints": true
     }
   ]
 }
