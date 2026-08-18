@@ -1,10 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { E2E_PREFIX, LOCALE_PREFIX } from "../../support/env.js";
-
-/** The row card carries the state; the stretched overlay button is the click target. */
-function row(page: Page, title: string) {
-  return page.getByTestId("today-task-row").filter({ hasText: title }).first();
-}
+import { ensurePending, row } from "../../support/today.js";
 
 test("date navigation settles on the requested day when the fetch is slow", async ({
   page,
@@ -47,7 +43,7 @@ test("a tap during a delayed date switch never writes to the stale date", async 
 }) => {
   await page.goto(`${LOCALE_PREFIX}/dashboard`);
   const title = `${E2E_PREFIX} Clean prep surface`;
-  await expect(row(page, title)).toBeVisible();
+  await ensurePending(page, title, "09:00");
 
   let writeCount = 0;
   await page.route("**/locations/*/today*", async (route) => {
@@ -78,6 +74,7 @@ test("a tap during a delayed date switch never writes to the stale date", async 
 test("switching dates closes an open temperature round", async ({ page }) => {
   await page.goto(`${LOCALE_PREFIX}/dashboard`);
   const title = `${E2E_PREFIX} Fridge check`;
+  await ensurePending(page, title, "08:00");
   await row(page, title).getByTestId("today-task-activate").click();
 
   const reading = page.getByTestId("temperature-reading");
