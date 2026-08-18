@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import type { Db } from "../../core/db/client.js";
-import { getRedis } from "../../core/redis/client.js";
+import { withRedis } from "../../core/redis/client.js";
 import { logger } from "../../lib/logger.js";
 
 export const healthService = {
@@ -10,8 +10,7 @@ export const healthService = {
     let redis: "connected" | "disconnected" = "disconnected";
 
     try {
-      const client = await getRedis();
-      await client.ping();
+      await withRedis((client) => client.ping());
       redis = "connected";
     } catch (err) {
       logger.warn({ err }, "Redis health check failed");

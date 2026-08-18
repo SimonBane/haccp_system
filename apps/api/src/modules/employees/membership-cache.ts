@@ -1,6 +1,6 @@
 import { orgRoleSchema } from "@haccp/shared";
 import { z } from "zod";
-import { getRedis } from "../../core/redis/client.js";
+import { withRedis } from "../../core/redis/client.js";
 import { logger } from "../../lib/logger.js";
 
 const KEY_PREFIX = "membership:clerk:";
@@ -27,8 +27,9 @@ export const membershipCache = {
     clerkUserId: string,
   ): Promise<MembershipCacheBlob | null> {
     try {
-      const redis = await getRedis();
-      const raw = await redis.get(cacheKey(clerkOrgId, clerkUserId));
+      const raw = await withRedis((client) =>
+        client.get(cacheKey(clerkOrgId, clerkUserId)),
+      );
 
       if (typeof raw !== "string") {
         return null;
@@ -52,11 +53,10 @@ export const membershipCache = {
     ttlSeconds = DEFAULT_TTL_SECONDS,
   ): Promise<void> {
     try {
-      const redis = await getRedis();
-      await redis.set(
-        cacheKey(clerkOrgId, clerkUserId),
-        JSON.stringify(blob),
-        { EX: ttlSeconds },
+      await withRedis((client) =>
+        client.set(cacheKey(clerkOrgId, clerkUserId), JSON.stringify(blob), {
+          EX: ttlSeconds,
+        }),
       );
     } catch (err) {
       logger.warn(
@@ -75,8 +75,9 @@ export const membershipCache = {
     }
 
     try {
-      const redis = await getRedis();
-      await redis.del(cacheKey(clerkOrgId, clerkUserId));
+      await withRedis((client) =>
+        client.del(cacheKey(clerkOrgId, clerkUserId)),
+      );
     } catch (err) {
       logger.warn(
         { err, clerkOrgId, clerkUserId },
