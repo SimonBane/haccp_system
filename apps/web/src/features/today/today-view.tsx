@@ -3,13 +3,14 @@
 import type { TodayResponse, TodayTaskItem } from "@haccp/shared";
 import { classifyTemperatureResult, zonedDateString } from "@haccp/shared";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { pageWidthVariants } from "@/components/layout/page-container";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useNow } from "@/hooks/use-now";
+import { useLocation } from "@/features/tenant/tenant-provider";
 import { useOrgTimeZone } from "@/features/tenant/use-org-timezone";
 import { getErrorMessage } from "@/lib/api/get-error-message";
 import { formatLocalDate, shiftLocalDate } from "@/lib/date";
@@ -36,6 +37,8 @@ import {
   applyClock,
   buildTodayTaskGroups,
   findTimelineItem,
+  isFutureSelection,
+  isStaleResponse,
   type TodayTimelineItem,
 } from "./lib/today-timeline";
 
@@ -54,6 +57,7 @@ export function TodayView({
   const locale = useLocale();
   const now = useNow();
   const timeZone = useOrgTimeZone();
+  const { locationId } = useLocation();
 
   // Recalculate from the ticking clock so an overnight tablet does not keep yesterday's date.
   const todayDate = useMemo(
@@ -81,6 +85,11 @@ export function TodayView({
   const currentUserId = response?.currentUserId ?? initialData.currentUserId;
   const { completeTask, uncompleteTask, completeTemperatureTask } =
     useTodayMutations(currentUserId, timeZone);
+
+  // Future dates may be viewed but never acted on; a stale response is still
+  // showing a previous date's rows while the new one is in flight.
+  const isFutureDate = isFutureSelection(selectedDate, now, timeZone);
+  const isStale = isStaleResponse(response?.date, selectedDate);
 
   // Depend on the stable mutate functions, not the result object (fresh every render).
   const runComplete = completeTask.mutateAsync;
@@ -112,6 +121,13 @@ export function TodayView({
     skip: skipRound,
     close: closeRound,
   } = round;
+
+  // A date/location switch must close any open form immediately, not wait for the
+  // new fetch — the round or record sheet would otherwise keep showing the old context.
+  useEffect(() => {
+    closeRound();
+    setRecordKey(null);
+  }, [selectedDate, locationId, closeRound]);
 
   // Latch the last non-null check so Base UI can run the exit after round/recordItem go null.
   const isRoundOpen =
@@ -307,6 +323,10 @@ export function TodayView({
 
   const handleActivate = useCallback(
     (item: TodayTimelineItem) => {
+      // A tap that lands while stale (previous-date) data is still showing, or on a
+      // future-dated view, must be a no-op rather than write to the wrong date.
+      if (isStale || isFutureDate) return;
+
       if (item.isCompleted) {
         setRecordKey(occurrenceKey(item.task));
         return;
@@ -328,7 +348,7 @@ export function TodayView({
 
       void handleComplete(item.task);
     },
-    [handleComplete, openRound, t],
+    [handleComplete, isFutureDate, isStale, openRound, t],
   );
 
   const isToday = selectedDate === todayDate;
@@ -417,6 +437,7 @@ export function TodayView({
               scrollKey={selectedDate}
               syncingKeys={syncingKeys}
               currentUserId={currentUserId}
+              disableActions={isFutureDate}
               onActivate={handleActivate}
             />
 

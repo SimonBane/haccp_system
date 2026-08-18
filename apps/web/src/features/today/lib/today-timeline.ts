@@ -76,6 +76,28 @@ export function timeGroupId(scheduledTime: string): string {
   return `time-group-${scheduledTime.replace(":", "-")}`;
 }
 
+/** Future dates may be viewed, but their actions must stay disabled. */
+export function isFutureSelection(
+  selectedDate: string,
+  now: Date,
+  timeZone: string,
+): boolean {
+  return selectedDate > zonedDateString(now, timeZone);
+}
+
+/**
+ * True while the response still reflects a previous date's data — `useTodayQuery`'s
+ * placeholder data only clears on a location change, not a date change, so a date
+ * switch keeps showing the old date (and its rows' `task.date`) until the new fetch
+ * resolves. Acting on a row during that window would write to the wrong date.
+ */
+export function isStaleResponse(
+  responseDate: string | undefined,
+  selectedDate: string,
+): boolean {
+  return responseDate === undefined || responseDate !== selectedDate;
+}
+
 /** Resolve a key against the current timeline — hold the key, not the item, because ticks rebuild it. */
 export function findTimelineItem(
   timeline: TodayTimeline,

@@ -23,6 +23,7 @@ import {
 import { tenantRepository } from "./tenant.repository.js";
 
 const DEFAULT_ORG_NAME = "Organization";
+const DEFAULT_ORG_TIMEZONE = "Europe/Sofia";
 
 export type ResolvedTenant = TenantContextResponse & {
   organizationId: string;
@@ -144,6 +145,7 @@ export const tenantService = {
           name,
           imageUrl,
           hasImage,
+          timezone: DEFAULT_ORG_TIMEZONE,
         });
 
         const location = await locationRepository.insert(tx, {
