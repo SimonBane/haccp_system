@@ -7,13 +7,13 @@ export type ZonedParts = {
   second: number;
 };
 
-/** Corrupt IANA id takes the page down (`RangeError`); fall back to the runtime zone. */
-function safeTimeZone(timeZone: string): string | undefined {
+/** The single shared IANA timezone validator — reused by schemas and, later, the materializer. */
+export function isValidTimeZone(timeZone: string): boolean {
   try {
     new Intl.DateTimeFormat("en-US", { timeZone });
-    return timeZone;
+    return true;
   } catch {
-    return undefined;
+    return false;
   }
 }
 
@@ -24,7 +24,7 @@ function partsFormatter(timeZone: string): Intl.DateTimeFormat {
   if (cached) return cached;
 
   const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: safeTimeZone(timeZone),
+    timeZone,
     hourCycle: "h23",
     year: "numeric",
     month: "2-digit",

@@ -4,6 +4,8 @@ import {
   applyClock,
   buildTodayTaskGroups,
   buildTodayTimeline,
+  isFutureSelection,
+  isStaleResponse,
   timeGroupId,
 } from "./today-timeline";
 
@@ -361,5 +363,33 @@ describe("buildTodayTaskGroups + applyClock", () => {
       expect(evening.groups[0].state).toBe("overdue");
       expect(morning.groups[0].items).toBe(evening.groups[0].items);
     });
+  });
+});
+
+describe("isFutureSelection", () => {
+  it("is false for the organization's current business date", () => {
+    expect(isFutureSelection(DATE, at("12:00"), SOFIA)).toBe(false);
+  });
+
+  it("is false for a past date", () => {
+    expect(isFutureSelection("2026-01-14", at("12:00"), SOFIA)).toBe(false);
+  });
+
+  it("is true for a date after the organization's current business date", () => {
+    expect(isFutureSelection("2026-01-16", at("12:00"), SOFIA)).toBe(true);
+  });
+});
+
+describe("isStaleResponse", () => {
+  it("is false when the response date matches the selection", () => {
+    expect(isStaleResponse(DATE, DATE)).toBe(false);
+  });
+
+  it("is true when the response still reflects a previous date", () => {
+    expect(isStaleResponse("2026-01-14", DATE)).toBe(true);
+  });
+
+  it("is true while there is no response yet", () => {
+    expect(isStaleResponse(undefined, DATE)).toBe(true);
   });
 });

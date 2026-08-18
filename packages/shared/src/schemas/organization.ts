@@ -1,6 +1,12 @@
 import { z } from "zod";
+import { isValidTimeZone } from "../lib/timezone.js";
 
 export const organizationLocaleSchema = z.enum(["bg", "en"]);
+
+export const timezoneSchema = z
+  .string()
+  .min(1)
+  .refine(isValidTimeZone, { error: "Must be a valid IANA timezone" });
 
 export const organizationResponseSchema = z.object({
   id: z.uuid(),
@@ -27,7 +33,7 @@ export type UpdateOrganizationNameInput = z.infer<
 
 export const updateOrganizationSchema = z
   .object({
-    timezone: z.string().min(1).optional(),
+    timezone: timezoneSchema.optional(),
     locale: organizationLocaleSchema.optional(),
     multipleLocationsEnabled: z.boolean().optional(),
   })

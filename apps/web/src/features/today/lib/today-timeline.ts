@@ -13,7 +13,6 @@ import {
 
 export type TimeGroupState = "done" | "overdue" | "now" | "upcoming";
 
-/** `completedAt` is when the reading was taken; `scheduledTime` is the round it belonged to. */
 export type TodayPriorReading = {
   scheduledTime: string;
   completedAt: string | null;
@@ -24,13 +23,10 @@ export type TodayTimelineItem = {
   task: TodayTaskItem;
   isCompleted: boolean;
   isDeviation: boolean;
-  /** Most recent same-day reading for this equipment, from the payload we already have. */
   priorReading: TodayPriorReading | null;
 };
 
-/** Clock-independent round; memoised on the response so ticks do not rebuild item identity. */
 export type TodayTaskGroup = {
-  /** Also the DOM anchor id for header-chip scroll. */
   id: string;
   scheduledTime: string;
   items: TodayTimelineItem[];
@@ -42,7 +38,6 @@ export type TodayTaskGroup = {
 
 export type TodayTimeGroup = TodayTaskGroup & {
   state: TimeGroupState;
-  /** Signed minutes from now. Negative means it has passed. */
   minutesUntil: number;
 };
 
@@ -74,6 +69,21 @@ export type TodayTimeline = {
 
 export function timeGroupId(scheduledTime: string): string {
   return `time-group-${scheduledTime.replace(":", "-")}`;
+}
+
+export function isFutureSelection(
+  selectedDate: string,
+  now: Date,
+  timeZone: string,
+): boolean {
+  return selectedDate > zonedDateString(now, timeZone);
+}
+
+export function isStaleResponse(
+  responseDate: string | undefined,
+  selectedDate: string,
+): boolean {
+  return responseDate === undefined || responseDate !== selectedDate;
 }
 
 /** Resolve a key against the current timeline — hold the key, not the item, because ticks rebuild it. */
