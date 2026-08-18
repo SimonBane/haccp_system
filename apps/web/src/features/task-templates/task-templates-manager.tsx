@@ -11,6 +11,8 @@ import { useTranslations } from "next-intl";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
+import { DataTableQueryError } from "@/components/ui/data-table/data-table-query-error";
+import { Spinner } from "@/components/ui/spinner";
 import {
   MobileHeaderAddAction,
   PageHeader,
@@ -35,7 +37,12 @@ export function TaskTemplatesManager({
   initialLocationId,
 }: TaskTemplatesManagerProps) {
   const t = useTranslations("TasksPage");
-  const { data: items = [], refetch } = useTaskTemplatesQuery({
+  const {
+    data: items = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useTaskTemplatesQuery({
     initialData: initialItems,
     initialLocationId,
   });
@@ -156,16 +163,24 @@ export function TaskTemplatesManager({
 
       <PageHeader title={t("title")} description={t("description")} />
 
-      <TaskTemplatesData
-        items={items}
-        onAdd={openCreateForm}
-        onEdit={openEditForm}
-        onDuplicate={openDuplicateForm}
-        onDelete={handleDelete}
-        onBulkDelete={handleBulkDelete}
-        rowSelection={rowSelection}
-        onRowSelectionChange={setRowSelection}
-      />
+      {isLoading ? (
+        <div className="flex items-center justify-center py-24">
+          <Spinner className="size-8" />
+        </div>
+      ) : isError ? (
+        <DataTableQueryError onRetry={() => void refetch()} />
+      ) : (
+        <TaskTemplatesData
+          items={items}
+          onAdd={openCreateForm}
+          onEdit={openEditForm}
+          onDuplicate={openDuplicateForm}
+          onDelete={handleDelete}
+          onBulkDelete={handleBulkDelete}
+          rowSelection={rowSelection}
+          onRowSelectionChange={setRowSelection}
+        />
+      )}
 
       <ResponsiveAlertDialog
         open={Boolean(deleteTarget)}

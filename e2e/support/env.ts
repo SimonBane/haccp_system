@@ -39,3 +39,20 @@ export const clerkEmails = {
 };
 
 export const E2E_PREFIX = "E2E";
+
+/**
+ * A Clerk publishable key is `pk_<env>_<base64(frontendApiHost + "$")>`. Deriving the
+ * host from it lets tests intercept Clerk's own network calls (e.g. token refresh)
+ * without hardcoding a per-instance domain.
+ */
+export function clerkFrontendApiHost(): string {
+  // Not E2E_CLERK_PUBLISHABLE_KEY: CI's job env (ci.yml) exports that secret's value
+  // only under CLERK_PUBLISHABLE_KEY / NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, and locally
+  // playwright.config only loads apps/api/.env(.local), never apps/web/.env.local
+  // where NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY lives. CLERK_PUBLISHABLE_KEY is present
+  // in both.
+  const key = required("CLERK_PUBLISHABLE_KEY");
+  const encoded = key.replace(/^pk_(test|live)_/, "");
+  const decoded = Buffer.from(encoded, "base64").toString("utf8");
+  return decoded.replace(/\$$/, "");
+}

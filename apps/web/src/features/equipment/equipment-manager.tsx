@@ -7,6 +7,8 @@ import { useTranslations } from "next-intl";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
+import { DataTableQueryError } from "@/components/ui/data-table/data-table-query-error";
+import { Spinner } from "@/components/ui/spinner";
 import {
   MobileHeaderAddAction,
   PageHeader,
@@ -27,7 +29,12 @@ export function EquipmentManager({
   initialLocationId,
 }: EquipmentManagerProps) {
   const t = useTranslations("EquipmentPage");
-  const { data: items = [], refetch } = useEquipmentQuery({
+  const {
+    data: items = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useEquipmentQuery({
     initialData: initialItems,
     initialLocationId,
   });
@@ -143,16 +150,24 @@ export function EquipmentManager({
 
       <PageHeader title={t("title")} description={t("description")} />
 
-      <EquipmentData
-        items={items}
-        onAdd={openCreateForm}
-        onEdit={openEditForm}
-        onDuplicate={openDuplicateForm}
-        onDelete={handleDelete}
-        onBulkDelete={handleBulkDelete}
-        rowSelection={rowSelection}
-        onRowSelectionChange={setRowSelection}
-      />
+      {isLoading ? (
+        <div className="flex items-center justify-center py-24">
+          <Spinner className="size-8" />
+        </div>
+      ) : isError ? (
+        <DataTableQueryError onRetry={() => void refetch()} />
+      ) : (
+        <EquipmentData
+          items={items}
+          onAdd={openCreateForm}
+          onEdit={openEditForm}
+          onDuplicate={openDuplicateForm}
+          onDelete={handleDelete}
+          onBulkDelete={handleBulkDelete}
+          rowSelection={rowSelection}
+          onRowSelectionChange={setRowSelection}
+        />
+      )}
 
       <ResponsiveAlertDialog
         open={Boolean(deleteTarget)}

@@ -65,15 +65,19 @@ export function TodayRecordSheet({
       }
       closeLabel={t("record.close")}
       footer={
-        <DialogFooter className="gap-2 sm:gap-2">
+        // flex-row overrides the base flex-col-reverse: this footer is always a
+        // 50/50 row, not just from sm: up.
+        <DialogFooter className="flex-row items-center gap-2 md:gap-3">
           <Button
             variant="outline"
+            className="min-h-14 flex-1 rounded-2xl md:min-h-10 md:rounded-md"
             onClick={() => onOpenChange(false)}
           >
             {t("record.close")}
           </Button>
           <Button
             variant="destructive"
+            className="min-h-14 flex-1 rounded-2xl md:min-h-10 md:rounded-md"
             isLoading={isUndoing}
             onClick={() => onUndo(item)}
           >
