@@ -4,6 +4,7 @@ import {
   equipment,
   locations,
   organizationMemberLocations,
+  taskTemplates,
   users,
 } from "../../src/core/db/schema/index.js";
 import { PG_ERROR, postgresErrorCode } from "./harness/db.js";
@@ -127,6 +128,52 @@ describe("database constraints", () => {
     );
 
     expect(sameNameElsewhere).toBeNull();
+  });
+
+  it("refuses a task template's equipment from another location in the same org", async () => {
+    // The composite (equipment_id, location_id) FK: HACCP-58's ownership guarantee.
+    const code = await codeFor(
+      db.insert(taskTemplates).values({
+        locationId: world.alpha.locations.annex.id,
+        title: "Cross-location check",
+        type: "temperature",
+        weekdays: ["monday"],
+        scheduledTimes: ["08:00"],
+        equipmentId: world.alpha.equipment.fridge.id,
+      }),
+    );
+
+    expect(code).toBe(PG_ERROR.FOREIGN_KEY_VIOLATION);
+  });
+
+  it("refuses a task template's equipment from another organization", async () => {
+    const code = await codeFor(
+      db.insert(taskTemplates).values({
+        locationId: world.alpha.locations.main.id,
+        title: "Cross-org check",
+        type: "temperature",
+        weekdays: ["monday"],
+        scheduledTimes: ["08:00"],
+        equipmentId: world.beta.equipment.fridge.id,
+      }),
+    );
+
+    expect(code).toBe(PG_ERROR.FOREIGN_KEY_VIOLATION);
+  });
+
+  it("accepts a task template's equipment from its own location", async () => {
+    const code = await codeFor(
+      db.insert(taskTemplates).values({
+        locationId: world.alpha.locations.main.id,
+        title: "Same-location check",
+        type: "temperature",
+        weekdays: ["monday"],
+        scheduledTimes: ["08:00"],
+        equipmentId: world.alpha.equipment.fridge.id,
+      }),
+    );
+
+    expect(code).toBeNull();
   });
 
   it("treats user email as globally unique, not per tenant", async () => {

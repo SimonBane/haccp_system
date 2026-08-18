@@ -18,8 +18,9 @@ import {
 import { useEmployeesMutations } from "@/features/employees/hooks/use-employees-mutations";
 import { useEmployeesQuery } from "@/features/employees/hooks/use-employees-query";
 import {
-  hasInviteMetadataChanges,
   resolveEmployeeLocationIds,
+  resolveEmployeeUpdatePlan,
+  sameLocationIds,
 } from "@/features/employees/utils";
 import { useTenant } from "@/features/tenant/tenant-provider";
 import { getErrorMessage } from "@/lib/api/get-error-message";
@@ -41,8 +42,15 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
   const { data: items = [] } = useEmployeesQuery({
     initialData: initialItems,
   });
-  const { create, update, invite, revokeInvitation, remove } =
-    useEmployeesMutations();
+  const {
+    create,
+    updateRole,
+    updateLocations,
+    updateProfile,
+    invite,
+    revokeInvitation,
+    remove,
+  } = useEmployeesMutations();
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] =
@@ -103,23 +111,45 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
 
       try {
         if (editingEmployee) {
-          const metadataChanged =
-            editingEmployee.status === "invited" &&
-            hasInviteMetadataChanges(editingEmployee, values);
+          const plan = resolveEmployeeUpdatePlan(editingEmployee, values);
+          const locationsChanged = !sameLocationIds(
+            locationIds,
+            editingEmployee.locationIds,
+          );
 
-          await update.mutateAsync({
-            id: editingEmployee.id,
-            input: {
-              ...(editingEmployee.status !== "active" && { email: values.email }),
-              firstName: values.firstName,
-              lastName: values.lastName,
-              role: values.role,
-              locationIds,
-            },
-          });
+          if (!plan && !locationsChanged) {
+            return true;
+          }
+
+          if (plan?.kind === "role") {
+            await updateRole.mutateAsync({
+              id: editingEmployee.id,
+              input: { role: plan.role },
+            });
+          } else if (plan?.kind === "profile") {
+            await updateProfile.mutateAsync({
+              id: editingEmployee.id,
+              input: {
+                email: plan.email,
+                firstName: plan.firstName,
+                lastName: plan.lastName,
+                role: plan.role,
+              },
+            });
+          }
+
+          if (locationsChanged) {
+            await updateLocations.mutateAsync({
+              id: editingEmployee.id,
+              input: { locationIds },
+            });
+          }
+
+          const invitedReissue =
+            editingEmployee.status === "invited" && plan?.kind === "profile";
 
           toast.success(
-            metadataChanged
+            invitedReissue
               ? t("toast.updateResendSuccess")
               : t("toast.updateSuccess"),
           );
@@ -149,7 +179,9 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
       editingEmployee,
       multipleLocationsEnabled,
       t,
-      update,
+      updateLocations,
+      updateProfile,
+      updateRole,
     ],
   );
 
