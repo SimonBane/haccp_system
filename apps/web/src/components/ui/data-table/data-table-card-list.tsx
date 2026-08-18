@@ -66,9 +66,6 @@ function CardListRow<TData>({
       data-testid="data-table-card"
       className={cn(
         "relative",
-        // Reserved as padding on the card's own border box, not on this wrapper —
-        // reserving it here instead would shrink the visible card and strand the
-        // button outside its border, in the now-empty margin.
         hasActions && "[&_[data-slot=mobile-list-row]]:pe-12",
       )}
       onContextMenu={(event) => {
