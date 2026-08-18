@@ -1,7 +1,7 @@
 import { apiErrorSchema, type ApiError } from "@haccp/shared";
+import { env } from "@/env";
 
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+export const API_BASE_URL = env.NEXT_PUBLIC_API_URL;
 
 export class ApiRequestError extends Error {
   constructor(
