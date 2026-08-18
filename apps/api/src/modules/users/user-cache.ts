@@ -1,7 +1,7 @@
 import type { UserResponse } from "@haccp/shared";
 import { userResponseSchema } from "@haccp/shared";
 import { z } from "zod";
-import { getRedis } from "../../core/redis/client.js";
+import { withRedis } from "../../core/redis/client.js";
 import { logger } from "../../lib/logger.js";
 
 const KEY_PREFIX = "user:clerk:";
@@ -16,8 +16,7 @@ function cacheKey(clerkUserId: string): string {
 export const userCache = {
   async get(clerkUserId: string): Promise<UserCacheBlob | null> {
     try {
-      const redis = await getRedis();
-      const raw = await redis.get(cacheKey(clerkUserId));
+      const raw = await withRedis((client) => client.get(cacheKey(clerkUserId)));
 
       if (typeof raw !== "string") {
         return null;
@@ -37,10 +36,11 @@ export const userCache = {
     ttlSeconds = DEFAULT_TTL_SECONDS,
   ): Promise<void> {
     try {
-      const redis = await getRedis();
-      await redis.set(cacheKey(clerkUserId), JSON.stringify(blob), {
-        EX: ttlSeconds,
-      });
+      await withRedis((client) =>
+        client.set(cacheKey(clerkUserId), JSON.stringify(blob), {
+          EX: ttlSeconds,
+        }),
+      );
     } catch (err) {
       logger.warn({ err, clerkUserId }, "User cache set failed");
     }
@@ -48,8 +48,7 @@ export const userCache = {
 
   async invalidate(clerkUserId: string): Promise<void> {
     try {
-      const redis = await getRedis();
-      await redis.del(cacheKey(clerkUserId));
+      await withRedis((client) => client.del(cacheKey(clerkUserId)));
     } catch (err) {
       logger.warn({ err, clerkUserId }, "User cache invalidate failed");
     }

@@ -6,9 +6,11 @@ const redis = vi.hoisted(() => ({
   set: vi.fn(),
   del: vi.fn(),
 }));
-const getRedis = vi.hoisted(() => vi.fn(async () => redis));
+const withRedis = vi.hoisted(() =>
+  vi.fn(async (fn: (client: typeof redis) => unknown) => fn(redis)),
+);
 
-vi.mock("../../core/redis/client.js", () => ({ getRedis }));
+vi.mock("../../core/redis/client.js", () => ({ withRedis }));
 
 const { membershipCache } = await import("./membership-cache.js");
 
@@ -22,6 +24,9 @@ const blob = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  withRedis.mockImplementation(async (fn: (client: typeof redis) => unknown) =>
+    fn(redis),
+  );
 });
 
 describe("membershipCache", () => {
@@ -43,5 +48,27 @@ describe("membershipCache", () => {
       JSON.stringify(blob),
       { EX: 60 },
     );
+  });
+
+  it("treats a withRedis failure on get as a miss, not a throw", async () => {
+    withRedis.mockRejectedValueOnce(new Error("Redis command timed out"));
+
+    await expect(membershipCache.get("org_1", "user_1")).resolves.toBeNull();
+  });
+
+  it("swallows a withRedis failure on set without throwing", async () => {
+    withRedis.mockRejectedValueOnce(new Error("Redis client is not ready"));
+
+    await expect(
+      membershipCache.set("org_1", "user_1", blob),
+    ).resolves.toBeUndefined();
+  });
+
+  it("swallows a withRedis failure on invalidate without throwing", async () => {
+    withRedis.mockRejectedValueOnce(new Error("Redis client is not ready"));
+
+    await expect(
+      membershipCache.invalidate("org_1", "user_1"),
+    ).resolves.toBeUndefined();
   });
 });
