@@ -6,8 +6,8 @@ export type RowAction = {
   icon?: ReactNode;
   onSelect: () => void;
   /**
-   * "primary" — listed first, never in the swipe tray.
-   * "destructive" — at most one; swipe-left reveals it.
+   * "primary" — listed first in the actions menu.
+   * "destructive" — at most one.
    */
   role?: "default" | "primary" | "destructive";
   /** Omitted from every surface (status gates). */

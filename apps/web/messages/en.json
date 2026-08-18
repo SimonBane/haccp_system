@@ -37,7 +37,13 @@
     "processing": "Processing your invitation…",
     "completing": "Signing you in…",
     "invalidTicket": "This invitation link is no longer valid. Ask your administrator for a new one.",
-    "backToSignIn": "Go to sign in"
+    "backToSignIn": "Go to sign in",
+    "error": {
+      "title": "Could not complete your invitation",
+      "description": "Check your connection and try again, or sign out and use the invitation link again.",
+      "retry": "Retry",
+      "signOut": "Sign out"
+    }
   },
   "DashboardPage": {
     "placeholder": "Sample dashboard content"
@@ -200,6 +206,11 @@
     },
     "rowActions": {
       "more": "Actions for {name}"
+    },
+    "error": {
+      "title": "Could not load this list",
+      "description": "Check your connection and try again.",
+      "retry": "Retry"
     }
   },
   "EquipmentPage": {
