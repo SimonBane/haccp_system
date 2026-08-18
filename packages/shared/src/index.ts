@@ -8,6 +8,7 @@ export {
   trimmedEmailSchema,
 } from "./schemas/fields.js";
 export {
+  isValidTimeZone,
   wallClockToInstant,
   zonedDateString,
   zonedMinutesOfDay,
@@ -67,6 +68,7 @@ export { pickDefaultLocation } from "./location-utils.js";
 export {
   organizationResponseSchema,
   organizationLocaleSchema,
+  timezoneSchema,
   updateOrganizationNameSchema,
   updateOrganizationSchema,
   type OrganizationResponse,

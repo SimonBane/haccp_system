@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isValidTimeZone,
   wallClockToInstant,
   zonedDateString,
   zonedMinutesOfDay,
@@ -35,11 +36,26 @@ describe("zonedDateString", () => {
     );
   });
 
-  it("falls back to the runtime zone rather than throwing on a corrupt value", () => {
-    // Corrupt IANA id must not take the page down.
-    expect(zonedDateString(new Date("2026-06-15T12:00:00Z"), "Not/AZone")).toMatch(
-      /^\d{4}-\d{2}-\d{2}$/,
-    );
+  it("throws on a corrupt value rather than falling back to the runtime zone", () => {
+    // A corrupt IANA id must fail loudly, not silently resolve against the host's local zone.
+    expect(() =>
+      zonedDateString(new Date("2026-06-15T12:00:00Z"), "Not/AZone"),
+    ).toThrow();
+  });
+});
+
+describe("isValidTimeZone", () => {
+  it("accepts a real IANA identifier", () => {
+    expect(isValidTimeZone(SOFIA)).toBe(true);
+    expect(isValidTimeZone("UTC")).toBe(true);
+  });
+
+  it("rejects a garbage string", () => {
+    expect(isValidTimeZone("Not/AZone")).toBe(false);
+  });
+
+  it("rejects an empty string", () => {
+    expect(isValidTimeZone("")).toBe(false);
   });
 });
 
