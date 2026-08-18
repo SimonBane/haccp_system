@@ -8,9 +8,6 @@ import { useIsMobile } from "@/hooks/use-mobile"
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme()
   const isMobile = useIsMobile()
-
-  // Toasts eat too much of a small screen top/bottom; mutations still succeed or
-  // fail visibly through their own UI (form errors, list state), so silence is safe.
   if (isMobile) return null
 
   return (
