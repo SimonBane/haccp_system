@@ -64,7 +64,13 @@ function CardListRow<TData>({
     <div
       ref={longPressRef}
       data-testid="data-table-card"
-      className="relative"
+      className={cn(
+        "relative",
+        // Reserved as padding on the card's own border box, not on this wrapper —
+        // reserving it here instead would shrink the visible card and strand the
+        // button outside its border, in the now-empty margin.
+        hasActions && "[&_[data-slot=mobile-list-row]]:pe-12",
+      )}
       onContextMenu={(event) => {
         if (!hasActions) return;
         event.preventDefault();
@@ -76,10 +82,7 @@ function CardListRow<TData>({
           role="button"
           tabIndex={0}
           aria-label={label}
-          className={cn(
-            "cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-            hasActions && "pe-12",
-          )}
+          className="cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
           onKeyDown={(event) => {
             if (
               hasActions &&
@@ -103,11 +106,9 @@ function CardListRow<TData>({
           {children}
         </div>
       ) : (
-        <div className={cn(hasActions && "pe-12")}>{children}</div>
+        children
       )}
 
-      {/* Always visible, not just long-press/right-click/focus: touch users need a
-          discoverable affordance, not a hidden gesture. */}
       {hasActions ? (
         <button
           type="button"
