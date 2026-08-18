@@ -5,6 +5,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
@@ -38,6 +39,7 @@ export const equipment = pgTable(
       "equipment_min_temp_less_than_max_temp",
       sql`${table.minTempC} < ${table.maxTempC}`,
     ),
+    unique("equipment_id_location_id_unique").on(table.id, table.locationId),
   ],
 );
 

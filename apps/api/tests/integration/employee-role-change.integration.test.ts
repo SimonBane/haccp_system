@@ -11,18 +11,17 @@ import { failRedisCommands } from "./harness/redis.js";
 import { apiRequest, asAdmin } from "./harness/request.js";
 
 /**
- * HACCP-56: role changes on active employees go through Clerk before Postgres,
- * using the role Clerk confirms — and a failed cache invalidation never fails
- * the request. tenant-isolation.integration.test.ts covers general cross-org
- * access; this covers the role-mutation sequencing specifically.
+ * HACCP-56/58: PATCH /employees/{id}/role is active-employees-only and goes
+ * through Clerk before Postgres, using the role Clerk confirms — a failed
+ * cache invalidation never fails the request. tenant-isolation.integration.test.ts
+ * covers general cross-org access; employee-locations and employee-profile
+ * integration tests cover the other two split endpoints.
  */
 describe("Employee role changes", () => {
   let org: SeededOrg;
-  let otherOrg: SeededOrg;
 
   beforeEach(async () => {
     org = await seedOrganization(db, { slug: "roles" });
-    otherOrg = await seedOrganization(db, { slug: "roles-other" });
   });
 
   async function addActiveAdmin(target: SeededOrg, label: string) {
@@ -56,7 +55,7 @@ describe("Employee role changes", () => {
   }
 
   it("updates Clerk first, then writes the role Clerk confirmed", async () => {
-    const response = await apiRequest(`/employees/${org.employee.membershipId}`, {
+    const response = await apiRequest(`/employees/${org.employee.membershipId}/role`, {
       method: "PATCH",
       actor: asAdmin(org),
       body: JSON.stringify({ role: ORG_ROLE.ADMIN }),
@@ -82,7 +81,7 @@ describe("Employee role changes", () => {
       "retryable",
     );
 
-    const response = await apiRequest(`/employees/${org.employee.membershipId}`, {
+    const response = await apiRequest(`/employees/${org.employee.membershipId}/role`, {
       method: "PATCH",
       actor: asAdmin(org),
       body: JSON.stringify({ role: ORG_ROLE.ADMIN }),
@@ -97,7 +96,7 @@ describe("Employee role changes", () => {
   });
 
   it("still rejects an admin changing their own role", async () => {
-    const response = await apiRequest(`/employees/${org.admin.membershipId}`, {
+    const response = await apiRequest(`/employees/${org.admin.membershipId}/role`, {
       method: "PATCH",
       actor: asAdmin(org),
       body: JSON.stringify({ role: ORG_ROLE.EMPLOYEE }),
@@ -115,7 +114,7 @@ describe("Employee role changes", () => {
     const secondAdmin = await addActiveAdmin(org, "second");
 
     const response = await apiRequest(
-      `/employees/${secondAdmin.membershipId}`,
+      `/employees/${secondAdmin.membershipId}/role`,
       {
         method: "PATCH",
         actor: asAdmin(org),
@@ -147,7 +146,7 @@ describe("Employee role changes", () => {
       locationIds: org.employee.locationIds,
     });
 
-    const response = await apiRequest(`/employees/${org.employee.membershipId}`, {
+    const response = await apiRequest(`/employees/${org.employee.membershipId}/role`, {
       method: "PATCH",
       actor: asAdmin(org),
       body: JSON.stringify({ role: ORG_ROLE.ADMIN }),
@@ -167,7 +166,7 @@ describe("Employee role changes", () => {
 
     try {
       const response = await apiRequest(
-        `/employees/${org.employee.membershipId}`,
+        `/employees/${org.employee.membershipId}/role`,
         {
           method: "PATCH",
           actor: asAdmin(org),
@@ -186,13 +185,59 @@ describe("Employee role changes", () => {
     }
   });
 
-  it("rejects a location from another organization", async () => {
-    const response = await apiRequest(`/employees/${org.employee.membershipId}`, {
+  it("changes only role — locations are untouched", async () => {
+    const response = await apiRequest(`/employees/${org.employee.membershipId}/role`, {
       method: "PATCH",
       actor: asAdmin(org),
-      body: JSON.stringify({ locationIds: [otherOrg.locations.main.id] }),
+      body: JSON.stringify({ role: ORG_ROLE.ADMIN }),
     });
 
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      locationIds: string[];
+      email: string;
+      firstName: string;
+    };
+    expect(body.locationIds).toEqual(org.employee.locationIds);
+    expect(body.email).toBe(org.employee.email);
+  });
+
+  it("rejects a call targeting a draft employee", async () => {
+    const runId = randomUUID().slice(0, 8);
+    const [user] = await db
+      .insert(users)
+      .values({
+        clerkUserId: null,
+        firstName: "Draft",
+        lastName: "Person",
+        email: `draft-${runId}@${org.clerkOrgId}.test`,
+      })
+      .returning();
+
+    const [draftMembership] = await db
+      .insert(organizationMemberships)
+      .values({
+        organizationId: org.organizationId,
+        userId: user!.id,
+        role: ORG_ROLE.EMPLOYEE,
+        status: MEMBERSHIP_STATUS.DRAFT,
+      })
+      .returning();
+
+    const response = await apiRequest(
+      `/employees/${draftMembership!.id}/role`,
+      {
+        method: "PATCH",
+        actor: asAdmin(org),
+        body: JSON.stringify({ role: ORG_ROLE.ADMIN }),
+      },
+    );
+
     expect(response.status).toBe(400);
+
+    const membership = await db.query.organizationMemberships.findFirst({
+      where: (m, { eq }) => eq(m.id, draftMembership!.id),
+    });
+    expect(membership?.role).toBe(ORG_ROLE.EMPLOYEE);
   });
 });

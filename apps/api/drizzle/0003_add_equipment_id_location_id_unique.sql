@@ -1,0 +1,1 @@
+ALTER TABLE "equipment" ADD CONSTRAINT "equipment_id_location_id_unique" UNIQUE("id","location_id");

@@ -24,7 +24,13 @@ export const taskTemplateRepository = {
         maxTempC: equipment.maxTempC,
       })
       .from(taskTemplates)
-      .leftJoin(equipment, eq(taskTemplates.equipmentId, equipment.id))
+      .leftJoin(
+        equipment,
+        and(
+          eq(taskTemplates.equipmentId, equipment.id),
+          eq(equipment.locationId, taskTemplates.locationId),
+        ),
+      )
       .where(
         and(
           eq(taskTemplates.locationId, locationId),
@@ -43,7 +49,13 @@ export const taskTemplateRepository = {
         maxTempC: equipment.maxTempC,
       })
       .from(taskTemplates)
-      .leftJoin(equipment, eq(taskTemplates.equipmentId, equipment.id))
+      .leftJoin(
+        equipment,
+        and(
+          eq(taskTemplates.equipmentId, equipment.id),
+          eq(equipment.locationId, taskTemplates.locationId),
+        ),
+      )
       .where(eq(taskTemplates.locationId, locationId))
       .orderBy(asc(taskTemplates.title));
   },
@@ -61,7 +73,13 @@ export const taskTemplateRepository = {
         maxTempC: equipment.maxTempC,
       })
       .from(taskTemplates)
-      .leftJoin(equipment, eq(taskTemplates.equipmentId, equipment.id))
+      .leftJoin(
+        equipment,
+        and(
+          eq(taskTemplates.equipmentId, equipment.id),
+          eq(equipment.locationId, taskTemplates.locationId),
+        ),
+      )
       .where(
         and(
           eq(taskTemplates.id, templateId),
