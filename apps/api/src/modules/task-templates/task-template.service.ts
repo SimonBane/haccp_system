@@ -129,13 +129,13 @@ export const taskTemplateService = {
     locationId: string,
     taskTemplateId: string,
   ): Promise<void> {
-    const deleted = await taskTemplateRepository.deleteByIdAndLocation(
+    const archived = await taskTemplateRepository.archiveByIdAndLocation(
       db,
       locationId,
       taskTemplateId,
     );
 
-    if (!deleted) {
+    if (!archived) {
       throw new NotFoundError("Task template not found");
     }
   },

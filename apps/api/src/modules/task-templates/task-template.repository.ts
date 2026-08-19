@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import type { Db } from "../../core/db/client.js";
 import { equipment } from "../../core/db/schema/equipment.js";
 import { taskTemplates } from "../../core/db/schema/task-templates.js";
@@ -34,6 +34,7 @@ export const taskTemplateRepository = {
       .where(
         and(
           eq(taskTemplates.locationId, locationId),
+          isNull(taskTemplates.archivedAt),
           sql`${weekday} = ANY(${taskTemplates.weekdays})`,
         ),
       )
@@ -56,7 +57,12 @@ export const taskTemplateRepository = {
           eq(equipment.locationId, taskTemplates.locationId),
         ),
       )
-      .where(eq(taskTemplates.locationId, locationId))
+      .where(
+        and(
+          eq(taskTemplates.locationId, locationId),
+          isNull(taskTemplates.archivedAt),
+        ),
+      )
       .orderBy(asc(taskTemplates.title));
   },
 
@@ -84,6 +90,7 @@ export const taskTemplateRepository = {
         and(
           eq(taskTemplates.id, templateId),
           eq(taskTemplates.locationId, locationId),
+          isNull(taskTemplates.archivedAt),
         ),
       )
       .limit(1);
@@ -117,21 +124,24 @@ export const taskTemplateRepository = {
     return updated ?? null;
   },
 
-  async deleteByIdAndLocation(
+  async archiveByIdAndLocation(
     db: Db,
     locationId: string,
     taskTemplateId: string,
   ) {
-    const [deleted] = await db
-      .delete(taskTemplates)
+    const now = new Date();
+    const [archived] = await db
+      .update(taskTemplates)
+      .set({ archivedAt: now, updatedAt: now })
       .where(
         and(
           eq(taskTemplates.id, taskTemplateId),
           eq(taskTemplates.locationId, locationId),
+          isNull(taskTemplates.archivedAt),
         ),
       )
       .returning({ id: taskTemplates.id });
 
-    return deleted ?? null;
+    return archived ?? null;
   },
 };
