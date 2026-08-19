@@ -146,14 +146,46 @@ jobs:
           path: apps/api/tests/integration/artifacts/**
           if-no-files-found: ignore
 
+  browser-changes:
+    name: Detect browser-relevant changes
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.changes.outputs.relevant }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Detect browser-relevant changes
+        id: changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          relevant=false
+          while IFS= read -r file; do
+            case "$file" in
+              apps/*|packages/*|e2e/*|.github/actions/setup/*|.github/workflows/ci.yml|.github/workflows/browser-regression.yml|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|turbo.json)
+                relevant=true
+                break
+                ;;
+            esac
+          done < <(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          echo "relevant=$relevant" >> "$GITHUB_OUTPUT"
+
   browser-smoke:
     name: Browser smoke
+    needs: browser-changes
     runs-on: ubuntu-latest
     timeout-minutes: 25
     # Forks get no secrets — the `secrets` context itself isn't readable in a job
     # `if:`, so this only screens the fork case; the "no dev instance yet" case is
     # screened per-step below via the `check-secrets` output.
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: >-
+      needs.browser-changes.outputs.relevant == 'true' &&
+      github.event.pull_request.head.repo.full_name == github.repository
 
     services:
       postgres:
@@ -223,7 +255,10 @@ jobs:
 
       - name: Run browser smoke suite
         if: steps.check-secrets.outputs.configured == 'true'
-        run: pnpm turbo test:e2e --filter=@haccp/e2e
+        run: >-
+          pnpm --filter @haccp/e2e exec playwright test
+          tests/today/completion.spec.ts
+          tests/today/date-navigation.spec.ts
 
       - name: Upload Playwright report
         if: steps.check-secrets.outputs.configured == 'true' && failure()

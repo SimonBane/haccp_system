@@ -1,0 +1,109 @@
+name: Browser regression
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/**"
+      - "packages/**"
+      - "e2e/**"
+      - ".github/actions/setup/**"
+      - ".github/workflows/browser-regression.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "turbo.json"
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: browser-regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-regression:
+    name: Browser regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: haccp
+          POSTGRES_PASSWORD: haccp
+          POSTGRES_DB: haccp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U haccp -d haccp"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgresql://haccp:haccp@localhost:5432/haccp
+      DIRECT_DATABASE_URL: postgresql://haccp:haccp@localhost:5432/haccp
+      REDIS_URL: redis://localhost:6379/1
+      CORS_ORIGIN: http://localhost:3000
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+      CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
+      E2E_CLERK_ADMIN_EMAIL: ${{ secrets.E2E_CLERK_ADMIN_EMAIL }}
+      E2E_CLERK_EMPLOYEE_EMAIL: ${{ secrets.E2E_CLERK_EMPLOYEE_EMAIL }}
+      E2E_CLERK_NO_ORG_EMAIL: ${{ secrets.E2E_CLERK_NO_ORG_EMAIL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Check whether the Clerk dev instance is configured
+        id: check-secrets
+        env:
+          E2E_CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+        run: echo "configured=${{ env.E2E_CLERK_SECRET_KEY != '' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup
+        if: steps.check-secrets.outputs.configured == 'true'
+        uses: ./.github/actions/setup
+
+      - name: Apply migrations
+        if: steps.check-secrets.outputs.configured == 'true'
+        run: pnpm --filter @haccp/api db:migrate:deploy
+
+      - name: Build
+        if: steps.check-secrets.outputs.configured == 'true'
+        run: pnpm turbo build --filter=@haccp/e2e...
+
+      - name: Install Chromium
+        if: steps.check-secrets.outputs.configured == 'true'
+        run: pnpm --filter @haccp/e2e exec playwright install --with-deps chromium
+
+      - name: Run full browser regression suite
+        if: steps.check-secrets.outputs.configured == 'true'
+        run: pnpm turbo test:e2e --filter=@haccp/e2e
+
+      - name: Upload Playwright report
+        if: steps.check-secrets.outputs.configured == 'true' && failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: browser-regression-report
+          path: |
+            e2e/playwright-report/**
+            e2e/test-results/**
+            e2e/results/**
+          retention-days: 7
+          if-no-files-found: ignore
