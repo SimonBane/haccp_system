@@ -1,0 +1,2 @@
+ALTER TABLE "task_templates" ADD COLUMN "archived_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "task_templates" ADD CONSTRAINT "task_templates_id_location_id_unique" UNIQUE("id","location_id");
