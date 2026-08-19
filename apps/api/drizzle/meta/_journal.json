@@ -36,6 +36,20 @@
       "when": 1787038513287,
       "tag": "0004_add_task_templates_equipment_location_fk",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787165420415,
+      "tag": "0005_add_task_template_archive",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787165439312,
+      "tag": "0006_add_occurrences_current_records",
+      "breakpoints": true
     }
   ]
 }

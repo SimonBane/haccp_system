@@ -7,3 +7,6 @@ export * from "./equipment.js";
 export * from "./task-templates.js";
 export * from "./task-completions.js";
 export * from "./temperature-logs.js";
+export * from "./task-occurrences.js";
+export * from "./task-records.js";
+export * from "./task-record-temperatures.js";

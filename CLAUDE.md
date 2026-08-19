@@ -37,10 +37,12 @@ code, not after the failure.
 | Scope any turbo task | `pnpm turbo build --filter=@haccp/web...` |
 
 CI (`.github/workflows/ci.yml`) runs on PRs to `main` as separate checks: lint, typecheck, build
-api, build web, unit tests (+ `test:discovery`), integration tests, browser smoke, and
-`validate-migrations`. `migrate.yml` applies migrations on push to `main`. **`@haccp/shared` is
-consumed from `dist/`** — turbo's `^build` handles this for `build`/`lint`/`typecheck`/`test`, but
-if you edit shared and then run `tsc` or `vitest` directly in an app, rebuild first:
+api, build web, unit tests (+ `test:discovery`), integration tests, a focused browser smoke for
+relevant changes, and `validate-migrations`. The full browser regression runs after relevant
+merges to `main`, nightly, and on demand. `migrate.yml` applies migrations on push to `main`.
+**`@haccp/shared` is consumed from `dist/`** — turbo's `^build` handles this for
+`build`/`lint`/`typecheck`/`test`, but if you edit shared and then run `tsc` or `vitest` directly
+in an app, rebuild first:
 `pnpm --filter @haccp/shared build`.
 
 ## Environment setup
