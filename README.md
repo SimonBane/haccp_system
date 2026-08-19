@@ -98,5 +98,7 @@ e2e/                   Playwright smoke suite
 ## CI
 
 `.github/workflows/ci.yml` runs on every PR to `main`: lint, typecheck, build (api, web), unit
-tests, integration tests (real Postgres + Redis), browser smoke, and migration drift
-validation. `.github/workflows/migrate.yml` applies migrations on push to `main`.
+tests, integration tests (real Postgres + Redis), a focused browser smoke for relevant changes,
+and migration drift validation. The full browser regression suite runs after relevant merges to
+`main`, nightly, and on demand. `.github/workflows/migrate.yml` applies migrations on push to
+`main`.

@@ -7,6 +7,7 @@ const equipmentRepository = vi.hoisted(() => ({
 const taskTemplateRepository = vi.hoisted(() => ({
   insert: vi.fn(),
   updateByIdAndLocation: vi.fn(),
+  archiveByIdAndLocation: vi.fn(),
 }));
 
 vi.mock("../equipment/equipment.repository.js", () => ({ equipmentRepository }));
@@ -129,5 +130,29 @@ describe("taskTemplateService.update", () => {
 
     expect(taskTemplateRepository.updateByIdAndLocation).toHaveBeenCalledTimes(1);
     expect(result.id).toBe(TEMPLATE_ID);
+  });
+});
+
+describe("taskTemplateService.delete", () => {
+  it("archives the template rather than deleting it", async () => {
+    taskTemplateRepository.archiveByIdAndLocation.mockResolvedValue({
+      id: TEMPLATE_ID,
+    });
+
+    await taskTemplateService.delete(db, LOCATION_ID, TEMPLATE_ID);
+
+    expect(taskTemplateRepository.archiveByIdAndLocation).toHaveBeenCalledWith(
+      db,
+      LOCATION_ID,
+      TEMPLATE_ID,
+    );
+  });
+
+  it("raises NotFound for an unknown or already-archived template", async () => {
+    taskTemplateRepository.archiveByIdAndLocation.mockResolvedValue(null);
+
+    await expect(
+      taskTemplateService.delete(db, LOCATION_ID, TEMPLATE_ID),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });

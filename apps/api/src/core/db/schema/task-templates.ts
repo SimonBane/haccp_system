@@ -4,6 +4,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uuid,
 } from "drizzle-orm/pg-core";
 import { equipment } from "./equipment.js";
@@ -21,6 +22,7 @@ export const taskTemplates = pgTable(
     weekdays: text("weekdays").array().notNull(),
     scheduledTimes: text("scheduled_times").array().notNull(),
     equipmentId: uuid("equipment_id"),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -35,6 +37,10 @@ export const taskTemplates = pgTable(
       columns: [table.equipmentId, table.locationId],
       foreignColumns: [equipment.id, equipment.locationId],
     }).onDelete("restrict"),
+    unique("task_templates_id_location_id_unique").on(
+      table.id,
+      table.locationId,
+    ),
   ],
 );
 
