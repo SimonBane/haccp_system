@@ -1,19 +1,8 @@
 import type { TodayResponse } from "@haccp/shared";
-import {
-  buildTodayTaskItem,
-  getWeekdayFromDate,
-  isValidTimeZone,
-  sortScheduledTimes,
-  TASK_TEMPLATE_TYPE,
-} from "@haccp/shared";
+import { isValidTimeZone } from "@haccp/shared";
 import type { Db } from "../../core/db/client.js";
 import { InternalError } from "../../core/errors/app-errors.js";
-import { taskTemplateRepository } from "../task-templates/task-template.repository.js";
-import {
-  buildCompletionKey,
-  sortItemsByScheduledTime,
-  toTemplateRow,
-} from "./today.mapper.js";
+import { sortItemsByScheduledTime, toTodayTaskItem } from "./today.mapper.js";
 import { todayRepository } from "./today.repository.js";
 
 export const todayService = {
@@ -28,24 +17,13 @@ export const todayService = {
       throw new InternalError("Organization timezone configuration is invalid");
     }
 
-    const weekday = getWeekdayFromDate(date);
     const now = new Date();
 
-    const [templateRows, completionRows] = await Promise.all([
-      taskTemplateRepository.findManyWithEquipmentByLocationAndWeekday(
-        db,
-        locationId,
-        weekday,
-      ),
-      todayRepository.findCompletionsWithTemperatureLogs(
-        db,
-        locationId,
-        date,
-      ),
-    ]);
-
-    const matchingTemplates = templateRows.map(toTemplateRow);
-    const completionByKey = todayRepository.buildCompletionMap(completionRows);
+    const rows = await todayRepository.findOccurrencesWithRecords(
+      db,
+      locationId,
+      date,
+    );
 
     const sections: TodayResponse["sections"] = {
       morning: [],
@@ -53,49 +31,9 @@ export const todayService = {
       evening: [],
     };
 
-    for (const template of matchingTemplates) {
-      const times = sortScheduledTimes(template.scheduledTimes);
-
-      for (const scheduledTime of times) {
-        const key = buildCompletionKey(template.id, scheduledTime);
-        const completion = completionByKey.get(key);
-
-        const temperatureReading =
-          template.type === TASK_TEMPLATE_TYPE.TEMPERATURE &&
-          completion?.temperatureLog
-            ? {
-                recordedC: Number(completion.temperatureLog.recordedC),
-                minTempC: Number(completion.temperatureLog.minTempC),
-                maxTempC: Number(completion.temperatureLog.maxTempC),
-                result: completion.temperatureLog.result as
-                  | "ok"
-                  | "out_of_range",
-                correctiveAction:
-                  completion.temperatureLog.correctiveAction ?? null,
-              }
-            : null;
-
-        const item = buildTodayTaskItem({
-          templateId: template.id,
-          title: template.title,
-          type: template.type,
-          equipmentId: template.equipmentId,
-          equipmentName: template.equipmentName,
-          minTempC: template.minTempC,
-          maxTempC: template.maxTempC,
-          scheduledTime,
-          date,
-          completedAt: completion?.completedAt
-            ? completion.completedAt.toISOString()
-            : null,
-          completedBy: completion?.completedBy ?? null,
-          temperatureReading,
-          now,
-          timeZone,
-        });
-
-        sections[item.timeSlot].push(item);
-      }
+    for (const row of rows) {
+      const item = toTodayTaskItem(row, now);
+      sections[item.timeSlot].push(item);
     }
 
     return {

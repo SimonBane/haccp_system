@@ -1,9 +1,36 @@
 import { and, eq, sql } from "drizzle-orm";
 import type { Db, DbClient } from "../../core/db/client.js";
 import { taskCompletions } from "../../core/db/schema/task-completions.js";
+import { taskOccurrences } from "../../core/db/schema/task-occurrences.js";
+import { taskRecordTemperatures } from "../../core/db/schema/task-record-temperatures.js";
+import { taskRecords } from "../../core/db/schema/task-records.js";
 import { temperatureLogs } from "../../core/db/schema/temperature-logs.js";
 import { users } from "../../core/db/schema/users.js";
 import { buildCompletionKey, type CompletionRecord } from "./today.mapper.js";
+
+export type OccurrenceWithRecordRow = {
+  occurrenceId: string;
+  taskTemplateId: string;
+  title: string;
+  type: string;
+  equipmentId: string | null;
+  equipmentName: string | null;
+  minTempC: string | null;
+  maxTempC: string | null;
+  scheduledTime: string;
+  occurrenceDate: string;
+  dueAt: Date;
+  recordedAt: Date | null;
+  recordedByUserId: string | null;
+  recordedByFirstName: string | null;
+  recordedByLastName: string | null;
+  voidedAt: Date | null;
+  detailRecordedC: string | null;
+  detailMinTempC: string | null;
+  detailMaxTempC: string | null;
+  detailResult: string | null;
+  detailCorrectiveAction: string | null;
+};
 
 export type CompletionWithTemperatureRow = {
   taskTemplateId: string;
@@ -20,6 +47,50 @@ export type CompletionWithTemperatureRow = {
 };
 
 export const todayRepository = {
+  async findOccurrencesWithRecords(
+    db: Db,
+    locationId: string,
+    date: string,
+  ): Promise<OccurrenceWithRecordRow[]> {
+    return db
+      .select({
+        occurrenceId: taskOccurrences.id,
+        taskTemplateId: taskOccurrences.taskTemplateId,
+        title: taskOccurrences.title,
+        type: taskOccurrences.type,
+        equipmentId: taskOccurrences.equipmentId,
+        equipmentName: taskOccurrences.equipmentName,
+        minTempC: taskOccurrences.minTempC,
+        maxTempC: taskOccurrences.maxTempC,
+        scheduledTime: taskOccurrences.scheduledTime,
+        occurrenceDate: taskOccurrences.occurrenceDate,
+        dueAt: taskOccurrences.dueAt,
+        recordedAt: taskRecords.recordedAt,
+        recordedByUserId: taskRecords.recordedByUserId,
+        recordedByFirstName: users.firstName,
+        recordedByLastName: users.lastName,
+        voidedAt: taskRecords.voidedAt,
+        detailRecordedC: taskRecordTemperatures.recordedC,
+        detailMinTempC: taskRecordTemperatures.minTempC,
+        detailMaxTempC: taskRecordTemperatures.maxTempC,
+        detailResult: taskRecordTemperatures.result,
+        detailCorrectiveAction: taskRecordTemperatures.correctiveAction,
+      })
+      .from(taskOccurrences)
+      .leftJoin(taskRecords, eq(taskRecords.occurrenceId, taskOccurrences.id))
+      .leftJoin(users, eq(taskRecords.recordedByUserId, users.id))
+      .leftJoin(
+        taskRecordTemperatures,
+        eq(taskRecordTemperatures.taskRecordId, taskRecords.id),
+      )
+      .where(
+        and(
+          eq(taskOccurrences.locationId, locationId),
+          eq(taskOccurrences.occurrenceDate, date),
+        ),
+      );
+  },
+
   async findCompletionsWithTemperatureLogs(
     db: Db,
     locationId: string,

@@ -3,7 +3,10 @@
 import type { TodayResponse, TodayTaskItem } from "@haccp/shared";
 import {
   classifyTemperatureResult,
+  RECORD_KIND,
+  RECORD_STATE,
   TASK_TEMPLATE_TYPE,
+  TEMPERATURE_RESULT,
   zonedDateString,
 } from "@haccp/shared";
 import { useLocale, useTranslations } from "next-intl";
@@ -16,6 +19,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useNow } from "@/hooks/use-now";
 import { useLocation } from "@/features/tenant/tenant-provider";
 import { useOrgTimeZone } from "@/features/tenant/use-org-timezone";
+import { ApiRequestError } from "@/lib/api-utils";
 import { getErrorMessage } from "@/lib/api/get-error-message";
 import { formatLocalDate, shiftLocalDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
@@ -73,6 +77,7 @@ export function TodayView({
     () => new Set(),
   );
   const [recordKey, setRecordKey] = useState<string | null>(null);
+  const [editKey, setEditKey] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
 
   const {
@@ -87,16 +92,16 @@ export function TodayView({
   });
 
   const currentUserId = response?.currentUserId ?? initialData.currentUserId;
-  const { completeTask, uncompleteTask, completeTemperatureTask } =
-    useTodayMutations(currentUserId, timeZone);
+  const { createRecord, updateRecord, voidRecord } =
+    useTodayMutations(currentUserId);
 
   const isFutureDate = isFutureSelection(selectedDate, now, timeZone);
   const isStale = isStaleResponse(response?.date, selectedDate);
 
   // Depend on the stable mutate functions, not the result object (fresh every render).
-  const runComplete = completeTask.mutateAsync;
-  const runUncomplete = uncompleteTask.mutateAsync;
-  const runCompleteTemperature = completeTemperatureTask.mutateAsync;
+  const runCreate = createRecord.mutateAsync;
+  const runUpdate = updateRecord.mutateAsync;
+  const runVoid = voidRecord.mutateAsync;
 
   // Group on the response; applyClock layers live state so TodayTaskRow can bail out between ticks.
   const taskGroups = useMemo(
@@ -115,6 +120,11 @@ export function TodayView({
     [timeline, recordKey],
   );
 
+  const editItem = useMemo(
+    () => findTimelineItem(timeline, editKey),
+    [timeline, editKey],
+  );
+
   const round = useTemperatureRound(timeline);
   const {
     open: openRound,
@@ -127,6 +137,7 @@ export function TodayView({
   useEffect(() => {
     closeRound();
     setRecordKey(null);
+    setEditKey(null);
   }, [selectedDate, locationId, closeRound]);
 
   // Latch the last non-null check so Base UI can run the exit after round/recordItem go null.
@@ -165,6 +176,32 @@ export function TodayView({
   const shownCheck = liveCheck ?? lastCheck;
   const shownRecordItem = recordItem ?? lastRecordItem;
 
+  const isEditOpen =
+    editItem !== null &&
+    editItem.task.minTempC !== null &&
+    editItem.task.maxTempC !== null;
+
+  const [lastEditCheck, setLastEditCheck] = useState<TemperatureCheck | null>(
+    null,
+  );
+
+  const liveEditCheck: TemperatureCheck | null = isEditOpen
+    ? {
+        item: editItem as TodayTimelineItem,
+        occurrenceKey: editKey as string,
+        minTempC: editItem?.task.minTempC as number,
+        maxTempC: editItem?.task.maxTempC as number,
+        position: 1,
+        size: 1,
+      }
+    : null;
+
+  if (liveEditCheck && lastEditCheck?.occurrenceKey !== liveEditCheck.occurrenceKey) {
+    setLastEditCheck(liveEditCheck);
+  }
+
+  const shownEditCheck = liveEditCheck ?? lastEditCheck;
+
   const markSyncing = useCallback((key: string, syncing: boolean) => {
     setSyncingKeys((previous) => {
       const next = new Set(previous);
@@ -179,11 +216,7 @@ export function TodayView({
       const key = occurrenceKey(task);
       markSyncing(key, true);
       try {
-        await runUncomplete({
-          templateId: task.templateId,
-          date: task.date,
-          scheduledTime: task.scheduledTime,
-        });
+        await runVoid({ occurrenceId: task.occurrenceId, date: task.date });
         setRecordKey(null);
         setAnnouncement(t("a11y.undone", { title: task.title }));
       } catch (error) {
@@ -197,19 +230,21 @@ export function TodayView({
         markSyncing(key, false);
       }
     },
-    [markSyncing, runUncomplete, t],
+    [markSyncing, runVoid, t],
   );
 
   const handleComplete = useCallback(
     async function complete(task: TodayTaskItem): Promise<void> {
       const key = occurrenceKey(task);
+      // A voided occurrence reactivates its existing record; only an unrecorded one is created.
+      const run = task.recordState === RECORD_STATE.NONE ? runCreate : runUpdate;
       markSyncing(key, true);
       tapFeedback();
       try {
-        await runComplete({
-          templateId: task.templateId,
+        await run({
+          occurrenceId: task.occurrenceId,
           date: task.date,
-          scheduledTime: task.scheduledTime,
+          kind: RECORD_KIND.ORDINARY,
         });
         setAnnouncement(t("a11y.completed", { title: task.title }));
         toast.success(t("toasts.completed", { title: task.title }), {
@@ -220,6 +255,10 @@ export function TodayView({
           },
         });
       } catch (error) {
+        if (error instanceof ApiRequestError && error.code === "CONFLICT") {
+          toast.error(t("toasts.alreadyRecorded"));
+          return;
+        }
         toast.error(getErrorMessage(error, t("toasts.doneError")), {
           action: {
             label: t("error.retry"),
@@ -230,7 +269,7 @@ export function TodayView({
         markSyncing(key, false);
       }
     },
-    [handleUndo, markSyncing, runComplete, t],
+    [handleUndo, markSyncing, runCreate, runUpdate, t],
   );
 
   /** One toast for a finished round instead of a toast per save. */
@@ -257,13 +296,14 @@ export function TodayView({
       const key = occurrenceKey(task);
       // Captured before advancing, which clears the round it describes.
       const roundSize = round.size;
+      const run = task.recordState === RECORD_STATE.NONE ? runCreate : runUpdate;
       markSyncing(key, true);
       tapFeedback();
       try {
-        await runCompleteTemperature({
-          templateId: task.templateId,
+        await run({
+          occurrenceId: task.occurrenceId,
           date: task.date,
-          scheduledTime: task.scheduledTime,
+          kind: RECORD_KIND.TEMPERATURE,
           recordedC,
           correctiveAction,
         });
@@ -283,13 +323,17 @@ export function TodayView({
                 minTempC: task.minTempC,
                 maxTempC: task.maxTempC,
               })
-            : "ok",
+            : TEMPERATURE_RESULT.OK,
         );
 
         const result = advanceRound();
         if (result.done) summariseRound(result, roundSize);
         return true;
       } catch (error) {
+        if (error instanceof ApiRequestError && error.code === "CONFLICT") {
+          toast.error(t("toasts.alreadyRecorded"));
+          return false;
+        }
         // Stay on the same reading so it is not lost.
         toast.error(getErrorMessage(error, t("toasts.doneError")));
         return false;
@@ -304,11 +348,44 @@ export function TodayView({
       recordSaved,
       round.item,
       round.size,
-      runCompleteTemperature,
+      runCreate,
+      runUpdate,
       summariseRound,
       t,
     ],
   );
+
+  const handleEditConfirm = useCallback(
+    async (recordedC: number, correctiveAction?: string): Promise<boolean> => {
+      const task = editItem?.task;
+      if (!task) return false;
+
+      const key = occurrenceKey(task);
+      markSyncing(key, true);
+      tapFeedback();
+      try {
+        await runUpdate({
+          occurrenceId: task.occurrenceId,
+          date: task.date,
+          kind: RECORD_KIND.TEMPERATURE,
+          recordedC,
+          correctiveAction,
+        });
+        setAnnouncement(t("a11y.recorded", { title: task.title }));
+        toast.success(t("toasts.recorded", { title: task.title }));
+        setEditKey(null);
+        return true;
+      } catch (error) {
+        toast.error(getErrorMessage(error, t("toasts.doneError")));
+        return false;
+      } finally {
+        markSyncing(key, false);
+      }
+    },
+    [editItem, markSyncing, runUpdate, t],
+  );
+
+  const handleEditClose = useCallback(() => setEditKey(null), []);
 
   const handleTemperatureSkip = useCallback(() => {
     const roundSize = round.size;
@@ -457,6 +534,15 @@ export function TodayView({
         onClose={handleTemperatureClose}
       />
 
+      {/* Edit reuses the same round-flow UI in single-record mode (no skip, size 1). */}
+      <TemperatureRoundFlow
+        open={isEditOpen}
+        check={shownEditCheck}
+        onSubmit={handleEditConfirm}
+        onSkip={handleEditClose}
+        onClose={handleEditClose}
+      />
+
       {shownRecordItem ? (
         <TodayRecordSheet
           open={Boolean(recordItem)}
@@ -467,6 +553,10 @@ export function TodayView({
           currentUserId={currentUserId}
           isUndoing={syncingKeys.has(occurrenceKey(shownRecordItem.task))}
           onUndo={(item) => void handleUndo(item.task)}
+          onEdit={(item) => {
+            setRecordKey(null);
+            setEditKey(occurrenceKey(item.task));
+          }}
         />
       ) : null}
     </div>

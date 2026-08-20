@@ -9,7 +9,7 @@ export function parseScheduledTimeToMinutes(time: string): number {
 }
 
 export function occurrenceKey(task: TodayTaskItem): string {
-  return `${task.templateId}:${task.scheduledTime}:${task.date}`;
+  return task.occurrenceId;
 }
 
 export function flatTodayTasks(response: TodayResponse): TodayTaskItem[] {

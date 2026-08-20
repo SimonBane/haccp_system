@@ -1,5 +1,6 @@
 import type { TodayTaskItem } from "@haccp/shared";
 import {
+  TEMPERATURE_RESULT,
   wallClockToInstant,
   zonedDateString,
   zonedMinutesOfDay,
@@ -118,7 +119,7 @@ export function findTimelineGroup(
 function isDeviation(task: TodayTaskItem): boolean {
   return (
     task.completedAt !== null &&
-    task.temperatureReading?.result === "out_of_range"
+    task.temperatureReading?.result === TEMPERATURE_RESULT.OUT_OF_RANGE
   );
 }
 

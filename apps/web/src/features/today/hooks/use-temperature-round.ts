@@ -1,5 +1,6 @@
 "use client";
 
+import { TEMPERATURE_RESULT } from "@haccp/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TemperatureVerdict } from "../lib/temperature";
 import { buildTemperatureRoundKeys } from "../lib/today-round";
@@ -68,7 +69,7 @@ export function useTemperatureRound(timeline: TodayTimeline) {
 
   const recordSaved = useCallback((verdict: TemperatureVerdict) => {
     tallyRef.current.saved += 1;
-    if (verdict === "out_of_range") tallyRef.current.deviations += 1;
+    if (verdict === TEMPERATURE_RESULT.OUT_OF_RANGE) tallyRef.current.deviations += 1;
   }, []);
 
   const skip = useCallback((): AdvanceResult => {

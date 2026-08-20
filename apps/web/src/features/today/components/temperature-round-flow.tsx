@@ -1,6 +1,6 @@
 "use client";
 
-import { classifyTemperatureResult } from "@haccp/shared";
+import { classifyTemperatureResult, TEMPERATURE_RESULT } from "@haccp/shared";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef } from "react";
 import { useOrgTimeZone } from "@/features/tenant/use-org-timezone";
@@ -114,7 +114,7 @@ export function TemperatureRoundFlow({
       recordedC: entry.parsed,
       minTempC,
       maxTempC,
-    }) === "out_of_range";
+    }) === TEMPERATURE_RESULT.OUT_OF_RANGE;
 
   const primaryIcon = isReading && isDeviationAhead ? "continue" : "confirm";
   const primaryLabel = (() => {
