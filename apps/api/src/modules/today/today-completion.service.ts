@@ -10,7 +10,7 @@ import {
 import type {
   CompleteTodayTaskInput,
   CompleteTodayTemperatureTaskInput,
-  TodayTaskItem,
+  LegacyTodayTaskItem,
 } from "@haccp/shared";
 import type { Db, DbClient } from "../../core/db/client.js";
 import { taskCompletions } from "../../core/db/schema/task-completions.js";
@@ -56,10 +56,10 @@ function buildTaskItemFromTemplate(
   input: CompleteTodayTaskInput,
   completedAt: string | null,
   completedBy: UserSummary | null,
-  temperatureReading: TodayTaskItem["temperatureReading"],
+  temperatureReading: LegacyTodayTaskItem["temperatureReading"],
   now: Date,
   timeZone: string,
-): TodayTaskItem {
+): LegacyTodayTaskItem {
   return buildTodayTaskItem({
     templateId: template.id,
     title: template.title,
@@ -157,7 +157,7 @@ export const todayCompletionService = {
     completedBy: UserSummary,
     input: CompleteTodayTaskInput,
     timeZone: string,
-  ): Promise<TodayTaskItem> {
+  ): Promise<LegacyTodayTaskItem> {
     return withCompletionContext(
       db,
       locationId,
@@ -194,7 +194,7 @@ export const todayCompletionService = {
     locationId: string,
     input: CompleteTodayTaskInput,
     timeZone: string,
-  ): Promise<TodayTaskItem> {
+  ): Promise<LegacyTodayTaskItem> {
     return withCompletionContext(
       db,
       locationId,
@@ -232,7 +232,7 @@ export const todayCompletionService = {
     completedBy: UserSummary,
     input: CompleteTodayTemperatureTaskInput,
     timeZone: string,
-  ): Promise<TodayTaskItem> {
+  ): Promise<LegacyTodayTaskItem> {
     return withCompletionContext(
       db,
       locationId,

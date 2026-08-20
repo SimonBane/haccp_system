@@ -1,15 +1,17 @@
 "use client";
 
+import { TEMPERATURE_RESULT } from "@haccp/shared";
 import { useLocale } from "next-intl";
 import { cn } from "@/lib/utils";
 import { formatTemperature } from "../lib/format";
+import type { TemperatureVerdict } from "../lib/temperature";
 
 type Props = {
   value: number | null;
   minTempC: number;
   maxTempC: number;
   /** Settled verdict — colour only, so a half-typed number never turns red. */
-  state: "neutral" | "ok" | "out_of_range";
+  state: TemperatureVerdict | "neutral";
   className?: string;
 };
 
@@ -65,8 +67,8 @@ export function TemperatureGauge({
             className={cn(
               "absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-background",
               "transition-[left,background-color] duration-150 motion-reduce:transition-none",
-              state === "out_of_range" && "bg-destructive",
-              state === "ok" && "bg-success",
+              state === TEMPERATURE_RESULT.OUT_OF_RANGE && "bg-destructive",
+              state === TEMPERATURE_RESULT.OK && "bg-success",
               state === "neutral" && "bg-foreground/60",
             )}
             style={{ left: `${clamp(percentOf(value), 2, 98)}%` }}

@@ -1,6 +1,7 @@
 "use client";
 
-import { CheckIcon, CircleAlertIcon, RotateCcwIcon } from "lucide-react";
+import { TASK_TEMPLATE_TYPE } from "@haccp/shared";
+import { CheckIcon, CircleAlertIcon, PencilIcon, RotateCcwIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ type Props = {
   currentUserId: string | null;
   isUndoing: boolean;
   onUndo: (item: TodayTimelineItem) => void;
+  onEdit: (item: TodayTimelineItem) => void;
 };
 
 function DetailRow({ label, value }: { label: string; value: string }) {
@@ -37,12 +39,14 @@ export function TodayRecordSheet({
   currentUserId,
   isUndoing,
   onUndo,
+  onEdit,
 }: Props) {
   const t = useTranslations("TodayPage");
   const locale = useLocale();
   const timeZone = useOrgTimeZone();
   const { task, isDeviation } = item;
   const reading = task.temperatureReading;
+  const canEdit = task.type === TASK_TEMPLATE_TYPE.TEMPERATURE;
 
   const userLabel = task.completedBy
     ? task.completedBy.id === currentUserId
@@ -75,6 +79,16 @@ export function TodayRecordSheet({
           >
             {t("record.close")}
           </Button>
+          {canEdit ? (
+            <Button
+              variant="secondary"
+              className="min-h-14 flex-1 rounded-2xl md:min-h-10 md:rounded-md"
+              onClick={() => onEdit(item)}
+            >
+              <PencilIcon />
+              {t("actions.edit")}
+            </Button>
+          ) : null}
           <Button
             variant="destructive"
             className="min-h-14 flex-1 rounded-2xl md:min-h-10 md:rounded-md"
