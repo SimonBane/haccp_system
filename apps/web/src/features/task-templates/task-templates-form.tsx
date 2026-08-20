@@ -3,6 +3,7 @@
 import {
   TASK_TEMPLATE_MAX_SCHEDULED_TIMES,
   TASK_TEMPLATE_ALL_WEEKDAYS,
+  TASK_TEMPLATE_TYPE,
   TASK_TEMPLATE_WEEKDAYS,
   scheduledTimeSchema,
   taskTemplateTypeSchema,
@@ -146,7 +147,7 @@ export function TaskTemplatesForm({
         equipmentId: z.uuid().nullable(),
       })
       .superRefine((data, ctx) => {
-        if (data.type === "temperature" && !data.equipmentId) {
+        if (data.type === TASK_TEMPLATE_TYPE.TEMPERATURE && !data.equipmentId) {
           ctx.addIssue({
             code: "custom",
             message: t("validation.equipmentRequired"),
@@ -289,7 +290,10 @@ export function TaskTemplatesForm({
       type: values.type,
       weekdays: values.weekdays,
       scheduledTimes: values.scheduledTimeRows.map((row) => row.time),
-      equipmentId: values.type === "temperature" ? values.equipmentId : null,
+      equipmentId:
+        values.type === TASK_TEMPLATE_TYPE.TEMPERATURE
+          ? values.equipmentId
+          : null,
     };
 
     try {
@@ -420,7 +424,7 @@ export function TaskTemplatesForm({
                     onValueChange={(value: unknown) => {
                       const nextType = value as TaskTemplateType;
                       field.onChange(nextType);
-                      if (nextType !== "temperature") {
+                      if (nextType !== TASK_TEMPLATE_TYPE.TEMPERATURE) {
                         form.setValue("equipmentId", null);
                       }
                     }}
@@ -454,7 +458,7 @@ export function TaskTemplatesForm({
               )}
             />
 
-            {selectedType === "temperature" ? (
+            {selectedType === TASK_TEMPLATE_TYPE.TEMPERATURE ? (
               <Controller
                 name="equipmentId"
                 control={form.control}

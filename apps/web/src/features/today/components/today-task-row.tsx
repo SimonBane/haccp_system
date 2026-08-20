@@ -1,5 +1,6 @@
 "use client";
 
+import { TASK_TEMPLATE_TYPE } from "@haccp/shared";
 import {
   CheckIcon,
   ChevronRightIcon,
@@ -34,11 +35,11 @@ type Props = {
 
 function typeIcon(type: TodayTimelineItem["task"]["type"]) {
   switch (type) {
-    case "temperature":
+    case TASK_TEMPLATE_TYPE.TEMPERATURE:
       return ThermometerIcon;
-    case "cleaning":
+    case TASK_TEMPLATE_TYPE.CLEANING:
       return SparklesIcon;
-    case "other":
+    case TASK_TEMPLATE_TYPE.OTHER:
       return Clock3Icon;
   }
 }
@@ -66,8 +67,8 @@ export const TodayTaskRow = memo(function TodayTaskRow({
   const locale = useLocale();
   const { task, isCompleted, isDeviation, priorReading } = item;
 
-  const isTemperature = task.type === "temperature";
-  const isCleaning = task.type === "cleaning";
+  const isTemperature = task.type === TASK_TEMPLATE_TYPE.TEMPERATURE;
+  const isCleaning = task.type === TASK_TEMPLATE_TYPE.CLEANING;
   const reading = task.temperatureReading;
   const TypeIcon = typeIcon(task.type);
 

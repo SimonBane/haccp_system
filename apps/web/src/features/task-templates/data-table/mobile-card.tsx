@@ -1,6 +1,7 @@
 "use client";
 
 import type { TaskTemplateResponse, TaskTemplateType } from "@haccp/shared";
+import { TASK_TEMPLATE_TYPE } from "@haccp/shared";
 import type { Row } from "@tanstack/react-table";
 import { ClipboardCheckIcon, ThermometerIcon } from "lucide-react";
 import { MobileListRow } from "@/components/ui/data-table/data-table-mobile-list";
@@ -30,7 +31,7 @@ export function TaskTemplatesMobileCard({
   const detail = [
     typeLabels[task.type],
     weekdays,
-    task.type === "temperature" ? task.equipmentName : null,
+    task.type === TASK_TEMPLATE_TYPE.TEMPERATURE ? task.equipmentName : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -39,7 +40,7 @@ export function TaskTemplatesMobileCard({
     <MobileListRow
       variant="card"
       leading={
-        task.type === "temperature" ? (
+        task.type === TASK_TEMPLATE_TYPE.TEMPERATURE ? (
           <ThermometerIcon
             className="size-5 text-muted-foreground"
             aria-hidden

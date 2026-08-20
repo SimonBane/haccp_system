@@ -21,6 +21,10 @@ export {
   getLocalizedPath,
   type AppLocale,
 } from "./lib/locale-path.js";
+export {
+  addCalendarDays,
+  calendarDateRange,
+} from "./lib/calendar-date.js";
 export { apiErrorSchema, type ApiError } from "./schemas/error.js";
 export {
   uuidParamSchema,
@@ -115,6 +119,7 @@ export {
   TASK_TEMPLATE_SLOT_THRESHOLDS,
   TASK_TEMPLATE_TIME_OPTIONS,
   TASK_TEMPLATE_ALL_WEEKDAYS,
+  TASK_TEMPLATE_TYPE,
   TASK_TEMPLATE_WEEKDAYS,
   composeScheduledTime,
   createTaskTemplateSchema,
@@ -143,6 +148,17 @@ export {
   type UpdateTaskTemplateInput,
 } from "./schemas/task-template.js";
 
+export {
+  occurrenceStatusSchema,
+  recordTimelinessSchema,
+  isActiveRecord,
+  deriveOccurrenceState,
+  deriveTemperatureResult,
+  type OccurrenceStatus,
+  type RecordTimeliness,
+  type ActiveRecordCandidate,
+  type DerivedOccurrenceState,
+} from "./schemas/task-occurrence.js";
 export {
   classifyTemperatureResult,
   buildTodayTaskItem,
