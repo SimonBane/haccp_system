@@ -3,6 +3,7 @@ import { E2E_PREFIX, LOCALE_PREFIX } from "../../support/env.js";
 import {
   ensurePending,
   expandGroup,
+  findTodayItem,
   occurrenceRow,
   waitForOccurrenceRecord,
 } from "../../support/today.js";
@@ -62,12 +63,22 @@ test.describe("Today completions", () => {
     page,
   }) => {
     const title = `${E2E_PREFIX} Clean prep surface`;
-    const task = await ensurePending(page, title);
+    const task = await findTodayItem(page, title);
+    await expandGroup(page, task.scheduledTime);
     const target = occurrenceRow(page, task.occurrenceId);
+    await expect(target).toBeVisible();
 
-    const posted = waitForOccurrenceRecord(page, task.occurrenceId, "POST");
-    await target.getByTestId("today-task-activate").click();
-    expect((await posted).status()).toBe(201);
+    // Earlier journeys in this file may already have recorded this occurrence.
+    // Unrecorded → POST; voided (after Undo) → PUT. Either yields an active row
+    // so the sheet can be opened.
+    if ((await target.getAttribute("data-completed")) !== "true") {
+      const recorded = waitForOccurrenceRecord(page, task.occurrenceId, [
+        "POST",
+        "PUT",
+      ]);
+      await target.getByTestId("today-task-activate").click();
+      expect([200, 201]).toContain((await recorded).status());
+    }
     await expect(target).toHaveAttribute("data-completed", "true");
 
     await target.getByTestId("today-task-activate").click();
@@ -79,6 +90,7 @@ test.describe("Today completions", () => {
     await sheet.getByRole("button", { name: "Undo" }).click();
     expect((await voided).status()).toBe(200);
     await expect(target).not.toHaveAttribute("data-completed", "true");
+    await expect(sheet).toBeHidden();
 
     const reactivated = waitForOccurrenceRecord(page, task.occurrenceId, "PUT");
     await target.getByTestId("today-task-activate").click();
