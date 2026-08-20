@@ -19,6 +19,18 @@ export const todayTaskStatusSchema = z.enum([
 
 export type TodayTaskStatus = z.infer<typeof todayTaskStatusSchema>;
 
+export const TEMPERATURE_RESULT = {
+  OK: "ok",
+  OUT_OF_RANGE: "out_of_range",
+} as const;
+
+export const temperatureResultSchema = z.enum([
+  TEMPERATURE_RESULT.OK,
+  TEMPERATURE_RESULT.OUT_OF_RANGE,
+]);
+
+export type TemperatureResult = z.infer<typeof temperatureResultSchema>;
+
 const isoDateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, { error: "Date must be YYYY-MM-DD" });
@@ -32,7 +44,7 @@ export type TodayDateQuery = z.infer<typeof todayDateQuerySchema>;
 export const todayTaskTemperatureReadingSchema = z
   .object({
     recordedC: z.number(),
-    result: z.enum(["ok", "out_of_range"]),
+    result: temperatureResultSchema,
     minTempC: z.number(),
     maxTempC: z.number(),
     correctiveAction: z.string().nullable(),
@@ -152,9 +164,11 @@ export function classifyTemperatureResult(params: {
   recordedC: number;
   minTempC: number;
   maxTempC: number;
-}): "ok" | "out_of_range" {
+}): TemperatureResult {
   const { recordedC, minTempC, maxTempC } = params;
-  return recordedC >= minTempC && recordedC <= maxTempC ? "ok" : "out_of_range";
+  return recordedC >= minTempC && recordedC <= maxTempC
+    ? TEMPERATURE_RESULT.OK
+    : TEMPERATURE_RESULT.OUT_OF_RANGE;
 }
 
 export function buildTodayTaskItem(params: {
