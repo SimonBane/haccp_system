@@ -6,6 +6,10 @@ import {
   LOCALE_PREFIX,
   storageStatePath,
 } from "../../support/env.js";
+import {
+  fetchTodayItems,
+  upcomingSameDayTimes,
+} from "../../support/today.js";
 
 setup.use({ storageState: storageStatePath("admin") });
 
@@ -14,7 +18,11 @@ const EQUIPMENT_COUNT = 11;
 
 type Location = { id: string; name: string; isDefault: boolean };
 type Tenant = {
-  organization: { id: string; multipleLocationsEnabled: boolean };
+  organization: {
+    id: string;
+    multipleLocationsEnabled: boolean;
+    timezone: string;
+  };
   locations: Location[];
 };
 type Named = { id: string; name?: string; title?: string };
@@ -87,11 +95,15 @@ setup("seed locations, equipment and templates", async ({ page }) => {
     );
   }
 
+  const [fridgeTime, cleaningTime] = upcomingSameDayTimes(
+    tenant.organization.timezone,
+  );
+
   await json(api, "post", templatePath, {
     title: `${E2E_PREFIX} Fridge check`,
     type: "temperature",
     weekdays: ALL_WEEKDAYS,
-    scheduledTimes: ["08:00"],
+    scheduledTimes: [fridgeTime],
     equipmentId: fridges[0]!.id,
   });
 
@@ -99,7 +111,7 @@ setup("seed locations, equipment and templates", async ({ page }) => {
     title: `${E2E_PREFIX} Clean prep surface`,
     type: "cleaning",
     weekdays: ALL_WEEKDAYS,
-    scheduledTimes: ["09:00"],
+    scheduledTimes: [cleaningTime],
   });
 
   const seeded = await json<{ items: Named[] }>(api, "get", equipmentPath);
@@ -107,6 +119,10 @@ setup("seed locations, equipment and templates", async ({ page }) => {
     seeded.items.filter((row) => (row.name ?? "").startsWith(E2E_PREFIX))
       .length,
   ).toBe(EQUIPMENT_COUNT);
+
+  const todayTitles = (await fetchTodayItems(api)).map((item) => item.title);
+  expect(todayTitles).toContain(`${E2E_PREFIX} Fridge check`);
+  expect(todayTitles).toContain(`${E2E_PREFIX} Clean prep surface`);
 
   await api.dispose();
 });
