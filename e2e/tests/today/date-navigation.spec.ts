@@ -55,7 +55,7 @@ test("a tap during a delayed date switch never writes to the stale date", async 
 }) => {
   await page.goto(`${LOCALE_PREFIX}/dashboard`);
   const title = `${E2E_PREFIX} Clean prep surface`;
-  await ensurePending(page, title, "09:00");
+  await ensurePending(page, title);
 
   let writeCount = 0;
   await page.route("**/locations/*/today*", async (route) => {
