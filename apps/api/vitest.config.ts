@@ -9,6 +9,7 @@ export default defineUnitConfig({
       CLERK_SECRET_KEY: "sk_test_placeholder",
       CLERK_PUBLISHABLE_KEY: "pk_test_placeholder",
       REDIS_URL: "redis://localhost:6379",
+      CRON_SECRET: "test-cron-secret-placeholder",
     },
   },
 });

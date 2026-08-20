@@ -9,9 +9,15 @@ const taskTemplateRepository = vi.hoisted(() => ({
   updateByIdAndLocation: vi.fn(),
   archiveByIdAndLocation: vi.fn(),
 }));
+const taskOccurrenceService = vi.hoisted(() => ({
+  reconcileTemplate: vi.fn(),
+}));
 
 vi.mock("../equipment/equipment.repository.js", () => ({ equipmentRepository }));
 vi.mock("./task-template.repository.js", () => ({ taskTemplateRepository }));
+vi.mock("../task-occurrences/task-occurrence.service.js", () => ({
+  taskOccurrenceService,
+}));
 
 const { taskTemplateService } = await import("./task-template.service.js");
 
@@ -31,7 +37,12 @@ const templateRow = {
   updatedAt: new Date(),
 };
 
-const db = {} as never;
+// `tx` inside the service is this same object, so existing `toHaveBeenCalledWith(db, ...)`
+// assertions still hold — the fake transaction is transparent to callers.
+const dbHandle: { transaction: (fn: (tx: unknown) => unknown) => unknown } = {
+  transaction: (fn) => fn(dbHandle),
+};
+const db = dbHandle as never;
 
 beforeEach(() => {
   vi.clearAllMocks();

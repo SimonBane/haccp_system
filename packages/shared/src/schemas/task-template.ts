@@ -1,9 +1,15 @@
 import { z } from "zod";
 
+export const TASK_TEMPLATE_TYPE = {
+  TEMPERATURE: "temperature",
+  CLEANING: "cleaning",
+  OTHER: "other",
+} as const;
+
 export const taskTemplateTypeSchema = z.enum([
-  "temperature",
-  "cleaning",
-  "other",
+  TASK_TEMPLATE_TYPE.TEMPERATURE,
+  TASK_TEMPLATE_TYPE.CLEANING,
+  TASK_TEMPLATE_TYPE.OTHER,
 ]);
 
 export type TaskTemplateType = z.infer<typeof taskTemplateTypeSchema>;
@@ -182,7 +188,7 @@ function withTaskTemplateValidation<T extends z.ZodType>(schema: T) {
       equipmentId?: string | null;
     };
 
-    if (value.type === "temperature" && !value.equipmentId) {
+    if (value.type === TASK_TEMPLATE_TYPE.TEMPERATURE && !value.equipmentId) {
       ctx.addIssue({
         code: "custom",
         message: "Equipment is required for temperature tasks",
@@ -190,7 +196,7 @@ function withTaskTemplateValidation<T extends z.ZodType>(schema: T) {
       });
     }
 
-    if (value.type !== "temperature" && value.equipmentId) {
+    if (value.type !== TASK_TEMPLATE_TYPE.TEMPERATURE && value.equipmentId) {
       ctx.addIssue({
         code: "custom",
         message: "Equipment applies only to temperature tasks",

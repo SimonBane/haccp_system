@@ -1,6 +1,7 @@
 import { and, asc, eq } from "drizzle-orm";
 import type { Db, DbClient } from "../../core/db/client.js";
 import { locations } from "../../core/db/schema/locations.js";
+import { organizations } from "../../core/db/schema/organizations.js";
 
 export const DEFAULT_LOCATION_NAME = "Main site";
 
@@ -13,8 +14,19 @@ export const locationRepository = {
       .orderBy(asc(locations.name));
   },
 
+  async findOrganizationContextByLocationId(db: DbClient, locationId: string) {
+    const [row] = await db
+      .select({
+        organizationId: organizations.id,
+        timeZone: organizations.timezone,
+      })
+      .from(locations)
+      .innerJoin(organizations, eq(locations.organizationId, organizations.id))
+      .where(eq(locations.id, locationId))
+      .limit(1);
 
-
+    return row ?? null;
+  },
 
   async insert(db: DbClient, data: typeof locations.$inferInsert) {
     const [created] = await db.insert(locations).values(data).returning();

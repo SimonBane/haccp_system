@@ -1,3 +1,4 @@
+import { TASK_TEMPLATE_TYPE } from "@haccp/shared";
 import { occurrenceKey } from "./today-grouping";
 import { findTimelineGroup } from "./today-timeline";
 import type {
@@ -9,7 +10,7 @@ import type {
 /** Needs a range and equipment; a tap on a template missing either is an error toast, not an empty dialog. */
 export function isChainableTemperatureItem(item: TodayTimelineItem): boolean {
   return (
-    item.task.type === "temperature" &&
+    item.task.type === TASK_TEMPLATE_TYPE.TEMPERATURE &&
     !item.isCompleted &&
     item.task.minTempC !== null &&
     item.task.maxTempC !== null &&
