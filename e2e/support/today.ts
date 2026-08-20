@@ -95,6 +95,25 @@ export function row(page: Page, title: string) {
   return page.getByTestId("today-task-row").filter({ hasText: title }).first();
 }
 
+export function occurrenceRow(page: Page, occurrenceId: string) {
+  return page.locator(
+    `[data-testid="today-task-row"][data-occurrence-key="${occurrenceId}"]`,
+  );
+}
+
+export function waitForOccurrenceRecord(
+  page: Page,
+  occurrenceId: string,
+  method: "POST" | "PUT" | "DELETE",
+) {
+  return page.waitForResponse((response) => {
+    return (
+      response.request().method() === method &&
+      response.url().includes(`/today/occurrences/${occurrenceId}/record`)
+    );
+  });
+}
+
 /**
  * A fully completed time group collapses, so a row a prior journey completed is
  * absent from the DOM rather than present-and-completed. Reopen it before asserting.
@@ -115,9 +134,9 @@ export async function expandGroup(page: Page, scheduledTime: string) {
 
 /**
  * The suite runs single-worker against one seeded org (`playwright.config.ts`:
- * `workers: 1`), so completion.spec.ts's two tests leave both seeded occurrences
- * completed by the time later specs run. Undo first so a test that needs a
- * pending row isn't at the mercy of file execution order.
+ * `workers: 1`), so completion.spec.ts leaves seeded occurrences completed by
+ * the time later specs run. Undo first so a test that needs a pending row
+ * isn't at the mercy of file execution order.
  */
 export async function ensurePending(
   page: Page,
@@ -125,7 +144,7 @@ export async function ensurePending(
 ): Promise<TodayTaskItem> {
   const item = await findTodayItem(page, title);
   await expandGroup(page, item.scheduledTime);
-  const target = row(page, title);
+  const target = occurrenceRow(page, item.occurrenceId);
   await expect(target).toBeVisible();
 
   if ((await target.getAttribute("data-completed")) === "true") {

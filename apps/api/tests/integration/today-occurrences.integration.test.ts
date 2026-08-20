@@ -1,4 +1,11 @@
-import { getWeekdayFromDate, todayResponseSchema, zonedDateString } from "@haccp/shared";
+import {
+  addCalendarDays,
+  getWeekdayFromDate,
+  todayResponseSchema,
+  zonedDateString,
+  zonedMinutesOfDay,
+  type TodayResponse,
+} from "@haccp/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../../src/core/db/client.js";
 import { taskOccurrences, taskTemplates } from "../../src/core/db/schema/index.js";
@@ -18,6 +25,20 @@ describe("Today occurrences (GET)", () => {
 
   function today(): string {
     return zonedDateString(new Date(), org.timeZone);
+  }
+
+  /** HH:MM strictly before now today — same cutoff template create uses for same-day slots. */
+  function pastTimeToday(): string {
+    const minutes = Math.floor(zonedMinutesOfDay(new Date(), org.timeZone) / 2);
+    return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+  }
+
+  function flatten(body: TodayResponse) {
+    return [
+      ...body.sections.morning,
+      ...body.sections.afternoon,
+      ...body.sections.evening,
+    ];
   }
 
   async function insertOccurrence(overrides: {
@@ -122,7 +143,7 @@ describe("Today occurrences (GET)", () => {
     const response = await todayGet(org.locations.main.id, today());
     expect(response.status).toBe(200);
     const body = todayResponseSchema.parse(await response.json());
-    const items = [...body.sections.morning, ...body.sections.afternoon, ...body.sections.evening];
+    const items = flatten(body);
 
     expect(items.map((item) => item.occurrenceId).sort()).toEqual(
       [noneId, activeId, voidedId].sort(),
@@ -155,7 +176,7 @@ describe("Today occurrences (GET)", () => {
 
     const response = await todayGet(org.locations.main.id, today());
     const body = todayResponseSchema.parse(await response.json());
-    const items = [...body.sections.morning, ...body.sections.afternoon, ...body.sections.evening];
+    const items = flatten(body);
     const item = items.find((entry) => entry.occurrenceId === occurrenceId)!;
 
     expect(item.title).toBe("Historical fridge check (old wording)");
@@ -185,6 +206,52 @@ describe("Today occurrences (GET)", () => {
     const evening = body.sections.evening;
 
     expect(evening.some((item) => item.templateId === created.id)).toBe(true);
+  });
+
+  it("does not show a newly created template whose due time is already past", async () => {
+    const weekday = getWeekdayFromDate(today());
+    const title = "Should not appear on Today";
+
+    const createdResponse = await apiRequest(
+      `/locations/${org.locations.main.id}/task-templates`,
+      {
+        method: "POST",
+        actor: asAdmin(org),
+        body: JSON.stringify({
+          title,
+          type: "cleaning",
+          weekdays: [weekday],
+          scheduledTimes: [pastTimeToday()],
+        }),
+      },
+    );
+    expect(createdResponse.status).toBe(201);
+    const created = (await createdResponse.json()) as { id: string };
+
+    const response = await todayGet(org.locations.main.id, today());
+    expect(response.status).toBe(200);
+    const items = flatten(todayResponseSchema.parse(await response.json()));
+
+    expect(items.some((item) => item.templateId === created.id)).toBe(false);
+    expect(items.some((item) => item.title === title)).toBe(false);
+  });
+
+  it("returns a future date's stored occurrences without denying the read", async () => {
+    const tomorrow = addCalendarDays(today(), 1);
+    const occurrenceId = await insertOccurrence({
+      type: "cleaning",
+      occurrenceDate: tomorrow,
+      scheduledTime: "08:00",
+      dueAt: new Date(`${tomorrow}T08:00:00Z`),
+    });
+
+    const response = await todayGet(org.locations.main.id, tomorrow);
+    expect(response.status).toBe(200);
+    const body = todayResponseSchema.parse(await response.json());
+    expect(body.date).toBe(tomorrow);
+    expect(flatten(body).some((item) => item.occurrenceId === occurrenceId)).toBe(
+      true,
+    );
   });
 
   it("never materializes work as a side effect of a read", async () => {
