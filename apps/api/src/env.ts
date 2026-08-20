@@ -34,6 +34,7 @@ const envSchema = z
     CLERK_SECRET_KEY: z.string().min(1),
     CLERK_PUBLISHABLE_KEY: z.string().min(1),
     CLERK_WEBHOOK_SIGNING_SECRET: z.string().min(1).optional(),
+    CRON_SECRET: z.string().min(1),
     WEB_APP_URL: z.url().default("http://localhost:3000"),
     REDIS_URL: z
       .string()
@@ -124,6 +125,14 @@ const envSchema = z
         message: "CLERK_PUBLISHABLE_KEY must not contain a placeholder value in production",
       });
     }
+
+    if (isPlaceholder(data.CRON_SECRET)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["CRON_SECRET"],
+        message: "CRON_SECRET must not contain a placeholder value in production",
+      });
+    }
   });
 
 // Issue messages are built above without echoing the offending value, so a thrown
@@ -145,6 +154,7 @@ function parseEnv() {
       CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
       CLERK_PUBLISHABLE_KEY: process.env.CLERK_PUBLISHABLE_KEY,
       CLERK_WEBHOOK_SIGNING_SECRET: process.env.CLERK_WEBHOOK_SIGNING_SECRET,
+      CRON_SECRET: process.env.CRON_SECRET,
       WEB_APP_URL: process.env.WEB_APP_URL,
       REDIS_URL: process.env.REDIS_URL,
       NODE_ENV: process.env.NODE_ENV,

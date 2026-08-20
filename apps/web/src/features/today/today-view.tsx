@@ -1,7 +1,11 @@
 "use client";
 
 import type { TodayResponse, TodayTaskItem } from "@haccp/shared";
-import { classifyTemperatureResult, zonedDateString } from "@haccp/shared";
+import {
+  classifyTemperatureResult,
+  TASK_TEMPLATE_TYPE,
+  zonedDateString,
+} from "@haccp/shared";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -326,7 +330,7 @@ export function TodayView({
         return;
       }
 
-      if (item.task.type === "temperature") {
+      if (item.task.type === TASK_TEMPLATE_TYPE.TEMPERATURE) {
         if (
           item.task.minTempC === null ||
           item.task.maxTempC === null ||

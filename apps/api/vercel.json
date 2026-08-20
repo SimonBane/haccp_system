@@ -1,5 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "cd ../.. && pnpm install",
-  "buildCommand": "cd ../.. && pnpm turbo build --filter=@haccp/api..."
+  "buildCommand": "cd ../.. && pnpm turbo build --filter=@haccp/api...",
+  "crons": [
+    {
+      "path": "/internal/task-occurrences/materialize",
+      "schedule": "0 2 * * *"
+    }
+  ]
 }

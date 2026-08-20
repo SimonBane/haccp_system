@@ -12,6 +12,7 @@ import {
   NotFoundError,
 } from "../../core/errors/app-errors.js";
 import { mapDbMutationError } from "../../lib/db-errors.js";
+import { taskOccurrenceService } from "../task-occurrences/task-occurrence.service.js";
 import { toEquipmentResponse } from "./equipment.mapper.js";
 import { equipmentRepository } from "./equipment.repository.js";
 
@@ -72,18 +73,26 @@ export const equipmentService = {
     };
 
     try {
-      const updated = await equipmentRepository.updateByIdAndLocation(
-        db,
-        locationId,
-        equipmentId,
-        updates,
-      );
+      return await db.transaction(async (tx) => {
+        const updated = await equipmentRepository.updateByIdAndLocation(
+          tx,
+          locationId,
+          equipmentId,
+          updates,
+        );
 
-      if (!updated) {
-        throw new NotFoundError("Equipment not found");
-      }
+        if (!updated) {
+          throw new NotFoundError("Equipment not found");
+        }
 
-      return toEquipmentResponse(updated);
+        await taskOccurrenceService.reconcileEquipment(
+          tx,
+          locationId,
+          equipmentId,
+        );
+
+        return toEquipmentResponse(updated);
+      });
     } catch (error) {
       if (error instanceof NotFoundError) {
         throw error;

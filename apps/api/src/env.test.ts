@@ -7,6 +7,7 @@ const BASE_ENV = {
   CLERK_SECRET_KEY: "sk_live_realvalue",
   CLERK_PUBLISHABLE_KEY: "pk_live_realvalue",
   CLERK_WEBHOOK_SIGNING_SECRET: "whsec_realvalue",
+  CRON_SECRET: "a_real_cron_secret_value",
   WEB_APP_URL: "https://app.example.com",
   CORS_ORIGIN: "https://app.example.com",
 } as const;
@@ -19,6 +20,7 @@ const ENV_KEYS = [
   "CLERK_SECRET_KEY",
   "CLERK_PUBLISHABLE_KEY",
   "CLERK_WEBHOOK_SIGNING_SECRET",
+  "CRON_SECRET",
   "WEB_APP_URL",
   "CORS_ORIGIN",
   "API_PORT",
@@ -110,6 +112,18 @@ describe("env in production", () => {
     await expect(loadEnv()).rejects.toThrow(/CLERK_SECRET_KEY/);
   });
 
+  it("rejects a missing CRON_SECRET", async () => {
+    applyEnv({ ...BASE_ENV, CRON_SECRET: undefined });
+
+    await expect(loadEnv()).rejects.toThrow(/CRON_SECRET/);
+  });
+
+  it("rejects a placeholder CRON_SECRET", async () => {
+    applyEnv({ ...BASE_ENV, CRON_SECRET: "changeme" });
+
+    await expect(loadEnv()).rejects.toThrow(/CRON_SECRET/);
+  });
+
   it("never includes the offending secret value in the thrown error", async () => {
     const secretValue = "whsec_super_secret_do_not_leak";
     applyEnv({
@@ -132,6 +146,7 @@ describe("env in development", () => {
       REDIS_URL: "redis://localhost:6379",
       CLERK_SECRET_KEY: "sk_test_placeholder",
       CLERK_PUBLISHABLE_KEY: "pk_test_placeholder",
+      CRON_SECRET: "dev-cron-secret",
     });
 
     const { env } = await loadEnv();

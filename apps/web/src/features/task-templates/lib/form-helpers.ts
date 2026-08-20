@@ -3,7 +3,7 @@ import type {
   TaskTemplateType,
   TaskTemplateWeekday,
 } from "@haccp/shared";
-import { TASK_TEMPLATE_ALL_WEEKDAYS } from "@haccp/shared";
+import { TASK_TEMPLATE_ALL_WEEKDAYS, TASK_TEMPLATE_TYPE } from "@haccp/shared";
 import {
   isEveryDayWeekdays,
   isWeekdaysPreset,
@@ -27,7 +27,10 @@ export function getWeekdayPreset(weekdays: TaskTemplateWeekday[]): WeekdayPreset
   return "custom";
 }
 
-export const TASK_TYPES: TaskTemplateType[] = ["temperature", "cleaning"];
+export const TASK_TYPES: TaskTemplateType[] = [
+  TASK_TEMPLATE_TYPE.TEMPERATURE,
+  TASK_TEMPLATE_TYPE.CLEANING,
+];
 
 export const WEEKDAY_PRESET_OPTIONS: Array<Exclude<WeekdayPreset, "none">> = [
   "everyDay",

@@ -1,9 +1,13 @@
 import { and, asc, eq } from "drizzle-orm";
-import type { Db } from "../../core/db/client.js";
+import type { Db, DbClient } from "../../core/db/client.js";
 import { equipment } from "../../core/db/schema/equipment.js";
 
 export const equipmentRepository = {
-  async findByIdAndLocation(db: Db, locationId: string, equipmentId: string) {
+  async findByIdAndLocation(
+    db: DbClient,
+    locationId: string,
+    equipmentId: string,
+  ) {
     const [row] = await db
       .select({ id: equipment.id })
       .from(equipment)
@@ -29,7 +33,7 @@ export const equipmentRepository = {
   },
 
   async updateByIdAndLocation(
-    db: Db,
+    db: DbClient,
     locationId: string,
     equipmentId: string,
     updates: Partial<typeof equipment.$inferInsert>,

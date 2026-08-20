@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import type { Db, DbClient } from "../../core/db/client.js";
 import { organizations } from "../../core/db/schema/organizations.js";
 
@@ -8,6 +8,13 @@ export const organizationRepository = {
   async insert(db: DbClient, data: typeof organizations.$inferInsert) {
     const [created] = await db.insert(organizations).values(data).returning();
     return created ?? null;
+  },
+
+  async findAllActive(db: DbClient) {
+    return db
+      .select({ id: organizations.id, timeZone: organizations.timezone })
+      .from(organizations)
+      .where(isNull(organizations.deletedAt));
   },
 
   async updateById(
@@ -26,7 +33,7 @@ export const organizationRepository = {
 
 
   async updateByClerkOrgId(
-    db: Db,
+    db: DbClient,
     clerkOrgId: string,
     updates: Partial<typeof organizations.$inferInsert>,
   ) {

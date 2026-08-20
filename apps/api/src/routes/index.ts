@@ -12,6 +12,7 @@ import { equipmentRoutes } from "../modules/equipment/equipment.routes.js";
 import { healthRoutes } from "../modules/health/health.routes.js";
 import { locationRoutes } from "../modules/locations/location.routes.js";
 import { organizationRoutes } from "../modules/organizations/organization.routes.js";
+import { taskOccurrenceRoutes } from "../modules/task-occurrences/task-occurrence.routes.js";
 import { taskTemplateRoutes } from "../modules/task-templates/task-template.routes.js";
 import { tenantRoutes } from "../modules/tenant/tenant.routes.js";
 import { todayRoutes } from "../modules/today/today.routes.js";
@@ -29,6 +30,8 @@ if (env.NODE_ENV === "development") {
 
 routes.route("/health", healthRoutes);
 routes.route("/webhooks", clerkWebhookRoutes);
+// Non-Clerk: guarded by its own CRON_SECRET bearer check, not requireAuth.
+routes.route("/internal/task-occurrences", taskOccurrenceRoutes);
 
 function mountProtected(
   path: string,

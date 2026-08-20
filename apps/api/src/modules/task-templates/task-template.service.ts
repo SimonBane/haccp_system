@@ -13,6 +13,7 @@ import {
 } from "../../core/errors/app-errors.js";
 import { mapDbMutationError } from "../../lib/db-errors.js";
 import { equipmentRepository } from "../equipment/equipment.repository.js";
+import { taskOccurrenceService } from "../task-occurrences/task-occurrence.service.js";
 import { toTaskTemplateResponse } from "./task-template.mapper.js";
 import { taskTemplateRepository } from "./task-template.repository.js";
 
@@ -62,20 +63,28 @@ export const taskTemplateService = {
     await assertEquipmentBelongsToLocation(db, locationId, input.equipmentId);
 
     try {
-      const created = await taskTemplateRepository.insert(db, {
-        locationId,
-        title: input.title,
-        type: input.type,
-        weekdays: sortWeekdays(input.weekdays),
-        scheduledTimes: sortScheduledTimes(input.scheduledTimes),
-        equipmentId: input.equipmentId ?? null,
+      return await db.transaction(async (tx) => {
+        const created = await taskTemplateRepository.insert(tx, {
+          locationId,
+          title: input.title,
+          type: input.type,
+          weekdays: sortWeekdays(input.weekdays),
+          scheduledTimes: sortScheduledTimes(input.scheduledTimes),
+          equipmentId: input.equipmentId ?? null,
+        });
+
+        if (!created) {
+          throw new InternalError("Failed to create task template");
+        }
+
+        await taskOccurrenceService.reconcileTemplate(
+          tx,
+          locationId,
+          created.id,
+        );
+
+        return toTaskTemplateResponse(created, null);
       });
-
-      if (!created) {
-        throw new InternalError("Failed to create task template");
-      }
-
-      return toTaskTemplateResponse(created, null);
     } catch (error) {
       mapDbMutationError(error, {
         foreignKey: () => new NotFoundError("Equipment not found"),
@@ -101,18 +110,26 @@ export const taskTemplateService = {
     };
 
     try {
-      const updated = await taskTemplateRepository.updateByIdAndLocation(
-        db,
-        locationId,
-        taskTemplateId,
-        updates,
-      );
+      return await db.transaction(async (tx) => {
+        const updated = await taskTemplateRepository.updateByIdAndLocation(
+          tx,
+          locationId,
+          taskTemplateId,
+          updates,
+        );
 
-      if (!updated) {
-        throw new NotFoundError("Task template not found");
-      }
+        if (!updated) {
+          throw new NotFoundError("Task template not found");
+        }
 
-      return toTaskTemplateResponse(updated, null);
+        await taskOccurrenceService.reconcileTemplate(
+          tx,
+          locationId,
+          taskTemplateId,
+        );
+
+        return toTaskTemplateResponse(updated, null);
+      });
     } catch (error) {
       if (error instanceof NotFoundError) {
         throw error;
@@ -129,14 +146,24 @@ export const taskTemplateService = {
     locationId: string,
     taskTemplateId: string,
   ): Promise<void> {
-    const archived = await taskTemplateRepository.archiveByIdAndLocation(
-      db,
-      locationId,
-      taskTemplateId,
-    );
+    await db.transaction(async (tx) => {
+      const archived = await taskTemplateRepository.archiveByIdAndLocation(
+        tx,
+        locationId,
+        taskTemplateId,
+      );
 
-    if (!archived) {
-      throw new NotFoundError("Task template not found");
-    }
+      if (!archived) {
+        throw new NotFoundError("Task template not found");
+      }
+
+      // Removes its future unrecorded occurrences: an archived template
+      // resolves no source, so every unprotected row for it is deleted.
+      await taskOccurrenceService.reconcileTemplate(
+        tx,
+        locationId,
+        taskTemplateId,
+      );
+    });
   },
 };

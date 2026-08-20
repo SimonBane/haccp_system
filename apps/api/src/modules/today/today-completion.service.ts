@@ -4,6 +4,7 @@ import {
   classifyTemperatureResult,
   getWeekdayFromDate,
   isValidTimeZone,
+  TASK_TEMPLATE_TYPE,
   zonedDateString,
 } from "@haccp/shared";
 import type {
@@ -163,7 +164,7 @@ export const todayCompletionService = {
       input,
       timeZone,
       async ({ locationId: resolvedLocationId, template, now }) => {
-        if (template.type === "temperature") {
+        if (template.type === TASK_TEMPLATE_TYPE.TEMPERATURE) {
           throw new ValidationError("This task requires a temperature reading");
         }
 
@@ -240,7 +241,7 @@ export const todayCompletionService = {
       async ({ locationId: resolvedLocationId, template, now }) => {
         const recordedC = Number(input.recordedC);
 
-        if (template.type !== "temperature") {
+        if (template.type !== TASK_TEMPLATE_TYPE.TEMPERATURE) {
           throw new ValidationError("This endpoint is for temperature tasks");
         }
 

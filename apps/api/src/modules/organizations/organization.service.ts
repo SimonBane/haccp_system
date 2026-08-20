@@ -12,6 +12,7 @@ import {
   NotFoundError,
   ValidationError,
 } from "../../core/errors/app-errors.js";
+import { taskOccurrenceService } from "../task-occurrences/task-occurrence.service.js";
 import { tenantCache } from "../tenant/tenant-cache.js";
 import { toOrganizationResponse } from "./organization.mapper.js";
 import { organizationRepository } from "./organization.repository.js";
@@ -35,15 +36,27 @@ async function applyOrganizationUpdate(
   clerkOrgId: string,
   patch: Parameters<typeof organizationRepository.updateByClerkOrgId>[2],
 ): Promise<OrganizationResponse> {
-  const updated = await organizationRepository.updateByClerkOrgId(
-    db,
-    clerkOrgId,
-    patch,
-  );
+  const updated = await db.transaction(async (tx) => {
+    const row = await organizationRepository.updateByClerkOrgId(
+      tx,
+      clerkOrgId,
+      patch,
+    );
 
-  if (!updated) {
-    throw new NotFoundError("Organization not found");
-  }
+    if (!row) {
+      throw new NotFoundError("Organization not found");
+    }
+
+    if (patch.timezone !== undefined) {
+      await taskOccurrenceService.reconcileOrganization(
+        tx,
+        row.id,
+        row.timezone,
+      );
+    }
+
+    return row;
+  });
 
   await tenantCache.invalidate(clerkOrgId);
 
@@ -90,7 +103,9 @@ export const organizationService = {
     }
 
     return applyOrganizationUpdate(db, clerkOrgId, {
-        ...(input.timezone !== undefined ? { timezone: input.timezone } : {}),
+        ...(input.timezone !== undefined && input.timezone !== organization.timezone
+          ? { timezone: input.timezone }
+          : {}),
         ...(input.locale !== undefined ? { locale: input.locale } : {}),
         ...(input.multipleLocationsEnabled !== undefined
           ? { multipleLocationsEnabled: input.multipleLocationsEnabled }

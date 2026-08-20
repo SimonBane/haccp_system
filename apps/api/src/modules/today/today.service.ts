@@ -4,6 +4,7 @@ import {
   getWeekdayFromDate,
   isValidTimeZone,
   sortScheduledTimes,
+  TASK_TEMPLATE_TYPE,
 } from "@haccp/shared";
 import type { Db } from "../../core/db/client.js";
 import { InternalError } from "../../core/errors/app-errors.js";
@@ -60,7 +61,8 @@ export const todayService = {
         const completion = completionByKey.get(key);
 
         const temperatureReading =
-          template.type === "temperature" && completion?.temperatureLog
+          template.type === TASK_TEMPLATE_TYPE.TEMPERATURE &&
+          completion?.temperatureLog
             ? {
                 recordedC: Number(completion.temperatureLog.recordedC),
                 minTempC: Number(completion.temperatureLog.minTempC),
