@@ -1,5 +1,6 @@
 "use client";
 
+import { TEMPERATURE_RESULT } from "@haccp/shared";
 import { useTranslations } from "next-intl";
 import type { KeyboardEvent, RefObject } from "react";
 import { Input } from "@/components/ui/input";
@@ -55,9 +56,9 @@ export function TemperatureReadout({
   const t = useTranslations("TodayPage");
 
   const verdictClassName =
-    verdict === "out_of_range"
+    verdict === TEMPERATURE_RESULT.OUT_OF_RANGE
       ? "text-destructive"
-      : verdict === "ok"
+      : verdict === TEMPERATURE_RESULT.OK
         ? "text-success"
         : undefined;
 

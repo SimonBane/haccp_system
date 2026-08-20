@@ -31,6 +31,20 @@ export const temperatureResultSchema = z.enum([
 
 export type TemperatureResult = z.infer<typeof temperatureResultSchema>;
 
+export const RECORD_STATE = {
+  NONE: "none",
+  ACTIVE: "active",
+  VOIDED: "voided",
+} as const;
+
+export const recordStateSchema = z.enum([
+  RECORD_STATE.NONE,
+  RECORD_STATE.ACTIVE,
+  RECORD_STATE.VOIDED,
+]);
+
+export type RecordState = z.infer<typeof recordStateSchema>;
+
 const isoDateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, { error: "Date must be YYYY-MM-DD" });
@@ -52,6 +66,7 @@ export const todayTaskTemperatureReadingSchema = z
   .nullable();
 
 export const todayTaskItemSchema = z.object({
+  occurrenceId: z.uuid(),
   templateId: z.uuid(),
   title: z.string(),
   type: taskTemplateTypeSchema,
@@ -62,6 +77,8 @@ export const todayTaskItemSchema = z.object({
   scheduledTime: scheduledTimeSchema,
   timeSlot: taskTemplateTimeSlotSchema,
   date: isoDateSchema,
+  dueAt: z.iso.datetime(),
+  recordState: recordStateSchema,
   status: todayTaskStatusSchema,
   completedAt: z.iso.datetime().nullable(),
   completedBy: userSummarySchema.nullable(),
@@ -171,6 +188,12 @@ export function classifyTemperatureResult(params: {
     : TEMPERATURE_RESULT.OUT_OF_RANGE;
 }
 
+/** The template-scan builder predates task_occurrences and has no real occurrence to report — used only by the completion routes HACCP-16 removes. */
+export type LegacyTodayTaskItem = Omit<
+  TodayTaskItem,
+  "occurrenceId" | "recordState" | "dueAt"
+>;
+
 export function buildTodayTaskItem(params: {
   templateId: string;
   title: string;
@@ -186,7 +209,7 @@ export function buildTodayTaskItem(params: {
   now: Date;
   timeZone: string;
   temperatureReading?: TodayTaskItem["temperatureReading"];
-}): TodayTaskItem {
+}): LegacyTodayTaskItem {
   const timeSlot = deriveTimeSlotFromTime(params.scheduledTime);
 
   return {
@@ -210,5 +233,75 @@ export function buildTodayTaskItem(params: {
     completedAt: params.completedAt,
     completedBy: params.completedBy,
     temperatureReading: params.temperatureReading ?? null,
+  };
+}
+
+export type ActiveTaskRecordCandidate = {
+  recordedAt: Date;
+  voidedAt: Date | null;
+};
+
+export function deriveRecordState(
+  record: ActiveTaskRecordCandidate | null,
+): RecordState {
+  if (!record) return RECORD_STATE.NONE;
+  return record.voidedAt === null ? RECORD_STATE.ACTIVE : RECORD_STATE.VOIDED;
+}
+
+export function deriveTodayTaskStatusFromOccurrence(params: {
+  recordState: RecordState;
+  dueAt: Date;
+  now: Date;
+}): TodayTaskStatus {
+  if (params.recordState === RECORD_STATE.ACTIVE) return "completed";
+  return params.now.getTime() >= params.dueAt.getTime()
+    ? "overdue"
+    : "pending";
+}
+
+export function buildTodayTaskItemFromOccurrence(params: {
+  occurrenceId: string;
+  templateId: string;
+  title: string;
+  type: TodayTaskItem["type"];
+  equipmentId: string | null;
+  equipmentName: string | null;
+  minTempC: number | null;
+  maxTempC: number | null;
+  scheduledTime: TodayTaskItem["scheduledTime"];
+  date: TodayTaskItem["date"];
+  dueAt: Date;
+  now: Date;
+  record: ActiveTaskRecordCandidate | null;
+  recordedBy: z.infer<typeof userSummarySchema> | null;
+  temperatureReading?: TodayTaskItem["temperatureReading"];
+}): TodayTaskItem {
+  const recordState = deriveRecordState(params.record);
+  const active = recordState === RECORD_STATE.ACTIVE;
+  const timeSlot = deriveTimeSlotFromTime(params.scheduledTime);
+
+  return {
+    occurrenceId: params.occurrenceId,
+    templateId: params.templateId,
+    title: params.title,
+    type: params.type,
+    equipmentId: params.equipmentId,
+    equipmentName: params.equipmentName,
+    minTempC: params.minTempC,
+    maxTempC: params.maxTempC,
+    scheduledTime: params.scheduledTime,
+    timeSlot,
+    date: params.date,
+    dueAt: params.dueAt.toISOString(),
+    recordState,
+    status: deriveTodayTaskStatusFromOccurrence({
+      recordState,
+      dueAt: params.dueAt,
+      now: params.now,
+    }),
+    // A voided record does not satisfy its occurrence — it renders uncompleted and does not expose its old reading.
+    completedAt: active ? params.record!.recordedAt.toISOString() : null,
+    completedBy: active ? params.recordedBy : null,
+    temperatureReading: active ? (params.temperatureReading ?? null) : null,
   };
 }

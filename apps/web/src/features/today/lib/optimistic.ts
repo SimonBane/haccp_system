@@ -1,18 +1,19 @@
-import type {
-  CompleteTodayTaskInput,
-  CompleteTodayTemperatureTaskInput,
-  TodayResponse,
-  TodayTaskItem,
+import type { TaskRecordInput, TodayResponse, TodayTaskItem } from "@haccp/shared";
+import {
+  classifyTemperatureResult,
+  deriveTodayTaskStatusFromOccurrence,
+  RECORD_KIND,
+  RECORD_STATE,
+  TEMPERATURE_RESULT,
 } from "@haccp/shared";
-import { classifyTemperatureResult, computeTodayTaskStatus } from "@haccp/shared";
 
 /** Cache patches that return the same reference on a no-op so React Query does not notify. */
 
-type OccurrenceTarget = { templateId: string; scheduledTime: string };
+export type RecordMutationInput = { occurrenceId: string } & TaskRecordInput;
 
 function patchOccurrence(
   response: TodayResponse | undefined,
-  target: OccurrenceTarget,
+  occurrenceId: string,
   patch: (task: TodayTaskItem) => TodayTaskItem,
 ): TodayResponse | undefined {
   if (!response) return response;
@@ -20,12 +21,7 @@ function patchOccurrence(
   let matched = false;
   const patchSection = (items: TodayTaskItem[]) =>
     items.map((item) => {
-      if (
-        item.templateId !== target.templateId ||
-        item.scheduledTime !== target.scheduledTime
-      ) {
-        return item;
-      }
+      if (item.occurrenceId !== occurrenceId) return item;
       matched = true;
       return patch(item);
     });
@@ -43,59 +39,40 @@ function optimisticUser(currentUserId: string): TodayTaskItem["completedBy"] {
   return { id: currentUserId, firstName: "", lastName: "" };
 }
 
-export function applyOptimisticCompletion(
-  response: TodayResponse | undefined,
-  input: CompleteTodayTaskInput,
+function activeCompletionPatch(
+  task: TodayTaskItem,
   currentUserId: string,
-  now: Date = new Date(),
-): TodayResponse | undefined {
-  return patchOccurrence(response, input, (task) => ({
+  now: Date,
+  temperatureReading?: TodayTaskItem["temperatureReading"],
+): TodayTaskItem {
+  return {
     ...task,
+    recordState: RECORD_STATE.ACTIVE,
     status: "completed",
     completedAt: now.toISOString(),
     completedBy: optimisticUser(currentUserId),
-  }));
+    temperatureReading: temperatureReading ?? null,
+  };
 }
 
-export function applyOptimisticUncompletion(
+/** Shared by both the create (POST, unrecorded) and update (PUT, edit/reactivate) mutations — both land the occurrence in the same active state. */
+export function applyOptimisticRecord(
   response: TodayResponse | undefined,
-  input: CompleteTodayTaskInput,
-  timeZone: string,
-  now: Date = new Date(),
-): TodayResponse | undefined {
-  return patchOccurrence(response, input, (task) => ({
-    ...task,
-    status: computeTodayTaskStatus({
-      date: task.date,
-      scheduledTime: task.scheduledTime,
-      now,
-      completedAt: null,
-      timeZone,
-    }),
-    completedAt: null,
-    completedBy: null,
-    temperatureReading: null,
-  }));
-}
-
-export function applyOptimisticTemperature(
-  response: TodayResponse | undefined,
-  input: CompleteTodayTemperatureTaskInput,
+  input: RecordMutationInput,
   currentUserId: string,
   now: Date = new Date(),
 ): TodayResponse | undefined {
-  return patchOccurrence(response, input, (task) => {
+  return patchOccurrence(response, input.occurrenceId, (task) => {
+    if (input.kind === RECORD_KIND.ORDINARY) {
+      return activeCompletionPatch(task, currentUserId, now);
+    }
+
     const minTempC = task.minTempC ?? task.temperatureReading?.minTempC ?? null;
     const maxTempC = task.maxTempC ?? task.temperatureReading?.maxTempC ?? null;
 
     // Without a range we cannot classify locally; leave the reading for the server.
     if (minTempC === null || maxTempC === null) {
-      return {
-        ...task,
-        status: "completed",
-        completedAt: now.toISOString(),
-        completedBy: optimisticUser(currentUserId),
-      };
+      return activeCompletionPatch(task, currentUserId, now);
     }
 
     const correctiveAction = input.correctiveAction?.trim() || null;
@@ -105,18 +82,31 @@ export function applyOptimisticTemperature(
       maxTempC,
     });
 
-    return {
-      ...task,
-      status: "completed",
-      completedAt: now.toISOString(),
-      completedBy: optimisticUser(currentUserId),
-      temperatureReading: {
-        recordedC: input.recordedC,
-        result,
-        minTempC,
-        maxTempC,
-        correctiveAction: result === "out_of_range" ? correctiveAction : null,
-      },
-    };
+    return activeCompletionPatch(task, currentUserId, now, {
+      recordedC: input.recordedC,
+      result,
+      minTempC,
+      maxTempC,
+      correctiveAction: result === TEMPERATURE_RESULT.OUT_OF_RANGE ? correctiveAction : null,
+    });
   });
+}
+
+export function applyOptimisticVoid(
+  response: TodayResponse | undefined,
+  occurrenceId: string,
+  now: Date = new Date(),
+): TodayResponse | undefined {
+  return patchOccurrence(response, occurrenceId, (task) => ({
+    ...task,
+    recordState: RECORD_STATE.VOIDED,
+    status: deriveTodayTaskStatusFromOccurrence({
+      recordState: RECORD_STATE.NONE,
+      dueAt: new Date(task.dueAt),
+      now,
+    }),
+    completedAt: null,
+    completedBy: null,
+    temperatureReading: null,
+  }));
 }

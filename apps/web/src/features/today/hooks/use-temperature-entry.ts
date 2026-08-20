@@ -1,6 +1,6 @@
 "use client";
 
-import { classifyTemperatureResult } from "@haccp/shared";
+import { classifyTemperatureResult, TEMPERATURE_RESULT } from "@haccp/shared";
 import { useLocale, useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 import { decimalSeparator } from "../lib/format";
@@ -119,7 +119,7 @@ export function useTemperatureEntry({
     if (step === "reading") {
       const isDeviation =
         classifyTemperatureResult({ recordedC: parsed, minTempC, maxTempC }) ===
-        "out_of_range";
+        TEMPERATURE_RESULT.OUT_OF_RANGE;
 
       if (isDeviation) {
         setShowErrors(false);

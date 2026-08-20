@@ -26,6 +26,7 @@ function uuid(): string {
 
 function task(overrides: Partial<TodayTaskItem> = {}): TodayTaskItem {
   return {
+    occurrenceId: uuid(),
     templateId: uuid(),
     title: "Task",
     type: "cleaning",
@@ -36,6 +37,8 @@ function task(overrides: Partial<TodayTaskItem> = {}): TodayTaskItem {
     scheduledTime: "07:00",
     timeSlot: "morning",
     date: DATE,
+    dueAt: `${DATE}T07:00:00.000Z`,
+    recordState: "none",
     status: "pending",
     completedAt: null,
     completedBy: null,
