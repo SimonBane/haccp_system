@@ -104,11 +104,14 @@ export function occurrenceRow(page: Page, occurrenceId: string) {
 export function waitForOccurrenceRecord(
   page: Page,
   occurrenceId: string,
-  method: "POST" | "PUT" | "DELETE",
+  method: "POST" | "PUT" | "DELETE" | ReadonlyArray<"POST" | "PUT" | "DELETE">,
 ) {
+  const methods = new Set(typeof method === "string" ? [method] : method);
   return page.waitForResponse((response) => {
     return (
-      response.request().method() === method &&
+      methods.has(
+        response.request().method() as "POST" | "PUT" | "DELETE",
+      ) &&
       response.url().includes(`/today/occurrences/${occurrenceId}/record`)
     );
   });
@@ -151,6 +154,7 @@ export async function ensurePending(
     await target.getByTestId("today-task-activate").click();
     await page.getByRole("button", { name: "Undo" }).click();
     await expect(target).not.toHaveAttribute("data-completed", "true");
+    await expect(page.getByRole("dialog")).toBeHidden();
   }
 
   return item;
