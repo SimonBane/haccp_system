@@ -1,4 +1,5 @@
 import { EQUIPMENT_TEMP_MAX_C, EQUIPMENT_TEMP_MIN_C } from "@haccp/shared";
+import type { TemperatureResult } from "@haccp/shared";
 
 export const TEMP_MAX_INT_DIGITS = 2;
 export const TEMP_MAX_FRACTION_DIGITS = 1;
@@ -7,7 +8,8 @@ export const TEMP_MAX_MAGNITUDE = 99.9;
 
 const PRESET_DELIMITER = ", ";
 
-export type TemperatureVerdict = "ok" | "out_of_range";
+/** The pass/fail verdict is the domain `TemperatureResult` — aliased so this feature's UI code reads naturally. */
+export type TemperatureVerdict = TemperatureResult;
 
 export const CORRECTIVE_PRESET_KEYS = [
   "movedProduct",

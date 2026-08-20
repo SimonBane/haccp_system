@@ -56,6 +56,7 @@
       "record": "Record",
       "recordAll": "Record all",
       "undo": "Undo",
+      "edit": "Edit",
       "viewRecord": "View record"
     },
     "taskTypes": {
@@ -174,7 +175,8 @@
       "recorded": "Recorded · {title}",
       "missingEquipment": "Unable to find the equipment temperature range",
       "undoError": "Could not undo task",
-      "doneError": "Could not complete task"
+      "doneError": "Could not complete task",
+      "alreadyRecorded": "Already recorded — showing the latest saved value"
     }
   },
   "DataTable": {

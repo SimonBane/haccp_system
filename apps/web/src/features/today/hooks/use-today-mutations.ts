@@ -1,36 +1,31 @@
 "use client";
 
-import type {
-  CompleteTodayTaskInput,
-  CompleteTodayTemperatureTaskInput,
-  TodayResponse,
-} from "@haccp/shared";
-import {
-  completeTodayTemperatureTaskSchema,
-  completeTodayTaskSchema,
-  todayTaskItemSchema,
-} from "@haccp/shared";
+import type { TaskRecordInput, TodayResponse } from "@haccp/shared";
+import { taskRecordInputSchema, taskRecordResponseSchema } from "@haccp/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "@/features/tenant/tenant-provider";
 import { useAuthenticatedFetch } from "@/lib/api/client";
 import { locationScopedPath } from "@/lib/api/paths";
 import { queryKeys } from "@/lib/api/query-keys";
-import {
-  applyOptimisticCompletion,
-  applyOptimisticTemperature,
-  applyOptimisticUncompletion,
-} from "../lib/optimistic";
+import { applyOptimisticRecord, applyOptimisticVoid } from "../lib/optimistic";
+import type { RecordMutationInput } from "../lib/optimistic";
 
 type OptimisticContext = {
   key: ReturnType<typeof queryKeys.today>;
   previous: TodayResponse | undefined;
 };
 
-export function useTodayMutations(currentUserId: string, timeZone: string) {
+type VoidRecordInput = { occurrenceId: string; date: string };
+type RecordInput = RecordMutationInput & { date: string };
+
+export function useTodayMutations(currentUserId: string) {
   const { locationId } = useLocation();
   const { fetchJson } = useAuthenticatedFetch();
   const queryClient = useQueryClient();
-  const todayPath = locationScopedPath(locationId, "today");
+
+  function recordPath(occurrenceId: string): string {
+    return locationScopedPath(locationId, "today/occurrences", `/${occurrenceId}/record`);
+  }
 
   async function beginOptimistic(
     date: string,
@@ -53,10 +48,11 @@ export function useTodayMutations(currentUserId: string, timeZone: string) {
     void queryClient.invalidateQueries({ queryKey: context.key });
   }
 
-  const completeTask = useMutation({
-    mutationFn: async (input: CompleteTodayTaskInput) => {
-      const payload = completeTodayTaskSchema.parse(input);
-      return fetchJson(`${todayPath}/complete`, todayTaskItemSchema, {
+  const createRecord = useMutation({
+    mutationFn: async (input: RecordInput) => {
+      // Extra keys (occurrenceId, date) are stripped by the plain (non-strict) object schema.
+      const payload: TaskRecordInput = taskRecordInputSchema.parse(input);
+      return fetchJson(recordPath(input.occurrenceId), taskRecordResponseSchema, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -64,49 +60,42 @@ export function useTodayMutations(currentUserId: string, timeZone: string) {
     },
     onMutate: (input) =>
       beginOptimistic(input.date, (previous) =>
-        applyOptimisticCompletion(previous, input, currentUserId),
+        applyOptimisticRecord(previous, input, currentUserId),
       ),
     onError: (_error, _input, context) => rollback(context),
     onSettled: (_data, _error, _input, context) => settle(context),
   });
 
-  const uncompleteTask = useMutation({
-    mutationFn: async (input: CompleteTodayTaskInput) => {
-      const payload = completeTodayTaskSchema.parse(input);
-      return fetchJson(`${todayPath}/uncomplete`, todayTaskItemSchema, {
-        method: "POST",
+  const updateRecord = useMutation({
+    mutationFn: async (input: RecordInput) => {
+      const payload: TaskRecordInput = taskRecordInputSchema.parse(input);
+      return fetchJson(recordPath(input.occurrenceId), taskRecordResponseSchema, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
     },
     onMutate: (input) =>
       beginOptimistic(input.date, (previous) =>
-        applyOptimisticUncompletion(previous, input, timeZone),
+        applyOptimisticRecord(previous, input, currentUserId),
       ),
     onError: (_error, _input, context) => rollback(context),
     onSettled: (_data, _error, _input, context) => settle(context),
   });
 
-  const completeTemperatureTask = useMutation({
-    mutationFn: async (input: CompleteTodayTemperatureTaskInput) => {
-      const payload = completeTodayTemperatureTaskSchema.parse(input);
-      return fetchJson(
-        `${todayPath}/complete-temperature`,
-        todayTaskItemSchema,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        },
-      );
+  const voidRecord = useMutation({
+    mutationFn: async (input: VoidRecordInput) => {
+      return fetchJson(recordPath(input.occurrenceId), taskRecordResponseSchema, {
+        method: "DELETE",
+      });
     },
     onMutate: (input) =>
       beginOptimistic(input.date, (previous) =>
-        applyOptimisticTemperature(previous, input, currentUserId),
+        applyOptimisticVoid(previous, input.occurrenceId),
       ),
     onError: (_error, _input, context) => rollback(context),
     onSettled: (_data, _error, _input, context) => settle(context),
   });
 
-  return { completeTask, uncompleteTask, completeTemperatureTask };
+  return { createRecord, updateRecord, voidRecord };
 }

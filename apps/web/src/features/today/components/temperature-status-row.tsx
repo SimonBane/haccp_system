@@ -1,5 +1,6 @@
 "use client";
 
+import { TEMPERATURE_RESULT } from "@haccp/shared";
 import { CheckIcon, CircleAlertIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
@@ -51,9 +52,9 @@ export function TemperatureStatusRow({
         </span>
       ) : (
         <>
-          <Badge variant={verdict === "ok" ? "success" : "destructive"}>
-            {verdict === "ok" ? <CheckIcon /> : <CircleAlertIcon />}
-            {verdict === "ok"
+          <Badge variant={verdict === TEMPERATURE_RESULT.OK ? "success" : "destructive"}>
+            {verdict === TEMPERATURE_RESULT.OK ? <CheckIcon /> : <CircleAlertIcon />}
+            {verdict === TEMPERATURE_RESULT.OK
               ? t("temperatureDialog.ok")
               : t("temperatureDialog.outOfRange")}
           </Badge>
@@ -65,7 +66,7 @@ export function TemperatureStatusRow({
           <span className="sr-only">
             {value === null
               ? null
-              : verdict === "ok"
+              : verdict === TEMPERATURE_RESULT.OK
                 ? t("temperatureDialog.srVerdictOk", {
                     value: formatTemperature(value, locale),
                   })
