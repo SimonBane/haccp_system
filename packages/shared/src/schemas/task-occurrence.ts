@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { TemperatureResult } from "./today.js";
 
 export const occurrenceStatusSchema = z.enum(["pending", "completed", "missed"]);
 
@@ -48,7 +49,7 @@ export function deriveOccurrenceState(params: {
 
 /** The temperature result is read from the stored detail row, never recomputed from a possibly-stale occurrence range. */
 export function deriveTemperatureResult(
-  detail: { result: "ok" | "out_of_range" } | null | undefined,
-): "ok" | "out_of_range" | null {
+  detail: { result: TemperatureResult } | null | undefined,
+): TemperatureResult | null {
   return detail?.result ?? null;
 }
