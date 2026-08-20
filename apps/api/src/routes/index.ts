@@ -13,6 +13,7 @@ import { healthRoutes } from "../modules/health/health.routes.js";
 import { locationRoutes } from "../modules/locations/location.routes.js";
 import { organizationRoutes } from "../modules/organizations/organization.routes.js";
 import { taskOccurrenceRoutes } from "../modules/task-occurrences/task-occurrence.routes.js";
+import { taskRecordRoutes } from "../modules/task-records/task-record.routes.js";
 import { taskTemplateRoutes } from "../modules/task-templates/task-template.routes.js";
 import { tenantRoutes } from "../modules/tenant/tenant.routes.js";
 import { todayRoutes } from "../modules/today/today.routes.js";
@@ -83,4 +84,9 @@ mountLocationScoped(
   true,
 );
 mountLocationScoped("/locations/:locationId/today", todayRoutes, false);
+mountLocationScoped(
+  "/locations/:locationId/today/occurrences",
+  taskRecordRoutes,
+  false,
+);
 mountAdminProtected("/locations", locationRoutes);
