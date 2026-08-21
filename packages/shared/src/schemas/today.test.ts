@@ -4,6 +4,7 @@ import {
   deriveRecordState,
   deriveTodayTaskStatusFromOccurrence,
   RECORD_STATE,
+  todayTaskItemSchema,
 } from "./today.js";
 
 const DUE_AT = new Date("2026-01-15T07:00:00Z");
@@ -145,5 +146,15 @@ describe("buildTodayTaskItemFromOccurrence", () => {
     expect(pending.status).toBe("pending");
     expect(overdue.status).toBe("overdue");
     expect(pending.recordState).toBe("none");
+  });
+});
+
+describe("Today contracts — removed M0 fields", () => {
+  it("does not expose organizationId, timeZone, or Snapshot-suffixed keys on a Today row", () => {
+    const keys = Object.keys(todayTaskItemSchema.shape);
+
+    expect(keys).not.toContain("organizationId");
+    expect(keys).not.toContain("timeZone");
+    expect(keys.some((key) => key.endsWith("Snapshot"))).toBe(false);
   });
 });

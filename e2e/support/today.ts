@@ -73,6 +73,13 @@ export async function fetchTodayItems(
   return flattenTodayItems(today);
 }
 
+/**
+ * A same-day reseed advances a template's scheduledTimes, so the old, already-recorded
+ * occurrence stays on Today alongside the fresh unrecorded one (reconciliation protects
+ * recorded rows — HACCP-16 scenario 19). Prefer the unrecorded match by recordState, not
+ * by status: the fresh occurrence's short due window means it may already read "overdue"
+ * by the time this runs, but it is still unrecorded and is the one a completion journey wants.
+ */
 export async function findTodayItem(
   page: Page,
   title: string,
@@ -80,11 +87,13 @@ export async function findTodayItem(
   const api = await apiContext(page);
   try {
     const items = await fetchTodayItems(api);
-    const item = items.find((entry) => entry.title === title);
-    if (!item) {
+    const matches = items.filter((entry) => entry.title === title);
+    if (matches.length === 0) {
       throw new Error(`Today has no occurrence titled "${title}"`);
     }
-    return item;
+    return (
+      matches.find((entry) => entry.recordState === "none") ?? matches[0]!
+    );
   } finally {
     await api.dispose();
   }

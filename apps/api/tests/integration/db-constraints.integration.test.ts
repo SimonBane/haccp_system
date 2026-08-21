@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../../src/core/db/client.js";
 import {
@@ -188,5 +189,19 @@ describe("database constraints", () => {
     );
 
     expect(code).toBe(PG_ERROR.UNIQUE_VIOLATION);
+  });
+
+  it("no longer has task_completions or temperature_logs", async () => {
+    const tables = (
+      await db.execute<{ tablename: string }>(
+        sql`select tablename from pg_tables where schemaname = 'public'`,
+      )
+    ).map((row) => row.tablename);
+
+    expect(tables).not.toContain("task_completions");
+    expect(tables).not.toContain("temperature_logs");
+    expect(tables).toContain("task_occurrences");
+    expect(tables).toContain("task_records");
+    expect(tables).toContain("task_templates");
   });
 });

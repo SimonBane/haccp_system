@@ -43,6 +43,19 @@ describe("location scoping across tenants", () => {
     expect(response.status).toBe(403);
   });
 
+  it("refuses an employee writing at an unassigned location in their own organization", async () => {
+    const response = await apiRequest(
+      `/locations/${world.alpha.locations.annex.id}/today/occurrences/00000000-0000-4000-8000-000000000099/record`,
+      {
+        method: "POST",
+        actor: asEmployee(world.alpha),
+        body: JSON.stringify({ kind: "ordinary" }),
+      },
+    );
+
+    expect(response.status).toBe(403);
+  });
+
   it("lets an employee reach the location they are assigned to", async () => {
     const response = await apiRequest(
       `/locations/${world.alpha.locations.main.id}/today?date=2026-08-16`,

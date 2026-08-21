@@ -7,6 +7,7 @@ import {
   organizationMemberLocations,
   organizationMemberships,
   organizations,
+  taskOccurrences,
   taskTemplates,
   users,
 } from "../../../src/core/db/schema/index.js";
@@ -261,6 +262,51 @@ export async function seedOrganization(
       },
     } satisfies SeededOrg;
   });
+}
+
+/** Direct template inserts skip reconciliation, so tests mint the stored occurrence themselves. */
+export async function seedOccurrence(
+  db: Db,
+  org: SeededOrg,
+  overrides: {
+    type: "temperature" | "cleaning";
+    locationId?: string;
+    occurrenceDate: string;
+    scheduledTime?: string;
+    dueAt?: Date;
+    title?: string;
+  },
+): Promise<string> {
+  const locationId = overrides.locationId ?? org.locations.main.id;
+  const scheduledTime = overrides.scheduledTime ?? "08:00";
+  const isTemperature = overrides.type === "temperature";
+
+  const [row] = await db
+    .insert(taskOccurrences)
+    .values({
+      locationId,
+      taskTemplateId: isTemperature
+        ? org.templates.temperature.id
+        : org.templates.cleaning.id,
+      occurrenceDate: overrides.occurrenceDate,
+      scheduledTime,
+      dueAt:
+        overrides.dueAt ??
+        new Date(`${overrides.occurrenceDate}T${scheduledTime}:00Z`),
+      title:
+        overrides.title ??
+        (isTemperature
+          ? org.templates.temperature.title
+          : org.templates.cleaning.title),
+      type: overrides.type,
+      equipmentId: isTemperature ? org.equipment.fridge.id : null,
+      equipmentName: isTemperature ? org.equipment.fridge.name : null,
+      minTempC: isTemperature ? "0.0" : null,
+      maxTempC: isTemperature ? "5.0" : null,
+    })
+    .returning({ id: taskOccurrences.id });
+
+  return row!.id;
 }
 
 /**
