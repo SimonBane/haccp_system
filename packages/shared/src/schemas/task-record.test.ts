@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { taskRecordInputSchema } from "./task-record.js";
+import { taskRecordInputSchema, taskRecordResponseSchema } from "./task-record.js";
 
 describe("taskRecordInputSchema", () => {
   it("accepts an ordinary record with no value payload", () => {
@@ -82,5 +82,17 @@ describe("taskRecordInputSchema", () => {
     if (result.success && result.data.kind === "temperature") {
       expect(result.data.correctiveAction).toBe("Moved stock");
     }
+  });
+});
+
+describe("taskRecordResponseSchema — removed M0 fields", () => {
+  it("does not expose organizationId, locationId, last-edited fields, or a void reason", () => {
+    const keys = Object.keys(taskRecordResponseSchema.shape);
+
+    expect(keys).not.toContain("organizationId");
+    expect(keys).not.toContain("locationId");
+    expect(keys).not.toContain("lastEditedAt");
+    expect(keys).not.toContain("lastEditedByUserId");
+    expect(keys).not.toContain("voidReason");
   });
 });

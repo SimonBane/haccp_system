@@ -82,6 +82,9 @@ describe("toTaskRecordResponse", () => {
 
     expect(response).not.toHaveProperty("lastEditedAt");
     expect(response).not.toHaveProperty("lastEditedByUserId");
+    expect(response).not.toHaveProperty("organizationId");
+    expect(response).not.toHaveProperty("locationId");
+    expect(response).not.toHaveProperty("voidReason");
     expect(response.recordedAt).toBe("2026-08-19T10:00:00.000Z");
     expect(response.recordedByUserId).toBe(OTHER_USER_ID);
   });

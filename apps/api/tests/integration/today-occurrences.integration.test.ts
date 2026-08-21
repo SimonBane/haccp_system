@@ -254,6 +254,27 @@ describe("Today occurrences (GET)", () => {
     );
   });
 
+  it("returns never-opened past work as overdue", async () => {
+    const yesterday = addCalendarDays(today(), -1);
+    const occurrenceId = await insertOccurrence({
+      type: "cleaning",
+      occurrenceDate: yesterday,
+      scheduledTime: "08:00",
+      dueAt: new Date(`${yesterday}T08:00:00Z`),
+    });
+
+    const response = await todayGet(org.locations.main.id, yesterday);
+    expect(response.status).toBe(200);
+    const item = flatten(todayResponseSchema.parse(await response.json())).find(
+      (entry) => entry.occurrenceId === occurrenceId,
+    );
+
+    expect(item).toBeDefined();
+    expect(item!.recordState).toBe("none");
+    expect(item!.status).toBe("overdue");
+    expect(item!.completedAt).toBeNull();
+  });
+
   it("never materializes work as a side effect of a read", async () => {
     const before = await db.select().from(taskOccurrences);
 
