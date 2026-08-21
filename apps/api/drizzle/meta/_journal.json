@@ -5,50 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1783573616308,
-      "tag": "0000_enable_pgcrypto",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1786218260530,
-      "tag": "0001_baseline",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1786219914642,
-      "tag": "0002_swift_hiroim",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1787038496906,
-      "tag": "0003_add_equipment_id_location_id_unique",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1787038513287,
-      "tag": "0004_add_task_templates_equipment_location_fk",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1787165420415,
-      "tag": "0005_add_task_template_archive",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1787165439312,
-      "tag": "0006_add_occurrences_current_records",
+      "when": 1787299043111,
+      "tag": "0000_baseline",
       "breakpoints": true
     }
   ]

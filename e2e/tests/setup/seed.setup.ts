@@ -37,18 +37,27 @@ const ALL_WEEKDAYS = [
   "sunday",
 ];
 
-async function replaceE2eRows(
+/**
+ * Task-template DELETE archives rather than removes the row (HACCP-11), which would
+ * leave an unremovable FK on its equipment forever. So seeding never deletes — it
+ * finds each fixture row by name/title and PATCHes it back to canonical values,
+ * creating it only the first time. Nothing accumulates across runs.
+ */
+async function upsertByLabel(
   api: APIRequestContext,
   path: string,
   label: (row: Named) => string,
-) {
+  target: string,
+  payload: Record<string, unknown>,
+): Promise<Named> {
   const { items } = await json<{ items: Named[] }>(api, "get", path);
+  const existing = items.find((row) => label(row) === target);
 
-  for (const row of items) {
-    if (label(row).startsWith(E2E_PREFIX)) {
-      await json(api, "delete", `${path}/${row.id}`);
-    }
+  if (existing) {
+    return await json<Named>(api, "patch", `${path}/${existing.id}`, payload);
   }
+
+  return await json<Named>(api, "post", path, payload);
 }
 
 setup("seed locations, equipment and templates", async ({ page }) => {
@@ -78,16 +87,13 @@ setup("seed locations, equipment and templates", async ({ page }) => {
   const equipmentPath = `/locations/${main.id}/equipment`;
   const templatePath = `/locations/${main.id}/task-templates`;
 
-  // Templates reference equipment, so they must go first or the delete is rejected.
-  await replaceE2eRows(api, templatePath, (row) => row.title ?? "");
-  await replaceE2eRows(api, equipmentPath, (row) => row.name ?? "");
-
   const fridges: Named[] = [];
   for (let index = 1; index <= EQUIPMENT_COUNT; index += 1) {
+    // Zero-padded so the 11th row is identifiable by name, not by position.
+    const name = `${E2E_PREFIX} Fridge ${String(index).padStart(2, "0")}`;
     fridges.push(
-      await json<Named>(api, "post", equipmentPath, {
-        // Zero-padded so the 11th row is identifiable by name, not by position.
-        name: `${E2E_PREFIX} Fridge ${String(index).padStart(2, "0")}`,
+      await upsertByLabel(api, equipmentPath, (row) => row.name ?? "", name, {
+        name,
         type: "fridge",
         minTempC: 0,
         maxTempC: 4,
@@ -99,20 +105,33 @@ setup("seed locations, equipment and templates", async ({ page }) => {
     tenant.organization.timezone,
   );
 
-  await json(api, "post", templatePath, {
-    title: `${E2E_PREFIX} Fridge check`,
-    type: "temperature",
-    weekdays: ALL_WEEKDAYS,
-    scheduledTimes: [fridgeTime],
-    equipmentId: fridges[0]!.id,
-  });
+  // Scheduled times must stay just ahead of "now", so this is a PATCH every run, not create-once.
+  await upsertByLabel(
+    api,
+    templatePath,
+    (row) => row.title ?? "",
+    `${E2E_PREFIX} Fridge check`,
+    {
+      title: `${E2E_PREFIX} Fridge check`,
+      type: "temperature",
+      weekdays: ALL_WEEKDAYS,
+      scheduledTimes: [fridgeTime],
+      equipmentId: fridges[0]!.id,
+    },
+  );
 
-  await json(api, "post", templatePath, {
-    title: `${E2E_PREFIX} Clean prep surface`,
-    type: "cleaning",
-    weekdays: ALL_WEEKDAYS,
-    scheduledTimes: [cleaningTime],
-  });
+  await upsertByLabel(
+    api,
+    templatePath,
+    (row) => row.title ?? "",
+    `${E2E_PREFIX} Clean prep surface`,
+    {
+      title: `${E2E_PREFIX} Clean prep surface`,
+      type: "cleaning",
+      weekdays: ALL_WEEKDAYS,
+      scheduledTimes: [cleaningTime],
+    },
+  );
 
   const seeded = await json<{ items: Named[] }>(api, "get", equipmentPath);
   expect(

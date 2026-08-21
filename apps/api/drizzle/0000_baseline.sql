@@ -66,6 +66,7 @@ CREATE TABLE "equipment" (
 	"max_temp_c" numeric(4, 1) NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "equipment_id_location_id_unique" UNIQUE("id","location_id"),
 	CONSTRAINT "equipment_min_temp_less_than_max_temp" CHECK ("equipment"."min_temp_c" < "equipment"."max_temp_c")
 );
 --> statement-breakpoint
@@ -77,34 +78,47 @@ CREATE TABLE "task_templates" (
 	"weekdays" text[] NOT NULL,
 	"scheduled_times" text[] NOT NULL,
 	"equipment_id" uuid,
+	"archived_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "task_templates_id_location_id_unique" UNIQUE("id","location_id")
 );
 --> statement-breakpoint
-CREATE TABLE "task_completions" (
+CREATE TABLE "task_occurrences" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"location_id" uuid NOT NULL,
 	"task_template_id" uuid NOT NULL,
 	"occurrence_date" date NOT NULL,
 	"scheduled_time" text NOT NULL,
-	"completed_at" timestamp with time zone NOT NULL,
-	"completed_by_user_id" uuid NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+	"due_at" timestamp with time zone NOT NULL,
+	"title" text NOT NULL,
+	"type" text NOT NULL,
+	"equipment_id" uuid,
+	"equipment_name" text,
+	"min_temp_c" numeric(4, 1),
+	"max_temp_c" numeric(4, 1),
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "task_occurrences_template_date_time_unique" UNIQUE("task_template_id","occurrence_date","scheduled_time")
 );
 --> statement-breakpoint
-CREATE TABLE "temperature_logs" (
+CREATE TABLE "task_records" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"location_id" uuid NOT NULL,
-	"task_completion_id" uuid NOT NULL,
-	"equipment_id" uuid NOT NULL,
+	"occurrence_id" uuid NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"created_by_user_id" uuid NOT NULL,
+	"recorded_at" timestamp with time zone NOT NULL,
+	"recorded_by_user_id" uuid NOT NULL,
+	"voided_at" timestamp with time zone,
+	"voided_by_user_id" uuid
+);
+--> statement-breakpoint
+CREATE TABLE "task_record_temperatures" (
+	"task_record_id" uuid PRIMARY KEY NOT NULL,
 	"recorded_c" numeric(4, 1) NOT NULL,
 	"min_temp_c" numeric(4, 1) NOT NULL,
 	"max_temp_c" numeric(4, 1) NOT NULL,
 	"result" text NOT NULL,
-	"corrective_action" text,
-	"recorded_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"recorded_by_user_id" uuid NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+	"corrective_action" text
 );
 --> statement-breakpoint
 ALTER TABLE "organization_memberships" ADD CONSTRAINT "organization_memberships_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -115,27 +129,25 @@ ALTER TABLE "organization_member_locations" ADD CONSTRAINT "organization_member_
 ALTER TABLE "locations" ADD CONSTRAINT "locations_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "equipment" ADD CONSTRAINT "equipment_location_id_locations_id_fk" FOREIGN KEY ("location_id") REFERENCES "public"."locations"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "task_templates" ADD CONSTRAINT "task_templates_location_id_locations_id_fk" FOREIGN KEY ("location_id") REFERENCES "public"."locations"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "task_templates" ADD CONSTRAINT "task_templates_equipment_id_equipment_id_fk" FOREIGN KEY ("equipment_id") REFERENCES "public"."equipment"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "task_completions" ADD CONSTRAINT "task_completions_location_id_locations_id_fk" FOREIGN KEY ("location_id") REFERENCES "public"."locations"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "task_completions" ADD CONSTRAINT "task_completions_task_template_id_task_templates_id_fk" FOREIGN KEY ("task_template_id") REFERENCES "public"."task_templates"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "task_completions" ADD CONSTRAINT "task_completions_completed_by_user_id_users_id_fk" FOREIGN KEY ("completed_by_user_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "temperature_logs" ADD CONSTRAINT "temperature_logs_location_id_locations_id_fk" FOREIGN KEY ("location_id") REFERENCES "public"."locations"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "temperature_logs" ADD CONSTRAINT "temperature_logs_task_completion_id_task_completions_id_fk" FOREIGN KEY ("task_completion_id") REFERENCES "public"."task_completions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "temperature_logs" ADD CONSTRAINT "temperature_logs_equipment_id_equipment_id_fk" FOREIGN KEY ("equipment_id") REFERENCES "public"."equipment"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "temperature_logs" ADD CONSTRAINT "temperature_logs_recorded_by_user_id_users_id_fk" FOREIGN KEY ("recorded_by_user_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_templates" ADD CONSTRAINT "task_templates_equipment_id_location_id_equipment_id_location_id_fk" FOREIGN KEY ("equipment_id","location_id") REFERENCES "public"."equipment"("id","location_id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_occurrences" ADD CONSTRAINT "task_occurrences_location_id_locations_id_fk" FOREIGN KEY ("location_id") REFERENCES "public"."locations"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_occurrences" ADD CONSTRAINT "task_occurrences_task_template_id_location_id_task_templates_id_location_id_fk" FOREIGN KEY ("task_template_id","location_id") REFERENCES "public"."task_templates"("id","location_id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_records" ADD CONSTRAINT "task_records_occurrence_id_task_occurrences_id_fk" FOREIGN KEY ("occurrence_id") REFERENCES "public"."task_occurrences"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_records" ADD CONSTRAINT "task_records_created_by_user_id_users_id_fk" FOREIGN KEY ("created_by_user_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_records" ADD CONSTRAINT "task_records_recorded_by_user_id_users_id_fk" FOREIGN KEY ("recorded_by_user_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_records" ADD CONSTRAINT "task_records_voided_by_user_id_users_id_fk" FOREIGN KEY ("voided_by_user_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_record_temperatures" ADD CONSTRAINT "task_record_temperatures_task_record_id_task_records_id_fk" FOREIGN KEY ("task_record_id") REFERENCES "public"."task_records"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "organizations_clerk_org_id_unique" ON "organizations" USING btree ("clerk_org_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "users_clerk_user_id_unique" ON "users" USING btree ("clerk_user_id") WHERE "users"."clerk_user_id" is not null;--> statement-breakpoint
 CREATE UNIQUE INDEX "users_email_unique" ON "users" USING btree (lower("email"));--> statement-breakpoint
 CREATE UNIQUE INDEX "organization_memberships_org_user_unique" ON "organization_memberships" USING btree ("organization_id","user_id");--> statement-breakpoint
-CREATE INDEX "locations_organization_id_idx" ON "locations" USING btree ("organization_id");--> statement-breakpoint
+CREATE INDEX "organization_memberships_org_active_created_idx" ON "organization_memberships" USING btree ("organization_id","created_at") WHERE "organization_memberships"."deleted_at" is null;--> statement-breakpoint
+CREATE INDEX "organization_member_locations_location_id_organization_id_idx" ON "organization_member_locations" USING btree ("location_id","organization_id");--> statement-breakpoint
+CREATE INDEX "organization_member_locations_organization_id_idx" ON "organization_member_locations" USING btree ("organization_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "locations_organization_id_name_unique" ON "locations" USING btree ("organization_id","name");--> statement-breakpoint
 CREATE UNIQUE INDEX "locations_organization_id_is_default_unique" ON "locations" USING btree ("organization_id") WHERE "locations"."is_default" = true;--> statement-breakpoint
 CREATE UNIQUE INDEX "equipment_location_id_name_unique" ON "equipment" USING btree ("location_id","name");--> statement-breakpoint
-CREATE INDEX "equipment_location_id_idx" ON "equipment" USING btree ("location_id");--> statement-breakpoint
 CREATE INDEX "task_templates_location_id_idx" ON "task_templates" USING btree ("location_id");--> statement-breakpoint
 CREATE INDEX "task_templates_equipment_id_idx" ON "task_templates" USING btree ("equipment_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "task_completions_template_date_time_unique" ON "task_completions" USING btree ("task_template_id","occurrence_date","scheduled_time");--> statement-breakpoint
-CREATE INDEX "task_completions_location_date_idx" ON "task_completions" USING btree ("location_id","occurrence_date");--> statement-breakpoint
-CREATE UNIQUE INDEX "temperature_logs_task_completion_id_unique" ON "temperature_logs" USING btree ("task_completion_id");--> statement-breakpoint
-CREATE INDEX "temperature_logs_location_id_recorded_at_idx" ON "temperature_logs" USING btree ("location_id","recorded_at");--> statement-breakpoint
-CREATE INDEX "temperature_logs_equipment_id_idx" ON "temperature_logs" USING btree ("equipment_id");
+CREATE INDEX "task_occurrences_location_date_time_id_idx" ON "task_occurrences" USING btree ("location_id","occurrence_date","scheduled_time","id");--> statement-breakpoint
+CREATE UNIQUE INDEX "task_records_occurrence_id_unique" ON "task_records" USING btree ("occurrence_id");

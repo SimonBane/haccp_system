@@ -67,6 +67,7 @@
   },
   "globalPassThroughEnv": [
     "CI",
+    "CRON_SECRET",
     "CLERK_TESTING_TOKEN",
     "E2E_CLERK_ADMIN_EMAIL",
     "E2E_CLERK_EMPLOYEE_EMAIL",
