@@ -1,6 +1,6 @@
 {
-  "id": "cbc76b8e-3f4d-41ac-ab65-80987a1b0af7",
-  "prevId": "b695680a-c01c-4723-a51d-1fc0ce2762c5",
+  "id": "fa2c4d15-cd97-45df-b839-debc4a921171",
+  "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -873,8 +873,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.task_completions": {
-      "name": "task_completions",
+    "public.task_occurrences": {
+      "name": "task_occurrences",
       "schema": "",
       "columns": {
         "id": {
@@ -908,17 +908,47 @@
           "primaryKey": false,
           "notNull": true
         },
-        "completed_at": {
-          "name": "completed_at",
+        "due_at": {
+          "name": "due_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
         },
-        "completed_by_user_id": {
-          "name": "completed_by_user_id",
-          "type": "uuid",
+        "title": {
+          "name": "title",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "equipment_id": {
+          "name": "equipment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "equipment_name": {
+          "name": "equipment_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "min_temp_c": {
+          "name": "min_temp_c",
+          "type": "numeric(4, 1)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "max_temp_c": {
+          "name": "max_temp_c",
+          "type": "numeric(4, 1)",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -929,11 +959,11 @@
         }
       },
       "indexes": {
-        "task_completions_template_date_time_unique": {
-          "name": "task_completions_template_date_time_unique",
+        "task_occurrences_location_date_time_id_idx": {
+          "name": "task_occurrences_location_date_time_id_idx",
           "columns": [
             {
-              "expression": "task_template_id",
+              "expression": "location_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -949,24 +979,9 @@
               "isExpression": false,
               "asc": true,
               "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "task_completions_location_date_idx": {
-          "name": "task_completions_location_date_idx",
-          "columns": [
-            {
-              "expression": "location_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
             },
             {
-              "expression": "occurrence_date",
+              "expression": "id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -979,9 +994,9 @@
         }
       },
       "foreignKeys": {
-        "task_completions_location_id_locations_id_fk": {
-          "name": "task_completions_location_id_locations_id_fk",
-          "tableFrom": "task_completions",
+        "task_occurrences_location_id_locations_id_fk": {
+          "name": "task_occurrences_location_id_locations_id_fk",
+          "tableFrom": "task_occurrences",
           "tableTo": "locations",
           "columnsFrom": [
             "location_id"
@@ -992,25 +1007,156 @@
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
-        "task_completions_task_template_id_task_templates_id_fk": {
-          "name": "task_completions_task_template_id_task_templates_id_fk",
-          "tableFrom": "task_completions",
+        "task_occurrences_task_template_id_location_id_task_templates_id_location_id_fk": {
+          "name": "task_occurrences_task_template_id_location_id_task_templates_id_location_id_fk",
+          "tableFrom": "task_occurrences",
           "tableTo": "task_templates",
           "columnsFrom": [
-            "task_template_id"
+            "task_template_id",
+            "location_id"
+          ],
+          "columnsTo": [
+            "id",
+            "location_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "task_occurrences_template_date_time_unique": {
+          "name": "task_occurrences_template_date_time_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "task_template_id",
+            "occurrence_date",
+            "scheduled_time"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.task_records": {
+      "name": "task_records",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "occurrence_id": {
+          "name": "occurrence_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recorded_at": {
+          "name": "recorded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recorded_by_user_id": {
+          "name": "recorded_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "voided_at": {
+          "name": "voided_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "voided_by_user_id": {
+          "name": "voided_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "task_records_occurrence_id_unique": {
+          "name": "task_records_occurrence_id_unique",
+          "columns": [
+            {
+              "expression": "occurrence_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "task_records_occurrence_id_task_occurrences_id_fk": {
+          "name": "task_records_occurrence_id_task_occurrences_id_fk",
+          "tableFrom": "task_records",
+          "tableTo": "task_occurrences",
+          "columnsFrom": [
+            "occurrence_id"
           ],
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         },
-        "task_completions_completed_by_user_id_users_id_fk": {
-          "name": "task_completions_completed_by_user_id_users_id_fk",
-          "tableFrom": "task_completions",
+        "task_records_created_by_user_id_users_id_fk": {
+          "name": "task_records_created_by_user_id_users_id_fk",
+          "tableFrom": "task_records",
           "tableTo": "users",
           "columnsFrom": [
-            "completed_by_user_id"
+            "created_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "task_records_recorded_by_user_id_users_id_fk": {
+          "name": "task_records_recorded_by_user_id_users_id_fk",
+          "tableFrom": "task_records",
+          "tableTo": "users",
+          "columnsFrom": [
+            "recorded_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "task_records_voided_by_user_id_users_id_fk": {
+          "name": "task_records_voided_by_user_id_users_id_fk",
+          "tableFrom": "task_records",
+          "tableTo": "users",
+          "columnsFrom": [
+            "voided_by_user_id"
           ],
           "columnsTo": [
             "id"
@@ -1025,33 +1171,14 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.temperature_logs": {
-      "name": "temperature_logs",
+    "public.task_record_temperatures": {
+      "name": "task_record_temperatures",
       "schema": "",
       "columns": {
-        "id": {
-          "name": "id",
+        "task_record_id": {
+          "name": "task_record_id",
           "type": "uuid",
           "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "location_id": {
-          "name": "location_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "task_completion_id": {
-          "name": "task_completion_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "equipment_id": {
-          "name": "equipment_id",
-          "type": "uuid",
-          "primaryKey": false,
           "notNull": true
         },
         "recorded_c": {
@@ -1083,127 +1210,16 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "recorded_at": {
-          "name": "recorded_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "recorded_by_user_id": {
-          "name": "recorded_by_user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
         }
       },
-      "indexes": {
-        "temperature_logs_task_completion_id_unique": {
-          "name": "temperature_logs_task_completion_id_unique",
-          "columns": [
-            {
-              "expression": "task_completion_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "temperature_logs_location_id_recorded_at_idx": {
-          "name": "temperature_logs_location_id_recorded_at_idx",
-          "columns": [
-            {
-              "expression": "location_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "recorded_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "temperature_logs_equipment_id_idx": {
-          "name": "temperature_logs_equipment_id_idx",
-          "columns": [
-            {
-              "expression": "equipment_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
-        "temperature_logs_location_id_locations_id_fk": {
-          "name": "temperature_logs_location_id_locations_id_fk",
-          "tableFrom": "temperature_logs",
-          "tableTo": "locations",
+        "task_record_temperatures_task_record_id_task_records_id_fk": {
+          "name": "task_record_temperatures_task_record_id_task_records_id_fk",
+          "tableFrom": "task_record_temperatures",
+          "tableTo": "task_records",
           "columnsFrom": [
-            "location_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "temperature_logs_task_completion_id_task_completions_id_fk": {
-          "name": "temperature_logs_task_completion_id_task_completions_id_fk",
-          "tableFrom": "temperature_logs",
-          "tableTo": "task_completions",
-          "columnsFrom": [
-            "task_completion_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "temperature_logs_equipment_id_equipment_id_fk": {
-          "name": "temperature_logs_equipment_id_equipment_id_fk",
-          "tableFrom": "temperature_logs",
-          "tableTo": "equipment",
-          "columnsFrom": [
-            "equipment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "temperature_logs_recorded_by_user_id_users_id_fk": {
-          "name": "temperature_logs_recorded_by_user_id_users_id_fk",
-          "tableFrom": "temperature_logs",
-          "tableTo": "users",
-          "columnsFrom": [
-            "recorded_by_user_id"
+            "task_record_id"
           ],
           "columnsTo": [
             "id"
