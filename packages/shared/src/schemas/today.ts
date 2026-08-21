@@ -1,7 +1,6 @@
 import { z } from "zod";
 import {
   deriveTimeSlotFromTime,
-  parseScheduledTimeToMinutes,
   scheduledTimeSchema,
   taskTemplateTimeSlotSchema,
   taskTemplateTypeSchema,
@@ -9,7 +8,6 @@ import {
   TASK_TEMPLATE_ALL_WEEKDAYS,
 } from "./task-template.js";
 import { userSummarySchema } from "./user.js";
-import { zonedDateString, zonedMinutesOfDay } from "../lib/timezone.js";
 
 export const todayTaskStatusSchema = z.enum([
   "pending",
@@ -100,24 +98,6 @@ export const todayResponseSchema = z.object({
 
 export type TodayResponse = z.infer<typeof todayResponseSchema>;
 
-export const completeTodayTaskSchema = z.object({
-  templateId: z.uuid(),
-  date: isoDateSchema,
-  scheduledTime: scheduledTimeSchema,
-});
-
-export type CompleteTodayTaskInput = z.infer<typeof completeTodayTaskSchema>;
-
-export const completeTodayTemperatureTaskSchema =
-  completeTodayTaskSchema.extend({
-    recordedC: z.coerce.number(),
-    correctiveAction: z.string().trim().max(1000).optional(),
-  });
-
-export type CompleteTodayTemperatureTaskInput = z.infer<
-  typeof completeTodayTemperatureTaskSchema
->;
-
 function jsDayToWeekday(
   day: number,
 ): z.infer<typeof taskTemplateWeekdaySchema> {
@@ -153,30 +133,6 @@ export function getWeekdayFromDate(
   return weekday;
 }
 
-/** `timeZone` is required: a scheduled time is a wall clock at the site. */
-export function computeTodayTaskStatus(params: {
-  date: string;
-  scheduledTime: string;
-  now: Date;
-  completedAt: string | null;
-  timeZone: string;
-}): TodayTaskStatus {
-  const { date, scheduledTime, now, completedAt, timeZone } = params;
-
-  if (completedAt) return "completed";
-
-  const nowDate = zonedDateString(now, timeZone);
-
-  if (date < nowDate) return "overdue";
-  if (date > nowDate) return "pending";
-
-  const nowMinutes = zonedMinutesOfDay(now, timeZone);
-  const scheduledMinutes = parseScheduledTimeToMinutes(scheduledTime);
-
-  if (nowMinutes > scheduledMinutes) return "overdue";
-  return "pending";
-}
-
 export function classifyTemperatureResult(params: {
   recordedC: number;
   minTempC: number;
@@ -186,54 +142,6 @@ export function classifyTemperatureResult(params: {
   return recordedC >= minTempC && recordedC <= maxTempC
     ? TEMPERATURE_RESULT.OK
     : TEMPERATURE_RESULT.OUT_OF_RANGE;
-}
-
-/** The template-scan builder predates task_occurrences and has no real occurrence to report — used only by the completion routes HACCP-16 removes. */
-export type LegacyTodayTaskItem = Omit<
-  TodayTaskItem,
-  "occurrenceId" | "recordState" | "dueAt"
->;
-
-export function buildTodayTaskItem(params: {
-  templateId: string;
-  title: string;
-  type: TodayTaskItem["type"];
-  equipmentId: string | null;
-  equipmentName: string | null;
-  minTempC?: number | null;
-  maxTempC?: number | null;
-  scheduledTime: TodayTaskItem["scheduledTime"];
-  date: TodayTaskItem["date"];
-  completedAt: string | null;
-  completedBy: z.infer<typeof userSummarySchema> | null;
-  now: Date;
-  timeZone: string;
-  temperatureReading?: TodayTaskItem["temperatureReading"];
-}): LegacyTodayTaskItem {
-  const timeSlot = deriveTimeSlotFromTime(params.scheduledTime);
-
-  return {
-    templateId: params.templateId,
-    title: params.title,
-    type: params.type,
-    equipmentId: params.equipmentId,
-    equipmentName: params.equipmentName,
-    minTempC: params.minTempC ?? null,
-    maxTempC: params.maxTempC ?? null,
-    scheduledTime: params.scheduledTime,
-    timeSlot,
-    date: params.date,
-    status: computeTodayTaskStatus({
-      date: params.date,
-      scheduledTime: params.scheduledTime,
-      now: params.now,
-      completedAt: params.completedAt,
-      timeZone: params.timeZone,
-    }),
-    completedAt: params.completedAt,
-    completedBy: params.completedBy,
-    temperatureReading: params.temperatureReading ?? null,
-  };
 }
 
 export type ActiveTaskRecordCandidate = {

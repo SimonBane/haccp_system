@@ -135,10 +135,7 @@ function buildPriorReadings(
 
     const previous = lastByEquipment.get(task.equipmentId);
     if (previous) {
-      priorByTaskKey.set(
-        `${task.templateId}:${task.scheduledTime}`,
-        previous,
-      );
+      priorByTaskKey.set(task.occurrenceId, previous);
     }
 
     if (task.temperatureReading) {
@@ -202,7 +199,7 @@ export function buildTodayTaskGroups(tasks: TodayTaskItem[]): TodayTaskGroups {
       isCompleted: task.completedAt !== null,
       isDeviation: isDeviation(task),
       priorReading:
-        priorReadings.get(`${task.templateId}:${task.scheduledTime}`) ?? null,
+        priorReadings.get(task.occurrenceId) ?? null,
     });
     byTime.set(task.scheduledTime, items);
   }

@@ -1,12 +1,6 @@
 import { bearerSecurity } from "../../core/openapi/responses.js";
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import {
-  completeTodayTemperatureTaskSchema,
-  completeTodayTaskSchema,
-  todayDateQuerySchema,
-  todayResponseSchema,
-  todayTaskItemSchema,
-} from "@haccp/shared";
+import { todayDateQuerySchema, todayResponseSchema } from "@haccp/shared";
 import {
   defineRouteHandler,
   errorResponse,
@@ -19,7 +13,6 @@ import {
   requireOrgContext,
 } from "../../lib/context.js";
 import type { AppEnv } from "../../types.js";
-import { todayCompletionService } from "./today-completion.service.js";
 import { todayService } from "./today.service.js";
 
 export const todayRoutes = new OpenAPIHono<AppEnv>();
@@ -40,81 +33,6 @@ const getTodayRoute = createRoute({
   },
 });
 
-const completeTaskRoute = createRoute({
-  method: "post",
-  path: "/complete",
-  tags: ["Today"],
-  security: bearerSecurity,
-  description:
-    "Mark a non-temperature task as complete. Any org member can complete tasks.",
-  request: {
-    body: {
-      content: {
-        "application/json": {
-          schema: completeTodayTaskSchema,
-        },
-      },
-    },
-  },
-  responses: {
-    200: jsonResponse(todayTaskItemSchema),
-    400: errorResponse("Validation error"),
-    401: errorResponse("Unauthorized"),
-    403: errorResponse("Forbidden"),
-    404: errorResponse("Not found"),
-  },
-});
-
-const completeTemperatureRoute = createRoute({
-  method: "post",
-  path: "/complete-temperature",
-  tags: ["Today"],
-  security: bearerSecurity,
-  description:
-    "Complete a temperature task with a reading. Any org member can complete tasks.",
-  request: {
-    body: {
-      content: {
-        "application/json": {
-          schema: completeTodayTemperatureTaskSchema,
-        },
-      },
-    },
-  },
-  responses: {
-    200: jsonResponse(todayTaskItemSchema),
-    400: errorResponse("Validation error"),
-    401: errorResponse("Unauthorized"),
-    403: errorResponse("Forbidden"),
-    404: errorResponse("Not found"),
-  },
-});
-
-const uncompleteTaskRoute = createRoute({
-  method: "post",
-  path: "/uncomplete",
-  tags: ["Today"],
-  security: bearerSecurity,
-  description:
-    "Remove a task completion. Any org member can uncomplete tasks.",
-  request: {
-    body: {
-      content: {
-        "application/json": {
-          schema: completeTodayTaskSchema,
-        },
-      },
-    },
-  },
-  responses: {
-    200: jsonResponse(todayTaskItemSchema),
-    400: errorResponse("Validation error"),
-    401: errorResponse("Unauthorized"),
-    403: errorResponse("Forbidden"),
-    404: errorResponse("Not found"),
-  },
-});
-
 todayRoutes.openapi(
   getTodayRoute,
   defineRouteHandler(getTodayRoute, async (c) => {
@@ -126,55 +44,6 @@ todayRoutes.openapi(
       locationId,
       date,
       user.id,
-      getCurrentOrganization(c).timezone,
-    );
-    return c.json(result, 200);
-  }),
-);
-
-todayRoutes.openapi(
-  completeTaskRoute,
-  defineRouteHandler(completeTaskRoute, async (c) => {
-    const { user } = requireOrgContext(c);
-    const { id: locationId } = getCurrentLocation(c);
-    const input = c.req.valid("json");
-    const result = await todayCompletionService.completeTask(
-      getDb(c),
-      locationId,
-      { id: user.id, firstName: user.firstName, lastName: user.lastName },
-      input,
-      getCurrentOrganization(c).timezone,
-    );
-    return c.json(result, 200);
-  }),
-);
-
-todayRoutes.openapi(
-  completeTemperatureRoute,
-  defineRouteHandler(completeTemperatureRoute, async (c) => {
-    const { user } = requireOrgContext(c);
-    const { id: locationId } = getCurrentLocation(c);
-    const input = c.req.valid("json");
-    const result = await todayCompletionService.completeTemperatureTask(
-      getDb(c),
-      locationId,
-      { id: user.id, firstName: user.firstName, lastName: user.lastName },
-      input,
-      getCurrentOrganization(c).timezone,
-    );
-    return c.json(result, 200);
-  }),
-);
-
-todayRoutes.openapi(
-  uncompleteTaskRoute,
-  defineRouteHandler(uncompleteTaskRoute, async (c) => {
-    const { id: locationId } = getCurrentLocation(c);
-    const input = c.req.valid("json");
-    const result = await todayCompletionService.uncompleteTask(
-      getDb(c),
-      locationId,
-      input,
       getCurrentOrganization(c).timezone,
     );
     return c.json(result, 200);
