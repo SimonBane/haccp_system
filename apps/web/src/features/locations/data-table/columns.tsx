@@ -34,6 +34,7 @@ export function getColumns({
     {
       id: "default",
       accessorKey: "isDefault",
+      enableSorting: false,
       meta: { view_label: t("columns.default") },
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title={t("columns.default")} />

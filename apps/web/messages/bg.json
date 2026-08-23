@@ -200,11 +200,12 @@
     },
     "pagination": {
       "rowsCount": "{current} от {total} ред(а)",
-      "rowsSelected": "{selected} от {total} ред(а) избрани.",
       "rowsPerPage": "Редове на страница",
       "pageCount": "Страница {current} от {total}",
       "previousPage": "Предишна страница",
-      "nextPage": "Следваща страница"
+      "nextPage": "Следваща страница",
+      "firstPage": "Първа страница",
+      "lastPage": "Последна страница"
     },
     "rowActions": {
       "more": "Действия за {name}"
@@ -213,6 +214,13 @@
       "title": "Списъкът не можа да се зареди",
       "description": "Проверете връзката си и опитайте отново.",
       "retry": "Опитай отново"
+    },
+    "filters": {
+      "filterBy": "Филтрирай по {name}",
+      "searchOptions": "Търсене в опциите",
+      "noOptions": "Няма съвпадащи опции.",
+      "clear": "Изчисти филтъра",
+      "clearAll": "Изчисти филтрите"
     }
   },
   "EquipmentPage": {
