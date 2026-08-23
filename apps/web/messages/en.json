@@ -200,11 +200,12 @@
     },
     "pagination": {
       "rowsCount": "{current} of {total} row(s)",
-      "rowsSelected": "{selected} of {total} row(s) selected.",
       "rowsPerPage": "Rows per page",
       "pageCount": "Page {current} of {total}",
       "previousPage": "Previous page",
-      "nextPage": "Next page"
+      "nextPage": "Next page",
+      "firstPage": "First page",
+      "lastPage": "Last page"
     },
     "rowActions": {
       "more": "Actions for {name}"
@@ -213,6 +214,13 @@
       "title": "Could not load this list",
       "description": "Check your connection and try again.",
       "retry": "Retry"
+    },
+    "filters": {
+      "filterBy": "Filter by {name}",
+      "searchOptions": "Search options",
+      "noOptions": "No matching options.",
+      "clear": "Clear filter",
+      "clearAll": "Clear filters"
     }
   },
   "EquipmentPage": {

@@ -16,41 +16,48 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { gridPageCount } from "@/components/ui/data-table/server-grid/grid-pagination";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { GRID_PAGE_SIZE_OPTIONS } from "@haccp/shared";
 
 interface DataTablePaginationProps<TData> {
   table: Table<TData>;
-  pageSizeOptions?: number[];
+  pageSizeOptions?: readonly number[];
   showSelectionCount?: boolean;
+  canNavigateForward?: boolean;
 }
 
 export function DataTablePagination<TData>({
   table,
-  pageSizeOptions = [10, 20, 25, 30, 40, 50],
+  pageSizeOptions = GRID_PAGE_SIZE_OPTIONS,
   showSelectionCount = false,
+  canNavigateForward = true,
 }: DataTablePaginationProps<TData>) {
   const t = useTranslations("DataTable.pagination");
   const isMobile = useIsMobile();
-  const totalRowsCount = table.getFilteredRowModel().rows.length;
+  const totalRowsCount = table.getRowCount();
   const currentPageRowsCount = table.getRowModel().rows.length;
   const pageSize = table.getState().pagination.pageSize;
   const selectedRowsCount = table.getFilteredSelectedRowModel().rows.length;
+  // Selecting rows swaps the count in place rather than adding a second phrase —
+  // "row(s)" never becomes "row(s) selected.".
+  const displayRowsCount =
+    showSelectionCount && selectedRowsCount > 0
+      ? selectedRowsCount
+      : currentPageRowsCount;
   const pageIndex = table.getState().pagination.pageIndex;
-  const pageCount = table.getPageCount();
+  const pageCount = gridPageCount(totalRowsCount, pageSize);
+  const canPreviousPage = table.getCanPreviousPage();
+  const canNextPage = table.getCanNextPage() && canNavigateForward;
 
   if (isMobile) {
     return (
       <div className="flex items-center justify-between gap-2 px-2">
         <span className="text-sm text-muted-foreground">
-          {showSelectionCount
-            ? t("rowsSelected", {
-                selected: selectedRowsCount,
-                total: totalRowsCount,
-              })
-            : t("rowsCount", {
-                current: currentPageRowsCount,
-                total: totalRowsCount,
-              })}
+          {t("rowsCount", {
+            current: displayRowsCount,
+            total: totalRowsCount,
+          })}
         </span>
         <div className="flex items-center gap-1">
           <Button
@@ -58,7 +65,7 @@ export function DataTablePagination<TData>({
             variant="outline"
             className="size-11 p-0"
             onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
+            disabled={!canPreviousPage}
             aria-label={t("previousPage")}
           >
             <ChevronLeftIcon className="size-4" />
@@ -74,7 +81,7 @@ export function DataTablePagination<TData>({
             variant="outline"
             className="size-11 p-0"
             onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
+            disabled={!canNextPage}
             aria-label={t("nextPage")}
             data-testid="data-table-next-page"
           >
@@ -89,15 +96,10 @@ export function DataTablePagination<TData>({
     <div className="flex flex-col justify-between gap-2 px-2 md:flex-row md:items-center">
       <div className="flex-1 text-sm text-muted-foreground">
         <span>
-          {showSelectionCount
-            ? t("rowsSelected", {
-                selected: selectedRowsCount,
-                total: totalRowsCount,
-              })
-            : t("rowsCount", {
-                current: currentPageRowsCount,
-                total: totalRowsCount,
-              })}
+          {t("rowsCount", {
+            current: displayRowsCount,
+            total: totalRowsCount,
+          })}
         </span>
       </div>
 
@@ -136,7 +138,8 @@ export function DataTablePagination<TData>({
             variant="outline"
             className="hidden h-8 w-8 p-0 lg:flex"
             onClick={() => table.setPageIndex(0)}
-            disabled={!table.getCanPreviousPage()}
+            disabled={!canPreviousPage}
+            aria-label={t("firstPage")}
           >
             <ChevronsLeftIcon className="h-4 w-4" />
           </Button>
@@ -145,7 +148,8 @@ export function DataTablePagination<TData>({
             variant="outline"
             className="h-8 w-8 p-0"
             onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
+            disabled={!canPreviousPage}
+            aria-label={t("previousPage")}
           >
             <ChevronLeftIcon className="h-4 w-4" />
           </Button>
@@ -154,7 +158,8 @@ export function DataTablePagination<TData>({
             variant="outline"
             className="h-8 w-8 p-0"
             onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
+            disabled={!canNextPage}
+            aria-label={t("nextPage")}
           >
             <ChevronRightIcon className="h-4 w-4" />
           </Button>
@@ -162,8 +167,9 @@ export function DataTablePagination<TData>({
             type="button"
             variant="outline"
             className="hidden h-8 w-8 p-0 lg:flex"
-            onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-            disabled={!table.getCanNextPage()}
+            onClick={() => table.setPageIndex(pageCount - 1)}
+            disabled={!canNextPage}
+            aria-label={t("lastPage")}
           >
             <ChevronsRightIcon className="h-4 w-4" />
           </Button>

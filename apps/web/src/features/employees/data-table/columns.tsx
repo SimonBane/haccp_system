@@ -67,6 +67,7 @@ export function getColumns({
               requiresLocationAssignments(row.role)
                 ? row.locations.map((location) => location.name).join(", ")
                 : t("allLocations"),
+            enableSorting: false,
             meta: { view_label: t("columns.locations") },
             header: ({ column }) => (
               <DataTableColumnHeader

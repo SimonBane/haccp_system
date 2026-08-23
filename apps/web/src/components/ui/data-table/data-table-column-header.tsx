@@ -1,5 +1,6 @@
 "use client";
 
+import { SORT_ORDER } from "@haccp/shared";
 import type { Column } from "@tanstack/react-table";
 import {
   ArrowDownIcon,
@@ -36,9 +37,9 @@ export function DataTableColumnHeader<TData, TValue>({
 
   const sortDirection = column.getIsSorted();
   const SortIcon =
-    sortDirection === "asc"
+    sortDirection === SORT_ORDER.ASC
       ? ArrowUpIcon
-      : sortDirection === "desc"
+      : sortDirection === SORT_ORDER.DESC
         ? ArrowDownIcon
         : ArrowUpDownIcon;
 
@@ -76,16 +77,16 @@ export function DataTableColumnHeader<TData, TValue>({
       <Button
         type="button"
         aria-label={
-          column.getIsSorted() === "desc"
+          column.getIsSorted() === SORT_ORDER.DESC
             ? "Sorted descending. Click to sort ascending."
-            : column.getIsSorted() === "asc"
+            : column.getIsSorted() === SORT_ORDER.ASC
               ? "Sorted ascending. Click to sort descending."
               : "Not sorted. Click to sort ascending."
         }
         variant="ghost"
         size="sm"
         className="-ml-3 h-8 cursor-pointer data-[state=open]:bg-accent"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        onClick={() => column.toggleSorting(column.getIsSorted() === SORT_ORDER.ASC)}
       >
         <span>{title}</span>
         <SortIcon
