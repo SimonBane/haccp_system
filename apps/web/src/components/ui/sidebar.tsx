@@ -87,7 +87,6 @@ function Sidebar({
   variant = "sidebar",
   className,
   children,
-  dir,
   mobileTitle,
   ...props
 }: React.ComponentProps<"div"> & {

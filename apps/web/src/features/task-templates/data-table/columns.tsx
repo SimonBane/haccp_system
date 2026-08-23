@@ -53,6 +53,7 @@ export function getColumns({
       id: "schedule",
       accessorFn: (row) =>
         formatScheduleSummary(row.weekdays, row.scheduledTimes, scheduleLabels),
+      enableSorting: false,
       meta: { view_label: t("columns.schedule") },
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title={t("columns.schedule")} />
