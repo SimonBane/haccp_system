@@ -23,10 +23,17 @@ import { DataTableCardList } from "@/components/ui/data-table/data-table-card-li
 import type { MobileListVariant } from "@/components/ui/data-table/data-table-mobile-list";
 import type { RowAction } from "@/components/ui/data-table/row-action";
 import { DataTableColumnHideButton } from "@/components/ui/data-table/data-table-column-hide-button";
+import {
+  DataTableFilterBar,
+  type DataTableFilterDefinition,
+} from "@/components/ui/data-table/data-table-filter";
 import { DataTablePagination } from "@/components/ui/data-table/data-table-pagination";
 import { DataTableSearch } from "@/components/ui/data-table/data-table-search";
 import { createSelectColumn } from "@/components/ui/data-table/data-table-select-column";
 import { DataTableViewOptions } from "@/components/ui/data-table/data-table-view-options";
+import { resolveGridTableMode } from "@/components/ui/data-table/server-grid/grid-mode";
+import type { DataTableServerConfig } from "@/components/ui/data-table/server-grid/types";
+import { useSearchCommitter } from "@/components/ui/data-table/server-grid/use-search-committer";
 import {
   Table,
   TableBody,
@@ -60,7 +67,7 @@ interface DataTableProps<TData, TValue> {
   searchPlaceholder?: string;
   enablePagination?: boolean;
   pageSize?: number;
-  pageSizeOptions?: number[];
+  pageSizeOptions?: readonly number[];
   enableColumnVisibility?: boolean;
   enableRowSelection?: boolean;
   showSelectionCount?: boolean;
@@ -70,6 +77,8 @@ interface DataTableProps<TData, TValue> {
   rowSelection?: RowSelectionState;
   onRowSelectionChange?: OnChangeFn<RowSelectionState>;
   initialSorting?: SortingState;
+  filters?: DataTableFilterDefinition[];
+  server?: DataTableServerConfig;
 }
 
 const TABLE_FILTER_FNS = {
@@ -124,10 +133,13 @@ export function DataTable<TData, TValue>({
   rowSelection: rowSelectionProp,
   onRowSelectionChange,
   initialSorting,
+  filters,
+  server,
 }: DataTableProps<TData, TValue>) {
   const t = useTranslations("DataTable.selection");
   const isMobile = useIsMobile();
   const useCardList = isMobile && Boolean(renderMobileRow);
+  const tableMode = resolveGridTableMode(server);
   const [sorting, setSorting] = React.useState<SortingState>(
     initialSorting ?? [],
   );
@@ -142,8 +154,12 @@ export function DataTable<TData, TValue>({
   const columnVisibility = columnVisibilityProp ?? internalColumnVisibility;
   const setColumnVisibility =
     onColumnVisibilityChange ?? setInternalColumnVisibility;
-  const rowSelection = rowSelectionProp ?? internalRowSelection;
-  const setRowSelection = onRowSelectionChange ?? setInternalRowSelection;
+  const rowSelection =
+    server?.rowSelection ?? rowSelectionProp ?? internalRowSelection;
+  const setRowSelection =
+    server?.onRowSelectionChange ??
+    onRowSelectionChange ??
+    setInternalRowSelection;
 
   // Ref so extending a shift-click range never rebuilds the memoised column list.
   const rangeAnchorRef = React.useRef<string | null>(null);
@@ -169,6 +185,8 @@ export function DataTable<TData, TValue>({
     }
   }, [enableSearch]);
 
+  // TanStack Table returns functions the React Compiler cannot safely memoize.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data,
     columns: tableColumns,
@@ -179,16 +197,23 @@ export function DataTable<TData, TValue>({
       },
     },
     state: {
-      ...(enablePagination
-        ? {}
-        : { pagination: { pageIndex: 0, pageSize: data.length } }),
-      sorting,
+      ...(server
+        ? { pagination: server.pagination }
+        : enablePagination
+          ? {}
+          : { pagination: { pageIndex: 0, pageSize: data.length } }),
+      sorting: server ? server.sorting : sorting,
       columnFilters,
       columnVisibility,
       rowSelection,
     },
     enableRowSelection,
-    onSortingChange: setSorting,
+    manualPagination: tableMode.manualPagination,
+    manualSorting: tableMode.manualSorting,
+    manualFiltering: tableMode.manualFiltering,
+    rowCount: tableMode.rowCount,
+    onPaginationChange: server?.onPaginationChange,
+    onSortingChange: server ? server.onSortingChange : setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
@@ -200,17 +225,84 @@ export function DataTable<TData, TValue>({
     defaultColumn: TABLE_DEFAULT_COLUMN,
   });
 
+  const [clientSearch, setClientSearch] = React.useState("");
+  const pushClientSearch = useSearchCommitter(
+    React.useCallback(
+      (value: string) => {
+        if (searchColumn) {
+          table.getColumn(searchColumn)?.setFilterValue(value);
+        }
+      },
+      [searchColumn, table],
+    ),
+  );
+
+  const handleClientSearch = React.useCallback(
+    (value: string) => {
+      setClientSearch(value);
+      pushClientSearch(value);
+    },
+    [pushClientSearch],
+  );
+
+  const searchValue = server ? server.search : clientSearch;
+  const onSearchChange = server ? server.onSearchChange : handleClientSearch;
+
+  const filterDefinitions = React.useMemo(() => filters ?? [], [filters]);
+  const clientFilterValues = React.useMemo(() => {
+    if (server) {
+      return server.filters;
+    }
+
+    return Object.fromEntries(
+      filterDefinitions.map((definition) => [
+        definition.key,
+        (table.getColumn(definition.key)?.getFilterValue() as string[]) ?? [],
+      ]),
+    );
+  }, [server, filterDefinitions, table]);
+
+  const handleFilterChange = React.useCallback(
+    (key: string, values: string[]) => {
+      if (server) {
+        server.onFilterChange(key, values);
+        return;
+      }
+
+      table
+        .getColumn(key)
+        ?.setFilterValue(values.length > 0 ? values : undefined);
+    },
+    [server, table],
+  );
+
+  const handleClearFilters = React.useCallback(() => {
+    if (server) {
+      server.onClearFilters();
+      return;
+    }
+
+    for (const definition of filterDefinitions) {
+      table.getColumn(definition.key)?.setFilterValue(undefined);
+    }
+  }, [server, filterDefinitions, table]);
+
   const visibleRows = table.getRowModel().rows;
-  const isFiltered = columnFilters.length > 0;
+  const isFiltered = server
+    ? server.hasActiveQuery
+    : columnFilters.length > 0;
   const displayEmptyMessage = isFiltered ? noResultsMessage : emptyMessage;
   const showColumnVisibility = enableColumnVisibility && !useCardList;
+  const showFilters = filterDefinitions.length > 0;
   const showInlineToolbar = Boolean(Toolbar) || Boolean(toolbar);
   const showToolbar =
     enableSearch ||
+    showFilters ||
     (showInlineToolbar && !useCardList) ||
     Boolean(Toolbar) ||
     showColumnVisibility;
   const shouldShowSelectionCount = showSelectionCount ?? enableRowSelection;
+  const isBusy = Boolean(server?.isFetching && server.isPlaceholderData);
 
   return (
     <div
@@ -218,6 +310,8 @@ export function DataTable<TData, TValue>({
         "flex min-h-0 flex-1 flex-col gap-3",
         classNameWrapper,
       )}
+      data-busy={isBusy ? "true" : undefined}
+      aria-busy={isBusy}
     >
       {showToolbar ? (
         <div className="shrink-0">
@@ -235,11 +329,19 @@ export function DataTable<TData, TValue>({
                   "sm:w-auto sm:flex-row sm:flex-wrap sm:items-center",
               )}
             >
-              {enableSearch && searchColumn ? (
+              {enableSearch && (server || searchColumn) ? (
                 <DataTableSearch
-                  table={table}
-                  column={searchColumn}
+                  value={searchValue}
+                  onValueChange={onSearchChange}
                   placeholder={searchPlaceholder ?? ""}
+                />
+              ) : null}
+              {showFilters ? (
+                <DataTableFilterBar
+                  definitions={filterDefinitions}
+                  values={clientFilterValues}
+                  onChange={handleFilterChange}
+                  onClearAll={handleClearFilters}
                 />
               ) : null}
               {showColumnVisibility ? (
@@ -266,12 +368,13 @@ export function DataTable<TData, TValue>({
           emptyMessage={displayEmptyMessage}
           emptyDescription={isFiltered ? undefined : emptyDescription}
           emptyAction={isFiltered ? undefined : emptyAction}
-          className={className}
+          className={cn(isBusy && "opacity-60 transition-opacity", className)}
         />
       ) : (
         <div
           className={cn(
             "min-h-0 overflow-auto rounded-md border bg-card shadow-xs",
+            isBusy && "opacity-60 transition-opacity",
             className,
           )}
         >
@@ -393,6 +496,7 @@ export function DataTable<TData, TValue>({
             table={table}
             pageSizeOptions={pageSizeOptions}
             showSelectionCount={shouldShowSelectionCount}
+            canNavigateForward={!server?.isPlaceholderData}
           />
         </div>
       ) : null}

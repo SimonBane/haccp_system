@@ -48,6 +48,7 @@ export function getColumns({
     {
       id: "range",
       accessorFn: (row) => row.minTempC,
+      enableSorting: false,
       meta: { view_label: t("columns.range") },
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title={t("columns.range")} />
@@ -58,12 +59,6 @@ export function getColumns({
           {formatTemp(row.original.maxTempC)}
         </span>
       ),
-      sortingFn: (rowA, rowB) => {
-        const a = rowA.original;
-        const b = rowB.original;
-        if (a.minTempC !== b.minTempC) return a.minTempC - b.minTempC;
-        return a.maxTempC - b.maxTempC;
-      },
     },
     {
       id: "actions",
