@@ -84,7 +84,6 @@ describe("records constants", () => {
     expect(RECORDS_TYPE_FILTER_VALUES).toEqual([
       "temperature",
       "cleaning",
-      "other",
     ]);
     expect(RECORDS_STATE_FILTER_VALUES).toEqual([
       "submitted",
