@@ -31,7 +31,6 @@ const LABELS = {
   typeOptions: {
     temperature: "Температура",
     cleaning: "Почистване",
-    other: "Друго",
   },
   stateOptions: {
     submitted: "Изпълнена",
@@ -260,7 +259,6 @@ describe("temperature-result filter visibility", () => {
     [[]],
     [["cleaning"]],
     [["temperature", "cleaning"]],
-    [["other"]],
   ])("stays hidden for %o", (values) => {
     expect(isTemperatureResultFilterVisible(values)).toBe(false);
   });
@@ -362,7 +360,6 @@ describe("filter definitions", () => {
     expect(definitions[0]!.options.map((option) => option.value)).toEqual([
       "temperature",
       "cleaning",
-      "other",
     ]);
     expect(definitions[1]!.options.map((option) => option.value)).toEqual([
       "submitted",
