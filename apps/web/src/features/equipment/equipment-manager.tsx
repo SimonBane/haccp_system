@@ -145,7 +145,7 @@ export function EquipmentManager({
   );
 
   return (
-    <div className="flex flex-1 flex-col gap-6">
+    <div className="flex min-h-0 flex-1 flex-col gap-6">
       <MobileHeaderAddAction label={t("add")} onClick={openCreateForm} />
 
       <PageHeader title={t("title")} description={t("description")} />

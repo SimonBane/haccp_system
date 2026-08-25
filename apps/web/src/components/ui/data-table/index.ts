@@ -1,10 +1,7 @@
 export { DataTable } from "@/components/ui/data-table/data-table";
 export { DataTableColumnHideButton } from "@/components/ui/data-table/data-table-column-hide-button";
 export { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
-export {
-  DataTableFilter,
-  DataTableFilterBar,
-} from "@/components/ui/data-table/data-table-filter";
+export { DataTableFilterBar } from "@/components/ui/data-table/data-table-filter";
 export { DataTablePagination } from "@/components/ui/data-table/data-table-pagination";
 export { DataTableSearch } from "@/components/ui/data-table/data-table-search";
 export { DataTableViewOptions } from "@/components/ui/data-table/data-table-view-options";

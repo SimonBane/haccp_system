@@ -56,13 +56,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       equipment: t("nav.equipment"),
       locations: t("nav.locations"),
       employees: t("nav.employees"),
+      records: t("nav.records"),
     }),
     [t],
   );
 
   const platformNav = useMemo(
-    () => toNavMainItems(getPlatformNavItems(pathname, navLabels)),
-    [navLabels, pathname],
+    () => toNavMainItems(getPlatformNavItems(pathname, navLabels, isAdmin)),
+    [isAdmin, navLabels, pathname],
   );
 
   const adminNav = useMemo(

@@ -62,6 +62,7 @@ interface DataTableProps<TData, TValue> {
   truncateCellValue?: boolean;
   Toolbar?: ({ table }: { table: ReactTable<TData> }) => React.ReactNode;
   toolbar?: React.ReactNode;
+  toolbarStart?: React.ReactNode;
   enableSearch?: boolean;
   searchColumn?: string;
   searchPlaceholder?: string;
@@ -118,6 +119,7 @@ export function DataTable<TData, TValue>({
   truncateCellValue = true,
   Toolbar,
   toolbar,
+  toolbarStart,
   enableSearch = false,
   searchColumn,
   searchPlaceholder,
@@ -212,7 +214,10 @@ export function DataTable<TData, TValue>({
     manualSorting: tableMode.manualSorting,
     manualFiltering: tableMode.manualFiltering,
     rowCount: tableMode.rowCount,
-    onPaginationChange: server?.onPaginationChange,
+    // Omitted entirely in client mode: an explicit `undefined` here would still
+    // override TanStack's own internal pagination-state updater (options are
+    // merged with a plain spread), turning nextPage()/setPageIndex() into no-ops.
+    ...(server ? { onPaginationChange: server.onPaginationChange } : {}),
     onSortingChange: server ? server.onSortingChange : setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
@@ -296,6 +301,7 @@ export function DataTable<TData, TValue>({
   const showFilters = filterDefinitions.length > 0;
   const showInlineToolbar = Boolean(Toolbar) || Boolean(toolbar);
   const showToolbar =
+    Boolean(toolbarStart) ||
     enableSearch ||
     showFilters ||
     (showInlineToolbar && !useCardList) ||
@@ -329,6 +335,7 @@ export function DataTable<TData, TValue>({
                   "sm:w-auto sm:flex-row sm:flex-wrap sm:items-center",
               )}
             >
+              {toolbarStart}
               {enableSearch && (server || searchColumn) ? (
                 <DataTableSearch
                   value={searchValue}

@@ -216,10 +216,9 @@
       "retry": "Retry"
     },
     "filters": {
-      "filterBy": "Filter by {name}",
+      "label": "Filter",
       "searchOptions": "Search options",
       "noOptions": "No matching options.",
-      "clear": "Clear filter",
       "clearAll": "Clear filters"
     }
   },
@@ -289,6 +288,90 @@
       "fridge": "Fridge",
       "freezer": "Freezer",
       "displayCase": "Display case"
+    }
+  },
+  "RecordsPage": {
+    "title": "Records",
+    "description": "Historical checks for the selected location and date range.",
+    "printReport": "Print report",
+    "locationContext": "Location: {location}",
+    "emptyRange": "No completed, voided or overdue work in this date range.",
+    "emptyFiltered": "No records match the selected filters.",
+    "viewDetails": "View details",
+    "columns": {
+      "dateTime": "Date/time",
+      "task": "Task/monitoring point",
+      "status": "Status",
+      "timing": "Timing",
+      "reading": "Reading",
+      "outcome": "Outcome"
+    },
+    "filters": {
+      "type": "Type",
+      "state": "Status",
+      "result": "Temperature result"
+    },
+    "types": {
+      "temperature": "Temperature",
+      "cleaning": "Cleaning",
+      "other": "Other"
+    },
+    "displayState": {
+      "submitted": "Submitted",
+      "missed": "Missed",
+      "voided": "Voided"
+    },
+    "recordState": {
+      "none": "No record",
+      "submitted": "Record submitted",
+      "voided": "Record voided"
+    },
+    "timing": {
+      "notSubmitted": "Not submitted",
+      "onTime": "On time",
+      "late": "Late"
+    },
+    "result": {
+      "pass": "Within range",
+      "fail": "Out of range",
+      "notEvaluated": "No temperature reading"
+    },
+    "dateRange": {
+      "label": "Date range",
+      "incomplete": "Select an end date.",
+      "cancel": "Cancel",
+      "apply": "Apply",
+      "presets": {
+        "last7": "Last 7 days",
+        "last30": "Last 30 days",
+        "last60": "Last 60 days",
+        "last90": "Last 90 days",
+        "thisMonth": "This month",
+        "previousMonth": "Previous month"
+      },
+      "error": {
+        "invalid": "Enter a valid date.",
+        "order": "The start date must be on or before the end date.",
+        "future": "Future dates are not available."
+      }
+    },
+    "detail": {
+      "close": "Close",
+      "scheduled": "Scheduled",
+      "due": "Due",
+      "type": "Type",
+      "monitoringPoint": "Monitoring point",
+      "displayState": "Status",
+      "recordState": "Record",
+      "timing": "Timing",
+      "result": "Temperature result",
+      "reading": "Reading",
+      "permittedRange": "Permitted range",
+      "correctiveAction": "Corrective action",
+      "createdBy": "First created",
+      "recordedBy": "Current record",
+      "voidedBy": "Voided",
+      "recordedTime": "Recorded time"
     }
   },
   "TasksPage": {
@@ -399,7 +482,8 @@
       "tasks": "Tasks",
       "equipment": "Cold storage",
       "locations": "Locations",
-      "employees": "Employees"
+      "employees": "Employees",
+      "records": "Records"
     },
     "userMenu": {
       "account": "Account",

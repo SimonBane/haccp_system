@@ -41,7 +41,7 @@ export async function apiContext(page: Page): Promise<APIRequestContext> {
 
 export async function json<T>(
   api: APIRequestContext,
-  method: "get" | "post" | "patch" | "delete",
+  method: "get" | "post" | "put" | "patch" | "delete",
   path: string,
   body?: unknown,
 ): Promise<T> {

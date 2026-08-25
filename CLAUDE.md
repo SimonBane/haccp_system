@@ -136,7 +136,7 @@ UI hooks (`use-mobile`, `use-now`).
   pair every input with a label and inline validation.
 - **i18n**: `next-intl`, locales `bg` (default) and `en`, `localePrefix: "as-needed"`, routes
   under `src/app/[locale]/`. **Any user-facing string must be added to both `messages/en.json`
-  and `messages/bg.json`** — currently at exact key parity (438 each). Pages call
+  and `messages/bg.json`** — currently at exact key parity (516 each). Pages call
   `setRequestLocale(locale)` before rendering; middleware is `src/proxy.ts` (Clerk + intl), not
   `middleware.ts`.
 

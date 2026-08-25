@@ -4,12 +4,14 @@ import {
   employeeListResponseSchema,
   equipmentListResponseSchema,
   locationListResponseSchema,
+  recordsListResponseSchema,
   taskTemplateListResponseSchema,
   tenantContextResponseSchema,
   todayResponseSchema,
   type EmployeeListResponse,
   type EquipmentListResponse,
   type LocationListResponse,
+  type RecordsListResponse,
   type TaskTemplateListResponse,
   type TenantContextResponse,
   type TodayResponse,
@@ -109,5 +111,16 @@ export async function getToday(
   return fetchJson(
     `${locationScopedPath(locationId, "today")}?date=${encodeURIComponent(date)}`,
     todayResponseSchema,
+  );
+}
+
+/** `query` is built by the Records feature so SSR and the grid controller agree byte for byte. */
+export async function getRecordsPage(
+  locationId: string,
+  query: string,
+): Promise<RecordsListResponse> {
+  return fetchJson(
+    `${locationScopedPath(locationId, "records")}?${query}`,
+    recordsListResponseSchema,
   );
 }
