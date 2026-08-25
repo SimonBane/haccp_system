@@ -5,7 +5,6 @@ import type { Row } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
 import { MobileListRow } from "@/components/ui/data-table/data-table-mobile-list";
 import {
-  EM_DASH,
   formatOccurrenceDate,
   formatTemperatureValue,
   hasTemperatureOutcome,
@@ -39,9 +38,11 @@ export function RecordsMobileCard({
       title={item.title}
       subtitle={item.equipmentName ?? labels.type[item.type]}
       trailing={
-        <span className="tabular-nums">
-          {reading === null ? EM_DASH : formatTemperatureValue(reading, locale)}
-        </span>
+        reading === null ? null : (
+          <span className="tabular-nums">
+            {formatTemperatureValue(reading, locale)}
+          </span>
+        )
       }
       details={
         <div className="flex flex-wrap items-center gap-1.5">

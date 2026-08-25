@@ -74,7 +74,7 @@ export function getColumns({
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title={t("columns.equipment")} />
       ),
-      cell: ({ row }) => row.original.equipmentName ?? "—",
+      cell: ({ row }) => row.original.equipmentName,
     },
     {
       id: "actions",

@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 import {
-  EM_DASH,
   formatOccurrenceDate,
   formatTemperatureValue,
   hasTemperatureOutcome,
@@ -105,9 +104,7 @@ export function getRecordsColumns({
           <Badge variant={RECORD_TIMING_VARIANT[timing]}>
             {labels.timing[timing]}
           </Badge>
-        ) : (
-          <span>{EM_DASH}</span>
-        );
+        ) : null;
       },
     },
     {
@@ -118,11 +115,11 @@ export function getRecordsColumns({
       cell: ({ row }) => {
         const reading = recordReading(row.original);
 
+        if (reading === null) return null;
+
         return (
           <span className="tabular-nums">
-            {reading === null
-              ? EM_DASH
-              : formatTemperatureValue(reading, locale)}
+            {formatTemperatureValue(reading, locale)}
           </span>
         );
       },
@@ -137,9 +134,7 @@ export function getRecordsColumns({
           <Badge variant={RECORD_RESULT_VARIANT[row.original.result]}>
             {labels.result[row.original.result]}
           </Badge>
-        ) : (
-          <span>{EM_DASH}</span>
-        ),
+        ) : null,
     },
     {
       id: "actions",
