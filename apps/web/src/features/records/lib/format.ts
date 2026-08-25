@@ -67,7 +67,7 @@ export function recordReading(item: RecordItem): number | null {
   return item.record?.temperature?.recordedC ?? null;
 }
 
-/** Non-temperature rows have no outcome to report — they show an em dash, not a badge. */
+/** Non-temperature rows have no temperature outcome to report in the grid. */
 export function hasTemperatureOutcome(item: RecordItem): boolean {
   return item.type === "temperature";
 }

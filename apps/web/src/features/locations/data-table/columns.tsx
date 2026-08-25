@@ -42,9 +42,7 @@ export function getColumns({
       cell: ({ row }) =>
         row.original.isDefault ? (
           <Badge variant="secondary">{t("status.default")}</Badge>
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        ),
+        ) : null,
       sortingFn: (rowA, rowB) =>
         Number(rowB.original.isDefault) - Number(rowA.original.isDefault),
     },
