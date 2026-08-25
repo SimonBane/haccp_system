@@ -35,27 +35,39 @@ import {
 } from "./types";
 import { useSearchCommitter } from "./use-search-committer";
 
-export type ServerGridFetcher<TItem> = (args: {
+export type ServerGridFetcher<TPage> = (args: {
   request: GridRequest;
   queryString: string;
   signal: AbortSignal;
-}) => Promise<GridPage<TItem>>;
+}) => Promise<TPage>;
 
-export type UseServerDataGridOptions<TItem> = {
+export type UseServerDataGridOptions<
+  TItem,
+  TPage extends GridPage<TItem> = GridPage<TItem>,
+> = {
   scopeKey: string;
   queryKeyRoot: readonly unknown[];
-  fetcher: ServerGridFetcher<TItem>;
+  fetcher: ServerGridFetcher<TPage>;
   getRowId: (item: TItem) => string;
   defaultSort?: GridDefaultSort;
   defaultPageSize?: number;
   capabilities?: Partial<GridCapabilities>;
-  initialPage?: GridPage<TItem>;
+  initialPage?: TPage;
   initialScopeKey?: string;
 };
 
-export type ServerDataGrid<TItem> = {
+export type ServerDataGrid<
+  TItem,
+  TPage extends GridPage<TItem> = GridPage<TItem>,
+> = {
   items: TItem[];
   total: number;
+  /**
+   * The whole parsed page for the request currently on screen, so a response type
+   * that extends `GridPage` keeps its extra metadata without a second query. It is
+   * `undefined` until the first response for this scope arrives.
+   */
+  page: TPage | undefined;
   isLoading: boolean;
   isError: boolean;
   isFetching: boolean;
@@ -68,9 +80,12 @@ export type ServerDataGrid<TItem> = {
   clearSelection: () => void;
 };
 
-export function useServerDataGrid<TItem>(
-  options: UseServerDataGridOptions<TItem>,
-): ServerDataGrid<TItem> {
+export function useServerDataGrid<
+  TItem,
+  TPage extends GridPage<TItem> = GridPage<TItem>,
+>(
+  options: UseServerDataGridOptions<TItem, TPage>,
+): ServerDataGrid<TItem, TPage> {
   const capabilities = useMemo(
     () => resolveGridCapabilities(options.capabilities),
     [options.capabilities],
@@ -302,6 +317,7 @@ export function useServerDataGrid<TItem>(
   return {
     items,
     total,
+    page: query.data,
     isLoading: query.isLoading,
     isError: query.isError,
     isFetching: query.isFetching,

@@ -74,19 +74,31 @@ export function createGridFilterSchema<const TValues extends readonly [string, .
 
 export type GridFilterSchemas = Record<string, z.ZodType>;
 
+/** `search: false` removes the key, so a strict grid query rejects it as unknown. */
+type GridSearchShape<TSearch extends boolean> = [TSearch] extends [false]
+  ? Record<never, never>
+  : { search: typeof searchSchema };
+
 export function createGridQuerySchema<
   const TSortFields extends readonly [string, ...string[]],
   TFilters extends GridFilterSchemas = Record<never, never>,
->(options: { sortFields: TSortFields; filters?: TFilters }) {
+  TSearch extends boolean = true,
+>(options: { sortFields: TSortFields; filters?: TFilters; search?: TSearch }) {
+  const shape = {
+    page: pageNumberSchema,
+    pageSize: pageSizeSchema,
+    sortBy: z.enum(options.sortFields).optional(),
+    sortOrder: sortOrderSchema.default(SORT_ORDER.ASC),
+    ...((options.filters ?? {}) as TFilters),
+  };
+
   return z
-    .strictObject({
-      page: pageNumberSchema,
-      pageSize: pageSizeSchema,
-      search: searchSchema,
-      sortBy: z.enum(options.sortFields).optional(),
-      sortOrder: sortOrderSchema.default(SORT_ORDER.ASC),
-      ...((options.filters ?? {}) as TFilters),
-    })
+    .strictObject(
+      (options.search === false
+        ? shape
+        : { ...shape, search: searchSchema }) as typeof shape &
+        GridSearchShape<TSearch>,
+    )
     .check((ctx) => {
       const { page, pageSize } = ctx.value as {
         page?: number;

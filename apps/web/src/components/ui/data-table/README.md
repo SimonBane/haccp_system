@@ -7,9 +7,9 @@ One `DataTable`, two execution modes.
   templates, employees, locations) uses today, unchanged.
 - **Server mode** — the component receives one page plus the server `total`, and
   TanStack is told not to process it again (`manualPagination`, `manualSorting`,
-  `manualFiltering`, `rowCount`). This mode is a reusable harness only: no current
-  page passes server config, so it is dormant until a follow-up task connects it to
-  a real endpoint.
+  `manualFiltering`, `rowCount`). Records (`features/records`) is the first
+  production adoption; everything below still describes the generic harness, not
+  Records rules.
 
 Both modes render the same toolbar, search box, sort headers, desktop table, mobile
 card list, pagination, selection and column visibility. There is no second grid
@@ -33,11 +33,10 @@ inventing a parallel `ServerDataTable`.
 `searchColumn` names the column the search box filters. Everything else is default
 TanStack behaviour, exactly as before this harness existed.
 
-## Server mode (illustrative — not wired to any endpoint)
+## Server mode
 
-The example below is hypothetical. There is no `widgets` resource, route,
-repository or `useWidgetsGrid` hook in this codebase — it exists only to show how
-a future feature would plug into the harness.
+The `widgets` example below is illustrative — there is no such resource in this
+codebase. For the real thing, read `features/records`.
 
 ```tsx
 const grid = useWidgetsGrid({ initialPage, initialLocationId });
@@ -59,10 +58,34 @@ const grid = useWidgetsGrid({ initialPage, initialLocationId });
 sorting, search, filter and selection state plus the server `rowCount`. Passing it
 is what switches `DataTable` into server mode.
 
-## Adopting server mode for a real grid (future work)
+## Response metadata beyond `items` and `total`
 
-None of the following exists yet. This is the checklist a follow-up task should
-work through to connect one production grid to server-side paging.
+`useServerDataGrid` is parameterized by the page type as well as the item type:
+
+```ts
+useServerDataGrid<RecordItem, RecordsListResponse>({/* … */});
+```
+
+`TPage` defaults to `GridPage<TItem>`, so a grid whose endpoint returns exactly
+`{ items, total }` passes nothing extra and behaves as before. When the response
+type _extends_ `GridPage` with extra fields (an unfiltered count, a summary, ...),
+the whole parsed page is exposed as `grid.page`:
+
+```ts
+const extra = grid.page?.someExtraField;
+```
+
+`items` and `total` remain the convenience fields and are unchanged. `grid.page`
+follows the same query as the rows, so it can never disagree with them, and it is
+`undefined` outside the current scope — placeholder data is refused across a scope
+change (`sameGridScope`), which is what keeps one location's or date range's
+metadata from surfacing under another. Recovering extra metadata with a second
+query, a callback or a side channel is what this seam exists to avoid.
+
+## Adopting server mode for a real grid
+
+`features/records` works through this checklist end to end; use it as the worked
+example.
 
 ### 1. Shared schema
 
@@ -89,8 +112,7 @@ outside the allowlist are all validation failures the endpoint must reject.
 
 ### 2. Repository, route and service
 
-None of this exists today — no route accepts `page`/`pageSize`/`sortBy`, no
-repository builds a SQL count alongside the page query. Building it means:
+`apps/api/src/modules/records` is the reference. Building one means:
 
 - one shared predicate for the page query and the count query, so `total` can never
   disagree with the rows;
@@ -163,10 +185,11 @@ feature should not re-decide:
 
 ### 5. Server render
 
-A future SSR page would fetch the same default request the controller builds (page
-1, the resource's default sort, no search/filters) and pass the whole `GridPage` —
-not just `items` — as `initialPage`, so the client's first request can seed from it
-instead of discarding it on hydration.
+The SSR page fetches the same default request the controller builds (page 1, the
+resource's default sort, no search/filters) and passes the whole `GridPage` — not
+just `items` — as `initialPage`, so the first client render seeds from it instead of
+discarding it on hydration. Records shares one `defaultRecordsGridRequest()` between
+the page and the controller so the two requests are byte-identical.
 
 ### 6. Columns
 
@@ -180,7 +203,13 @@ Each capability is opt-in per grid: `search`, `sorting`, `pagination`, `filterin
 `selection`, `columnVisibility`. A disabled capability contributes nothing to the
 request, so it cannot change the cache key either.
 
-### 8. Filters
+### 8. Search
+
+`createGridQuerySchema({ …, search: false })` drops the `search` key from the
+strict query object, so a grid with the `search` capability disabled rejects the
+parameter as unknown rather than silently accepting it.
+
+### 9. Filters
 
 Filters are declarative. A definition supplies the API key, a translated label and
 the canonical option values:
@@ -201,7 +230,7 @@ serializes them as one comma-separated parameter per key. Client mode applies th
 same definitions through TanStack column filters. Every new generic string belongs in
 both `messages/en.json` and `messages/bg.json`.
 
-### 9. Selection
+### 10. Selection
 
 Selection is deliberately page-scoped. Row ids must be stable (`getRowId`), the
 header checkbox selects only the visible page, and the controller drops the whole
@@ -209,7 +238,7 @@ selection on a page, page-size, search, filter, sorting or scope change — and 
 refetch that removes a selected row. Bulk actions would read `grid.selectedIds`,
 which is already intersected with the rendered page.
 
-### 10. Tests
+### 11. Tests
 
 - Pure controller logic — request building, filter serialization, the reducer, the
   debounce, clamping — belongs in the Node Vitest suites next to these files. No DOM
@@ -219,8 +248,12 @@ which is already intersected with the rendered page.
 - Journeys that only a browser can prove (page transitions, scope switches, selection
   clearing) belong in the Playwright smoke suite.
 
-None of these adoption tests exist yet, because no grid has adopted server mode.
-This harness's own tests (below) cover only the dormant, generic behaviour.
+Records carries all three layers: `packages/shared/src/schemas/records.test.ts`
+and `apps/api/src/modules/records/*.test.ts` for the contract and query
+composition, `apps/api/tests/integration/records.integration.test.ts` for the
+endpoint, `apps/web/src/features/records/lib/*.test.ts` for the feature's own
+composition, and `e2e/tests/records/` for the browser journey. The metadata seam's
+own generic coverage is in `server-grid/grid-metadata.test.ts`.
 
 ## Reference
 
@@ -235,5 +268,5 @@ This harness's own tests (below) cover only the dormant, generic behaviour.
 | State machine | `server-grid/grid-reducer.ts` |
 | Search debounce | `server-grid/grid-search.ts`, `server-grid/use-search-committer.ts` |
 | Client/server mode derivation | `server-grid/grid-mode.ts` |
-| Controller | `server-grid/use-server-data-grid.ts` |
+| Controller and the `page` metadata seam | `server-grid/use-server-data-grid.ts` |
 | Filter controls | `data-table-filter.tsx` |

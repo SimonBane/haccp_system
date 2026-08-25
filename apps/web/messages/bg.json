@@ -216,10 +216,9 @@
       "retry": "Опитай отново"
     },
     "filters": {
-      "filterBy": "Филтрирай по {name}",
+      "label": "Филтър",
       "searchOptions": "Търсене в опциите",
       "noOptions": "Няма съвпадащи опции.",
-      "clear": "Изчисти филтъра",
       "clearAll": "Изчисти филтрите"
     }
   },
@@ -289,6 +288,90 @@
       "fridge": "Хладилник",
       "freezer": "Фризер",
       "displayCase": "Витрина"
+    }
+  },
+  "RecordsPage": {
+    "title": "Записи",
+    "description": "Историческите проверки за избрания обект и период.",
+    "printReport": "Печат на отчет",
+    "locationContext": "Обект: {location}",
+    "emptyRange": "Няма изпълнена, анулирана или просрочена работа в този период.",
+    "emptyFiltered": "Няма записи, отговарящи на избраните филтри.",
+    "viewDetails": "Виж детайли",
+    "columns": {
+      "dateTime": "Дата/час",
+      "task": "Задача/точка за контрол",
+      "status": "Статус",
+      "timing": "Навременност",
+      "reading": "Отчет",
+      "outcome": "Резултат"
+    },
+    "filters": {
+      "type": "Вид",
+      "state": "Статус",
+      "result": "Температурен резултат"
+    },
+    "types": {
+      "temperature": "Температура",
+      "cleaning": "Почистване",
+      "other": "Друго"
+    },
+    "displayState": {
+      "submitted": "Изпълнена",
+      "missed": "Пропусната",
+      "voided": "Анулирана"
+    },
+    "recordState": {
+      "none": "Няма запис",
+      "submitted": "Подаден запис",
+      "voided": "Анулиран запис"
+    },
+    "timing": {
+      "notSubmitted": "Няма подаване",
+      "onTime": "Навреме",
+      "late": "Със закъснение"
+    },
+    "result": {
+      "pass": "В диапазона",
+      "fail": "Извън диапазона",
+      "notEvaluated": "Няма измерена температура"
+    },
+    "dateRange": {
+      "label": "Период",
+      "incomplete": "Изберете крайна дата.",
+      "cancel": "Отказ",
+      "apply": "Приложи",
+      "presets": {
+        "last7": "Последните 7 дни",
+        "last30": "Последните 30 дни",
+        "last60": "Последните 60 дни",
+        "last90": "Последните 90 дни",
+        "thisMonth": "Този месец",
+        "previousMonth": "Предходния месец"
+      },
+      "error": {
+        "invalid": "Въведете валидна дата.",
+        "order": "Началната дата трябва да е преди или на крайната дата.",
+        "future": "Бъдещи дати не са налични."
+      }
+    },
+    "detail": {
+      "close": "Затвори",
+      "scheduled": "Планирано",
+      "due": "Краен срок",
+      "type": "Вид",
+      "monitoringPoint": "Точка за контрол",
+      "displayState": "Статус",
+      "recordState": "Запис",
+      "timing": "Навременност",
+      "result": "Температурен резултат",
+      "reading": "Отчет",
+      "permittedRange": "Допустим диапазон",
+      "correctiveAction": "Коригиращо действие",
+      "createdBy": "Първоначално създаден",
+      "recordedBy": "Текущ запис",
+      "voidedBy": "Анулиран",
+      "recordedTime": "Час на записа"
     }
   },
   "TasksPage": {
@@ -399,7 +482,8 @@
       "tasks": "Задачи",
       "equipment": "Хладилна техника",
       "locations": "Локации",
-      "employees": "Служители"
+      "employees": "Служители",
+      "records": "Записи"
     },
     "userMenu": {
       "account": "Акаунт",
