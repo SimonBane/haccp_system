@@ -1,6 +1,7 @@
 import {
   Building2Icon,
   CalendarDaysIcon,
+  ClipboardListIcon,
   ListChecksIcon,
   ThermometerSnowflakeIcon,
   type LucideIcon,
@@ -28,11 +29,13 @@ type NavLabels = {
   equipment: string;
   locations: string;
   employees: string;
+  records: string;
 };
 
 export function getPlatformNavItems(
   pathname: string,
-  labels: Pick<NavLabels, "today">,
+  labels: Pick<NavLabels, "today" | "records">,
+  isAdmin: boolean,
 ): NavItem[] {
   return [
     {
@@ -41,6 +44,16 @@ export function getPlatformNavItems(
       icon: CalendarDaysIcon,
       isActive: pathname === "/dashboard",
     },
+    ...(isAdmin
+      ? [
+          {
+            title: labels.records,
+            url: "/dashboard/records",
+            icon: ClipboardListIcon,
+            isActive: pathname.startsWith("/dashboard/records"),
+          },
+        ]
+      : []),
   ];
 }
 

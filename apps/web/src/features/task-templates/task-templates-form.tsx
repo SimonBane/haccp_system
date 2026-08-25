@@ -68,9 +68,6 @@ import { ScheduledTimeRow } from "@/features/task-templates/components/scheduled
 import { WeekdayMultiSelect } from "@/features/task-templates/components/weekday-multi-select";
 import { cn } from "@/lib/utils";
 
-
-
-
 const TASK_TEMPLATES_FORM_ID = "task-templates-form";
 
 const SCHEDULED_TIME_SLOT_CLASS =
@@ -85,9 +82,6 @@ type TaskTemplatesFormProps = {
   equipment: Pick<EquipmentResponse, "id" | "name">[];
   onSubmit: (values: TaskTemplateFieldsInput) => Promise<void>;
 };
-
-
-
 
 export function TaskTemplatesForm({
   open,

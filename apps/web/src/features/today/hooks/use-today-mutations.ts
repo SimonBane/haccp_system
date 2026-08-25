@@ -46,6 +46,11 @@ export function useTodayMutations(currentUserId: string) {
   function settle(context: OptimisticContext | undefined) {
     if (!context) return;
     void queryClient.invalidateQueries({ queryKey: context.key });
+    // The whole location-scoped Records family: any cached range, page or filter
+    // variant may now hold a stale row for this occurrence.
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.records(locationId),
+    });
   }
 
   const createRecord = useMutation({

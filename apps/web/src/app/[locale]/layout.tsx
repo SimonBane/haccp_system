@@ -89,7 +89,7 @@ export default async function LocaleLayout({
         <ServiceWorkerRegistration />
         <QueryProvider>
           <TooltipProvider>
-            <div className="flex min-h-dvh flex-col bg-background">
+            <div className="flex h-dvh flex-col overflow-hidden bg-background">
               {children}
             </div>
             <Toaster position="bottom-right" />
