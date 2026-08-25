@@ -213,3 +213,45 @@ describe("page response", () => {
     ).toBe(true);
   });
 });
+
+describe("createGridQuerySchema search seam", () => {
+  const searchless = createGridQuerySchema({
+    sortFields: ["name"] as const,
+    search: false,
+  });
+
+  it("rejects search as an unknown parameter when the grid has no search", () => {
+    expect(searchless.safeParse({ search: "x" }).success).toBe(false);
+    expect(searchless.safeParse({ search: "" }).success).toBe(false);
+  });
+
+  it("leaves every other generic behaviour untouched", () => {
+    const parsed = searchless.parse({
+      page: "2",
+      pageSize: "50",
+      sortBy: "name",
+      sortOrder: "desc",
+    });
+
+    expect(parsed).toEqual({
+      page: 2,
+      pageSize: 50,
+      sortBy: "name",
+      sortOrder: "desc",
+    });
+    expect(searchless.safeParse({ page: "2" }).success).toBe(false);
+    expect(searchless.safeParse({ bogus: "1" }).success).toBe(false);
+  });
+
+  it("keeps search for grids that do not opt out", () => {
+    expect(parse({ search: "fridge" }).data).toMatchObject({
+      search: "fridge",
+    });
+    expect(
+      createGridQuerySchema({
+        sortFields: ["name"] as const,
+        search: true,
+      }).safeParse({ search: "fridge" }).success,
+    ).toBe(true);
+  });
+});

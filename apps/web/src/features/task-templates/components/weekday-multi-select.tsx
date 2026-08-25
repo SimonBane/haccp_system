@@ -46,7 +46,7 @@ export function WeekdayMultiSelect({
   invalid = false,
   placeholder,
   emptyMessage,
-  maxVisibleChips = 5,
+  maxVisibleChips = 7,
   moreSelectedLabel,
   overflowRemoveLabel,
   selectOnly = false,

@@ -12,6 +12,7 @@ import { equipmentRoutes } from "../modules/equipment/equipment.routes.js";
 import { healthRoutes } from "../modules/health/health.routes.js";
 import { locationRoutes } from "../modules/locations/location.routes.js";
 import { organizationRoutes } from "../modules/organizations/organization.routes.js";
+import { recordsRoutes } from "../modules/records/records.routes.js";
 import { taskOccurrenceRoutes } from "../modules/task-occurrences/task-occurrence.routes.js";
 import { taskRecordRoutes } from "../modules/task-records/task-record.routes.js";
 import { taskTemplateRoutes } from "../modules/task-templates/task-template.routes.js";
@@ -83,6 +84,7 @@ mountLocationScoped(
   taskTemplateRoutes,
   true,
 );
+mountLocationScoped("/locations/:locationId/records", recordsRoutes, true);
 mountLocationScoped("/locations/:locationId/today", todayRoutes, false);
 mountLocationScoped(
   "/locations/:locationId/today/occurrences",

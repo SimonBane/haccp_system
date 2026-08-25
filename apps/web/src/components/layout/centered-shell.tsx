@@ -11,7 +11,7 @@ export function CenteredShell({
   return (
     <main
       className={cn(
-        "flex min-h-dvh w-full flex-1 items-center justify-center px-6 py-16",
+        "flex min-h-full w-full flex-1 items-center justify-center overflow-y-auto px-6 py-16",
         className,
       )}
     >

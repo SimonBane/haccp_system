@@ -27,7 +27,7 @@ export function PageContainer({
     <div
       className={cn(
         pageWidthVariants({ width }),
-        "flex min-w-0 flex-1 flex-col gap-6 pt-4 pb-16 md:pt-6",
+        "flex min-h-0 min-w-0 flex-1 flex-col gap-6 pt-4 pb-16 md:pt-6",
         className,
       )}
     >
