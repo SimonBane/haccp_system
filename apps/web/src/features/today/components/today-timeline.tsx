@@ -17,7 +17,6 @@ type Props = {
   scrollKey: string;
   syncingKeys: ReadonlySet<string>;
   currentUserId: string | null;
-  disableActions: boolean;
   onActivate: (item: TodayTimelineItem) => void;
 };
 
@@ -27,7 +26,6 @@ export function TodayTimeline({
   scrollKey,
   syncingKeys,
   currentUserId,
-  disableActions,
   onActivate,
 }: Props) {
   const scrolledFor = useRef<string | null>(null);
@@ -72,7 +70,6 @@ export function TodayTimeline({
             isTail={index === groups.length - 1 && !nowLineIsTail}
             syncingKeys={syncingKeys}
             currentUserId={currentUserId}
-            disableActions={disableActions}
             onActivate={onActivate}
           />
         </Fragment>

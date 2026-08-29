@@ -21,12 +21,14 @@ export const RECORD_DISPLAY_STATE = {
   SUBMITTED: "submitted",
   MISSED: "missed",
   VOIDED: "voided",
+  OPEN: "open",
 } as const;
 
 export const recordDisplayStateSchema = z.enum([
   RECORD_DISPLAY_STATE.SUBMITTED,
   RECORD_DISPLAY_STATE.MISSED,
   RECORD_DISPLAY_STATE.VOIDED,
+  RECORD_DISPLAY_STATE.OPEN,
 ]);
 
 export type RecordDisplayState = z.infer<typeof recordDisplayStateSchema>;
@@ -49,12 +51,14 @@ export const RECORD_TIMING = {
   NOT_SUBMITTED: "not_submitted",
   ON_TIME: "on_time",
   LATE: "late",
+  NO_DEADLINE: "no_deadline",
 } as const;
 
 export const recordTimingSchema = z.enum([
   RECORD_TIMING.NOT_SUBMITTED,
   RECORD_TIMING.ON_TIME,
   RECORD_TIMING.LATE,
+  RECORD_TIMING.NO_DEADLINE,
 ]);
 
 export type RecordTiming = z.infer<typeof recordTimingSchema>;
@@ -99,6 +103,7 @@ export const RECORDS_STATE_FILTER_VALUES = [
   RECORD_DISPLAY_STATE.SUBMITTED,
   RECORD_DISPLAY_STATE.MISSED,
   RECORD_DISPLAY_STATE.VOIDED,
+  RECORD_DISPLAY_STATE.OPEN,
 ] as const;
 
 export const RECORDS_RESULT_FILTER_VALUES = [
@@ -217,7 +222,8 @@ export const recordItemSchema = z.object({
   taskTemplateId: z.uuid(),
   occurrenceDate: recordsCalendarDateSchema,
   scheduledTime: scheduledTimeSchema,
-  dueAt: z.iso.datetime(),
+  availableAt: z.iso.datetime(),
+  dueAt: z.iso.datetime().nullable(),
   title: z.string(),
   type: taskTemplateTypeSchema,
   equipmentId: z.uuid().nullable(),
@@ -239,13 +245,22 @@ export type RecordsListResponse = z.infer<typeof recordsListResponseSchema>;
 
 export type RecordEligibilityInput = {
   hasRecord: boolean;
-  dueAt: Date;
+  availableAt: Date;
+  dueAt: Date | null;
   now: Date;
 };
 
-/** Records holds audit evidence: submitted or voided immediately, missed once due. */
+/**
+ * Records holds audit evidence: submitted or voided immediately; otherwise a finite deadline
+ * makes the row eligible once due, and a no-deadline occurrence becomes eligible once opened
+ * so the admin can see it remains outstanding without being called missed.
+ */
 export function isRecordEligible(input: RecordEligibilityInput): boolean {
-  return input.hasRecord || input.dueAt.getTime() <= input.now.getTime();
+  if (input.hasRecord) return true;
+
+  return input.dueAt !== null
+    ? input.dueAt.getTime() <= input.now.getTime()
+    : input.availableAt.getTime() <= input.now.getTime();
 }
 
 export function deriveRecordEntryState(
@@ -257,27 +272,38 @@ export function deriveRecordEntryState(
     : RECORD_ENTRY_STATE.VOIDED;
 }
 
-export function deriveRecordDisplayState(
-  record: { voidedAt: Date | null } | null,
-): RecordDisplayState {
-  if (!record) return RECORD_DISPLAY_STATE.MISSED;
-  return record.voidedAt === null
-    ? RECORD_DISPLAY_STATE.SUBMITTED
-    : RECORD_DISPLAY_STATE.VOIDED;
+/** No record and a null dueAt is Open, not Missed — it only appears here once opened (see isRecordEligible). */
+export function deriveRecordDisplayState(input: {
+  record: { voidedAt: Date | null } | null;
+  dueAt: Date | null;
+}): RecordDisplayState {
+  const { record, dueAt } = input;
+
+  if (record) {
+    return record.voidedAt === null
+      ? RECORD_DISPLAY_STATE.SUBMITTED
+      : RECORD_DISPLAY_STATE.VOIDED;
+  }
+
+  return dueAt === null ? RECORD_DISPLAY_STATE.OPEN : RECORD_DISPLAY_STATE.MISSED;
 }
 
-/** A voided record has no active submission, so it carries no timing claim. */
+/** A voided record has no active submission, so it carries no timing claim; a submitted no-deadline record is No deadline, not Late. */
 export function deriveRecordTiming(input: {
   record: { recordedAt: Date; voidedAt: Date | null } | null;
-  dueAt: Date;
+  dueAt: Date | null;
 }): RecordTiming {
-  const { record } = input;
+  const { record, dueAt } = input;
 
   if (!record || record.voidedAt !== null) {
     return RECORD_TIMING.NOT_SUBMITTED;
   }
 
-  return record.recordedAt.getTime() <= input.dueAt.getTime()
+  if (dueAt === null) {
+    return RECORD_TIMING.NO_DEADLINE;
+  }
+
+  return record.recordedAt.getTime() <= dueAt.getTime()
     ? RECORD_TIMING.ON_TIME
     : RECORD_TIMING.LATE;
 }

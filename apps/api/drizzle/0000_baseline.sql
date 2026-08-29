@@ -78,10 +78,14 @@ CREATE TABLE "task_templates" (
 	"weekdays" text[] NOT NULL,
 	"scheduled_times" text[] NOT NULL,
 	"equipment_id" uuid,
+	"completion_opens_before_minutes" integer DEFAULT 1440 NOT NULL,
+	"completion_due_after_minutes" integer DEFAULT 0,
 	"archived_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "task_templates_id_location_id_unique" UNIQUE("id","location_id")
+	CONSTRAINT "task_templates_id_location_id_unique" UNIQUE("id","location_id"),
+	CONSTRAINT "task_templates_completion_opens_before_range" CHECK ("task_templates"."completion_opens_before_minutes" >= 0 AND "task_templates"."completion_opens_before_minutes" <= 1440),
+	CONSTRAINT "task_templates_completion_due_after_range" CHECK ("task_templates"."completion_due_after_minutes" IS NULL OR ("task_templates"."completion_due_after_minutes" >= 0 AND "task_templates"."completion_due_after_minutes" <= 1440))
 );
 --> statement-breakpoint
 CREATE TABLE "task_occurrences" (
@@ -90,7 +94,8 @@ CREATE TABLE "task_occurrences" (
 	"task_template_id" uuid NOT NULL,
 	"occurrence_date" date NOT NULL,
 	"scheduled_time" text NOT NULL,
-	"due_at" timestamp with time zone NOT NULL,
+	"available_at" timestamp with time zone NOT NULL,
+	"due_at" timestamp with time zone,
 	"title" text NOT NULL,
 	"type" text NOT NULL,
 	"equipment_id" uuid,

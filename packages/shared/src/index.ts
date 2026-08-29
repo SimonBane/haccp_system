@@ -9,6 +9,7 @@ export {
 } from "./schemas/fields.js";
 export {
   isValidTimeZone,
+  startOfLocalDay,
   wallClockToInstant,
   zonedDateString,
   zonedMinutesOfDay,
@@ -133,6 +134,10 @@ export {
   type UpdateEquipmentInput,
 } from "./schemas/equipment.js";
 export {
+  TASK_TEMPLATE_COMPLETION_DUE_AFTER_DEFAULT_MINUTES,
+  TASK_TEMPLATE_COMPLETION_MINUTES_MAX,
+  TASK_TEMPLATE_COMPLETION_MINUTES_MIN,
+  TASK_TEMPLATE_COMPLETION_OPENS_BEFORE_DEFAULT_MINUTES,
   TASK_TEMPLATE_HOURS,
   TASK_TEMPLATE_MAX_SCHEDULED_TIMES,
   TASK_TEMPLATE_MINUTES,
@@ -141,6 +146,8 @@ export {
   TASK_TEMPLATE_ALL_WEEKDAYS,
   TASK_TEMPLATE_TYPE,
   TASK_TEMPLATE_WEEKDAYS,
+  completionDueAfterMinutesSchema,
+  completionOpensBeforeMinutesSchema,
   composeScheduledTime,
   createTaskTemplateSchema,
   deriveTimeSlotFromTime,
@@ -171,6 +178,8 @@ export {
 export {
   occurrenceStatusSchema,
   recordTimelinessSchema,
+  computeAvailableAt,
+  computeDueAt,
   isActiveRecord,
   deriveOccurrenceState,
   deriveTemperatureResult,

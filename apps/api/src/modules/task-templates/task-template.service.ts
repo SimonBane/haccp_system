@@ -71,6 +71,8 @@ export const taskTemplateService = {
           weekdays: sortWeekdays(input.weekdays),
           scheduledTimes: sortScheduledTimes(input.scheduledTimes),
           equipmentId: input.equipmentId ?? null,
+          completionOpensBeforeMinutes: input.completionOpensBeforeMinutes,
+          completionDueAfterMinutes: input.completionDueAfterMinutes,
         });
 
         if (!created) {
@@ -107,6 +109,8 @@ export const taskTemplateService = {
       weekdays: sortWeekdays(input.weekdays),
       scheduledTimes: sortScheduledTimes(input.scheduledTimes),
       equipmentId: input.equipmentId ?? null,
+      completionOpensBeforeMinutes: input.completionOpensBeforeMinutes,
+      completionDueAfterMinutes: input.completionDueAfterMinutes,
     };
 
     try {

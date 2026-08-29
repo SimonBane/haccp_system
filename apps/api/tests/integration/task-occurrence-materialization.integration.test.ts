@@ -138,7 +138,7 @@ describe("Task occurrence materialization — daily job", () => {
       pastTimeToday(),
     );
     expect(occurrence).not.toBeNull();
-    expect(occurrence!.dueAt.getTime()).toBeLessThan(Date.now());
+    expect(occurrence!.dueAt!.getTime()).toBeLessThan(Date.now());
   });
 
   it("reaches only locations belonging to each organization", async () => {
@@ -286,11 +286,14 @@ describe("Task occurrence materialization — configuration writes", () => {
     expect(protectedRow).not.toBeNull();
     expect(futureRowBefore).not.toBeNull();
 
-    // Force this one to already be due, independent of real wall-clock time.
-    await db
-      .update(taskOccurrences)
-      .set({ dueAt: new Date(Date.now() - 60 * 60 * 1000) })
-      .where(eq(taskOccurrences.id, protectedRow!.id));
+    // A record is what locks values in now — an already-open but unrecorded occurrence
+    // would otherwise get corrected to the new equipment details.
+    await db.insert(taskRecords).values({
+      occurrenceId: protectedRow!.id,
+      createdByUserId: world.admin.userId,
+      recordedAt: new Date(),
+      recordedByUserId: world.admin.userId,
+    });
 
     const response = await apiRequest(
       `/locations/${world.locations.main.id}/equipment/${world.equipment.fridge.id}`,
@@ -345,11 +348,14 @@ describe("Task occurrence materialization — configuration writes", () => {
     expect(protectedRow).not.toBeNull();
     expect(futureRowBefore).not.toBeNull();
 
-    const forcedDueAt = new Date(Date.now() - 60 * 60 * 1000);
-    await db
-      .update(taskOccurrences)
-      .set({ dueAt: forcedDueAt })
-      .where(eq(taskOccurrences.id, protectedRow!.id));
+    // A record is what locks values in now — an already-open but unrecorded occurrence
+    // would otherwise get recomputed under the new timezone.
+    await db.insert(taskRecords).values({
+      occurrenceId: protectedRow!.id,
+      createdByUserId: world.admin.userId,
+      recordedAt: new Date(),
+      recordedByUserId: world.admin.userId,
+    });
 
     const response = await apiRequest("/organizations/current", {
       method: "PATCH",
@@ -364,7 +370,9 @@ describe("Task occurrence materialization — configuration writes", () => {
       "09:00",
     );
     expect(protectedAfter!.id).toBe(protectedRow!.id);
-    expect(protectedAfter!.dueAt.getTime()).toBe(forcedDueAt.getTime());
+    expect(protectedAfter!.availableAt.getTime()).toBe(
+      protectedRow!.availableAt.getTime(),
+    );
 
     const futureAfter = await findOccurrence(
       world.templates.cleaning.id,
@@ -373,7 +381,217 @@ describe("Task occurrence materialization — configuration writes", () => {
     );
     expect(futureAfter).not.toBeNull();
     expect(futureAfter!.id).not.toBe(futureRowBefore!.id);
-    expect(futureAfter!.dueAt.getTime()).not.toBe(futureRowBefore!.dueAt.getTime());
+    expect(futureAfter!.availableAt.getTime()).not.toBe(
+      futureRowBefore!.availableAt.getTime(),
+    );
+  });
+
+  it("stores a template's completion window and snapshots availableAt/dueAt onto new occurrences", async () => {
+    const response = await apiRequest(
+      `/locations/${world.locations.main.id}/task-templates/${world.templates.cleaning.id}`,
+      {
+        method: "PATCH",
+        actor: asAdmin(world),
+        body: JSON.stringify({
+          title: world.templates.cleaning.title,
+          type: "cleaning",
+          weekdays: [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+          ],
+          scheduledTimes: ["09:00"],
+          completionOpensBeforeMinutes: 30,
+          completionDueAfterMinutes: 60,
+        }),
+      },
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      completionOpensBeforeMinutes: number;
+      completionDueAfterMinutes: number | null;
+    };
+    expect(body.completionOpensBeforeMinutes).toBe(30);
+    expect(body.completionDueAfterMinutes).toBe(60);
+
+    const futureDate = addCalendarDays(todayLocal(), 2);
+    const occurrence = await findOccurrence(
+      world.templates.cleaning.id,
+      futureDate,
+      "09:00",
+    );
+    expect(occurrence).not.toBeNull();
+
+    const scheduledInstant = new Date(
+      occurrence!.dueAt!.getTime() - 60 * 60 * 1000,
+    );
+    expect(occurrence!.availableAt.getTime()).toBe(
+      scheduledInstant.getTime() - 30 * 60 * 1000,
+    );
+  });
+
+  it("a Never overdue window is stored as a null dueAt on newly materialized occurrences", async () => {
+    const response = await apiRequest(
+      `/locations/${world.locations.main.id}/task-templates/${world.templates.cleaning.id}`,
+      {
+        method: "PATCH",
+        actor: asAdmin(world),
+        body: JSON.stringify({
+          title: world.templates.cleaning.title,
+          type: "cleaning",
+          weekdays: [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+          ],
+          scheduledTimes: ["09:00"],
+          completionOpensBeforeMinutes: 1440,
+          completionDueAfterMinutes: null,
+        }),
+      },
+    );
+    expect(response.status).toBe(200);
+
+    const futureDate = addCalendarDays(todayLocal(), 2);
+    const occurrence = await findOccurrence(
+      world.templates.cleaning.id,
+      futureDate,
+      "09:00",
+    );
+    expect(occurrence).not.toBeNull();
+    expect(occurrence!.dueAt).toBeNull();
+  });
+
+  it("a completion window change replaces only unrecorded occurrences", async () => {
+    await materialize();
+
+    const protectedRow = await findOccurrence(
+      world.templates.cleaning.id,
+      todayLocal(),
+      "09:00",
+    );
+    const futureDate = addCalendarDays(todayLocal(), 2);
+    const futureRowBefore = await findOccurrence(
+      world.templates.cleaning.id,
+      futureDate,
+      "09:00",
+    );
+    expect(protectedRow).not.toBeNull();
+    expect(futureRowBefore).not.toBeNull();
+
+    // A record is what locks values in now, regardless of whether the window already opened.
+    await db.insert(taskRecords).values({
+      occurrenceId: protectedRow!.id,
+      createdByUserId: world.admin.userId,
+      recordedAt: new Date(),
+      recordedByUserId: world.admin.userId,
+    });
+
+    const response = await apiRequest(
+      `/locations/${world.locations.main.id}/task-templates/${world.templates.cleaning.id}`,
+      {
+        method: "PATCH",
+        actor: asAdmin(world),
+        body: JSON.stringify({
+          title: world.templates.cleaning.title,
+          type: "cleaning",
+          weekdays: [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+          ],
+          scheduledTimes: ["09:00"],
+          completionOpensBeforeMinutes: 15,
+          completionDueAfterMinutes: 30,
+        }),
+      },
+    );
+    expect(response.status).toBe(200);
+
+    const protectedAfter = await findOccurrence(
+      world.templates.cleaning.id,
+      todayLocal(),
+      "09:00",
+    );
+    expect(protectedAfter!.id).toBe(protectedRow!.id);
+    expect(protectedAfter!.dueAt!.getTime()).toBe(
+      protectedRow!.dueAt!.getTime(),
+    );
+
+    const futureAfter = await findOccurrence(
+      world.templates.cleaning.id,
+      futureDate,
+      "09:00",
+    );
+    expect(futureAfter).not.toBeNull();
+    expect(futureAfter!.id).not.toBe(futureRowBefore!.id);
+    expect(futureAfter!.availableAt.getTime()).not.toBe(
+      futureRowBefore!.availableAt.getTime(),
+    );
+  });
+
+  it("corrects an already-open, unrecorded occurrence's window when the template narrows it", async () => {
+    // Regression for a stale-window bug: the default (1440-minute) window opens at the start
+    // of the local day, so today's occurrence is already "open" by the time an admin narrows
+    // the window same-day. With no record on it yet, the narrower window must still apply —
+    // it must not stay frozen at the wide window it happened to materialize under.
+    await materialize();
+
+    const beforeRow = await findOccurrence(
+      world.templates.cleaning.id,
+      todayLocal(),
+      "09:00",
+    );
+    expect(beforeRow).not.toBeNull();
+    expect(beforeRow!.availableAt.getTime()).toBeLessThanOrEqual(Date.now());
+
+    const response = await apiRequest(
+      `/locations/${world.locations.main.id}/task-templates/${world.templates.cleaning.id}`,
+      {
+        method: "PATCH",
+        actor: asAdmin(world),
+        body: JSON.stringify({
+          title: world.templates.cleaning.title,
+          type: "cleaning",
+          weekdays: [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+          ],
+          scheduledTimes: ["09:00"],
+          completionOpensBeforeMinutes: 15,
+          completionDueAfterMinutes: 30,
+        }),
+      },
+    );
+    expect(response.status).toBe(200);
+
+    const afterRow = await findOccurrence(
+      world.templates.cleaning.id,
+      todayLocal(),
+      "09:00",
+    );
+    expect(afterRow).not.toBeNull();
+    expect(afterRow!.id).not.toBe(beforeRow!.id);
+    expect(afterRow!.availableAt.getTime()).not.toBe(
+      beforeRow!.availableAt.getTime(),
+    );
   });
 
   it("leaves a recorded occurrence — including a voided one — unchanged despite a stale slot", async () => {

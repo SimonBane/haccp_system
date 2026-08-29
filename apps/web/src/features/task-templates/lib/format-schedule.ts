@@ -49,6 +49,10 @@ export function formatWeekdaysLabel(
     .join(", ");
 }
 
+export function formatScheduledTimesLabel(scheduledTimes: string[]): string {
+  return [...scheduledTimes].sort().join(", ");
+}
+
 export function formatScheduleSummary(
   weekdays: TaskTemplateWeekday[],
   scheduledTimes: string[],
@@ -59,6 +63,6 @@ export function formatScheduleSummary(
   },
 ): string {
   const weekdayLabel = formatWeekdaysLabel(weekdays, labels);
-  const timesLabel = [...scheduledTimes].sort().join(", ");
+  const timesLabel = formatScheduledTimesLabel(scheduledTimes);
   return `${weekdayLabel} · ${timesLabel}`;
 }

@@ -1,6 +1,9 @@
+import { sql } from "drizzle-orm";
 import {
+  check,
   foreignKey,
   index,
+  integer,
   pgTable,
   text,
   timestamp,
@@ -22,6 +25,12 @@ export const taskTemplates = pgTable(
     weekdays: text("weekdays").array().notNull(),
     scheduledTimes: text("scheduled_times").array().notNull(),
     equipmentId: uuid("equipment_id"),
+    completionOpensBeforeMinutes: integer("completion_opens_before_minutes")
+      .notNull()
+      .default(1440),
+    completionDueAfterMinutes: integer(
+      "completion_due_after_minutes",
+    ).default(0),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -40,6 +49,14 @@ export const taskTemplates = pgTable(
     unique("task_templates_id_location_id_unique").on(
       table.id,
       table.locationId,
+    ),
+    check(
+      "task_templates_completion_opens_before_range",
+      sql`${table.completionOpensBeforeMinutes} >= 0 AND ${table.completionOpensBeforeMinutes} <= 1440`,
+    ),
+    check(
+      "task_templates_completion_due_after_range",
+      sql`${table.completionDueAfterMinutes} IS NULL OR (${table.completionDueAfterMinutes} >= 0 AND ${table.completionDueAfterMinutes} <= 1440)`,
     ),
   ],
 );

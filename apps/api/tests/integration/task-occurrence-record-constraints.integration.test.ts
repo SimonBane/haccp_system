@@ -43,6 +43,7 @@ describe("task occurrence and record constraints", () => {
       taskTemplateId: overrides.taskTemplateId,
       occurrenceDate: overrides.occurrenceDate ?? "2026-08-19",
       scheduledTime: overrides.scheduledTime ?? "08:00",
+      availableAt: new Date("2026-08-19T00:00:00Z"),
       dueAt: new Date("2026-08-19T08:00:00Z"),
       title: "Morning fridge check",
       type: "temperature",

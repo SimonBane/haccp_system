@@ -77,7 +77,8 @@
       "recordRound": "Запиши отчитанията за {time} ({count})"
     },
     "row": {
-      "lastReadingAt": "Последно {time}"
+      "lastReadingAt": "Последно {time}",
+      "availableAt": "Достъпно от {time}"
     },
     "record": {
       "close": "Затвори",
@@ -319,7 +320,8 @@
     "displayState": {
       "submitted": "Изпълнена",
       "missed": "Пропусната",
-      "voided": "Анулирана"
+      "voided": "Анулирана",
+      "open": "Отворена"
     },
     "recordState": {
       "none": "Няма запис",
@@ -329,7 +331,8 @@
     "timing": {
       "notSubmitted": "Няма подаване",
       "onTime": "Навреме",
-      "late": "Със закъснение"
+      "late": "Със закъснение",
+      "noDeadline": "Без краен срок"
     },
     "result": {
       "pass": "В диапазона",
@@ -371,7 +374,9 @@
       "createdBy": "Първоначално създаден",
       "recordedBy": "Текущ запис",
       "voidedBy": "Анулиран",
-      "recordedTime": "Час на записа"
+      "recordedTime": "Час на записа",
+      "available": "Достъпна от",
+      "noDeadline": "Без краен срок"
     }
   },
   "TasksPage": {
@@ -388,21 +393,21 @@
     "duplicateTitle": "Дублиране на задача",
     "duplicateDescription": "Създайте копие с ново заглавие.",
     "duplicateSuggestedTitle": "{title} (Копие)",
+    "sections": {
+      "details": "Детайли",
+      "schedule": "График"
+    },
     "titleLabel": "Заглавие",
     "titlePlaceholder": "Проверка на складов хладилник",
     "typeLabel": "Тип",
-    "typePlaceholder": "Изберете тип",
     "equipmentLabel": "Хладилна техника",
     "equipmentPlaceholder": "Изберете хладилна техника",
-    "weekdaysLabel": "График",
-    "daysOfWeekLabel": "Дни от седмицата",
-    "schedulePlaceholder": "Изберете график",
-    "weekdaysPlaceholder": "Изберете дни",
+    "weekdaysLabel": "Повтаря се на",
     "moreSelected": "+ още {count}",
     "overflowRemoveLabel": "Премахни още {count} дни",
-    "weekdaysEmpty": "Няма намерени дни.",
     "timesLabel": "Часове",
     "removeTime": "Премахни час",
+    "addTime": "Добави час",
     "save": "Запази",
     "cancel": "Отказ",
     "edit": "Редактирай",
@@ -430,8 +435,7 @@
     },
     "presets": {
       "everyDay": "Всеки ден",
-      "weekdays": "Делнични дни",
-      "custom": "По избор"
+      "weekdays": "Делнични дни"
     },
     "weekdaysShort": {
       "monday": "Пон",
@@ -441,6 +445,15 @@
       "friday": "Пет",
       "saturday": "Съб",
       "sunday": "Нед"
+    },
+    "weekdaysFull": {
+      "monday": "Понеделник",
+      "tuesday": "Вторник",
+      "wednesday": "Сряда",
+      "thursday": "Четвъртък",
+      "friday": "Петък",
+      "saturday": "Събота",
+      "sunday": "Неделя"
     },
     "validation": {
       "titleRequired": "Заглавието е задължително.",
@@ -452,19 +465,63 @@
       "timesUnique": "Часовете трябва да са уникални.",
       "timeRequired": "Часът е задължителен.",
       "timeInvalid": "Въведете валиден час във формат ЧЧ:ММ.",
-      "equipmentRequired": "Хладилната техника е задължителна за температурни задачи."
+      "equipmentRequired": "Хладилната техника е задължителна за температурни задачи.",
+      "completionMinutesRange": "Въведете стойност между 0 и 1440 минути.",
+      "completionAvailableRequired": "Изберете кога задачата става достъпна.",
+      "completionDeadlineRequired": "Изберете краен срок.",
+      "completionMinutesInteger": "Въведете цяло число."
     },
     "columns": {
       "title": "Заглавие",
       "type": "Тип",
       "schedule": "График",
       "equipment": "Хладилна техника",
-      "actions": "Действия"
+      "actions": "Действия",
+      "window": "Диапазон на изпълнение"
     },
     "types": {
       "temperature": "Температура",
       "cleaning": "Почистване",
       "other": "Друго"
+    },
+    "completionWindow": {
+      "legend": "Диапазон на изпълнение",
+      "minutesSuffixBefore": "мин преди",
+      "minutesSuffixAfter": "мин след",
+      "compactFromStartOfDay": "Целия ден",
+      "compactOpensBefore": "{minutes} мин преди",
+      "compactNeverOverdue": "Без краен срок",
+      "compactOverdueAfter": "{minutes} мин след",
+      "availableLabel": "Достъпно",
+      "availableInfoLabel": "За достъпността",
+      "availableInfoDescription": "Моментът, в който задачата става достъпна за изпълнение от служител.",
+      "availablePlaceholder": "Изберете начално време",
+      "deadlineLabel": "Краен срок",
+      "deadlineInfoLabel": "За крайния срок",
+      "deadlineInfoIntro": "След този час задачата се счита за закъсняла.",
+      "deadlineInfoStillDoable": "Може да бъде изпълнена и след това - просто ще бъде отбелязана като закъсняла.",
+      "deadlineInfoNoDeadline": "Изберете „Без краен срок“, за да не се отбелязва никога като закъсняла.",
+      "deadlinePlaceholder": "Изберете краен срок",
+      "customMinutesBefore": "Персонализирани минути преди планираното време",
+      "customMinutesAfter": "Персонализирани минути след планираното време",
+      "presets": {
+        "opens": {
+          "min30": "30 минути преди",
+          "min60": "1 час преди",
+          "min120": "2 часа преди",
+          "atScheduledTime": "В планираното време",
+          "startOfDay": "От началото на деня",
+          "custom": "По избор…"
+        },
+        "due": {
+          "min30": "30 минути след",
+          "min60": "1 час след",
+          "min120": "2 часа след",
+          "atScheduledTime": "В планираното време",
+          "never": "Без краен срок",
+          "custom": "По избор…"
+        }
+      }
     }
   },
   "Sidebar": {

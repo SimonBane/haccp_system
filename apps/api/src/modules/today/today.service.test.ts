@@ -24,6 +24,7 @@ function occurrenceRow(overrides: Record<string, unknown> = {}) {
     maxTempC: null,
     scheduledTime: "07:00",
     occurrenceDate: "2026-01-15",
+    availableAt: new Date("2026-01-15T00:00:00Z"),
     dueAt: new Date("2026-01-15T07:00:00Z"),
     recordedAt: null,
     recordedByUserId: null,

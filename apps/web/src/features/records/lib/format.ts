@@ -32,6 +32,7 @@ export function formatRecordInstant(
   const timePart = new Intl.DateTimeFormat(locale, {
     hour: "2-digit",
     minute: "2-digit",
+    hourCycle: "h23",
     timeZone,
   }).format(date);
 
@@ -46,6 +47,7 @@ export function formatRecordTimeOfDay(
   return new Intl.DateTimeFormat(locale, {
     hour: "2-digit",
     minute: "2-digit",
+    hourCycle: "h23",
     timeZone,
   }).format(new Date(timestamp));
 }

@@ -41,6 +41,8 @@ describe("Task record writes", () => {
     equipmentId?: string | null;
     minTempC?: string | null;
     maxTempC?: string | null;
+    availableAt?: Date;
+    dueAt?: Date | null;
   }): Promise<string> {
     const locationId = overrides.locationId ?? org.locations.main.id;
     const taskTemplateId =
@@ -56,7 +58,15 @@ describe("Task record writes", () => {
         taskTemplateId,
         occurrenceDate,
         scheduledTime: "08:00",
-        dueAt: new Date(`${occurrenceDate}T08:00:00Z`),
+        // Default: available from the start of the occurrence's calendar day, matching
+        // the default 1440-minute completion window — a future-dated default occurrence
+        // stays closed, a past-dated one is already open.
+        availableAt:
+          overrides.availableAt ?? new Date(`${occurrenceDate}T00:00:00Z`),
+        dueAt:
+          overrides.dueAt === undefined
+            ? new Date(`${occurrenceDate}T08:00:00Z`)
+            : overrides.dueAt,
         title: "Test occurrence",
         type: overrides.type,
         equipmentId:
@@ -279,6 +289,81 @@ describe("Task record writes", () => {
       const occurrenceId = await insertOccurrence({
         type: "cleaning",
         occurrenceDate: addCalendarDays(today(), -3),
+      });
+
+      const response = await apiRequest(
+        recordPath(org.locations.main.id, occurrenceId),
+        {
+          method: "POST",
+          actor: asEmployee(org),
+          body: JSON.stringify({ kind: "ordinary" }),
+        },
+      );
+
+      expect(response.status).toBe(201);
+    });
+
+    it("rejects a write before availableAt", async () => {
+      const occurrenceId = await insertOccurrence({
+        type: "cleaning",
+        // Far enough ahead that the DB round-trip itself can't close the gap.
+        availableAt: new Date(Date.now() + 60_000),
+      });
+
+      const response = await apiRequest(
+        recordPath(org.locations.main.id, occurrenceId),
+        {
+          method: "POST",
+          actor: asEmployee(org),
+          body: JSON.stringify({ kind: "ordinary" }),
+        },
+      );
+
+      expect(response.status).toBe(400);
+    });
+
+    it("accepts a write at exactly availableAt", async () => {
+      const occurrenceId = await insertOccurrence({
+        type: "cleaning",
+        availableAt: new Date(),
+      });
+
+      const response = await apiRequest(
+        recordPath(org.locations.main.id, occurrenceId),
+        {
+          method: "POST",
+          actor: asEmployee(org),
+          body: JSON.stringify({ kind: "ordinary" }),
+        },
+      );
+
+      expect(response.status).toBe(201);
+    });
+
+    it("accepts a late submission past a finite deadline — the deadline never disables completion", async () => {
+      const occurrenceId = await insertOccurrence({
+        type: "cleaning",
+        dueAt: new Date(Date.now() - 60 * 60 * 1000),
+      });
+
+      const response = await apiRequest(
+        recordPath(org.locations.main.id, occurrenceId),
+        {
+          method: "POST",
+          actor: asEmployee(org),
+          body: JSON.stringify({ kind: "ordinary" }),
+        },
+      );
+
+      expect(response.status).toBe(201);
+    });
+
+    it("accepts a no-deadline submission long after it opened", async () => {
+      const occurrenceId = await insertOccurrence({
+        type: "cleaning",
+        occurrenceDate: addCalendarDays(today(), -30),
+        availableAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+        dueAt: null,
       });
 
       const response = await apiRequest(
@@ -518,6 +603,7 @@ describe("Task record writes", () => {
           taskTemplateId: world.alpha.templates.cleaning.id,
           occurrenceDate: zonedDateString(new Date(), world.alpha.timeZone),
           scheduledTime: "08:00",
+          availableAt: new Date(Date.now() - 60_000),
           dueAt: new Date(),
           title: "Alpha occurrence",
           type: "cleaning",

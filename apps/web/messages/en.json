@@ -77,7 +77,8 @@
       "recordRound": "Record the {time} readings ({count})"
     },
     "row": {
-      "lastReadingAt": "Last {time}"
+      "lastReadingAt": "Last {time}",
+      "availableAt": "Available at {time}"
     },
     "record": {
       "close": "Close",
@@ -319,7 +320,8 @@
     "displayState": {
       "submitted": "Submitted",
       "missed": "Missed",
-      "voided": "Voided"
+      "voided": "Voided",
+      "open": "Open"
     },
     "recordState": {
       "none": "No record",
@@ -329,7 +331,8 @@
     "timing": {
       "notSubmitted": "Not submitted",
       "onTime": "On time",
-      "late": "Late"
+      "late": "Late",
+      "noDeadline": "No deadline"
     },
     "result": {
       "pass": "Within range",
@@ -371,7 +374,9 @@
       "createdBy": "First created",
       "recordedBy": "Current record",
       "voidedBy": "Voided",
-      "recordedTime": "Recorded time"
+      "recordedTime": "Recorded time",
+      "available": "Available from",
+      "noDeadline": "No deadline"
     }
   },
   "TasksPage": {
@@ -388,21 +393,21 @@
     "duplicateTitle": "Duplicate task",
     "duplicateDescription": "Create a copy with a new title.",
     "duplicateSuggestedTitle": "{title} (Copy)",
+    "sections": {
+      "details": "Details",
+      "schedule": "Schedule"
+    },
     "titleLabel": "Title",
     "titlePlaceholder": "Check walk-in chiller",
     "typeLabel": "Type",
-    "typePlaceholder": "Select a type",
     "equipmentLabel": "Cold storage",
     "equipmentPlaceholder": "Select cold storage",
-    "weekdaysLabel": "Schedule",
-    "daysOfWeekLabel": "Days of the week",
-    "schedulePlaceholder": "Select schedule",
-    "weekdaysPlaceholder": "Select days",
+    "weekdaysLabel": "Repeats on",
     "moreSelected": "+ {count} more",
     "overflowRemoveLabel": "Remove {count} more days",
-    "weekdaysEmpty": "No days found.",
     "timesLabel": "Scheduled times",
     "removeTime": "Remove time",
+    "addTime": "Add time",
     "save": "Save",
     "cancel": "Cancel",
     "edit": "Edit",
@@ -430,8 +435,7 @@
     },
     "presets": {
       "everyDay": "Every day",
-      "weekdays": "Weekdays",
-      "custom": "Custom"
+      "weekdays": "Weekdays"
     },
     "weekdaysShort": {
       "monday": "Mon",
@@ -441,6 +445,15 @@
       "friday": "Fri",
       "saturday": "Sat",
       "sunday": "Sun"
+    },
+    "weekdaysFull": {
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday",
+      "sunday": "Sunday"
     },
     "validation": {
       "titleRequired": "Title is required.",
@@ -452,19 +465,63 @@
       "timesUnique": "Scheduled times must be unique.",
       "timeRequired": "Scheduled time is required.",
       "timeInvalid": "Enter a valid time in HH:MM format.",
-      "equipmentRequired": "Cold storage is required for temperature tasks."
+      "equipmentRequired": "Cold storage is required for temperature tasks.",
+      "completionMinutesRange": "Enter a value between 0 and 1440 minutes.",
+      "completionAvailableRequired": "Select when the task becomes available.",
+      "completionDeadlineRequired": "Select a deadline.",
+      "completionMinutesInteger": "Enter a whole number of minutes."
     },
     "columns": {
       "title": "Title",
       "type": "Type",
       "schedule": "Schedule",
       "equipment": "Cold storage",
-      "actions": "Actions"
+      "actions": "Actions",
+      "window": "Completion window"
     },
     "types": {
       "temperature": "Temperature",
       "cleaning": "Cleaning",
       "other": "Other"
+    },
+    "completionWindow": {
+      "legend": "Completion window",
+      "minutesSuffixBefore": "min before",
+      "minutesSuffixAfter": "min after",
+      "compactFromStartOfDay": "All day",
+      "compactOpensBefore": "{minutes} min before",
+      "compactNeverOverdue": "No deadline",
+      "compactOverdueAfter": "{minutes} min after",
+      "availableLabel": "Available",
+      "availableInfoLabel": "About availability",
+      "availableInfoDescription": "The moment when the task becomes available for staff to complete.",
+      "availablePlaceholder": "Select when it opens",
+      "deadlineLabel": "Deadline",
+      "deadlineInfoLabel": "About the deadline",
+      "deadlineInfoIntro": "After this time, the task is considered late.",
+      "deadlineInfoStillDoable": "It can still be completed after - just marked as late.",
+      "deadlineInfoNoDeadline": "Choose “No deadline” to never mark it as late.",
+      "deadlinePlaceholder": "Select a deadline",
+      "customMinutesBefore": "Custom minutes before the scheduled time",
+      "customMinutesAfter": "Custom minutes after the scheduled time",
+      "presets": {
+        "opens": {
+          "min30": "30 minutes before",
+          "min60": "1 hour before",
+          "min120": "2 hours before",
+          "atScheduledTime": "At the scheduled time",
+          "startOfDay": "From the start of the day",
+          "custom": "Custom…"
+        },
+        "due": {
+          "min30": "30 minutes after",
+          "min60": "1 hour after",
+          "min120": "2 hours after",
+          "atScheduledTime": "At the scheduled time",
+          "never": "No deadline",
+          "custom": "Custom…"
+        }
+      }
     }
   },
   "Sidebar": {

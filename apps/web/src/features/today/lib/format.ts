@@ -8,12 +8,14 @@ export function formatTimeOfDay(
     return new Intl.DateTimeFormat(locale, {
       hour: "2-digit",
       minute: "2-digit",
+      hourCycle: "h23",
       timeZone,
     }).format(new Date(timestamp));
   } catch {
     return new Intl.DateTimeFormat(locale, {
       hour: "2-digit",
       minute: "2-digit",
+      hourCycle: "h23",
     }).format(new Date(timestamp));
   }
 }
