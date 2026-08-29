@@ -2,6 +2,7 @@
 
 import type { TodayResponse, TodayTaskItem } from "@haccp/shared";
 import {
+  API_ERROR_CODE,
   classifyTemperatureResult,
   RECORD_KIND,
   RECORD_STATE,
@@ -12,15 +13,14 @@ import {
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { ApiQueryError } from "@/components/api-query-error";
 import { pageWidthVariants } from "@/components/layout/page-container";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useNow } from "@/hooks/use-now";
 import { useLocation } from "@/features/tenant/tenant-provider";
 import { useOrgTimeZone } from "@/features/tenant/use-org-timezone";
 import { ApiRequestError } from "@/lib/api-utils";
-import { getErrorMessage } from "@/lib/api/get-error-message";
+import { useApiErrorToast } from "@/lib/api/use-api-error-toast";
 import { formatLocalDate, shiftLocalDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import {
@@ -61,6 +61,7 @@ export function TodayView({
   initialLocationId: string;
 }) {
   const t = useTranslations("TodayPage");
+  const showApiError = useApiErrorToast();
   const locale = useLocale();
   const now = useNow();
   const timeZone = useOrgTimeZone();
@@ -83,6 +84,7 @@ export function TodayView({
     data: response,
     isLoading,
     isError,
+    error,
     isFetching,
     refetch,
   } = useTodayQuery(selectedDate, {
@@ -194,7 +196,10 @@ export function TodayView({
       }
     : null;
 
-  if (liveEditCheck && lastEditCheck?.occurrenceKey !== liveEditCheck.occurrenceKey) {
+  if (
+    liveEditCheck &&
+    lastEditCheck?.occurrenceKey !== liveEditCheck.occurrenceKey
+  ) {
     setLastEditCheck(liveEditCheck);
   }
 
@@ -218,7 +223,7 @@ export function TodayView({
         setRecordKey(null);
         setAnnouncement(t("a11y.undone", { title: task.title }));
       } catch (error) {
-        toast.error(getErrorMessage(error, t("toasts.undoError")), {
+        showApiError(error, {
           action: {
             label: t("error.retry"),
             onClick: () => void undo(task),
@@ -228,14 +233,15 @@ export function TodayView({
         markSyncing(key, false);
       }
     },
-    [markSyncing, runVoid, t],
+    [markSyncing, runVoid, showApiError, t],
   );
 
   const handleComplete = useCallback(
     async function complete(task: TodayTaskItem): Promise<void> {
       const key = occurrenceKey(task);
       // A voided occurrence reactivates its existing record; only an unrecorded one is created.
-      const run = task.recordState === RECORD_STATE.NONE ? runCreate : runUpdate;
+      const run =
+        task.recordState === RECORD_STATE.NONE ? runCreate : runUpdate;
       markSyncing(key, true);
       tapFeedback();
       try {
@@ -253,11 +259,14 @@ export function TodayView({
           },
         });
       } catch (error) {
-        if (error instanceof ApiRequestError && error.code === "CONFLICT") {
-          toast.error(t("toasts.alreadyRecorded"));
+        if (
+          error instanceof ApiRequestError &&
+          error.code === API_ERROR_CODE.TASK_RECORD_ALREADY_EXISTS
+        ) {
+          showApiError(error);
           return;
         }
-        toast.error(getErrorMessage(error, t("toasts.doneError")), {
+        showApiError(error, {
           action: {
             label: t("error.retry"),
             onClick: () => void complete(task),
@@ -267,7 +276,7 @@ export function TodayView({
         markSyncing(key, false);
       }
     },
-    [handleUndo, markSyncing, runCreate, runUpdate, t],
+    [handleUndo, markSyncing, runCreate, runUpdate, showApiError, t],
   );
 
   /** One toast for a finished round instead of a toast per save. */
@@ -294,7 +303,8 @@ export function TodayView({
       const key = occurrenceKey(task);
       // Captured before advancing, which clears the round it describes.
       const roundSize = round.size;
-      const run = task.recordState === RECORD_STATE.NONE ? runCreate : runUpdate;
+      const run =
+        task.recordState === RECORD_STATE.NONE ? runCreate : runUpdate;
       markSyncing(key, true);
       tapFeedback();
       try {
@@ -328,12 +338,15 @@ export function TodayView({
         if (result.done) summariseRound(result, roundSize);
         return true;
       } catch (error) {
-        if (error instanceof ApiRequestError && error.code === "CONFLICT") {
-          toast.error(t("toasts.alreadyRecorded"));
+        if (
+          error instanceof ApiRequestError &&
+          error.code === API_ERROR_CODE.TASK_RECORD_ALREADY_EXISTS
+        ) {
+          showApiError(error);
           return false;
         }
         // Stay on the same reading so it is not lost.
-        toast.error(getErrorMessage(error, t("toasts.doneError")));
+        showApiError(error);
         return false;
       } finally {
         markSyncing(key, false);
@@ -348,6 +361,7 @@ export function TodayView({
       round.size,
       runCreate,
       runUpdate,
+      showApiError,
       summariseRound,
       t,
     ],
@@ -374,13 +388,13 @@ export function TodayView({
         setEditKey(null);
         return true;
       } catch (error) {
-        toast.error(getErrorMessage(error, t("toasts.doneError")));
+        showApiError(error);
         return false;
       } finally {
         markSyncing(key, false);
       }
     },
-    [editItem, markSyncing, runUpdate, t],
+    [editItem, markSyncing, runUpdate, showApiError, t],
   );
 
   const handleEditClose = useCallback(() => setEditKey(null), []);
@@ -436,10 +450,7 @@ export function TodayView({
     () => setSelectedDate((date) => shiftLocalDate(date, 1)),
     [],
   );
-  const goToToday = useCallback(
-    () => setSelectedDate(todayDate),
-    [todayDate],
-  );
+  const goToToday = useCallback(() => setSelectedDate(todayDate), [todayDate]);
 
   const header = (
     <TodayStickyHeader
@@ -469,13 +480,7 @@ export function TodayView({
       <div className="flex flex-1 flex-col">
         {header}
         <div className={cn(pageWidthVariants({ width: "narrow" }), "pt-6")}>
-          <Alert>
-            <AlertTitle>{t("error.title")}</AlertTitle>
-            <AlertDescription>{t("error.description")}</AlertDescription>
-            <Button className="mt-4" onClick={() => void refetch()}>
-              {t("error.retry")}
-            </Button>
-          </Alert>
+          <ApiQueryError error={error} onRetry={() => void refetch()} />
         </div>
       </div>
     );

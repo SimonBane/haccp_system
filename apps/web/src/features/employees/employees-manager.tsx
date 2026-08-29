@@ -5,11 +5,11 @@ import { Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
+import { ApiQueryError } from "@/components/api-query-error";
 import {
   MobileHeaderAddAction,
   PageHeader,
 } from "@/components/layout/page-header";
-import { DataTableQueryError } from "@/components/ui/data-table/data-table-query-error";
 import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { EmployeesData } from "@/features/employees/data-table/data";
@@ -25,7 +25,6 @@ import {
   sameLocationIds,
 } from "@/features/employees/utils";
 import { useTenant } from "@/features/tenant/tenant-provider";
-import { getErrorMessage } from "@/lib/api/get-error-message";
 
 type EmployeesManagerProps = {
   initialItems: EmployeeResponse[];
@@ -33,11 +32,7 @@ type EmployeesManagerProps = {
 
 export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
   const t = useTranslations("EmployeesPage");
-  const {
-    organization,
-    locations: tenantLocations,
-    locationId,
-  } = useTenant();
+  const { organization, locations: tenantLocations, locationId } = useTenant();
   const multipleLocationsEnabled = organization.multipleLocationsEnabled;
   const defaultLocationId =
     tenantLocations.find((location) => location.isDefault)?.id ?? locationId;
@@ -45,6 +40,7 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
     data: items = [],
     isLoading,
     isError,
+    error,
     refetch,
   } = useEmployeesQuery({
     initialData: initialItems,
@@ -89,8 +85,8 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
       try {
         await invite.mutateAsync(employee.id);
         toast.success(t("toast.inviteSuccess"));
-      } catch (error) {
-        toast.error(getErrorMessage(error, t("errors.generic")));
+      } catch {
+        // The mutation cache owns the user-facing error.
       }
     },
     [invite, t],
@@ -101,15 +97,18 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
       try {
         await revokeInvitation.mutateAsync(employee.id);
         toast.success(t("toast.revokeSuccess"));
-      } catch (error) {
-        toast.error(getErrorMessage(error, t("errors.generic")));
+      } catch {
+        // The mutation cache owns the user-facing error.
       }
     },
     [revokeInvitation, t],
   );
 
   const handleSave = useCallback(
-    async (values: EmployeeFormValues, inviteNow: boolean): Promise<boolean> => {
+    async (
+      values: EmployeeFormValues,
+      inviteNow: boolean,
+    ): Promise<boolean> => {
       const locationIds = resolveEmployeeLocationIds(values.locationIds, {
         role: values.role,
         multipleLocationsEnabled,
@@ -170,14 +169,15 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
             inviteNow,
           });
           toast.success(
-            inviteNow ? t("toast.createInviteSuccess") : t("toast.createSuccess"),
+            inviteNow
+              ? t("toast.createInviteSuccess")
+              : t("toast.createSuccess"),
           );
         }
 
         return true;
-      } catch (error) {
-        toast.error(getErrorMessage(error, t("errors.generic")));
-        throw error;
+      } catch {
+        return false;
       }
     },
     [
@@ -203,8 +203,8 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
       await remove.mutateAsync(deleteTarget.id);
       toast.success(t("toast.deleteSuccess"));
       setDeleteTarget(null);
-    } catch (error) {
-      toast.error(getErrorMessage(error, t("errors.generic")));
+    } catch {
+      // The mutation cache owns the user-facing error.
     } finally {
       setIsDeleting(false);
     }
@@ -221,7 +221,7 @@ export function EmployeesManager({ initialItems }: EmployeesManagerProps) {
           <Spinner className="size-8" />
         </div>
       ) : isError ? (
-        <DataTableQueryError onRetry={() => void refetch()} />
+        <ApiQueryError error={error} onRetry={() => void refetch()} />
       ) : (
         <EmployeesData
           items={items}

@@ -7,6 +7,7 @@ import { corsMiddleware } from "./core/middleware/cors.js";
 import {
   errorHandler,
   notFoundHandler,
+  validationHook,
 } from "./core/middleware/error-handler.js";
 import { requestIdMiddleware } from "./core/middleware/request-id.js";
 import { env } from "./env.js";
@@ -14,7 +15,7 @@ import { isSentryEnabled } from "./lib/sentry.js";
 import { routes } from "./routes/index.js";
 import type { AppEnv } from "./types.js";
 
-export const app = new OpenAPIHono<AppEnv>();
+export const app = new OpenAPIHono<AppEnv>({ defaultHook: validationHook });
 
 if (isSentryEnabled()) {
   app.use(sentry(app));

@@ -1,6 +1,6 @@
+import { API_ERROR_CODE } from "@haccp/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  ConflictError,
   NotFoundError,
   ValidationError,
 } from "../../core/errors/app-errors.js";
@@ -250,7 +250,9 @@ describe("create", () => {
 
     await expect(
       taskRecordService.create(fakeDb(), SCOPE, { kind: "ordinary" }),
-    ).rejects.toBeInstanceOf(ConflictError);
+    ).rejects.toMatchObject({
+      code: API_ERROR_CODE.TASK_RECORD_ALREADY_EXISTS,
+    });
   });
 
   it("rolls the transaction's error up when the temperature detail insert fails", async () => {
@@ -353,7 +355,9 @@ describe("update", () => {
       kind: "ordinary",
     });
 
-    expect(taskRecordRepository.updateRecordForReactivation).toHaveBeenCalledWith(
+    expect(
+      taskRecordRepository.updateRecordForReactivation,
+    ).toHaveBeenCalledWith(
       "tx",
       RECORD_ID,
       expect.objectContaining({ recordedByUserId: USER_ID }),

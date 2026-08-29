@@ -83,9 +83,10 @@ process won't start.
   didn't run.
 - **Errors**: throw the `AppError` subclasses from `src/core/errors/app-errors.ts`
   (`NotFoundError`, `ConflictError`, `ForbiddenError`, `ServiceUnavailableError`, …). The global
-  handler serializes `{ error, message, details?, requestId }` (`apiErrorSchema`) and reports
-  5xx — except 503 — to Sentry. Translate driver errors with `mapDbMutationError(error, { unique,
-  foreignKey })` from `src/lib/db-errors.ts`; use `isContention` for a lost insert race.
+  handler serializes `{ error, message, details?, requestId }` (`apiErrorSchema`) for every
+  non-2xx response, sanitizes all 5xx messages, and reports 5xx — except 503 — to Sentry.
+  Translate driver errors with `mapDbMutationError(error, { unique, foreignKey })` from
+  `src/lib/db-errors.ts`; use `isContention` for a lost insert race.
 - **Plain admin CRUD** should use `registerAdminCrudRoutes` from
   `src/core/openapi/route-factory.ts` — pass schemas + a service with `list/create/update/delete`
   and it generates all four documented routes. `equipment` is the smallest end-to-end example.
@@ -114,7 +115,9 @@ UI hooks (`use-mobile`, `use-now`).
   `src/lib/api/client.ts`, always parsing responses with the shared Zod schema. Every query key
   lives in `src/lib/api/query-keys.ts` and is scoped by `locationId` or `organizationId` so a
   location/org switch can't serve another tenant's cached rows; mutations invalidate related
-  keys (e.g. an equipment edit also invalidates `todayByLocation`).
+  keys (e.g. an equipment edit also invalidates `todayByLocation`). API failures are presented
+  through `src/lib/api/error-presentation.ts`: action failures toast globally, initial query
+  failures render `ApiQueryError`, and background failures retain cached data and toast once.
 - **Active location** comes from `TenantProvider` (`src/features/tenant/tenant-provider.tsx`) —
   `useLocation()` / `useTenant()`; the preference is persisted in the `haccp_location_id` cookie
   so the server render agrees with the client.

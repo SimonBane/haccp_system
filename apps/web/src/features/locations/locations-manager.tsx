@@ -5,11 +5,11 @@ import { Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
+import { ApiQueryError } from "@/components/api-query-error";
 import {
   MobileHeaderAddAction,
   PageHeader,
 } from "@/components/layout/page-header";
-import { DataTableQueryError } from "@/components/ui/data-table/data-table-query-error";
 import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { LocationsData } from "@/features/locations/data-table/data";
@@ -17,7 +17,7 @@ import { useLocationsMutations } from "@/features/locations/hooks/use-locations-
 import { useLocationsQuery } from "@/features/locations/hooks/use-locations-query";
 import { LocationForm } from "@/features/locations/location-form";
 import { useTenant } from "@/features/tenant/tenant-provider";
-import { getErrorMessage } from "@/lib/api/get-error-message";
+import { useApiErrorToast } from "@/lib/api/use-api-error-toast";
 
 type LocationsManagerProps = {
   initialItems: LocationResponse[];
@@ -25,11 +25,13 @@ type LocationsManagerProps = {
 
 export function LocationsManager({ initialItems }: LocationsManagerProps) {
   const t = useTranslations("LocationsPage");
+  const showApiError = useApiErrorToast();
   const { reloadTenant } = useTenant();
   const {
     data: items = [],
     isLoading,
     isError,
+    error,
     refetch,
   } = useLocationsQuery({
     initialData: initialItems,
@@ -79,12 +81,12 @@ export function LocationsManager({ initialItems }: LocationsManagerProps) {
         await reloadTenant();
         toast.success(t("toast.setDefaultSuccess", { name: location.name }));
       } catch (error) {
-        toast.error(getErrorMessage(error, t("errors.generic")));
+        showApiError(error);
       } finally {
         setSettingDefaultId(null);
       }
     },
-    [reloadTenant, refetch, settingDefaultId, t, update],
+    [reloadTenant, refetch, settingDefaultId, showApiError, t, update],
   );
 
   const confirmDelete = useCallback(async () => {
@@ -100,9 +102,17 @@ export function LocationsManager({ initialItems }: LocationsManagerProps) {
       setDeleteTarget(null);
     } catch (error) {
       setIsDeleting(false);
-      toast.error(getErrorMessage(error, t("toast.deleteError")));
+      showApiError(error);
     }
-  }, [deleteTarget, isDeleting, reloadTenant, refetch, remove, t]);
+  }, [
+    deleteTarget,
+    isDeleting,
+    reloadTenant,
+    refetch,
+    remove,
+    showApiError,
+    t,
+  ]);
 
   // Only clear `open` — clearing the record remounts the form via `key` and kills the slide-out.
   const handleFormOpenChange = useCallback((open: boolean) => {
@@ -141,7 +151,7 @@ export function LocationsManager({ initialItems }: LocationsManagerProps) {
           <Spinner className="size-8" />
         </div>
       ) : isError ? (
-        <DataTableQueryError onRetry={() => void refetch()} />
+        <ApiQueryError error={error} onRetry={() => void refetch()} />
       ) : (
         <LocationsData
           items={items}

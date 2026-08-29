@@ -9,14 +9,13 @@ import {
 } from "@haccp/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "@/features/tenant/tenant-provider";
-import { ApiRequestError, parseApiError } from "@/lib/api-utils";
 import { useAuthenticatedFetch } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
 import { locationScopedPath } from "@/lib/api/paths";
 
 export function useEquipmentMutations() {
   const { locationId } = useLocation();
-  const { fetchJson, fetchApi } = useAuthenticatedFetch();
+  const { fetchJson, fetchVoid } = useAuthenticatedFetch();
   const queryClient = useQueryClient();
   const equipmentPath = locationScopedPath(locationId, "equipment");
 
@@ -31,6 +30,7 @@ export function useEquipmentMutations() {
   };
 
   const create = useMutation({
+    meta: { handlesError: true },
     mutationFn: async (input: EquipmentFieldsInput) => {
       const payload = createEquipmentSchema.parse(input);
       return fetchJson(equipmentPath, equipmentResponseSchema, {
@@ -43,6 +43,7 @@ export function useEquipmentMutations() {
   });
 
   const update = useMutation({
+    meta: { handlesError: true },
     mutationFn: async ({
       id,
       input,
@@ -61,18 +62,11 @@ export function useEquipmentMutations() {
   });
 
   const remove = useMutation({
+    meta: { handlesError: true },
     mutationFn: async (id: string) => {
-      const response = await fetchApi(`${equipmentPath}/${id}`, {
+      await fetchVoid(`${equipmentPath}/${id}`, {
         method: "DELETE",
       });
-
-      if (!response.ok) {
-        const error = await parseApiError(response);
-        throw new ApiRequestError(
-          error?.message ?? `Request failed with ${response.status}`,
-          error?.error ?? "UNKNOWN",
-        );
-      }
     },
     onSuccess: invalidateEquipment,
   });
