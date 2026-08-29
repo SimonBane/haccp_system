@@ -8,14 +8,13 @@ import {
   type UpdateLocationInput,
 } from "@haccp/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ApiRequestError, parseApiError } from "@/lib/api-utils";
 import { useTenant } from "@/features/tenant/tenant-provider";
 import { useAuthenticatedFetch } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
 
 export function useLocationsMutations() {
   const { organization } = useTenant();
-  const { fetchJson, fetchApi } = useAuthenticatedFetch();
+  const { fetchJson, fetchVoid } = useAuthenticatedFetch();
   const queryClient = useQueryClient();
 
   const invalidateLocations = () => {
@@ -25,6 +24,7 @@ export function useLocationsMutations() {
   };
 
   const create = useMutation({
+    meta: { handlesError: true },
     mutationFn: async (input: CreateLocationInput) => {
       const payload = createLocationSchema.parse(input);
       return fetchJson("/locations", locationResponseSchema, {
@@ -37,6 +37,7 @@ export function useLocationsMutations() {
   });
 
   const update = useMutation({
+    meta: { handlesError: true },
     mutationFn: async ({
       id,
       input,
@@ -55,18 +56,11 @@ export function useLocationsMutations() {
   });
 
   const remove = useMutation({
+    meta: { handlesError: true },
     mutationFn: async (id: string) => {
-      const response = await fetchApi(`/locations/${id}`, {
+      await fetchVoid(`/locations/${id}`, {
         method: "DELETE",
       });
-
-      if (!response.ok) {
-        const error = await parseApiError(response);
-        throw new ApiRequestError(
-          error?.message ?? `Request failed with ${response.status}`,
-          error?.error ?? "UNKNOWN",
-        );
-      }
     },
     onSuccess: invalidateLocations,
   });

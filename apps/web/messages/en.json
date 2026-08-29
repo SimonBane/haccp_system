@@ -26,6 +26,29 @@
     "description": "We could not load your workspace. This is usually temporary — please try again.",
     "retry": "Try again"
   },
+  "ApiErrors": {
+    "generic": "Something went wrong. Try again.",
+    "validation": "Check the information and try again.",
+    "unauthorized": "Your session has expired. Sign in again.",
+    "forbidden": "You do not have permission to do that.",
+    "notFound": "The requested item no longer exists.",
+    "conflict": "The data has changed. Refresh and try again.",
+    "unavailable": "The service is temporarily unavailable. Try again.",
+    "reference": "Reference: {requestId}",
+    "queryTitle": "Could not load this content",
+    "queryDescription": "Check your connection and try again.",
+    "retry": "Try again",
+    "codes": {
+      "equipmentNameExists": "Equipment with this name already exists at this site.",
+      "employeeEmailExists": "An employee with this email already exists.",
+      "locationNameExists": "A location with this name already exists.",
+      "multipleLocationsDisabled": "Multiple locations are not enabled for this organization.",
+      "defaultLocationDeleteForbidden": "Choose another default location before deleting this one.",
+      "lastLocationDeleteForbidden": "The last location cannot be deleted.",
+      "locationHasDependencies": "This location cannot be deleted while it has equipment or task data.",
+      "taskRecordAlreadyExists": "This task was already recorded. The latest saved value is shown."
+    }
+  },
   "ForbiddenPage": {
     "description": "You do not have permission to access this page."
   },

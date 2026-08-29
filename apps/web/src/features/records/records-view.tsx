@@ -4,10 +4,10 @@ import type { AppLocale, RecordItem, RecordsListResponse } from "@haccp/shared";
 import { PrinterIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useMemo, useState } from "react";
+import { ApiQueryError } from "@/components/api-query-error";
 import { MobileHeaderActions } from "@/components/layout/shell-slots";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { DataTableQueryError } from "@/components/ui/data-table/data-table-query-error";
 import { DataTableSkeleton } from "@/components/ui/data-table/data-table-skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { RecordDetailDialog } from "@/features/records/components/record-detail-dialog";
@@ -198,7 +198,7 @@ export function RecordsView({
       {grid.isLoading ? (
         <DataTableSkeleton columns={6} />
       ) : grid.isError ? (
-        <DataTableQueryError onRetry={() => void grid.refetch()} />
+        <ApiQueryError error={grid.error} onRetry={() => void grid.refetch()} />
       ) : (
         <RecordsData
           items={grid.items}

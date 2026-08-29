@@ -27,10 +27,9 @@ import {
   useFormState,
   useWatch,
 } from "react-hook-form";
-import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { ApiRequestError } from "@/lib/api-utils";
+import { useApiErrorToast } from "@/lib/api/use-api-error-toast";
 import { cn } from "@/lib/utils";
 import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -99,6 +98,7 @@ export function TaskTemplatesForm({
   onSubmit,
 }: TaskTemplatesFormProps) {
   const t = useTranslations("TasksPage");
+  const showApiError = useApiErrorToast();
   const isEditing = Boolean(task);
   const isDuplicating = Boolean(duplicateSource) && !isEditing;
 
@@ -121,25 +121,23 @@ export function TaskTemplatesForm({
         scheduledTimeRows: z
           .array(
             z.object({
-              time: z
-                .string()
-                .superRefine((value, ctx) => {
-                  if (value === "") {
-                    ctx.addIssue({
-                      code: "custom",
-                      message: t("validation.timeRequired"),
-                    });
-                    return;
-                  }
+              time: z.string().superRefine((value, ctx) => {
+                if (value === "") {
+                  ctx.addIssue({
+                    code: "custom",
+                    message: t("validation.timeRequired"),
+                  });
+                  return;
+                }
 
-                  const result = scheduledTimeSchema.safeParse(value);
-                  if (!result.success) {
-                    ctx.addIssue({
-                      code: "custom",
-                      message: t("validation.timeInvalid"),
-                    });
-                  }
-                }),
+                const result = scheduledTimeSchema.safeParse(value);
+                if (!result.success) {
+                  ctx.addIssue({
+                    code: "custom",
+                    message: t("validation.timeInvalid"),
+                  });
+                }
+              }),
             }),
           )
           .min(1, t("validation.timesRequired"))
@@ -182,7 +180,11 @@ export function TaskTemplatesForm({
       requiredMessage: string,
     ) {
       if (value === "") {
-        ctx.addIssue({ code: "custom", message: requiredMessage, path: [path] });
+        ctx.addIssue({
+          code: "custom",
+          message: requiredMessage,
+          path: [path],
+        });
         return;
       }
 
@@ -414,13 +416,7 @@ export function TaskTemplatesForm({
       await onSubmit(payload);
       onOpenChange(false);
     } catch (error) {
-      if (error instanceof ApiRequestError && error.code === "CONFLICT") {
-        toast.error(error.message);
-        return;
-      }
-      toast.error(
-        error instanceof Error ? error.message : t("submitError"),
-      );
+      showApiError(error);
     }
   }
 
@@ -482,255 +478,253 @@ export function TaskTemplatesForm({
       footer={formFooter}
       className="sm:max-w-lg"
     >
-        <form
-          id={TASK_TEMPLATES_FORM_ID}
-          onSubmit={form.handleSubmit(handleValidSubmit)}
-          className="grid gap-6"
-        >
-          <FieldSet className="gap-4">
-            <FieldLegend variant="label">{t("sections.details")}</FieldLegend>
+      <form
+        id={TASK_TEMPLATES_FORM_ID}
+        onSubmit={form.handleSubmit(handleValidSubmit)}
+        className="grid gap-6"
+      >
+        <FieldSet className="gap-4">
+          <FieldLegend variant="label">{t("sections.details")}</FieldLegend>
 
-            <Controller
-              name="title"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel
-                    htmlFor={`${TASK_TEMPLATES_FORM_ID}-title`}
-                    className={REQUIRED_LABEL_CLASS}
-                  >
-                    {t("titleLabel")}
-                  </FieldLabel>
-                  <Input
-                    {...field}
-                    ref={(node) => {
-                      field.ref(node);
-                      titleRef.current = node;
-                    }}
-                    id={`${TASK_TEMPLATES_FORM_ID}-title`}
-                    aria-invalid={fieldState.invalid}
-                    placeholder={t("titlePlaceholder")}
-                  />
-                  {fieldState.invalid && (
-                    <FieldError errors={[fieldState.error]} />
-                  )}
-                </Field>
-              )}
-            />
-
-            <Controller
-              name="type"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel
-                    htmlFor={`${TASK_TEMPLATES_FORM_ID}-type`}
-                    className={REQUIRED_LABEL_CLASS}
-                  >
-                    {t("typeLabel")}
-                  </FieldLabel>
-                  <TaskTypeToggle
-                    id={`${TASK_TEMPLATES_FORM_ID}-type`}
-                    value={field.value}
-                    labels={typeLabels}
-                    invalid={fieldState.invalid}
-                    onValueChange={(nextType) => {
-                      field.onChange(nextType);
-                      if (nextType !== TASK_TEMPLATE_TYPE.TEMPERATURE) {
-                        form.setValue("equipmentId", null);
-                      }
-                    }}
-                    onBlur={field.onBlur}
-                  />
-                  {fieldState.invalid && (
-                    <FieldError errors={[fieldState.error]} />
-                  )}
-                </Field>
-              )}
-            />
-
-            {selectedType === TASK_TEMPLATE_TYPE.TEMPERATURE ? (
-              <Controller
-                name="equipmentId"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel
-                      htmlFor={`${TASK_TEMPLATES_FORM_ID}-equipment`}
-                      className={REQUIRED_LABEL_CLASS}
-                    >
-                      {t("equipmentLabel")}
-                    </FieldLabel>
-                    <Select
-                      name={field.name}
-                      items={equipment.map((item) => ({
-                        label: item.name,
-                        value: item.id,
-                      }))}
-                      value={field.value ?? null}
-                      onValueChange={(value: unknown) => {
-                        field.onChange(
-                          typeof value === "string" ? value : null,
-                        );
-                      }}
-                      onOpenChange={(nextOpen) => {
-                        if (!nextOpen) {
-                          field.onBlur();
-                        }
-                      }}
-                    >
-                      <SelectTrigger
-                        id={`${TASK_TEMPLATES_FORM_ID}-equipment`}
-                        aria-invalid={fieldState.invalid}
-                        className="w-full"
-                      >
-                        <SelectValue placeholder={t("equipmentPlaceholder")} />
-                      </SelectTrigger>
-                      <SelectContent alignItemWithTrigger={false}>
-                        <SelectGroup>
-                          {equipment.map((item) => (
-                            <SelectItem key={item.id} value={item.id}>
-                              {item.name}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </Field>
+          <Controller
+            name="title"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel
+                  htmlFor={`${TASK_TEMPLATES_FORM_ID}-title`}
+                  className={REQUIRED_LABEL_CLASS}
+                >
+                  {t("titleLabel")}
+                </FieldLabel>
+                <Input
+                  {...field}
+                  ref={(node) => {
+                    field.ref(node);
+                    titleRef.current = node;
+                  }}
+                  id={`${TASK_TEMPLATES_FORM_ID}-title`}
+                  aria-invalid={fieldState.invalid}
+                  placeholder={t("titlePlaceholder")}
+                />
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
                 )}
-              />
-            ) : null}
-          </FieldSet>
+              </Field>
+            )}
+          />
 
-          <FieldSeparator />
-
-          <FieldSet className="gap-4">
-            <FieldLegend variant="label">{t("sections.schedule")}</FieldLegend>
-
-            <Controller
-              name="weekdays"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <WeekdayToggleStrip
-                  id={`${TASK_TEMPLATES_FORM_ID}-weekdays`}
-                  label={t("weekdaysLabel")}
+          <Controller
+            name="type"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel
+                  htmlFor={`${TASK_TEMPLATES_FORM_ID}-type`}
+                  className={REQUIRED_LABEL_CLASS}
+                >
+                  {t("typeLabel")}
+                </FieldLabel>
+                <TaskTypeToggle
+                  id={`${TASK_TEMPLATES_FORM_ID}-type`}
                   value={field.value}
-                  shortLabels={weekdayShortLabels}
-                  fullLabels={weekdayFullLabels}
-                  everyDayLabel={t("presets.everyDay")}
-                  weekdaysLabel={t("presets.weekdays")}
+                  labels={typeLabels}
                   invalid={fieldState.invalid}
-                  errorMessage={fieldState.error?.message}
-                  onValueChange={(nextValue) => {
-                    field.onChange(nextValue);
-                    if (nextValue.length > 0) {
-                      form.clearErrors("weekdays");
+                  onValueChange={(nextType) => {
+                    field.onChange(nextType);
+                    if (nextType !== TASK_TEMPLATE_TYPE.TEMPERATURE) {
+                      form.setValue("equipmentId", null);
                     }
                   }}
                   onBlur={field.onBlur}
                 />
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
+                )}
+              </Field>
+            )}
+          />
+
+          {selectedType === TASK_TEMPLATE_TYPE.TEMPERATURE ? (
+            <Controller
+              name="equipmentId"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel
+                    htmlFor={`${TASK_TEMPLATES_FORM_ID}-equipment`}
+                    className={REQUIRED_LABEL_CLASS}
+                  >
+                    {t("equipmentLabel")}
+                  </FieldLabel>
+                  <Select
+                    name={field.name}
+                    items={equipment.map((item) => ({
+                      label: item.name,
+                      value: item.id,
+                    }))}
+                    value={field.value ?? null}
+                    onValueChange={(value: unknown) => {
+                      field.onChange(typeof value === "string" ? value : null);
+                    }}
+                    onOpenChange={(nextOpen) => {
+                      if (!nextOpen) {
+                        field.onBlur();
+                      }
+                    }}
+                  >
+                    <SelectTrigger
+                      id={`${TASK_TEMPLATES_FORM_ID}-equipment`}
+                      aria-invalid={fieldState.invalid}
+                      className="w-full"
+                    >
+                      <SelectValue placeholder={t("equipmentPlaceholder")} />
+                    </SelectTrigger>
+                    <SelectContent alignItemWithTrigger={false}>
+                      <SelectGroup>
+                        {equipment.map((item) => (
+                          <SelectItem key={item.id} value={item.id}>
+                            {item.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
+                </Field>
               )}
             />
+          ) : null}
+        </FieldSet>
 
-            <FieldSet
-              className="gap-3"
-              data-invalid={Boolean(scheduledTimeRowsGroupError)}
-            >
-              <div className="flex items-baseline justify-between gap-2">
-                <FieldLegend
-                  variant="label"
-                  className={cn(REQUIRED_LABEL_CLASS, "mb-0")}
-                >
-                  {t("timesLabel")}
-                </FieldLegend>
-                <span className="text-xs tabular-nums text-muted-foreground">
-                  {fields.length}/{TASK_TEMPLATE_MAX_SCHEDULED_TIMES}
-                </span>
-              </div>
-              {fields.length > 0 ? (
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {fields.map((field, index) => {
-                    const isDuplicate = duplicateTimeIndices.has(index);
-                    return (
-                      <Controller
-                        key={field.id}
-                        name={`scheduledTimeRows.${index}.time`}
-                        control={form.control}
-                        render={({ field: timeField, fieldState }) => (
-                          <ScheduledTimeRow
-                            id={`${TASK_TEMPLATES_FORM_ID}-time-${index}`}
-                            value={timeField.value}
-                            aria-invalid={fieldState.invalid || isDuplicate}
-                            autoFocus={autoFocusTimeIndex === index}
-                            onChange={timeField.onChange}
-                            onBlur={timeField.onBlur}
-                            onRemove={() => {
-                              remove(index);
-                              setAutoFocusTimeIndex(null);
-                            }}
-                          />
-                        )}
-                      />
-                    );
-                  })}
-                </div>
-              ) : null}
-              {fields.length < TASK_TEMPLATE_MAX_SCHEDULED_TIMES ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-(--control-h) w-full"
-                  onClick={() => {
-                    const nextIndex = fields.length;
-                    append(
-                      {
-                        time: getNextDefaultScheduledTime(
-                          watchedScheduledTimes.map((row) => row.time),
-                        ),
-                      },
-                      { shouldFocus: false },
-                    );
-                    setAutoFocusTimeIndex(nextIndex);
-                  }}
-                >
-                  <PlusIcon />
-                  {t("addTime")}
-                </Button>
-              ) : null}
-              {scheduledTimeRowsGroupError ? (
-                <FieldError>{scheduledTimeRowsGroupError}</FieldError>
-              ) : null}
-            </FieldSet>
+        <FieldSeparator />
 
-            <FieldSet className="gap-3">
-              <FieldLegend variant="label">
-                {t("completionWindow.legend")}
-              </FieldLegend>
-              <CompletionWindowFields
-                idPrefix={TASK_TEMPLATES_FORM_ID}
-                opensValue={opensField.field.value}
-                onOpensChange={opensField.field.onChange}
-                onOpensBlur={opensField.field.onBlur}
-                opensInvalid={opensField.fieldState.invalid}
-                opensErrorMessage={opensField.fieldState.error?.message}
-                opensPreset={opensPreset}
-                onOpensPresetChange={handleOpensPresetChange}
-                dueValue={dueField.field.value}
-                onDueChange={dueField.field.onChange}
-                onDueBlur={dueField.field.onBlur}
-                dueInvalid={dueField.fieldState.invalid}
-                dueErrorMessage={dueField.fieldState.error?.message}
-                duePreset={duePreset}
-                onDuePresetChange={handleDuePresetChange}
+        <FieldSet className="gap-4">
+          <FieldLegend variant="label">{t("sections.schedule")}</FieldLegend>
+
+          <Controller
+            name="weekdays"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <WeekdayToggleStrip
+                id={`${TASK_TEMPLATES_FORM_ID}-weekdays`}
+                label={t("weekdaysLabel")}
+                value={field.value}
+                shortLabels={weekdayShortLabels}
+                fullLabels={weekdayFullLabels}
+                everyDayLabel={t("presets.everyDay")}
+                weekdaysLabel={t("presets.weekdays")}
+                invalid={fieldState.invalid}
+                errorMessage={fieldState.error?.message}
+                onValueChange={(nextValue) => {
+                  field.onChange(nextValue);
+                  if (nextValue.length > 0) {
+                    form.clearErrors("weekdays");
+                  }
+                }}
+                onBlur={field.onBlur}
               />
-            </FieldSet>
+            )}
+          />
+
+          <FieldSet
+            className="gap-3"
+            data-invalid={Boolean(scheduledTimeRowsGroupError)}
+          >
+            <div className="flex items-baseline justify-between gap-2">
+              <FieldLegend
+                variant="label"
+                className={cn(REQUIRED_LABEL_CLASS, "mb-0")}
+              >
+                {t("timesLabel")}
+              </FieldLegend>
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {fields.length}/{TASK_TEMPLATE_MAX_SCHEDULED_TIMES}
+              </span>
+            </div>
+            {fields.length > 0 ? (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {fields.map((field, index) => {
+                  const isDuplicate = duplicateTimeIndices.has(index);
+                  return (
+                    <Controller
+                      key={field.id}
+                      name={`scheduledTimeRows.${index}.time`}
+                      control={form.control}
+                      render={({ field: timeField, fieldState }) => (
+                        <ScheduledTimeRow
+                          id={`${TASK_TEMPLATES_FORM_ID}-time-${index}`}
+                          value={timeField.value}
+                          aria-invalid={fieldState.invalid || isDuplicate}
+                          autoFocus={autoFocusTimeIndex === index}
+                          onChange={timeField.onChange}
+                          onBlur={timeField.onBlur}
+                          onRemove={() => {
+                            remove(index);
+                            setAutoFocusTimeIndex(null);
+                          }}
+                        />
+                      )}
+                    />
+                  );
+                })}
+              </div>
+            ) : null}
+            {fields.length < TASK_TEMPLATE_MAX_SCHEDULED_TIMES ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-(--control-h) w-full"
+                onClick={() => {
+                  const nextIndex = fields.length;
+                  append(
+                    {
+                      time: getNextDefaultScheduledTime(
+                        watchedScheduledTimes.map((row) => row.time),
+                      ),
+                    },
+                    { shouldFocus: false },
+                  );
+                  setAutoFocusTimeIndex(nextIndex);
+                }}
+              >
+                <PlusIcon />
+                {t("addTime")}
+              </Button>
+            ) : null}
+            {scheduledTimeRowsGroupError ? (
+              <FieldError>{scheduledTimeRowsGroupError}</FieldError>
+            ) : null}
           </FieldSet>
 
-          <FieldSeparator />
-        </form>
+          <FieldSet className="gap-3">
+            <FieldLegend variant="label">
+              {t("completionWindow.legend")}
+            </FieldLegend>
+            <CompletionWindowFields
+              idPrefix={TASK_TEMPLATES_FORM_ID}
+              opensValue={opensField.field.value}
+              onOpensChange={opensField.field.onChange}
+              onOpensBlur={opensField.field.onBlur}
+              opensInvalid={opensField.fieldState.invalid}
+              opensErrorMessage={opensField.fieldState.error?.message}
+              opensPreset={opensPreset}
+              onOpensPresetChange={handleOpensPresetChange}
+              dueValue={dueField.field.value}
+              onDueChange={dueField.field.onChange}
+              onDueBlur={dueField.field.onBlur}
+              dueInvalid={dueField.fieldState.invalid}
+              dueErrorMessage={dueField.fieldState.error?.message}
+              duePreset={duePreset}
+              onDuePresetChange={handleDuePresetChange}
+            />
+          </FieldSet>
+        </FieldSet>
+
+        <FieldSeparator />
+      </form>
     </ResponsiveFormDialog>
   );
 }

@@ -2,22 +2,37 @@
 
 import { useAuth } from "@clerk/nextjs";
 import { useCallback } from "react";
-import { API_BASE_URL, ApiRequestError, parseApiError } from "./api-utils";
+import {
+  API_BASE_URL,
+  ApiRequestError,
+  networkRequestError,
+  parseApiJson,
+  throwIfApiError,
+} from "./api-utils";
 
 export async function fetchWithToken(
   getToken: () => Promise<string | null>,
   path: string,
   init?: RequestInit,
 ): Promise<Response> {
-  const token = await getToken();
+  try {
+    const token = await getToken();
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers: {
+        ...init?.headers,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
 
-  return fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      ...init?.headers,
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
+    return await throwIfApiError(response);
+  } catch (error) {
+    if (error instanceof ApiRequestError) {
+      throw error;
+    }
+
+    throw networkRequestError(error);
+  }
 }
 
 export async function fetchJsonWithToken<T>(
@@ -27,17 +42,15 @@ export async function fetchJsonWithToken<T>(
   init?: RequestInit,
 ): Promise<T> {
   const response = await fetchWithToken(getToken, path, init);
+  return parseApiJson(response, schema);
+}
 
-  if (!response.ok) {
-    const error = await parseApiError(response);
-    throw new ApiRequestError(
-      error?.message ?? `Request failed with ${response.status}`,
-      error?.error ?? "UNKNOWN",
-    );
-  }
-
-  const body: unknown = await response.json();
-  return schema.parse(body);
+export async function fetchVoidWithToken(
+  getToken: () => Promise<string | null>,
+  path: string,
+  init?: RequestInit,
+): Promise<void> {
+  await fetchWithToken(getToken, path, init);
 }
 
 export function useAuthenticatedFetch(): {
@@ -46,8 +59,7 @@ export function useAuthenticatedFetch(): {
     schema: { parse: (data: unknown) => T },
     init?: RequestInit,
   ) => Promise<T>;
-  fetchApi: (path: string, init?: RequestInit) => Promise<Response>;
-  getToken: () => Promise<string | null>;
+  fetchVoid: (path: string, init?: RequestInit) => Promise<void>;
 } {
   const { getToken } = useAuth();
 
@@ -60,11 +72,11 @@ export function useAuthenticatedFetch(): {
     [getToken],
   );
 
-  const fetchApi = useCallback(
+  const fetchVoid = useCallback(
     async (path: string, init?: RequestInit) =>
-      fetchWithToken(getToken, path, init),
+      fetchVoidWithToken(getToken, path, init),
     [getToken],
   );
 
-  return { fetchJson, fetchApi, getToken };
+  return { fetchJson, fetchVoid };
 }

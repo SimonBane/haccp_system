@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { FieldLabel } from "@/components/ui/field";
 import { useTenant } from "@/features/tenant/tenant-provider";
 import { useAuthenticatedFetch } from "@/lib/api/client";
-import { getErrorMessage } from "@/lib/api/get-error-message";
+import { useApiErrorToast } from "@/lib/api/use-api-error-toast";
 
 type OrganizationLogoUploadProps = {
   organization: OrganizationResponse;
@@ -62,7 +62,8 @@ export function OrganizationLogoUpload({
   organization,
 }: OrganizationLogoUploadProps) {
   const t = useTranslations("SettingsPage");
-  const { fetchApi, fetchJson } = useAuthenticatedFetch();
+  const { fetchJson } = useAuthenticatedFetch();
+  const showApiError = useApiErrorToast();
   const { refreshTenant } = useTenant();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -98,7 +99,10 @@ export function OrganizationLogoUpload({
   }, [displayImageUrl]);
 
   async function refreshOrganizationContext() {
-    const tenant = await fetchJson("/tenant/current", tenantContextResponseSchema);
+    const tenant = await fetchJson(
+      "/tenant/current",
+      tenantContextResponseSchema,
+    );
     refreshTenant(tenant);
   }
 
@@ -130,25 +134,14 @@ export function OrganizationLogoUpload({
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetchApi("/organizations/current/logo", {
-        method: "PUT",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => null);
-        throw new Error(
-          typeof error === "object" &&
-            error !== null &&
-            "message" in error &&
-            typeof error.message === "string"
-            ? error.message
-            : t("errors.generic"),
-        );
-      }
-
-      const body: unknown = await response.json();
-      const updated = organizationResponseSchema.parse(body);
+      const updated = await fetchJson(
+        "/organizations/current/logo",
+        organizationResponseSchema,
+        {
+          method: "PUT",
+          body: formData,
+        },
+      );
       if (updated.hasImage) {
         await waitForImageLoad(updated.imageUrl);
       }
@@ -159,7 +152,7 @@ export function OrganizationLogoUpload({
     } catch (err) {
       awaitingDisplayedLogoRef.current = false;
       setPreviewUrl(null);
-      toast.error(getErrorMessage(err, t("errors.generic")));
+      showApiError(err);
     } finally {
       URL.revokeObjectURL(objectUrl);
       if (!awaitingDisplayedLogoRef.current) {
@@ -172,30 +165,17 @@ export function OrganizationLogoUpload({
     setIsRemoving(true);
 
     try {
-      const response = await fetchApi("/organizations/current/logo", {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => null);
-        throw new Error(
-          typeof error === "object" &&
-            error !== null &&
-            "message" in error &&
-            typeof error.message === "string"
-            ? error.message
-            : t("errors.generic"),
-        );
-      }
-
-      const body: unknown = await response.json();
-      organizationResponseSchema.parse(body);
+      await fetchJson(
+        "/organizations/current/logo",
+        organizationResponseSchema,
+        { method: "DELETE" },
+      );
       await refreshOrganizationContext();
       setPreviewUrl(null);
       setRemoveDialogOpen(false);
       toast.success(t("toast.logoRemoved"));
     } catch (err) {
-      toast.error(getErrorMessage(err, t("errors.generic")));
+      showApiError(err);
     } finally {
       setIsRemoving(false);
     }
@@ -265,7 +245,9 @@ export function OrganizationLogoUpload({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("removeLogo")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("removeLogoConfirm")}</AlertDialogDescription>
+            <AlertDialogDescription>
+              {t("removeLogoConfirm")}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isRemoving}>

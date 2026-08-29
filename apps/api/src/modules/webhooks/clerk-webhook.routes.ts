@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import {
   ForbiddenError,
   NotFoundError,
+  ValidationError,
 } from "../../core/errors/app-errors.js";
 import { env } from "../../env.js";
 import { getDb } from "../../lib/context.js";
@@ -24,7 +25,7 @@ clerkWebhookRoutes.post("/clerk", async (c) => {
       { err: error },
       "Clerk webhook verification failed — check CLERK_WEBHOOK_SIGNING_SECRET matches the Clerk Dashboard endpoint (note: .env.local overrides .env)",
     );
-    return c.text("Webhook verification failed", 400);
+    throw new ValidationError("Webhook verification failed");
   }
 
   const db = getDb(c);

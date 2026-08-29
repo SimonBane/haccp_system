@@ -1,7 +1,6 @@
 "use client";
 
-import { isSentryEnabled } from "@/lib/sentry";
-import * as Sentry from "@sentry/nextjs";
+import { reportUnexpectedWebError } from "@/lib/api/error-reporting";
 import NextError from "next/error";
 import { useEffect } from "react";
 
@@ -11,8 +10,8 @@ export default function GlobalError({
   error: Error & { digest?: string };
 }) {
   useEffect(() => {
-    if (isSentryEnabled()) {
-      Sentry.captureException(error);
+    if (!error.digest) {
+      reportUnexpectedWebError(error);
     }
   }, [error]);
 

@@ -14,14 +14,13 @@ import {
 } from "@haccp/shared";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ApiRequestError, parseApiError } from "@/lib/api-utils";
 import { useTenant } from "@/features/tenant/tenant-provider";
 import { useAuthenticatedFetch } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
 
 export function useEmployeesMutations() {
   const { organization } = useTenant();
-  const { fetchJson, fetchApi } = useAuthenticatedFetch();
+  const { fetchJson, fetchVoid } = useAuthenticatedFetch();
   const queryClient = useQueryClient();
   const { userId: clerkUserId } = useAuth();
   const { user } = useUser();
@@ -131,17 +130,9 @@ export function useEmployeesMutations() {
 
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetchApi(`/employees/${id}`, {
+      await fetchVoid(`/employees/${id}`, {
         method: "DELETE",
       });
-
-      if (!response.ok) {
-        const error = await parseApiError(response);
-        throw new ApiRequestError(
-          error?.message ?? `Request failed with ${response.status}`,
-          error?.error ?? "UNKNOWN",
-        );
-      }
     },
     onSuccess: invalidateEmployees,
   });

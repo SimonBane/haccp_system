@@ -1,9 +1,6 @@
 "use client";
 
-import {
-  GRID_DEFAULT_PAGE_SIZE,
-  type GridPage,
-} from "@haccp/shared";
+import { GRID_DEFAULT_PAGE_SIZE, type GridPage } from "@haccp/shared";
 import { useQuery } from "@tanstack/react-query";
 import type {
   OnChangeFn,
@@ -70,6 +67,7 @@ export type ServerDataGrid<
   page: TPage | undefined;
   isLoading: boolean;
   isError: boolean;
+  error: unknown;
   isFetching: boolean;
   isPlaceholderData: boolean;
   refetch: () => Promise<unknown>;
@@ -208,10 +206,18 @@ export function useServerDataGrid<
       return;
     }
 
-    if (clampPageIndex(state.pageIndex, total, state.pageSize) !== state.pageIndex) {
+    if (
+      clampPageIndex(state.pageIndex, total, state.pageSize) !== state.pageIndex
+    ) {
       dispatch({ type: "clampToLastPage", total });
     }
-  }, [query.data, query.isPlaceholderData, state.pageIndex, state.pageSize, total]);
+  }, [
+    query.data,
+    query.isPlaceholderData,
+    state.pageIndex,
+    state.pageSize,
+    total,
+  ]);
 
   const onPaginationChange: OnChangeFn<PaginationState> = useCallback(
     (updater) => {
@@ -320,6 +326,7 @@ export function useServerDataGrid<
     page: query.data,
     isLoading: query.isLoading,
     isError: query.isError,
+    error: query.error,
     isFetching: query.isFetching,
     isPlaceholderData: query.isPlaceholderData,
     refetch: query.refetch,

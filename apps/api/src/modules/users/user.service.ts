@@ -1,8 +1,12 @@
 import type { UserResponse } from "@haccp/shared";
-import { normalizeEmail, normalizeName } from "@haccp/shared";
+import { API_ERROR_CODE, normalizeEmail, normalizeName } from "@haccp/shared";
 import type { Db, DbClient } from "../../core/db/client.js";
 import type { User } from "../../core/db/schema/users.js";
-import { ConflictError, InternalError, NotFoundError } from "../../core/errors/app-errors.js";
+import {
+  ConflictError,
+  InternalError,
+  NotFoundError,
+} from "../../core/errors/app-errors.js";
 import { mapDbMutationError } from "../../lib/db-errors.js";
 import { buildUserCacheBlob, userCache } from "./user-cache.js";
 import {
@@ -82,25 +86,38 @@ export const userService = {
   async syncUserFromClerk(
     db: Db,
     clerkUserId: string,
-    profile: ClerkUserProfile
+    profile: ClerkUserProfile,
   ): Promise<User | null> {
     try {
-      const existing = await userRepository.findAnyByClerkUserId(db, clerkUserId);
+      const existing = await userRepository.findAnyByClerkUserId(
+        db,
+        clerkUserId,
+      );
       if (!existing) {
         return null;
       }
 
       const profileData = buildClerkProfileData(clerkUserId, profile);
-      const user = await userRepository.updateById(db, existing.id, profileData);
+      const user = await userRepository.updateById(
+        db,
+        existing.id,
+        profileData,
+      );
 
       if (user) {
-        await userCache.set(clerkUserId, buildUserCacheBlob(toUserResponse(user)));
+        await userCache.set(
+          clerkUserId,
+          buildUserCacheBlob(toUserResponse(user)),
+        );
       }
 
       return user;
     } catch (error) {
       mapDbMutationError(error, {
-        unique: () => new ConflictError("A user with this email already exists"),
+        unique: () =>
+          new ConflictError("A user with this email already exists", {
+            code: API_ERROR_CODE.EMPLOYEE_EMAIL_EXISTS,
+          }),
       });
     }
   },
