@@ -74,7 +74,8 @@ describe("Records list (GET)", () => {
     type: "temperature" | "cleaning";
     occurrenceDate?: string;
     scheduledTime?: string;
-    dueAt?: Date;
+    availableAt?: Date;
+    dueAt?: Date | null;
     title?: string;
     locationId?: string;
     templateId?: string;
@@ -95,9 +96,13 @@ describe("Records list (GET)", () => {
             : org.templates.cleaning.id),
         occurrenceDate,
         scheduledTime,
+        availableAt:
+          overrides.availableAt ??
+          wallClockToInstant(occurrenceDate, "00:00", org.timeZone),
         dueAt:
-          overrides.dueAt ??
-          wallClockToInstant(occurrenceDate, scheduledTime, org.timeZone),
+          overrides.dueAt === undefined
+            ? wallClockToInstant(occurrenceDate, scheduledTime, org.timeZone)
+            : overrides.dueAt,
         title:
           overrides.title ??
           (isTemperature
@@ -296,6 +301,69 @@ describe("Records list (GET)", () => {
       expect(find(page, onTimeId).timing).toBe("on_time");
       expect(find(page, lateId).timing).toBe("late");
       expect(find(page, lateId).displayState).toBe("submitted");
+    });
+
+    it("excludes a finite, unrecorded occurrence before its deadline even once it has opened", async () => {
+      const pendingId = await insertOccurrence({
+        type: "cleaning",
+        occurrenceDate: today(),
+        scheduledTime: "23:59",
+        availableAt: new Date(Date.now() - 60 * 60 * 1000),
+        dueAt: new Date(Date.now() + 60 * 60 * 1000),
+      });
+
+      const page = await listRecords();
+
+      expect(page.items.map((item) => item.occurrenceId)).not.toContain(
+        pendingId,
+      );
+    });
+
+    it("includes an opened, unrecorded no-deadline occurrence as Open, not Missed", async () => {
+      const openId = await insertOccurrence({
+        type: "cleaning",
+        scheduledTime: "07:00",
+        dueAt: null,
+      });
+
+      const page = await listRecords();
+
+      expect(find(page, openId).displayState).toBe("open");
+      expect(find(page, openId).recordState).toBe("none");
+      expect(find(page, openId).timing).toBe("not_submitted");
+      expect(find(page, openId).dueAt).toBeNull();
+    });
+
+    it("excludes an unopened no-deadline occurrence — it has not become outstanding yet", async () => {
+      const unopenedId = await insertOccurrence({
+        type: "cleaning",
+        occurrenceDate: today(),
+        scheduledTime: "23:59",
+        availableAt: new Date(Date.now() + 60 * 60 * 1000),
+        dueAt: null,
+      });
+
+      const page = await listRecords();
+
+      expect(page.items.map((item) => item.occurrenceId)).not.toContain(
+        unopenedId,
+      );
+    });
+
+    it("maps a submitted no-deadline record to No deadline timing, not Late", async () => {
+      const submittedOpenId = await insertOccurrence({
+        type: "cleaning",
+        scheduledTime: "07:00",
+        dueAt: null,
+      });
+      await insertRecord(submittedOpenId, {
+        recordedAt: wallClockToInstant(daysAgo(1), "20:00", org.timeZone),
+      });
+
+      const page = await listRecords();
+
+      expect(find(page, submittedOpenId).displayState).toBe("submitted");
+      expect(find(page, submittedOpenId).timing).toBe("no_deadline");
     });
   });
 

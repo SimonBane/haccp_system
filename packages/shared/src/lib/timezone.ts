@@ -96,3 +96,7 @@ export function wallClockToInstant(
 
   return new Date(naive - secondOffset * 60_000);
 }
+
+export function startOfLocalDay(date: string, timeZone: string): Date {
+  return wallClockToInstant(date, "00:00", timeZone);
+}

@@ -23,6 +23,7 @@ function task(overrides: Partial<TodayTaskItem> = {}): TodayTaskItem {
     scheduledTime: "07:00",
     timeSlot: "morning",
     date: DATE,
+    availableAt: "2026-01-15T00:00:00.000Z",
     dueAt: "2026-01-15T07:00:00.000Z",
     recordState: "none",
     status: "pending",
@@ -174,6 +175,24 @@ describe("applyOptimisticVoid", () => {
   it("returns the identical reference when nothing matched", () => {
     const before = response({ morning: [completed] });
     expect(applyOptimisticVoid(before, OCCURRENCE_B, NOW)).toBe(before);
+  });
+
+  it("recomputes status as pending, never overdue, for a no-deadline occurrence", () => {
+    const noDeadline = task({
+      dueAt: null,
+      recordState: "active",
+      status: "completed",
+      completedAt: "2026-01-15T05:10:00.000Z",
+    });
+    const before = response({ morning: [noDeadline] });
+    const after = applyOptimisticVoid(
+      before,
+      OCCURRENCE_A,
+      new Date("2026-03-01T00:00:00.000Z"),
+    );
+
+    expect(after?.sections.morning[0].status).toBe("pending");
+    expect(after?.sections.morning[0].dueAt).toBeNull();
   });
 });
 

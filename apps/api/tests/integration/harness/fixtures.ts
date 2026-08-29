@@ -273,7 +273,8 @@ export async function seedOccurrence(
     locationId?: string;
     occurrenceDate: string;
     scheduledTime?: string;
-    dueAt?: Date;
+    availableAt?: Date;
+    dueAt?: Date | null;
     title?: string;
   },
 ): Promise<string> {
@@ -290,9 +291,13 @@ export async function seedOccurrence(
         : org.templates.cleaning.id,
       occurrenceDate: overrides.occurrenceDate,
       scheduledTime,
+      availableAt:
+        overrides.availableAt ??
+        new Date(`${overrides.occurrenceDate}T00:00:00Z`),
       dueAt:
-        overrides.dueAt ??
-        new Date(`${overrides.occurrenceDate}T${scheduledTime}:00Z`),
+        overrides.dueAt === undefined
+          ? new Date(`${overrides.occurrenceDate}T${scheduledTime}:00Z`)
+          : overrides.dueAt,
       title:
         overrides.title ??
         (isTemperature

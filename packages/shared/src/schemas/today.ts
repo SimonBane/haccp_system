@@ -10,6 +10,7 @@ import {
 import { userSummarySchema } from "./user.js";
 
 export const todayTaskStatusSchema = z.enum([
+  "upcoming",
   "pending",
   "completed",
   "overdue",
@@ -75,7 +76,8 @@ export const todayTaskItemSchema = z.object({
   scheduledTime: scheduledTimeSchema,
   timeSlot: taskTemplateTimeSlotSchema,
   date: isoDateSchema,
-  dueAt: z.iso.datetime(),
+  availableAt: z.iso.datetime(),
+  dueAt: z.iso.datetime().nullable(),
   recordState: recordStateSchema,
   status: todayTaskStatusSchema,
   completedAt: z.iso.datetime().nullable(),
@@ -158,13 +160,16 @@ export function deriveRecordState(
 
 export function deriveTodayTaskStatusFromOccurrence(params: {
   recordState: RecordState;
-  dueAt: Date;
+  availableAt: Date;
+  dueAt: Date | null;
   now: Date;
 }): TodayTaskStatus {
   if (params.recordState === RECORD_STATE.ACTIVE) return "completed";
-  return params.now.getTime() >= params.dueAt.getTime()
-    ? "overdue"
-    : "pending";
+  if (params.now.getTime() < params.availableAt.getTime()) return "upcoming";
+  if (params.dueAt !== null && params.now.getTime() >= params.dueAt.getTime()) {
+    return "overdue";
+  }
+  return "pending";
 }
 
 export function buildTodayTaskItemFromOccurrence(params: {
@@ -178,7 +183,8 @@ export function buildTodayTaskItemFromOccurrence(params: {
   maxTempC: number | null;
   scheduledTime: TodayTaskItem["scheduledTime"];
   date: TodayTaskItem["date"];
-  dueAt: Date;
+  availableAt: Date;
+  dueAt: Date | null;
   now: Date;
   record: ActiveTaskRecordCandidate | null;
   recordedBy: z.infer<typeof userSummarySchema> | null;
@@ -200,10 +206,12 @@ export function buildTodayTaskItemFromOccurrence(params: {
     scheduledTime: params.scheduledTime,
     timeSlot,
     date: params.date,
-    dueAt: params.dueAt.toISOString(),
+    availableAt: params.availableAt.toISOString(),
+    dueAt: params.dueAt === null ? null : params.dueAt.toISOString(),
     recordState,
     status: deriveTodayTaskStatusFromOccurrence({
       recordState,
+      availableAt: params.availableAt,
       dueAt: params.dueAt,
       now: params.now,
     }),

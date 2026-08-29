@@ -53,3 +53,32 @@ export function deriveTemperatureResult(
 ): TemperatureResult | null {
   return detail?.result ?? null;
 }
+
+/**
+ * availableAt = max(start of the occurrence's local day, scheduled instant minus the opening
+ * offset) — a task never opens on the previous local date, however wide the offset.
+ */
+export function computeAvailableAt(params: {
+  scheduledInstant: Date;
+  startOfLocalDay: Date;
+  completionOpensBeforeMinutes: number;
+}): Date {
+  const candidate =
+    params.scheduledInstant.getTime() -
+    params.completionOpensBeforeMinutes * 60_000;
+
+  return new Date(Math.max(params.startOfLocalDay.getTime(), candidate));
+}
+
+/** Null completionDueAfterMinutes is the only persisted representation of "Never overdue". */
+export function computeDueAt(params: {
+  scheduledInstant: Date;
+  completionDueAfterMinutes: number | null;
+}): Date | null {
+  if (params.completionDueAfterMinutes === null) return null;
+
+  return new Date(
+    params.scheduledInstant.getTime() +
+      params.completionDueAfterMinutes * 60_000,
+  );
+}

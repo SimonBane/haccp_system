@@ -16,7 +16,7 @@ import {
   RECORD_DISPLAY_STATE_VARIANT,
   RECORD_RESULT_VARIANT,
   RECORD_TIMING_VARIANT,
-  showsTiming,
+  timingBadgeValue,
   type RecordsLabels,
 } from "@/features/records/lib/labels";
 
@@ -98,9 +98,9 @@ export function getRecordsColumns({
       meta: { view_label: copy.timing },
       header: () => copy.timing,
       cell: ({ row }) => {
-        const { displayState, timing } = row.original;
+        const timing = timingBadgeValue(row.original);
 
-        return showsTiming(displayState, timing) ? (
+        return timing ? (
           <Badge variant={RECORD_TIMING_VARIANT[timing]}>
             {labels.timing[timing]}
           </Badge>

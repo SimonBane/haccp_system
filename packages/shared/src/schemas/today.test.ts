@@ -7,6 +7,7 @@ import {
   todayTaskItemSchema,
 } from "./today.js";
 
+const AVAILABLE_AT = new Date("2026-01-15T00:00:00Z");
 const DUE_AT = new Date("2026-01-15T07:00:00Z");
 
 describe("deriveRecordState", () => {
@@ -28,22 +29,46 @@ describe("deriveRecordState", () => {
 });
 
 describe("deriveTodayTaskStatusFromOccurrence", () => {
-  it("is pending before the deadline with no active record", () => {
+  it("is upcoming before availableAt with no active record", () => {
     expect(
       deriveTodayTaskStatusFromOccurrence({
         recordState: RECORD_STATE.NONE,
+        availableAt: AVAILABLE_AT,
+        dueAt: DUE_AT,
+        now: new Date("2026-01-14T23:00:00Z"),
+      }),
+    ).toBe("upcoming");
+  });
+
+  it("is pending at exactly availableAt with no active record", () => {
+    expect(
+      deriveTodayTaskStatusFromOccurrence({
+        recordState: RECORD_STATE.NONE,
+        availableAt: AVAILABLE_AT,
+        dueAt: DUE_AT,
+        now: AVAILABLE_AT,
+      }),
+    ).toBe("pending");
+  });
+
+  it("is pending between availableAt and a finite deadline with no active record", () => {
+    expect(
+      deriveTodayTaskStatusFromOccurrence({
+        recordState: RECORD_STATE.NONE,
+        availableAt: AVAILABLE_AT,
         dueAt: DUE_AT,
         now: new Date("2026-01-15T06:00:00Z"),
       }),
     ).toBe("pending");
   });
 
-  it("is overdue once the deadline passes with no active record", () => {
+  it("is overdue once a finite deadline passes with no active record", () => {
     expect(
       deriveTodayTaskStatusFromOccurrence({
         recordState: RECORD_STATE.NONE,
+        availableAt: AVAILABLE_AT,
         dueAt: DUE_AT,
-        now: new Date("2026-01-15T07:00:00Z"),
+        now: DUE_AT,
       }),
     ).toBe("overdue");
   });
@@ -52,6 +77,7 @@ describe("deriveTodayTaskStatusFromOccurrence", () => {
     expect(
       deriveTodayTaskStatusFromOccurrence({
         recordState: RECORD_STATE.VOIDED,
+        availableAt: AVAILABLE_AT,
         dueAt: DUE_AT,
         now: new Date("2026-01-15T08:00:00Z"),
       }),
@@ -62,10 +88,33 @@ describe("deriveTodayTaskStatusFromOccurrence", () => {
     expect(
       deriveTodayTaskStatusFromOccurrence({
         recordState: RECORD_STATE.ACTIVE,
+        availableAt: AVAILABLE_AT,
         dueAt: DUE_AT,
         now: new Date("2026-01-15T09:00:00Z"),
       }),
     ).toBe("completed");
+  });
+
+  it("never becomes overdue for a no-deadline occurrence, however late", () => {
+    expect(
+      deriveTodayTaskStatusFromOccurrence({
+        recordState: RECORD_STATE.NONE,
+        availableAt: AVAILABLE_AT,
+        dueAt: null,
+        now: new Date("2026-02-15T09:00:00Z"),
+      }),
+    ).toBe("pending");
+  });
+
+  it("is upcoming for a no-deadline occurrence before it opens", () => {
+    expect(
+      deriveTodayTaskStatusFromOccurrence({
+        recordState: RECORD_STATE.NONE,
+        availableAt: AVAILABLE_AT,
+        dueAt: null,
+        now: new Date("2026-01-14T23:00:00Z"),
+      }),
+    ).toBe("upcoming");
   });
 });
 
@@ -81,6 +130,7 @@ describe("buildTodayTaskItemFromOccurrence", () => {
     maxTempC: 5,
     scheduledTime: "07:00",
     date: "2026-01-15",
+    availableAt: AVAILABLE_AT,
     dueAt: DUE_AT,
   };
 
@@ -129,7 +179,13 @@ describe("buildTodayTaskItemFromOccurrence", () => {
     expect(item.temperatureReading?.recordedC).toBe(3.1);
   });
 
-  it("derives pending/overdue by dueAt when there is no record", () => {
+  it("derives upcoming/pending/overdue by availableAt and dueAt when there is no record", () => {
+    const upcoming = buildTodayTaskItemFromOccurrence({
+      ...BASE,
+      now: new Date("2026-01-14T23:00:00Z"),
+      record: null,
+      recordedBy: null,
+    });
     const pending = buildTodayTaskItemFromOccurrence({
       ...BASE,
       now: new Date("2026-01-15T06:00:00Z"),
@@ -143,9 +199,24 @@ describe("buildTodayTaskItemFromOccurrence", () => {
       recordedBy: null,
     });
 
+    expect(upcoming.status).toBe("upcoming");
     expect(pending.status).toBe("pending");
     expect(overdue.status).toBe("overdue");
     expect(pending.recordState).toBe("none");
+  });
+
+  it("serializes availableAt and a null dueAt for a Never overdue occurrence", () => {
+    const item = buildTodayTaskItemFromOccurrence({
+      ...BASE,
+      dueAt: null,
+      now: new Date("2026-03-01T09:00:00Z"),
+      record: null,
+      recordedBy: null,
+    });
+
+    expect(item.availableAt).toBe(AVAILABLE_AT.toISOString());
+    expect(item.dueAt).toBeNull();
+    expect(item.status).toBe("pending");
   });
 });
 

@@ -33,6 +33,8 @@ const templateRow = {
   weekdays: ["monday"],
   scheduledTimes: ["08:00"],
   equipmentId: EQUIPMENT_ID,
+  completionOpensBeforeMinutes: 1440,
+  completionDueAfterMinutes: 0,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -59,6 +61,8 @@ describe("taskTemplateService.create", () => {
         weekdays: ["monday"],
         scheduledTimes: ["08:00"],
         equipmentId: EQUIPMENT_ID,
+        completionOpensBeforeMinutes: 1440,
+        completionDueAfterMinutes: 0,
       }),
     ).rejects.toBeInstanceOf(NotFoundError);
 
@@ -80,9 +84,18 @@ describe("taskTemplateService.create", () => {
       weekdays: ["monday"],
       scheduledTimes: ["08:00"],
       equipmentId: EQUIPMENT_ID,
+      completionOpensBeforeMinutes: 1440,
+      completionDueAfterMinutes: 0,
     });
 
     expect(taskTemplateRepository.insert).toHaveBeenCalledTimes(1);
+    expect(taskTemplateRepository.insert).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        completionOpensBeforeMinutes: 1440,
+        completionDueAfterMinutes: 0,
+      }),
+    );
     expect(result.id).toBe(TEMPLATE_ID);
   });
 
@@ -98,6 +111,8 @@ describe("taskTemplateService.create", () => {
       type: "cleaning",
       weekdays: ["monday"],
       scheduledTimes: ["09:00"],
+      completionOpensBeforeMinutes: 1440,
+      completionDueAfterMinutes: 0,
     });
 
     expect(equipmentRepository.findByIdAndLocation).not.toHaveBeenCalled();
@@ -116,6 +131,8 @@ describe("taskTemplateService.update", () => {
         weekdays: ["monday"],
         scheduledTimes: ["08:00"],
         equipmentId: EQUIPMENT_ID,
+        completionOpensBeforeMinutes: 1440,
+        completionDueAfterMinutes: 0,
       }),
     ).rejects.toBeInstanceOf(NotFoundError);
 
@@ -137,9 +154,20 @@ describe("taskTemplateService.update", () => {
       weekdays: ["monday"],
       scheduledTimes: ["08:00"],
       equipmentId: EQUIPMENT_ID,
+      completionOpensBeforeMinutes: 1440,
+      completionDueAfterMinutes: 0,
     });
 
     expect(taskTemplateRepository.updateByIdAndLocation).toHaveBeenCalledTimes(1);
+    expect(taskTemplateRepository.updateByIdAndLocation).toHaveBeenCalledWith(
+      db,
+      LOCATION_ID,
+      TEMPLATE_ID,
+      expect.objectContaining({
+        completionOpensBeforeMinutes: 1440,
+        completionDueAfterMinutes: 0,
+      }),
+    );
     expect(result.id).toBe(TEMPLATE_ID);
   });
 });

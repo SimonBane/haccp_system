@@ -14,7 +14,7 @@ import {
   RECORD_DISPLAY_STATE_VARIANT,
   RECORD_RESULT_VARIANT,
   RECORD_TIMING_VARIANT,
-  showsTiming,
+  timingBadgeValue,
   type RecordsLabels,
 } from "@/features/records/lib/labels";
 
@@ -31,6 +31,7 @@ export function RecordsMobileCard({
 }: RecordsMobileCardProps) {
   const item = row.original;
   const reading = recordReading(item);
+  const timing = timingBadgeValue(item);
 
   return (
     <MobileListRow
@@ -53,9 +54,9 @@ export function RecordsMobileCard({
           <Badge variant={RECORD_DISPLAY_STATE_VARIANT[item.displayState]}>
             {labels.displayState[item.displayState]}
           </Badge>
-          {showsTiming(item.displayState, item.timing) ? (
-            <Badge variant={RECORD_TIMING_VARIANT[item.timing]}>
-              {labels.timing[item.timing]}
+          {timing ? (
+            <Badge variant={RECORD_TIMING_VARIANT[timing]}>
+              {labels.timing[timing]}
             </Badge>
           ) : null}
           {hasTemperatureOutcome(item) ? (

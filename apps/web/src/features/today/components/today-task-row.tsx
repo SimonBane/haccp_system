@@ -19,17 +19,14 @@ import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { formatTemperature, formatTimeOfDay } from "../lib/format";
 import { occurrenceKey } from "../lib/today-grouping";
-import type { TimeGroupState, TodayTimelineItem } from "../lib/today-timeline";
+import type { TodayTimelineItem } from "../lib/today-timeline";
 
 type Props = {
   item: TodayTimelineItem;
-  groupState: TimeGroupState;
   /** Prop, not tenant context: a context consumer would bypass `memo`. */
   timeZone: string;
   isSyncing: boolean;
   currentUserId: string | null;
-  /** True for a future-dated view — the row renders but is not interactive. */
-  disableActions: boolean;
   onActivate: (item: TodayTimelineItem) => void;
 };
 
@@ -56,27 +53,32 @@ function formatUserName(
 
 export const TodayTaskRow = memo(function TodayTaskRow({
   item,
-  groupState,
   timeZone,
   isSyncing,
   currentUserId,
-  disableActions,
   onActivate,
 }: Props) {
   const t = useTranslations("TodayPage");
   const locale = useLocale();
-  const { task, isCompleted, isDeviation, priorReading } = item;
+  const { task, isCompleted, isDeviation, priorReading, liveStatus } = item;
 
   const isTemperature = task.type === TASK_TEMPLATE_TYPE.TEMPERATURE;
   const isCleaning = task.type === TASK_TEMPLATE_TYPE.CLEANING;
   const reading = task.temperatureReading;
   const TypeIcon = typeIcon(task.type);
 
+  const isAvailable = liveStatus !== "upcoming";
+  const availableAtLabel = t("row.availableAt", {
+    time: formatTimeOfDay(task.availableAt, locale, timeZone),
+  });
+
   const actionLabel = isCompleted
     ? t("actions.viewRecord")
-    : isTemperature
-      ? t("actions.record")
-      : t("actions.complete");
+    : !isAvailable
+      ? availableAtLabel
+      : isTemperature
+        ? t("actions.record")
+        : t("actions.complete");
 
   const recordedLabel =
     isCompleted && reading
@@ -84,7 +86,7 @@ export const TodayTaskRow = memo(function TodayTaskRow({
       : null;
   const readingLabel =
     recordedLabel ??
-    (!isCompleted && priorReading
+    (!isCompleted && isAvailable && priorReading
       ? formatTemperature(priorReading.recordedC, locale)
       : null);
   const completedTime =
@@ -132,9 +134,9 @@ export const TodayTaskRow = memo(function TodayTaskRow({
               ? "border-transparent bg-destructive/12 text-destructive"
               : isCompleted
                 ? "border-transparent bg-success/12 text-success"
-                : groupState === "overdue"
+                : liveStatus === "overdue"
                   ? "border-destructive/35 text-destructive"
-                  : groupState === "now"
+                  : liveStatus === "pending"
                     ? "border-primary/40 bg-primary/5 text-primary"
                     : "border-border text-muted-foreground",
           )}
@@ -275,7 +277,7 @@ export const TodayTaskRow = memo(function TodayTaskRow({
                 </div>
               )
             ) : null}
-            {!isCompleted && priorReading ? (
+            {!isCompleted && isAvailable && priorReading ? (
               <div className="whitespace-nowrap text-[13px] leading-tight text-muted-foreground/80">
                 {t("row.lastReadingAt", { time: priorReading.scheduledTime })}
               </div>
@@ -291,11 +293,13 @@ export const TodayTaskRow = memo(function TodayTaskRow({
               <span
                 className={cn(
                   "hidden rounded-md px-2.5 py-1 text-xs font-medium sm:inline-flex",
-                  groupState === "now"
-                    ? "bg-primary text-primary-foreground"
-                    : groupState === "overdue"
-                      ? "bg-destructive/10 text-destructive"
-                      : "bg-secondary text-secondary-foreground",
+                  !isAvailable
+                    ? "bg-secondary text-muted-foreground"
+                    : liveStatus === "pending"
+                      ? "bg-primary text-primary-foreground"
+                      : liveStatus === "overdue"
+                        ? "bg-destructive/10 text-destructive"
+                        : "bg-secondary text-secondary-foreground",
                 )}
                 aria-hidden
               >
@@ -324,7 +328,8 @@ export const TodayTaskRow = memo(function TodayTaskRow({
         className="absolute inset-0 h-auto w-full rounded-xl p-0 hover:bg-transparent active:translate-y-0 dark:hover:bg-transparent"
         aria-label={ariaLabel}
         data-testid="today-task-activate"
-        disabled={isSyncing || disableActions}
+        data-available={isAvailable || undefined}
+        disabled={isSyncing || (!isCompleted && !isAvailable)}
         onClick={() => onActivate(item)}
       />
     </Card>
