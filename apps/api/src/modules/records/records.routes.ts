@@ -2,6 +2,8 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import {
   recordsListQuerySchema,
   recordsListResponseSchema,
+  recordsReportQuerySchema,
+  recordsReportResponseSchema,
 } from "@haccp/shared";
 import {
   defineRouteHandler,
@@ -46,6 +48,42 @@ recordsRoutes.openapi(
     const { organizationId } = requireOrgContext(c);
 
     const result = await recordsService.listRecords(getDb(c), {
+      locationId,
+      organizationId,
+      timeZone: getCurrentOrganization(c).timezone,
+      query,
+    });
+
+    return c.json(result, 200);
+  }),
+);
+
+const reportRecordsRoute = createRoute({
+  method: "get",
+  path: "/report",
+  tags: ["Records"],
+  security: bearerSecurity,
+  description:
+    "Complete Records dataset for one location and organization-local date range, read from a single consistent snapshot for browser printing. Admin only.",
+  request: {
+    query: recordsReportQuerySchema,
+  },
+  responses: {
+    200: jsonResponse(recordsReportResponseSchema),
+    400: errorResponse("Validation error"),
+    401: errorResponse("Unauthorized"),
+    403: errorResponse("Forbidden"),
+  },
+});
+
+recordsRoutes.openapi(
+  reportRecordsRoute,
+  defineRouteHandler(reportRecordsRoute, async (c) => {
+    const query = c.req.valid("query");
+    const { id: locationId } = getCurrentLocation(c);
+    const { organizationId } = requireOrgContext(c);
+
+    const result = await recordsService.getRecordsReport(getDb(c), {
       locationId,
       organizationId,
       timeZone: getCurrentOrganization(c).timezone,
