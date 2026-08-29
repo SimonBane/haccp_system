@@ -1,6 +1,7 @@
 export {
   fetchApi,
   getRecordsPage,
+  getRecordsReport,
   getTenantContext,
   getToday,
   listEmployees,

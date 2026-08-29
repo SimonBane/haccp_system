@@ -1,4 +1,7 @@
-import { GRID_DEFAULT_PAGE_SIZE } from "@haccp/shared";
+import {
+  GRID_DEFAULT_PAGE_SIZE,
+  recordsReportSearchParamsSchema,
+} from "@haccp/shared";
 import { describe, expect, it } from "vitest";
 import { buildGridRequest } from "@/components/ui/data-table/server-grid/grid-request";
 import { queryKeys } from "@/lib/api/query-keys";
@@ -255,14 +258,12 @@ describe("temperature-result filter visibility", () => {
     expect(isTemperatureResultFilterVisible(["temperature"])).toBe(true);
   });
 
-  it.each([
-    [undefined],
-    [[]],
-    [["cleaning"]],
-    [["temperature", "cleaning"]],
-  ])("stays hidden for %o", (values) => {
-    expect(isTemperatureResultFilterVisible(values)).toBe(false);
-  });
+  it.each([[undefined], [[]], [["cleaning"]], [["temperature", "cleaning"]]])(
+    "stays hidden for %o",
+    (values) => {
+      expect(isTemperatureResultFilterVisible(values)).toBe(false);
+    },
+  );
 });
 
 describe("clearing the result filter", () => {
@@ -449,6 +450,42 @@ describe("report URL", () => {
 
     expect(bg.startsWith("/records/print")).toBe(true);
     expect(en.startsWith("/en/records/print")).toBe(true);
+  });
+
+  it("serializes state=open, which is a report state like any other", () => {
+    expect(
+      buildRecordsReportUrl({
+        locale: "bg",
+        locationId: LOCATION_A,
+        range: RANGE,
+        filters: { state: ["open"] },
+      }),
+    ).toBe(
+      `/records/print?locationId=${LOCATION_A}&dateFrom=2026-08-17&dateTo=2026-08-23&state=open`,
+    );
+  });
+
+  /** The handoff is only correct if the print page can parse what the grid emits. */
+  it("emits a link the report page parses back to the same canonical filters", () => {
+    const url = buildRecordsReportUrl({
+      locale: "bg",
+      locationId: LOCATION_A,
+      range: RANGE,
+      filters: { state: ["open", "missed"], type: ["cleaning"] },
+    });
+
+    const parsed = recordsReportSearchParamsSchema.safeParse(
+      Object.fromEntries(new URLSearchParams(url.split("?")[1]!)),
+    );
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.data).toMatchObject({
+      locationId: LOCATION_A,
+      dateFrom: "2026-08-17",
+      dateTo: "2026-08-23",
+      state: ["missed", "open"],
+      type: ["cleaning"],
+    });
   });
 
   it("stays available for a zero-row result", () => {

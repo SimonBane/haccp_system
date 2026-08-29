@@ -1,11 +1,12 @@
 "use client";
 
-import type { RecordItem, UserSummary } from "@haccp/shared";
+import type { RecordItem } from "@haccp/shared";
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
 import {
+  actorName,
   EM_DASH,
   formatOccurrenceDate,
   formatRecordInstant,
@@ -20,12 +21,6 @@ import {
   resolvedTiming,
   type RecordsLabels,
 } from "@/features/records/lib/labels";
-
-function actorName(user: UserSummary | null): string | null {
-  if (!user) return null;
-  const name = `${user.firstName} ${user.lastName}`.trim();
-  return name === "" ? null : name;
-}
 
 function DetailRow({
   label,
