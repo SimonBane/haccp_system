@@ -10,8 +10,8 @@ import { Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { ApiQueryError } from "@/components/api-query-error";
 import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
-import { DataTableQueryError } from "@/components/ui/data-table/data-table-query-error";
 import { Spinner } from "@/components/ui/spinner";
 import {
   MobileHeaderAddAction,
@@ -22,7 +22,7 @@ import { TaskTemplatesData } from "@/features/task-templates/data-table/data";
 import { useTaskTemplatesMutations } from "@/features/task-templates/hooks/use-task-templates-mutations";
 import { useTaskTemplatesQuery } from "@/features/task-templates/hooks/use-task-templates-query";
 import { TaskTemplatesForm } from "@/features/task-templates/task-templates-form";
-import { getErrorMessage } from "@/lib/api/get-error-message";
+import { useApiErrorToast } from "@/lib/api/use-api-error-toast";
 
 type TaskTemplatesManagerProps = {
   initialItems: TaskTemplateResponse[];
@@ -37,10 +37,12 @@ export function TaskTemplatesManager({
   initialLocationId,
 }: TaskTemplatesManagerProps) {
   const t = useTranslations("TasksPage");
+  const showApiError = useApiErrorToast();
   const {
     data: items = [],
     isLoading,
     isError,
+    error,
     refetch,
   } = useTaskTemplatesQuery({
     initialData: initialItems,
@@ -107,9 +109,9 @@ export function TaskTemplatesManager({
       setDeleteTarget(null);
     } catch (error) {
       setIsDeleting(false);
-      toast.error(getErrorMessage(error, t("toast.deleteError")));
+      showApiError(error);
     }
-  }, [deleteTarget, isDeleting, refetch, remove, t]);
+  }, [deleteTarget, isDeleting, refetch, remove, showApiError, t]);
 
   const handleBulkDelete = useCallback(() => {
     setDeleteTarget(null);
@@ -128,11 +130,11 @@ export function TaskTemplatesManager({
       setRowSelection({});
       setBulkDeleteOpen(false);
     } catch (error) {
-      toast.error(getErrorMessage(error, t("toast.bulkDeleteError")));
+      showApiError(error);
     } finally {
       setIsBulkDeleting(false);
     }
-  }, [isBulkDeleting, refetch, remove, selectedIds, t]);
+  }, [isBulkDeleting, refetch, remove, selectedIds, showApiError, t]);
 
   // Only clear `open` — clearing the record remounts the form via `key` and kills the slide-out.
   const handleFormOpenChange = useCallback((open: boolean) => {
@@ -168,7 +170,7 @@ export function TaskTemplatesManager({
           <Spinner className="size-8" />
         </div>
       ) : isError ? (
-        <DataTableQueryError onRetry={() => void refetch()} />
+        <ApiQueryError error={error} onRetry={() => void refetch()} />
       ) : (
         <TaskTemplatesData
           items={items}

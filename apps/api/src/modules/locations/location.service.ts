@@ -4,6 +4,7 @@ import type {
   LocationResponse,
   UpdateLocationInput,
 } from "@haccp/shared";
+import { API_ERROR_CODE } from "@haccp/shared";
 import type { Db } from "../../core/db/client.js";
 import {
   ConflictError,
@@ -28,12 +29,17 @@ export const locationService = {
     input: CreateLocationInput,
   ): Promise<LocationResponse> {
     if (!multipleLocationsEnabled) {
-      throw new ConflictError("Multiple locations are not enabled");
+      throw new ConflictError("Multiple locations are not enabled", {
+        code: API_ERROR_CODE.MULTIPLE_LOCATIONS_DISABLED,
+      });
     }
 
     try {
       if (input.isDefault) {
-        await locationRepository.clearDefaultForOrganization(db, organizationId);
+        await locationRepository.clearDefaultForOrganization(
+          db,
+          organizationId,
+        );
       }
 
       const created = await locationRepository.insert(db, {
@@ -51,7 +57,9 @@ export const locationService = {
     } catch (error) {
       mapDbMutationError(error, {
         unique: () =>
-          new ConflictError("A location with this name already exists"),
+          new ConflictError("A location with this name already exists", {
+            code: API_ERROR_CODE.LOCATION_NAME_EXISTS,
+          }),
       });
     }
   },
@@ -94,7 +102,9 @@ export const locationService = {
 
       mapDbMutationError(error, {
         unique: () =>
-          new ConflictError("A location with this name already exists"),
+          new ConflictError("A location with this name already exists", {
+            code: API_ERROR_CODE.LOCATION_NAME_EXISTS,
+          }),
       });
     }
   },
@@ -113,11 +123,15 @@ export const locationService = {
     }
 
     if (location.isDefault) {
-      throw new ConflictError("Cannot delete the default location");
+      throw new ConflictError("Cannot delete the default location", {
+        code: API_ERROR_CODE.DEFAULT_LOCATION_DELETE_FORBIDDEN,
+      });
     }
 
     if (tenantLocations.length <= 1) {
-      throw new ConflictError("Cannot delete the last location");
+      throw new ConflictError("Cannot delete the last location", {
+        code: API_ERROR_CODE.LAST_LOCATION_DELETE_FORBIDDEN,
+      });
     }
 
     try {
@@ -141,6 +155,7 @@ export const locationService = {
         foreignKey: () =>
           new ConflictError(
             "Cannot delete location while it has equipment or task data",
+            { code: API_ERROR_CODE.LOCATION_HAS_DEPENDENCIES },
           ),
       });
     }

@@ -14,17 +14,23 @@ export function useOrganizationMutations() {
   const { fetchJson } = useAuthenticatedFetch();
 
   const updateName = useMutation({
+    meta: { handlesError: true },
     mutationFn: async (input: UpdateOrganizationNameInput) => {
       const payload = updateOrganizationNameSchema.parse(input);
-      return fetchJson("/organizations/current/name", organizationResponseSchema, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      return fetchJson(
+        "/organizations/current/name",
+        organizationResponseSchema,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
     },
   });
 
   const updateSettings = useMutation({
+    meta: { handlesError: true },
     mutationFn: async (input: UpdateOrganizationInput) => {
       const payload = updateOrganizationSchema.parse(input);
       return fetchJson("/organizations/current", organizationResponseSchema, {

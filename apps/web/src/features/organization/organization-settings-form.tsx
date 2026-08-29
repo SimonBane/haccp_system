@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useTenant } from "@/features/tenant/tenant-provider";
-import { getErrorMessage } from "@/lib/api/get-error-message";
+import { useApiErrorToast } from "@/lib/api/use-api-error-toast";
 import { useZodErrorMap } from "@/lib/forms/zod-error-map";
 
 type SettingsSection = "general" | "regional" | "locations";
@@ -73,6 +73,7 @@ export function OrganizationSettingsForm({
   initialOrganization,
 }: OrganizationSettingsFormProps) {
   const t = useTranslations("SettingsPage");
+  const showApiError = useApiErrorToast();
   const { updateName, updateSettings } = useOrganizationMutations();
   const { organization, reloadTenant, locations } = useTenant();
   const localeLabels = useMemo(
@@ -83,8 +84,10 @@ export function OrganizationSettingsForm({
     [t],
   );
 
-  const [showMultipleLocationsDisableWarning, setShowMultipleLocationsDisableWarning] =
-    useState(false);
+  const [
+    showMultipleLocationsDisableWarning,
+    setShowMultipleLocationsDisableWarning,
+  ] = useState(false);
   // Per card: react-hook-form has one `isSubmitting`, but the three sections save independently.
   const [submittingSections, setSubmittingSections] = useState<
     Record<SettingsSection, boolean>
@@ -161,8 +164,8 @@ export function OrganizationSettingsForm({
         setShowMultipleLocationsDisableWarning(false);
       }
       toast.success(t("toast.saved"));
-    } catch (err) {
-      toast.error(getErrorMessage(err, t("errors.generic")));
+    } catch (error) {
+      showApiError(error);
     } finally {
       setSubmittingSections((current) => ({ ...current, [section]: false }));
     }

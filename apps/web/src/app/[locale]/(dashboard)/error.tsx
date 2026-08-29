@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import { useTranslations } from "next-intl";
-import * as Sentry from "@sentry/nextjs";
 import { CenteredShell } from "@/components/layout/centered-shell";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { isSentryEnabled } from "@/lib/sentry";
+import { reportUnexpectedWebError } from "@/lib/api/error-reporting";
 
 export default function DashboardError({
   error,
@@ -24,8 +23,8 @@ export default function DashboardError({
   const t = useTranslations("DashboardErrorPage");
 
   useEffect(() => {
-    if (isSentryEnabled()) {
-      Sentry.captureException(error);
+    if (!error.digest) {
+      reportUnexpectedWebError(error);
     }
   }, [error]);
 

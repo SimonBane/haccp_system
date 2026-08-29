@@ -31,7 +31,12 @@ export {
   isCalendarDate,
   startOfCalendarMonth,
 } from "./lib/calendar-date.js";
-export { apiErrorSchema, type ApiError } from "./schemas/error.js";
+export {
+  API_ERROR_CODE,
+  apiErrorSchema,
+  type ApiError,
+  type ApiErrorCode,
+} from "./schemas/error.js";
 export {
   GRID_DEFAULT_PAGE_SIZE,
   GRID_MAX_PAGE_SIZE,

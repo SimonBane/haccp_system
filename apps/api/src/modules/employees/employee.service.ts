@@ -9,6 +9,7 @@ import type {
   UpdateEmployeeRoleInput,
 } from "@haccp/shared";
 import {
+  API_ERROR_CODE,
   normalizeEmail,
   normalizeName,
   normalizeOrgRole,
@@ -26,7 +27,10 @@ import {
 } from "../../core/errors/app-errors.js";
 import { mapDbMutationError } from "../../lib/db-errors.js";
 import { userService } from "../users/user.service.js";
-import { revokeClerkInvitation, syncClerkMembershipRemoval } from "./employee.clerk.js";
+import {
+  revokeClerkInvitation,
+  syncClerkMembershipRemoval,
+} from "./employee.clerk.js";
 import { changeActiveEmployeeRole } from "./employee.role.js";
 import type { EmployeeDetail } from "./employee.mapper.js";
 import {
@@ -35,7 +39,10 @@ import {
   toEmployeeResponse,
 } from "./employee.mapper.js";
 import { issueMembershipInvitation } from "./employee.invitations.js";
-import { resolveLocationAssignments, sameLocationIds } from "./employee.locations.js";
+import {
+  resolveLocationAssignments,
+  sameLocationIds,
+} from "./employee.locations.js";
 import { membershipCache } from "./membership-cache.js";
 import { employeeRepository } from "./employee.repository.js";
 
@@ -61,7 +68,9 @@ function assertLocationIdsBelongToTenant(
   locationIds: string[],
   tenantLocations: LocationResponse[],
 ): void {
-  const tenantLocationIds = new Set(tenantLocations.map((location) => location.id));
+  const tenantLocationIds = new Set(
+    tenantLocations.map((location) => location.id),
+  );
   const hasInvalidLocation = locationIds.some(
     (locationId) => !tenantLocationIds.has(locationId),
   );
@@ -122,8 +131,12 @@ async function createDraftEmployee(
     });
   } catch (error) {
     mapDbMutationError(error, {
-      unique: () => new ConflictError("An employee with this email already exists"),
-      foreignKey: () => new ValidationError("One or more locations are invalid"),
+      unique: () =>
+        new ConflictError("An employee with this email already exists", {
+          code: API_ERROR_CODE.EMPLOYEE_EMAIL_EXISTS,
+        }),
+      foreignKey: () =>
+        new ValidationError("One or more locations are invalid"),
     });
   }
 }
@@ -197,7 +210,11 @@ export const employeeService = {
     input: UpdateEmployeeRoleInput,
     tenantLocations: LocationResponse[],
   ): Promise<EmployeeResponse> {
-    const detail = await requireEmployeeDetail(db, organizationId, membershipId);
+    const detail = await requireEmployeeDetail(
+      db,
+      organizationId,
+      membershipId,
+    );
 
     if (detail.membership.status !== MEMBERSHIP_STATUS.ACTIVE) {
       throw new ValidationError(
@@ -237,7 +254,11 @@ export const employeeService = {
     input: UpdateEmployeeLocationsInput,
     tenantLocations: LocationResponse[],
   ): Promise<EmployeeResponse> {
-    const detail = await requireEmployeeDetail(db, organizationId, membershipId);
+    const detail = await requireEmployeeDetail(
+      db,
+      organizationId,
+      membershipId,
+    );
     assertLocationIdsBelongToTenant(input.locationIds, tenantLocations);
 
     if (
@@ -278,7 +299,11 @@ export const employeeService = {
     input: UpdateEmployeeProfileInput,
     tenantLocations: LocationResponse[],
   ): Promise<EmployeeResponse> {
-    const detail = await requireEmployeeDetail(db, organizationId, membershipId);
+    const detail = await requireEmployeeDetail(
+      db,
+      organizationId,
+      membershipId,
+    );
 
     if (detail.membership.status === MEMBERSHIP_STATUS.ACTIVE) {
       throw new ValidationError(
@@ -286,21 +311,34 @@ export const employeeService = {
       );
     }
 
-    const email = input.email !== undefined ? normalizeEmail(input.email) : undefined;
+    const email =
+      input.email !== undefined ? normalizeEmail(input.email) : undefined;
     const firstName =
-      input.firstName !== undefined ? normalizeName(input.firstName) : undefined;
+      input.firstName !== undefined
+        ? normalizeName(input.firstName)
+        : undefined;
     const lastName =
       input.lastName !== undefined ? normalizeName(input.lastName) : undefined;
-    const role = input.role !== undefined ? normalizeOrgRole(input.role) : undefined;
+    const role =
+      input.role !== undefined ? normalizeOrgRole(input.role) : undefined;
 
-    const emailChanged = email !== undefined && email !== normalizeEmail(detail.user.email);
+    const emailChanged =
+      email !== undefined && email !== normalizeEmail(detail.user.email);
     const firstNameChanged =
-      firstName !== undefined && firstName !== normalizeName(detail.user.firstName);
+      firstName !== undefined &&
+      firstName !== normalizeName(detail.user.firstName);
     const lastNameChanged =
-      lastName !== undefined && lastName !== normalizeName(detail.user.lastName);
-    const roleChanged = role !== undefined && role !== normalizeOrgRole(detail.membership.role);
+      lastName !== undefined &&
+      lastName !== normalizeName(detail.user.lastName);
+    const roleChanged =
+      role !== undefined && role !== normalizeOrgRole(detail.membership.role);
 
-    if (!emailChanged && !firstNameChanged && !lastNameChanged && !roleChanged) {
+    if (
+      !emailChanged &&
+      !firstNameChanged &&
+      !lastNameChanged &&
+      !roleChanged
+    ) {
       return buildEmployeeResponseFromDetail(detail, tenantLocations);
     }
 
@@ -338,7 +376,10 @@ export const employeeService = {
       });
     } catch (error) {
       mapDbMutationError(error, {
-        unique: () => new ConflictError("An employee with this email already exists"),
+        unique: () =>
+          new ConflictError("An employee with this email already exists", {
+            code: API_ERROR_CODE.EMPLOYEE_EMAIL_EXISTS,
+          }),
       });
     }
 
@@ -384,7 +425,11 @@ export const employeeService = {
     membershipId: string,
     tenantLocations: LocationResponse[],
   ): Promise<EmployeeResponse> {
-    const detail = await requireEmployeeDetail(db, organizationId, membershipId);
+    const detail = await requireEmployeeDetail(
+      db,
+      organizationId,
+      membershipId,
+    );
 
     if (detail.membership.status !== MEMBERSHIP_STATUS.DRAFT) {
       throw new ValidationError("Only draft employees can be invited");
@@ -417,7 +462,11 @@ export const employeeService = {
     membershipId: string,
     tenantLocations: LocationResponse[],
   ): Promise<EmployeeResponse> {
-    const detail = await requireEmployeeDetail(db, organizationId, membershipId);
+    const detail = await requireEmployeeDetail(
+      db,
+      organizationId,
+      membershipId,
+    );
 
     if (
       detail.membership.status !== MEMBERSHIP_STATUS.INVITED ||
@@ -426,20 +475,22 @@ export const employeeService = {
       throw new ValidationError("Employee does not have a pending invitation");
     }
 
-    await revokeClerkInvitation(clerkOrgId, detail.membership.clerkInvitationId);
+    await revokeClerkInvitation(
+      clerkOrgId,
+      detail.membership.clerkInvitationId,
+    );
 
-    const membership =
-      await employeeRepository.updateStatusByIdAndOrganization(
-        db,
-        organizationId,
-        membershipId,
-        MEMBERSHIP_STATUS.INVITED,
-        {
-          status: MEMBERSHIP_STATUS.DRAFT,
-          clerkInvitationId: null,
-          invitedAt: null,
-        },
-      );
+    const membership = await employeeRepository.updateStatusByIdAndOrganization(
+      db,
+      organizationId,
+      membershipId,
+      MEMBERSHIP_STATUS.INVITED,
+      {
+        status: MEMBERSHIP_STATUS.DRAFT,
+        clerkInvitationId: null,
+        invitedAt: null,
+      },
+    );
 
     if (!membership) {
       throw new ValidationError("Employee does not have a pending invitation");

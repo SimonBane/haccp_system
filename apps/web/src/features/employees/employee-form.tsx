@@ -14,7 +14,6 @@ import { SaveIcon, SendIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm, useFormState, useWatch } from "react-hook-form";
-import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
@@ -47,7 +46,6 @@ import {
   resolveEmployeeLocationIds,
 } from "@/features/employees/utils";
 import { useTenant } from "@/features/tenant/tenant-provider";
-import { getErrorMessage } from "@/lib/api/get-error-message";
 
 type EmployeeFormProps = {
   open: boolean;
@@ -87,11 +85,12 @@ export function EmployeeForm({
 }: EmployeeFormProps) {
   const t = useTranslations("EmployeesPage");
   const { userId: clerkUserId } = useAuth();
-  const { organization, locations: tenantLocations, locationId } =
-    useTenant();
+  const { organization, locations: tenantLocations, locationId } = useTenant();
   const multipleLocationsEnabled = organization.multipleLocationsEnabled;
   const defaultLocationId = useMemo(() => {
-    const defaultLocation = tenantLocations.find((location) => location.isDefault);
+    const defaultLocation = tenantLocations.find(
+      (location) => location.isDefault,
+    );
     return defaultLocation?.id ?? locationId;
   }, [tenantLocations, locationId]);
   const isEditing = Boolean(employee);
@@ -119,39 +118,43 @@ export function EmployeeForm({
 
   const employeeFormSchema = useMemo(
     () =>
-      z.object({
-        email: z.string().trim().max(256).pipe(z.email({ error: t("validation.emailInvalid") })),
-        firstName: z
-          .string()
-          .trim()
-          .min(1, t("validation.firstNameRequired"))
-          .max(100),
-        lastName: z
-          .string()
-          .trim()
-          .min(1, t("validation.lastNameRequired"))
-          .max(100),
-        role: z
-          .enum(["", ORG_ROLE.ADMIN, ORG_ROLE.EMPLOYEE] as const)
-          .refine(
-            (value): value is EmployeeRole => value !== "",
-            { error: t("validation.roleRequired") },
-          ),
-        locationIds: z.array(z.uuid()),
-      })
-      .check((ctx) => {
-        // Same predicate as the API; waived for single-location orgs (assignment filled in on submit).
-        if (
-          needsLocationSelection({ ...ctx.value, multipleLocationsEnabled })
-        ) {
-          ctx.issues.push({
-            code: "custom",
-            path: ["locationIds"],
-            message: t("validation.locationsRequired"),
-            input: ctx.value.locationIds,
-          });
-        }
-      }),
+      z
+        .object({
+          email: z
+            .string()
+            .trim()
+            .max(256)
+            .pipe(z.email({ error: t("validation.emailInvalid") })),
+          firstName: z
+            .string()
+            .trim()
+            .min(1, t("validation.firstNameRequired"))
+            .max(100),
+          lastName: z
+            .string()
+            .trim()
+            .min(1, t("validation.lastNameRequired"))
+            .max(100),
+          role: z
+            .enum(["", ORG_ROLE.ADMIN, ORG_ROLE.EMPLOYEE] as const)
+            .refine((value): value is EmployeeRole => value !== "", {
+              error: t("validation.roleRequired"),
+            }),
+          locationIds: z.array(z.uuid()),
+        })
+        .check((ctx) => {
+          // Same predicate as the API; waived for single-location orgs (assignment filled in on submit).
+          if (
+            needsLocationSelection({ ...ctx.value, multipleLocationsEnabled })
+          ) {
+            ctx.issues.push({
+              code: "custom",
+              path: ["locationIds"],
+              message: t("validation.locationsRequired"),
+              input: ctx.value.locationIds,
+            });
+          }
+        }),
     [multipleLocationsEnabled, t],
   );
 
@@ -174,7 +177,10 @@ export function EmployeeForm({
       firstName: employee?.firstName ?? "",
       lastName: employee?.lastName ?? "",
       role: employee?.role ?? "",
-      locationIds: resolveLocationIds(employee?.role ?? "", employee?.locationIds),
+      locationIds: resolveLocationIds(
+        employee?.role ?? "",
+        employee?.locationIds,
+      ),
     },
   });
 
@@ -185,7 +191,10 @@ export function EmployeeForm({
         firstName: employee?.firstName ?? "",
         lastName: employee?.lastName ?? "",
         role: employee?.role ?? "",
-        locationIds: resolveLocationIds(employee?.role ?? "", employee?.locationIds),
+        locationIds: resolveLocationIds(
+          employee?.role ?? "",
+          employee?.locationIds,
+        ),
       });
     }
   }, [open, employee, form, resolveLocationIds]);
@@ -272,8 +281,8 @@ export function EmployeeForm({
         setPendingValues(null);
         onOpenChange(false);
       }
-    } catch (error) {
-      toast.error(getErrorMessage(error, t("errors.generic")));
+    } catch {
+      // The mutation cache owns the user-facing error.
     } finally {
       setIsResending(false);
     }
@@ -296,46 +305,45 @@ export function EmployeeForm({
   };
 
   const formFooter = (
-      <DialogFooter>
-        {!isEditing ? (
-          <div className="flex w-full flex-row gap-2 sm:justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              className="flex-1 sm:flex-none"
-              isLoading={pendingAction === "save"}
-              disabled={pendingAction !== null && pendingAction !== "save"}
-              onClick={() => void submit(false)}
-            >
-              <SaveIcon data-icon="inline-start" />
-              {t("save")}
-            </Button>
-            <Button
-              type="button"
-              className="flex-1 sm:flex-none"
-              isLoading={pendingAction === "invite"}
-              disabled={pendingAction !== null && pendingAction !== "invite"}
-              onClick={() => void submit(true)}
-            >
-              <SendIcon data-icon="inline-start" />
-              {t("saveAndInvite")}
-            </Button>
-          </div>
-        ) : (
+    <DialogFooter>
+      {!isEditing ? (
+        <div className="flex w-full flex-row gap-2 sm:justify-end">
           <Button
             type="button"
+            variant="outline"
+            className="flex-1 sm:flex-none"
             isLoading={pendingAction === "save"}
-            disabled={
-              !hasChanges ||
-              (pendingAction !== null && pendingAction !== "save")
-            }
-            onClick={() => void submitEdit()}
+            disabled={pendingAction !== null && pendingAction !== "save"}
+            onClick={() => void submit(false)}
           >
             <SaveIcon data-icon="inline-start" />
             {t("save")}
           </Button>
-        )}
-      </DialogFooter>
+          <Button
+            type="button"
+            className="flex-1 sm:flex-none"
+            isLoading={pendingAction === "invite"}
+            disabled={pendingAction !== null && pendingAction !== "invite"}
+            onClick={() => void submit(true)}
+          >
+            <SendIcon data-icon="inline-start" />
+            {t("saveAndInvite")}
+          </Button>
+        </div>
+      ) : (
+        <Button
+          type="button"
+          isLoading={pendingAction === "save"}
+          disabled={
+            !hasChanges || (pendingAction !== null && pendingAction !== "save")
+          }
+          onClick={() => void submitEdit()}
+        >
+          <SaveIcon data-icon="inline-start" />
+          {t("save")}
+        </Button>
+      )}
+    </DialogFooter>
   );
 
   return (
@@ -352,13 +360,13 @@ export function EmployeeForm({
         onConfirm={() => void confirmResend()}
       />
       <ResponsiveFormDialog
-      open={open}
-      onOpenChange={handleDialogOpenChange}
-      title={isEditing ? t("editTitle") : t("addTitle")}
-      description={isEditing ? t("editDescription") : t("addDescription")}
-      closeLabel={t("cancel")}
-      footer={formFooter}
-    >
+        open={open}
+        onOpenChange={handleDialogOpenChange}
+        title={isEditing ? t("editTitle") : t("addTitle")}
+        description={isEditing ? t("editDescription") : t("addDescription")}
+        closeLabel={t("cancel")}
+        footer={formFooter}
+      >
         <form id={EMPLOYEE_FORM_ID} className="space-y-6">
           <FieldGroup>
             <Controller
@@ -366,7 +374,10 @@ export function EmployeeForm({
               name="email"
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="employee-email" className={REQUIRED_LABEL_CLASS}>
+                  <FieldLabel
+                    htmlFor="employee-email"
+                    className={REQUIRED_LABEL_CLASS}
+                  >
                     {t("emailLabel")}
                   </FieldLabel>
                   <Input
@@ -514,7 +525,9 @@ export function EmployeeForm({
                     >
                       {t("locationsLabel")}
                     </FieldLabel>
-                    <FieldDescription>{t("locationsDescription")}</FieldDescription>
+                    <FieldDescription>
+                      {t("locationsDescription")}
+                    </FieldDescription>
                     <LocationMultiSelect
                       id="employee-locations"
                       locations={locations}
@@ -524,7 +537,9 @@ export function EmployeeForm({
                       placeholder={t("locationsPlaceholder")}
                       emptyMessage={t("locationsEmpty")}
                       noLocationsMessage={t("noLocationsAvailable")}
-                      moreSelectedLabel={(count) => t("moreSelected", { count })}
+                      moreSelectedLabel={(count) =>
+                        t("moreSelected", { count })
+                      }
                       overflowRemoveLabel={(count) =>
                         t("overflowRemoveLabel", { count })
                       }
@@ -537,7 +552,6 @@ export function EmployeeForm({
               />
             ) : null}
           </FieldGroup>
-
         </form>
       </ResponsiveFormDialog>
     </>

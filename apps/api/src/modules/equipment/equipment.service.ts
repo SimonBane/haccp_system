@@ -4,6 +4,7 @@ import type {
   EquipmentResponse,
   UpdateEquipmentInput,
 } from "@haccp/shared";
+import { API_ERROR_CODE } from "@haccp/shared";
 import type { Db } from "../../core/db/client.js";
 import { equipment } from "../../core/db/schema/equipment.js";
 import {
@@ -17,10 +18,7 @@ import { toEquipmentResponse } from "./equipment.mapper.js";
 import { equipmentRepository } from "./equipment.repository.js";
 
 export const equipmentService = {
-  async list(
-    db: Db,
-    locationId: string,
-  ): Promise<EquipmentListResponse> {
+  async list(db: Db, locationId: string): Promise<EquipmentListResponse> {
     const rows = await equipmentRepository.findManyByLocation(db, locationId);
 
     return {
@@ -52,6 +50,7 @@ export const equipmentService = {
         unique: () =>
           new ConflictError(
             "Equipment with this name already exists at this site",
+            { code: API_ERROR_CODE.EQUIPMENT_NAME_EXISTS },
           ),
         foreignKey: () => new NotFoundError("Location not found"),
       });
@@ -102,6 +101,7 @@ export const equipmentService = {
         unique: () =>
           new ConflictError(
             "Equipment with this name already exists at this site",
+            { code: API_ERROR_CODE.EQUIPMENT_NAME_EXISTS },
           ),
         foreignKey: () => new NotFoundError("Location not found"),
       });

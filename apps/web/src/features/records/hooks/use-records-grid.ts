@@ -48,6 +48,7 @@ export type RecordsGrid = {
   showResultFilter: boolean;
   isLoading: boolean;
   isError: boolean;
+  error: unknown;
   refetch: () => Promise<unknown>;
   /** Bumps whenever the visible dataset changes, so open detail can be dismissed. */
   datasetKey: string;
@@ -152,6 +153,7 @@ export function useRecordsGrid(options: UseRecordsGridOptions): RecordsGrid {
     showResultFilter,
     isLoading: grid.isLoading,
     isError: grid.isError,
+    error: grid.error,
     refetch: grid.refetch,
     datasetKey,
   };

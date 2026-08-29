@@ -6,8 +6,8 @@ import { Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { ApiQueryError } from "@/components/api-query-error";
 import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
-import { DataTableQueryError } from "@/components/ui/data-table/data-table-query-error";
 import { Spinner } from "@/components/ui/spinner";
 import {
   MobileHeaderAddAction,
@@ -17,7 +17,7 @@ import { EquipmentForm } from "@/features/equipment/equipment-form";
 import { EquipmentData } from "@/features/equipment/data-table/data";
 import { useEquipmentMutations } from "@/features/equipment/hooks/use-equipment-mutations";
 import { useEquipmentQuery } from "@/features/equipment/hooks/use-equipment-query";
-import { getErrorMessage } from "@/lib/api/get-error-message";
+import { useApiErrorToast } from "@/lib/api/use-api-error-toast";
 
 type EquipmentManagerProps = {
   initialItems: EquipmentResponse[];
@@ -29,10 +29,12 @@ export function EquipmentManager({
   initialLocationId,
 }: EquipmentManagerProps) {
   const t = useTranslations("EquipmentPage");
+  const showApiError = useApiErrorToast();
   const {
     data: items = [],
     isLoading,
     isError,
+    error,
     refetch,
   } = useEquipmentQuery({
     initialData: initialItems,
@@ -94,9 +96,9 @@ export function EquipmentManager({
       setDeleteTarget(null);
     } catch (error) {
       setIsDeleting(false);
-      toast.error(getErrorMessage(error, t("toast.deleteError")));
+      showApiError(error);
     }
-  }, [deleteTarget, isDeleting, refetch, remove, t]);
+  }, [deleteTarget, isDeleting, refetch, remove, showApiError, t]);
 
   const handleBulkDelete = useCallback(() => {
     setDeleteTarget(null);
@@ -115,11 +117,11 @@ export function EquipmentManager({
       setRowSelection({});
       setBulkDeleteOpen(false);
     } catch (error) {
-      toast.error(getErrorMessage(error, t("toast.bulkDeleteError")));
+      showApiError(error);
     } finally {
       setIsBulkDeleting(false);
     }
-  }, [isBulkDeleting, refetch, remove, selectedIds, t]);
+  }, [isBulkDeleting, refetch, remove, selectedIds, showApiError, t]);
 
   // Only clear `open` — clearing the record remounts the form via `key` and kills the slide-out.
   const handleFormOpenChange = useCallback((open: boolean) => {
@@ -155,7 +157,7 @@ export function EquipmentManager({
           <Spinner className="size-8" />
         </div>
       ) : isError ? (
-        <DataTableQueryError onRetry={() => void refetch()} />
+        <ApiQueryError error={error} onRetry={() => void refetch()} />
       ) : (
         <EquipmentData
           items={items}

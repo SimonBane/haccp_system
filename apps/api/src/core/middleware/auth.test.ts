@@ -11,6 +11,7 @@ vi.mock("@clerk/backend", () => ({ verifyToken }));
 
 const { requireAuth } = await import("./auth.js");
 const { errorHandler } = await import("./error-handler.js");
+const { requestIdMiddleware } = await import("./request-id.js");
 
 /** 401 only for a bad token — the web app treats 401 as signed out. */
 function tokenError(reason: string): TokenVerificationError {
@@ -19,6 +20,7 @@ function tokenError(reason: string): TokenVerificationError {
 
 function app() {
   const instance = new Hono<AppEnv>();
+  instance.use("*", requestIdMiddleware);
   instance.onError(errorHandler);
   instance.get("/probe", requireAuth, (c) => c.json({ ok: true }));
   return instance;
@@ -42,7 +44,11 @@ describe("requireAuth", () => {
   });
 
   it("passes the verified claims through on success", async () => {
-    verifyToken.mockResolvedValue({ sub: "user_1", org_id: "org_1", org_role: "org:admin" });
+    verifyToken.mockResolvedValue({
+      sub: "user_1",
+      org_id: "org_1",
+      org_role: "org:admin",
+    });
 
     const res = await get(AUTHED);
     expect(res.status).toBe(200);

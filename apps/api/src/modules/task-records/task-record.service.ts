@@ -6,6 +6,7 @@ import type {
   TemperatureResult,
 } from "@haccp/shared";
 import {
+  API_ERROR_CODE,
   classifyTemperatureResult,
   RECORD_KIND,
   TASK_TEMPLATE_TYPE,
@@ -160,7 +161,10 @@ export const taskRecordService = {
       }
 
       mapDbMutationError(error, {
-        unique: () => new ConflictError("This occurrence already has a record"),
+        unique: () =>
+          new ConflictError("This occurrence already has a record", {
+            code: API_ERROR_CODE.TASK_RECORD_ALREADY_EXISTS,
+          }),
         foreignKey: () => new NotFoundError("Task occurrence not found"),
       });
     }
@@ -189,11 +193,12 @@ export const taskRecordService = {
         : null;
 
     return db.transaction(async (tx) => {
-      const updatedRecord = await taskRecordRepository.updateRecordForReactivation(
-        tx,
-        chain.recordId,
-        { recordedAt: now, recordedByUserId: scope.actorUserId },
-      );
+      const updatedRecord =
+        await taskRecordRepository.updateRecordForReactivation(
+          tx,
+          chain.recordId,
+          { recordedAt: now, recordedByUserId: scope.actorUserId },
+        );
 
       if (!updatedRecord) {
         throw new InternalError("Failed to update task record");
@@ -223,10 +228,7 @@ export const taskRecordService = {
     });
   },
 
-  async remove(
-    db: Db,
-    scope: WriteScope,
-  ): Promise<TaskRecordResponse> {
+  async remove(db: Db, scope: WriteScope): Promise<TaskRecordResponse> {
     const chain: RecordChainRow | null =
       await taskRecordRepository.findRecordChain(db, scope);
 

@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
+import { shouldReportUnexpectedWebError } from "./src/lib/api/error-reporting";
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
@@ -10,4 +11,10 @@ export async function register() {
   }
 }
 
-export const onRequestError = Sentry.captureRequestError;
+export const onRequestError = (
+  ...args: Parameters<typeof Sentry.captureRequestError>
+) => {
+  if (shouldReportUnexpectedWebError(args[0])) {
+    Sentry.captureRequestError(...args);
+  }
+};
