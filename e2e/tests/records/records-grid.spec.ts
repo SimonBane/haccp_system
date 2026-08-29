@@ -21,8 +21,9 @@ const CLEANING_TASK = `${E2E_PREFIX} Clean prep surface`;
  * local state — the way to read the active range without forcing a request.
  */
 async function activeRange(page: Page): Promise<{ from: string; to: string }> {
+  // Base UI renders the action as an anchor with role="button", not a link.
   const href = await page
-    .getByRole("link", { name: "Print report" })
+    .getByRole("button", { name: "Print report" })
     .getAttribute("href");
   const params = new URL(href!, "http://localhost").searchParams;
 
@@ -292,7 +293,7 @@ test("the print action carries the current filters but no paging or sort", async
   );
 
   const href = await page
-    .getByRole("link", { name: "Print report" })
+    .getByRole("button", { name: "Print report" })
     .getAttribute("href");
 
   expect(href).toContain("/records/print?");
