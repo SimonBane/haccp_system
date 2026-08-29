@@ -22,25 +22,38 @@ import { cache } from "react";
 
 import { LOCATION_COOKIE, resolveLocationId } from "@/lib/location-preference";
 import { locationScopedPath } from "./paths";
-import { API_BASE_URL, ApiRequestError, parseApiError } from "./api-utils";
-
-export { parseApiError } from "./api-utils";
+import {
+  API_BASE_URL,
+  ApiRequestError,
+  networkRequestError,
+  parseApiJson,
+  throwIfApiError,
+} from "./api-utils";
 
 export async function fetchApi(
   path: string,
   init?: RequestInit,
 ): Promise<Response> {
-  const { getToken } = await auth();
-  const token = await getToken();
+  try {
+    const { getToken } = await auth();
+    const token = await getToken();
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      cache: "no-store",
+      headers: {
+        ...init?.headers,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
 
-  return fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    cache: "no-store",
-    headers: {
-      ...init?.headers,
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
+    return await throwIfApiError(response);
+  } catch (error) {
+    if (error instanceof ApiRequestError) {
+      throw error;
+    }
+
+    throw networkRequestError(error);
+  }
 }
 
 async function fetchJson<T>(
@@ -50,16 +63,7 @@ async function fetchJson<T>(
 ): Promise<T> {
   const response = await fetchApi(path, init);
 
-  if (!response.ok) {
-    const error = await parseApiError(response);
-    throw new ApiRequestError(
-      error?.message ?? `Request failed with ${response.status}`,
-      error?.error ?? "UNKNOWN",
-    );
-  }
-
-  const body: unknown = await response.json();
-  return schema.parse(body);
+  return parseApiJson(response, schema);
 }
 
 /** Deduped per render: `cache: "no-store"` opts out of Next fetch memoization. */

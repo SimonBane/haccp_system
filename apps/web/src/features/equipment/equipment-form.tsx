@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  API_ERROR_CODE,
   EQUIPMENT_DEFAULT_TEMPS,
   EQUIPMENT_TEMP_MAX_C,
   EQUIPMENT_TEMP_MIN_C,
@@ -15,7 +16,6 @@ import { useTranslations } from "next-intl";
 import { PlusIcon, SaveIcon } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import { Controller, useForm, useFormState } from "react-hook-form";
-import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,10 +35,9 @@ import {
   InputGroupText,
 } from "@/components/ui/input-group";
 import { ApiRequestError } from "@/lib/api-utils";
+import { useApiErrorToast } from "@/lib/api/use-api-error-toast";
 import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
-import {
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { DialogFooter } from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -58,11 +57,7 @@ type EquipmentFormProps = {
   onSubmit: (values: EquipmentFieldsInput) => Promise<void>;
 };
 
-const EQUIPMENT_TYPES: EquipmentType[] = [
-  "fridge",
-  "freezer",
-  "display_case",
-];
+const EQUIPMENT_TYPES: EquipmentType[] = ["fridge", "freezer", "display_case"];
 
 const EQUIPMENT_FORM_ID = "equipment-form";
 
@@ -148,6 +143,7 @@ export function EquipmentForm({
   onSubmit,
 }: EquipmentFormProps) {
   const t = useTranslations("EquipmentPage");
+  const showApiError = useApiErrorToast();
   const isEditing = Boolean(equipment);
   const isDuplicating = Boolean(duplicateSource) && !isEditing;
   const nameRef = useRef<HTMLInputElement | null>(null);
@@ -197,11 +193,7 @@ export function EquipmentForm({
       .superRefine((data, ctx) => {
         const minTempC = parseTempValue(data.minTempC);
         const maxTempC = parseTempValue(data.maxTempC);
-        if (
-          minTempC !== null &&
-          maxTempC !== null &&
-          minTempC >= maxTempC
-        ) {
+        if (minTempC !== null && maxTempC !== null && minTempC >= maxTempC) {
           ctx.addIssue({
             code: "custom",
             message: t("validation.tempRange"),
@@ -280,14 +272,15 @@ export function EquipmentForm({
       await onSubmit(payload);
       onOpenChange(false);
     } catch (error) {
-      if (error instanceof ApiRequestError && error.code === "CONFLICT") {
+      if (
+        error instanceof ApiRequestError &&
+        error.code === API_ERROR_CODE.EQUIPMENT_NAME_EXISTS
+      ) {
         form.setError("name", { message: t("nameTaken") });
         return;
       }
 
-      toast.error(
-        error instanceof Error ? error.message : t("submitError"),
-      );
+      showApiError(error);
     }
   }
 
@@ -342,207 +335,204 @@ export function EquipmentForm({
       initialFocus={isEditing || isDuplicating ? undefined : false}
       footer={formFooter}
     >
-        <form
-          id={EQUIPMENT_FORM_ID}
-          onSubmit={form.handleSubmit(handleValidSubmit)}
-          className="grid gap-8"
-        >
-          <FieldGroup>
-            <Controller
-              name="name"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel
-                    htmlFor={`${EQUIPMENT_FORM_ID}-name`}
-                    className={REQUIRED_LABEL_CLASS}
-                  >
-                    {t("nameLabel")}
-                  </FieldLabel>
-                  <Input
-                    {...field}
-                    ref={(node) => {
-                      field.ref(node);
-                      nameRef.current = node;
-                    }}
-                    id={`${EQUIPMENT_FORM_ID}-name`}
+      <form
+        id={EQUIPMENT_FORM_ID}
+        onSubmit={form.handleSubmit(handleValidSubmit)}
+        className="grid gap-8"
+      >
+        <FieldGroup>
+          <Controller
+            name="name"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel
+                  htmlFor={`${EQUIPMENT_FORM_ID}-name`}
+                  className={REQUIRED_LABEL_CLASS}
+                >
+                  {t("nameLabel")}
+                </FieldLabel>
+                <Input
+                  {...field}
+                  ref={(node) => {
+                    field.ref(node);
+                    nameRef.current = node;
+                  }}
+                  id={`${EQUIPMENT_FORM_ID}-name`}
+                  aria-invalid={fieldState.invalid}
+                  placeholder={t("namePlaceholder")}
+                />
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
+                )}
+              </Field>
+            )}
+          />
+
+          <Controller
+            name="type"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel
+                  htmlFor={`${EQUIPMENT_FORM_ID}-type`}
+                  className={REQUIRED_LABEL_CLASS}
+                >
+                  {t("typeLabel")}
+                </FieldLabel>
+                <Select
+                  name={field.name}
+                  items={typeItems}
+                  value={field.value || null}
+                  onValueChange={(value: unknown) => {
+                    const nextType = value as EquipmentType;
+                    field.onChange(nextType);
+
+                    if (!isEditing) {
+                      form.setValue(
+                        "minTempC",
+                        String(EQUIPMENT_DEFAULT_TEMPS[nextType].minTempC),
+                      );
+                      form.setValue(
+                        "maxTempC",
+                        String(EQUIPMENT_DEFAULT_TEMPS[nextType].maxTempC),
+                      );
+                    }
+                  }}
+                  onOpenChange={(nextOpen) => {
+                    if (!nextOpen) {
+                      field.onBlur();
+                    }
+                  }}
+                >
+                  <SelectTrigger
+                    id={`${EQUIPMENT_FORM_ID}-type`}
                     aria-invalid={fieldState.invalid}
-                    placeholder={t("namePlaceholder")}
-                  />
-                  {fieldState.invalid && (
-                    <FieldError errors={[fieldState.error]} />
-                  )}
-                </Field>
-              )}
-            />
+                    className="w-full"
+                  >
+                    <SelectValue placeholder={t("typePlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent alignItemWithTrigger={false}>
+                    <SelectGroup>
+                      {EQUIPMENT_TYPES.map((equipmentType) => (
+                        <SelectItem key={equipmentType} value={equipmentType}>
+                          {typeLabels[equipmentType]}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
+                )}
+              </Field>
+            )}
+          />
+        </FieldGroup>
 
+        <FieldSet
+          className="gap-2"
+          data-invalid={Boolean(errors.minTempC || errors.maxTempC)}
+        >
+          <FieldLegend variant="label" className={REQUIRED_LABEL_CLASS}>
+            {t("allowedTempLabel")}
+          </FieldLegend>
+          <div className="flex items-center gap-2">
             <Controller
-              name="type"
+              name="minTempC"
               control={form.control}
               render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel
-                    htmlFor={`${EQUIPMENT_FORM_ID}-type`}
-                    className={REQUIRED_LABEL_CLASS}
-                  >
-                    {t("typeLabel")}
-                  </FieldLabel>
-                  <Select
-                    name={field.name}
-                    items={typeItems}
-                    value={field.value || null}
-                    onValueChange={(value: unknown) => {
-                      const nextType = value as EquipmentType;
-                      field.onChange(nextType);
+                <Field className="flex-1" data-invalid={fieldState.invalid}>
+                  <InputGroup>
+                    <InputGroupInput
+                      id={`${EQUIPMENT_FORM_ID}-min-temp`}
+                      type="text"
+                      inputMode="decimal"
 
-                      if (!isEditing) {
-                        form.setValue(
-                          "minTempC",
-                          String(EQUIPMENT_DEFAULT_TEMPS[nextType].minTempC),
-                        );
-                        form.setValue(
-                          "maxTempC",
-                          String(EQUIPMENT_DEFAULT_TEMPS[nextType].maxTempC),
-                        );
-                      }
-                    }}
-                    onOpenChange={(nextOpen) => {
-                      if (!nextOpen) {
-                        field.onBlur();
-                      }
-                    }}
-                  >
-                    <SelectTrigger
-                      id={`${EQUIPMENT_FORM_ID}-type`}
+                      enterKeyHint="next"
                       aria-invalid={fieldState.invalid}
-                      className="w-full"
-                    >
-                      <SelectValue placeholder={t("typePlaceholder")} />
-                    </SelectTrigger>
-                    <SelectContent alignItemWithTrigger={false}>
-                      <SelectGroup>
-                        {EQUIPMENT_TYPES.map((equipmentType) => (
-                          <SelectItem
-                            key={equipmentType}
-                            value={equipmentType}
-                          >
-                            {typeLabels[equipmentType]}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  {fieldState.invalid && (
-                    <FieldError errors={[fieldState.error]} />
-                  )}
+                      className={numberInputNoSpinClass}
+                      name={field.name}
+                      ref={field.ref}
+                      value={field.value}
+                      onChange={(event) => {
+                        const next = event.target.value;
+                        if (!isAllowedTempInput(next)) return;
+
+                        field.onChange(next);
+                        if (
+                          form.formState.touchedFields.minTempC ||
+                          form.formState.touchedFields.maxTempC
+                        ) {
+                          void form.trigger(["minTempC", "maxTempC"]);
+                        }
+                      }}
+                      onBlur={() => {
+                        field.onBlur();
+                        void form.trigger(["minTempC", "maxTempC"]);
+                      }}
+                    />
+                    <InputGroupAddon align="inline-end">
+                      <InputGroupText>°C</InputGroupText>
+                    </InputGroupAddon>
+                  </InputGroup>
                 </Field>
               )}
             />
-          </FieldGroup>
 
-          <FieldSet
-            className="gap-2"
-            data-invalid={Boolean(errors.minTempC || errors.maxTempC)}
-          >
-            <FieldLegend variant="label" className={REQUIRED_LABEL_CLASS}>
-              {t("allowedTempLabel")}
-            </FieldLegend>
-            <div className="flex items-center gap-2">
-              <Controller
-                name="minTempC"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field className="flex-1" data-invalid={fieldState.invalid}>
-                    <InputGroup>
-                      <InputGroupInput
-                        id={`${EQUIPMENT_FORM_ID}-min-temp`}
-                        type="text"
-                        inputMode="decimal"
+            <span className="shrink-0 text-sm text-muted-foreground">
+              {t("tempTo")}
+            </span>
 
-                        enterKeyHint="next"
-                        aria-invalid={fieldState.invalid}
-                        className={numberInputNoSpinClass}
-                        name={field.name}
-                        ref={field.ref}
-                        value={field.value}
-                        onChange={(event) => {
-                          const next = event.target.value;
-                          if (!isAllowedTempInput(next)) return;
+            <Controller
+              name="maxTempC"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field className="flex-1" data-invalid={fieldState.invalid}>
+                  <InputGroup>
+                    <InputGroupInput
+                      id={`${EQUIPMENT_FORM_ID}-max-temp`}
+                      type="text"
+                      inputMode="decimal"
 
-                          field.onChange(next);
-                          if (
-                            form.formState.touchedFields.minTempC ||
-                            form.formState.touchedFields.maxTempC
-                          ) {
-                            void form.trigger(["minTempC", "maxTempC"]);
-                          }
-                        }}
-                        onBlur={() => {
-                          field.onBlur();
+                      enterKeyHint="next"
+                      aria-invalid={fieldState.invalid}
+                      className={numberInputNoSpinClass}
+                      name={field.name}
+                      ref={field.ref}
+                      value={field.value}
+                      onChange={(event) => {
+                        const next = event.target.value;
+                        if (!isAllowedTempInput(next)) return;
+
+                        field.onChange(next);
+                        if (
+                          form.formState.touchedFields.minTempC ||
+                          form.formState.touchedFields.maxTempC
+                        ) {
                           void form.trigger(["minTempC", "maxTempC"]);
-                        }}
-                      />
-                      <InputGroupAddon align="inline-end">
-                        <InputGroupText>°C</InputGroupText>
-                      </InputGroupAddon>
-                    </InputGroup>
-                  </Field>
-                )}
-              />
-
-              <span className="shrink-0 text-sm text-muted-foreground">
-                {t("tempTo")}
-              </span>
-
-              <Controller
-                name="maxTempC"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field className="flex-1" data-invalid={fieldState.invalid}>
-                    <InputGroup>
-                      <InputGroupInput
-                        id={`${EQUIPMENT_FORM_ID}-max-temp`}
-                        type="text"
-                        inputMode="decimal"
-
-                        enterKeyHint="next"
-                        aria-invalid={fieldState.invalid}
-                        className={numberInputNoSpinClass}
-                        name={field.name}
-                        ref={field.ref}
-                        value={field.value}
-                        onChange={(event) => {
-                          const next = event.target.value;
-                          if (!isAllowedTempInput(next)) return;
-
-                          field.onChange(next);
-                          if (
-                            form.formState.touchedFields.minTempC ||
-                            form.formState.touchedFields.maxTempC
-                          ) {
-                            void form.trigger(["minTempC", "maxTempC"]);
-                          }
-                        }}
-                        onBlur={() => {
-                          field.onBlur();
-                          void form.trigger(["minTempC", "maxTempC"]);
-                        }}
-                      />
-                      <InputGroupAddon align="inline-end">
-                        <InputGroupText>°C</InputGroupText>
-                      </InputGroupAddon>
-                    </InputGroup>
-                  </Field>
-                )}
-              />
-            </div>
-            {errors.minTempC?.message ? (
-              <FieldError>{errors.minTempC.message}</FieldError>
-            ) : errors.maxTempC?.message ? (
-              <FieldError>{errors.maxTempC.message}</FieldError>
-            ) : null}
-          </FieldSet>
-        </form>
+                        }
+                      }}
+                      onBlur={() => {
+                        field.onBlur();
+                        void form.trigger(["minTempC", "maxTempC"]);
+                      }}
+                    />
+                    <InputGroupAddon align="inline-end">
+                      <InputGroupText>°C</InputGroupText>
+                    </InputGroupAddon>
+                  </InputGroup>
+                </Field>
+              )}
+            />
+          </div>
+          {errors.minTempC?.message ? (
+            <FieldError>{errors.minTempC.message}</FieldError>
+          ) : errors.maxTempC?.message ? (
+            <FieldError>{errors.maxTempC.message}</FieldError>
+          ) : null}
+        </FieldSet>
+      </form>
     </ResponsiveFormDialog>
   );
 }

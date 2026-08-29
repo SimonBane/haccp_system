@@ -14,6 +14,7 @@ import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
 import { FieldGroup } from "@/components/ui/field";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
+import { useApiErrorToast } from "@/lib/api/use-api-error-toast";
 
 type LocationFormProps = {
   open: boolean;
@@ -31,6 +32,7 @@ export function LocationForm({
   onSubmit,
 }: LocationFormProps) {
   const t = useTranslations("LocationsPage");
+  const showApiError = useApiErrorToast();
   const isEditing = Boolean(location);
   const nameRef = useRef<HTMLInputElement | null>(null);
 
@@ -67,8 +69,12 @@ export function LocationForm({
   const hasChanges = !isEditing || !location || isDirty;
 
   const handleSubmit = form.handleSubmit(async (values) => {
-    await onSubmit(values);
-    onOpenChange(false);
+    try {
+      await onSubmit(values);
+      onOpenChange(false);
+    } catch (error) {
+      showApiError(error);
+    }
   });
 
   const submitLabel = isEditing ? t("save") : t("add");
@@ -106,29 +112,29 @@ export function LocationForm({
       footer={formFooter}
     >
       <form id={LOCATION_FORM_ID} className="space-y-4" onSubmit={handleSubmit}>
-          <FieldGroup>
-            <FormField
-              control={form.control}
-              name="name"
-              htmlFor="location-name"
-              label={t("nameLabel")}
-              required
-            >
-              {({ field, id }) => (
-                <Input
-                  {...field}
-                  ref={(node) => {
-                    field.ref(node);
-                    nameRef.current = node;
-                  }}
-                  id={id}
-                  autoComplete="off"
-                  enterKeyHint="done"
-                  placeholder={t("namePlaceholder")}
-                />
-              )}
-            </FormField>
-          </FieldGroup>
+        <FieldGroup>
+          <FormField
+            control={form.control}
+            name="name"
+            htmlFor="location-name"
+            label={t("nameLabel")}
+            required
+          >
+            {({ field, id }) => (
+              <Input
+                {...field}
+                ref={(node) => {
+                  field.ref(node);
+                  nameRef.current = node;
+                }}
+                id={id}
+                autoComplete="off"
+                enterKeyHint="done"
+                placeholder={t("namePlaceholder")}
+              />
+            )}
+          </FormField>
+        </FieldGroup>
       </form>
     </ResponsiveFormDialog>
   );

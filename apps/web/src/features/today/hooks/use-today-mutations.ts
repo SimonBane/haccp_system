@@ -24,7 +24,11 @@ export function useTodayMutations(currentUserId: string) {
   const queryClient = useQueryClient();
 
   function recordPath(occurrenceId: string): string {
-    return locationScopedPath(locationId, "today/occurrences", `/${occurrenceId}/record`);
+    return locationScopedPath(
+      locationId,
+      "today/occurrences",
+      `/${occurrenceId}/record`,
+    );
   }
 
   async function beginOptimistic(
@@ -54,14 +58,19 @@ export function useTodayMutations(currentUserId: string) {
   }
 
   const createRecord = useMutation({
+    meta: { handlesError: true },
     mutationFn: async (input: RecordInput) => {
       // Extra keys (occurrenceId, date) are stripped by the plain (non-strict) object schema.
       const payload: TaskRecordInput = taskRecordInputSchema.parse(input);
-      return fetchJson(recordPath(input.occurrenceId), taskRecordResponseSchema, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      return fetchJson(
+        recordPath(input.occurrenceId),
+        taskRecordResponseSchema,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
     },
     onMutate: (input) =>
       beginOptimistic(input.date, (previous) =>
@@ -72,13 +81,18 @@ export function useTodayMutations(currentUserId: string) {
   });
 
   const updateRecord = useMutation({
+    meta: { handlesError: true },
     mutationFn: async (input: RecordInput) => {
       const payload: TaskRecordInput = taskRecordInputSchema.parse(input);
-      return fetchJson(recordPath(input.occurrenceId), taskRecordResponseSchema, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      return fetchJson(
+        recordPath(input.occurrenceId),
+        taskRecordResponseSchema,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
     },
     onMutate: (input) =>
       beginOptimistic(input.date, (previous) =>
@@ -89,10 +103,15 @@ export function useTodayMutations(currentUserId: string) {
   });
 
   const voidRecord = useMutation({
+    meta: { handlesError: true },
     mutationFn: async (input: VoidRecordInput) => {
-      return fetchJson(recordPath(input.occurrenceId), taskRecordResponseSchema, {
-        method: "DELETE",
-      });
+      return fetchJson(
+        recordPath(input.occurrenceId),
+        taskRecordResponseSchema,
+        {
+          method: "DELETE",
+        },
+      );
     },
     onMutate: (input) =>
       beginOptimistic(input.date, (previous) =>
