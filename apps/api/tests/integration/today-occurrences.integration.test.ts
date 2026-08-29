@@ -46,7 +46,8 @@ describe("Today occurrences (GET)", () => {
     locationId?: string;
     scheduledTime?: string;
     occurrenceDate?: string;
-    dueAt?: Date;
+    availableAt?: Date;
+    dueAt?: Date | null;
     title?: string;
     equipmentName?: string | null;
     minTempC?: string | null;
@@ -67,7 +68,12 @@ describe("Today occurrences (GET)", () => {
         taskTemplateId,
         occurrenceDate,
         scheduledTime,
-        dueAt: overrides.dueAt ?? new Date(`${occurrenceDate}T${scheduledTime}:00Z`),
+        availableAt:
+          overrides.availableAt ?? new Date(`${occurrenceDate}T00:00:00Z`),
+        dueAt:
+          overrides.dueAt === undefined
+            ? new Date(`${occurrenceDate}T${scheduledTime}:00Z`)
+            : overrides.dueAt,
         title: overrides.title ?? "Test occurrence",
         type: overrides.type,
         equipmentId: overrides.type === "temperature" ? org.equipment.fridge.id : null,
@@ -116,6 +122,7 @@ describe("Today occurrences (GET)", () => {
       taskTemplateId: annexTemplate!.id,
       occurrenceDate: today(),
       scheduledTime: "10:00",
+      availableAt: new Date(`${today()}T00:00:00Z`),
       dueAt: new Date(`${today()}T10:00:00Z`),
       title: "Annex occurrence",
       type: "cleaning",
@@ -273,6 +280,42 @@ describe("Today occurrences (GET)", () => {
     expect(item!.recordState).toBe("none");
     expect(item!.status).toBe("overdue");
     expect(item!.completedAt).toBeNull();
+  });
+
+  it("returns upcoming for an occurrence before its own availableAt", async () => {
+    const occurrenceId = await insertOccurrence({
+      type: "cleaning",
+      availableAt: new Date(Date.now() + 60 * 60 * 1000),
+    });
+
+    const response = await todayGet(org.locations.main.id, today());
+    expect(response.status).toBe(200);
+    const item = flatten(todayResponseSchema.parse(await response.json())).find(
+      (entry) => entry.occurrenceId === occurrenceId,
+    );
+
+    expect(item).toBeDefined();
+    expect(item!.status).toBe("upcoming");
+  });
+
+  it("never reports overdue for a no-deadline occurrence, however late", async () => {
+    const yesterday = addCalendarDays(today(), -1);
+    const occurrenceId = await insertOccurrence({
+      type: "cleaning",
+      occurrenceDate: yesterday,
+      availableAt: new Date(`${yesterday}T00:00:00Z`),
+      dueAt: null,
+    });
+
+    const response = await todayGet(org.locations.main.id, yesterday);
+    expect(response.status).toBe(200);
+    const item = flatten(todayResponseSchema.parse(await response.json())).find(
+      (entry) => entry.occurrenceId === occurrenceId,
+    );
+
+    expect(item).toBeDefined();
+    expect(item!.status).toBe("pending");
+    expect(item!.dueAt).toBeNull();
   });
 
   it("never materializes work as a side effect of a read", async () => {

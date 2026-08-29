@@ -62,6 +62,8 @@ function makeSource(
     weekdays: ALL_WEEKDAYS,
     scheduledTimes: ["08:00"],
     equipmentId: null,
+    completionOpensBeforeMinutes: 1440,
+    completionDueAfterMinutes: 0,
     createdAt: new Date("2020-01-01T00:00:00Z"),
     equipmentName: null,
     minTempC: null,
@@ -79,6 +81,9 @@ function makeExistingRow(
     taskTemplateId: TEMPLATE_ID,
     occurrenceDate: "2026-08-19",
     scheduledTime: "08:00",
+    // Default template settings (1440 before / 0 after) put availableAt at the
+    // start of the Sofia-local day and dueAt at the scheduled instant.
+    availableAt: new Date("2026-08-18T21:00:00Z"),
     dueAt: new Date("2026-08-19T05:00:00Z"),
     title: "Wipe counters",
     type: "cleaning",
@@ -243,6 +248,121 @@ describe("reconcileTemplateIds — window and expansion", () => {
   });
 });
 
+describe("reconcileTemplateIds — completion window derivation", () => {
+  it("computes availableAt before the scheduled instant and dueAt after it from the template's window", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-19T04:00:00Z"));
+
+    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([
+      makeSource({
+        weekdays: ["wednesday"],
+        scheduledTimes: ["08:00"],
+        completionOpensBeforeMinutes: 30,
+        completionDueAfterMinutes: 60,
+      }),
+    ]);
+
+    await taskOccurrenceService.reconcileTemplateIds(db, {
+      templateIds: [TEMPLATE_ID],
+      timeZone: TZ,
+    });
+
+    const inserted = taskOccurrenceRepository.insertMany.mock.calls[0]![1] as {
+      occurrenceDate: string;
+      availableAt: Date;
+      dueAt: Date | null;
+    }[];
+    const row = inserted.find((r) => r.occurrenceDate === "2026-08-19")!;
+
+    // 08:00 Sofia = 05:00Z; 30 minutes before = 04:30Z; 60 minutes after = 06:00Z.
+    expect(row.availableAt.toISOString()).toBe("2026-08-19T04:30:00.000Z");
+    expect(row.dueAt?.toISOString()).toBe("2026-08-19T06:00:00.000Z");
+  });
+
+  it("clamps availableAt to the start of the local day instead of opening on the previous date", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-19T00:00:00Z"));
+
+    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([
+      makeSource({
+        weekdays: ["wednesday"],
+        scheduledTimes: ["08:00"],
+        completionOpensBeforeMinutes: 1440,
+        completionDueAfterMinutes: 0,
+      }),
+    ]);
+
+    await taskOccurrenceService.reconcileTemplateIds(db, {
+      templateIds: [TEMPLATE_ID],
+      timeZone: TZ,
+    });
+
+    const inserted = taskOccurrenceRepository.insertMany.mock.calls[0]![1] as {
+      occurrenceDate: string;
+      availableAt: Date;
+    }[];
+    const row = inserted.find((r) => r.occurrenceDate === "2026-08-19")!;
+
+    // Start of the Sofia-local day, not 1440 minutes before the 05:00Z scheduled instant.
+    expect(row.availableAt.toISOString()).toBe("2026-08-18T21:00:00.000Z");
+  });
+
+  it("stores a null dueAt for Never overdue instead of a second boolean flag", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-19T04:00:00Z"));
+
+    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([
+      makeSource({
+        weekdays: ["wednesday"],
+        scheduledTimes: ["08:00"],
+        completionDueAfterMinutes: null,
+      }),
+    ]);
+
+    await taskOccurrenceService.reconcileTemplateIds(db, {
+      templateIds: [TEMPLATE_ID],
+      timeZone: TZ,
+    });
+
+    const inserted = taskOccurrenceRepository.insertMany.mock.calls[0]![1] as {
+      occurrenceDate: string;
+      dueAt: Date | null;
+    }[];
+    const row = inserted.find((r) => r.occurrenceDate === "2026-08-19")!;
+
+    expect(row.dueAt).toBeNull();
+  });
+
+  it("uses the scheduled instant, not the later dueAt, as the creation-effective cutoff", async () => {
+    // Scheduled instant (05:00Z) has already passed; a 120-minute deadline would push
+    // dueAt (07:00Z) to still be ahead of "now" (06:00Z) — the slot must still be excluded.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-19T06:00:00Z"));
+
+    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([
+      makeSource({
+        weekdays: ["wednesday"],
+        scheduledTimes: ["08:00"],
+        completionDueAfterMinutes: 120,
+        createdAt: new Date("2026-08-19T06:00:00Z"), // created just now, after 08:00 Sofia
+      }),
+    ]);
+
+    await taskOccurrenceService.reconcileTemplateIds(db, {
+      templateIds: [TEMPLATE_ID],
+      timeZone: TZ,
+    });
+
+    const inserted = taskOccurrenceRepository.insertMany.mock.calls[0]![1] as {
+      occurrenceDate: string;
+    }[];
+
+    expect(inserted.some((row) => row.occurrenceDate === "2026-08-19")).toBe(
+      false,
+    );
+  });
+});
+
 describe("reconcileTemplateIds — stored-value comparison and protection", () => {
   it("retains an existing occurrence whose stored values still match", async () => {
     vi.useFakeTimers();
@@ -288,6 +408,7 @@ describe("reconcileTemplateIds — stored-value comparison and protection", () =
       makeExistingRow({
         id: existingId,
         occurrenceDate: "2026-08-19",
+        availableAt: new Date("2026-08-19T04:30:00Z"), // still ahead of "now" — unprotected
         dueAt: new Date("2026-08-19T05:00:00Z"),
         title: "Wipe counters",
       }),
@@ -305,7 +426,7 @@ describe("reconcileTemplateIds — stored-value comparison and protection", () =
     expect(summary.deleted).toBe(0);
   });
 
-  it("never touches a protected occurrence (dueAt already passed), even with mismatched values", async () => {
+  it("never touches a recorded occurrence, even with mismatched values and its dueAt already passed", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-19T10:00:00Z"));
 
@@ -316,10 +437,46 @@ describe("reconcileTemplateIds — stored-value comparison and protection", () =
         title: "Renamed",
       }),
     ]);
+    const existingId = "00000000-0000-4000-8000-0000000000x4";
     taskOccurrenceRepository.findByTemplateIds.mockResolvedValue([
       makeExistingRow({
+        id: existingId,
         occurrenceDate: "2026-08-19",
         dueAt: new Date("2026-08-19T05:00:00Z"), // already past
+        title: "Original",
+      }),
+    ]);
+    taskOccurrenceRepository.findRecordedOccurrenceIds.mockResolvedValue(
+      new Set([existingId]),
+    );
+
+    const summary = await taskOccurrenceService.reconcileTemplateIds(db, {
+      templateIds: [TEMPLATE_ID],
+      timeZone: TZ,
+    });
+
+    expect(taskOccurrenceRepository.deleteByIds).not.toHaveBeenCalled();
+    expect(summary.replaced).toBe(0);
+  });
+
+  it("replaces an unrecorded occurrence even once its availableAt has passed — only a record locks values in", async () => {
+    // availableAt (08-18T21:00Z) and dueAt (08-19T05:00Z) are both already past "now", but
+    // with no record the stale stored title must still be corrected to match the template.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-19T10:00:00Z"));
+
+    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([
+      makeSource({
+        weekdays: ALL_WEEKDAYS,
+        scheduledTimes: ["08:00"],
+        title: "Renamed",
+      }),
+    ]);
+    const existingId = "00000000-0000-4000-8000-0000000000x5";
+    taskOccurrenceRepository.findByTemplateIds.mockResolvedValue([
+      makeExistingRow({
+        id: existingId,
+        occurrenceDate: "2026-08-19",
         title: "Original",
       }),
     ]);
@@ -329,8 +486,54 @@ describe("reconcileTemplateIds — stored-value comparison and protection", () =
       timeZone: TZ,
     });
 
-    expect(taskOccurrenceRepository.deleteByIds).not.toHaveBeenCalled();
-    expect(summary.replaced).toBe(0);
+    expect(taskOccurrenceRepository.deleteByIds).toHaveBeenCalledWith(db, [
+      existingId,
+    ]);
+    expect(summary.replaced).toBe(1);
+  });
+
+  it("replaces an unrecorded, mismatched occurrence whether or not its availableAt has passed", async () => {
+    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([
+      makeSource({
+        weekdays: ALL_WEEKDAYS,
+        scheduledTimes: ["08:00"],
+        title: "Renamed",
+      }),
+    ]);
+
+    const availableAt = new Date("2026-08-18T21:00:00Z");
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(availableAt.getTime() - 1));
+    taskOccurrenceRepository.findByTemplateIds.mockResolvedValue([
+      makeExistingRow({ occurrenceDate: "2026-08-19", title: "Original" }),
+    ]);
+
+    const beforeSummary = await taskOccurrenceService.reconcileTemplateIds(db, {
+      templateIds: [TEMPLATE_ID],
+      timeZone: TZ,
+    });
+    expect(beforeSummary.replaced).toBe(1);
+
+    vi.clearAllMocks();
+    defaultRepos();
+    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([
+      makeSource({
+        weekdays: ALL_WEEKDAYS,
+        scheduledTimes: ["08:00"],
+        title: "Renamed",
+      }),
+    ]);
+    vi.setSystemTime(new Date(availableAt.getTime() + 1));
+    taskOccurrenceRepository.findByTemplateIds.mockResolvedValue([
+      makeExistingRow({ occurrenceDate: "2026-08-19", title: "Original" }),
+    ]);
+
+    const afterSummary = await taskOccurrenceService.reconcileTemplateIds(db, {
+      templateIds: [TEMPLATE_ID],
+      timeZone: TZ,
+    });
+    expect(afterSummary.replaced).toBe(1);
   });
 
   it("never touches a protected occurrence with any task_records row, including voided", async () => {
@@ -376,6 +579,7 @@ describe("reconcileTemplateIds — stored-value comparison and protection", () =
     taskOccurrenceRepository.findByTemplateIds.mockResolvedValue([
       makeExistingRow({
         id: existingId,
+        availableAt: new Date("2026-08-19T06:00:00Z"), // still ahead of "now" — unprotected
         dueAt: new Date("2026-08-19T09:00:00Z"),
       }),
     ]);
@@ -390,6 +594,28 @@ describe("reconcileTemplateIds — stored-value comparison and protection", () =
     ]);
     expect(summary.deleted).toBe(1);
     expect(summary.replaced).toBe(0);
+  });
+
+  it("keeps a no-longer-desired occurrence that already opened, even without a record", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-19T05:00:00Z"));
+
+    // Template is no longer active for this template id, so no sources resolve.
+    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([]);
+    taskOccurrenceRepository.findByTemplateIds.mockResolvedValue([
+      makeExistingRow({
+        availableAt: new Date("2026-08-19T04:00:00Z"), // already past "now"
+        dueAt: new Date("2026-08-19T09:00:00Z"),
+      }),
+    ]);
+
+    const summary = await taskOccurrenceService.reconcileTemplateIds(db, {
+      templateIds: [TEMPLATE_ID],
+      timeZone: TZ,
+    });
+
+    expect(taskOccurrenceRepository.deleteByIds).not.toHaveBeenCalled();
+    expect(summary.deleted).toBe(0);
   });
 });
 

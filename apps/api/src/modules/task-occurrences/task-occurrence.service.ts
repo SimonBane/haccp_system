@@ -1,8 +1,11 @@
 import {
   calendarDateRange,
+  computeAvailableAt,
+  computeDueAt,
   getWeekdayFromDate,
   isValidTimeZone,
   sortScheduledTimes,
+  startOfLocalDay,
   TASK_TEMPLATE_TYPE,
   wallClockToInstant,
   zonedDateString,
@@ -37,7 +40,8 @@ type DesiredOccurrence = {
   locationId: string;
   occurrenceDate: string;
   scheduledTime: string;
-  dueAt: Date;
+  availableAt: Date;
+  dueAt: Date | null;
   title: string;
   type: TaskTemplateType;
   equipmentId: string | null;
@@ -85,17 +89,29 @@ function buildDesiredOccurrences(
       const weekday = getWeekdayFromDate(date);
       if (!source.weekdays.includes(weekday)) continue;
 
-      for (const time of times) {
-        const dueAt = wallClockToInstant(date, time, timeZone);
+      const dayStart = startOfLocalDay(date, timeZone);
 
-        // The template did not exist yet when this slot was due — do not invent it.
-        if (dueAt.getTime() < source.createdAt.getTime()) continue;
+      for (const time of times) {
+        const scheduledInstant = wallClockToInstant(date, time, timeZone);
+
+        if (scheduledInstant.getTime() < source.createdAt.getTime()) continue;
+
+        const availableAt = computeAvailableAt({
+          scheduledInstant,
+          startOfLocalDay: dayStart,
+          completionOpensBeforeMinutes: source.completionOpensBeforeMinutes,
+        });
+        const dueAt = computeDueAt({
+          scheduledInstant,
+          completionDueAfterMinutes: source.completionDueAfterMinutes,
+        });
 
         desired.set(desiredKey(source.id, date, time), {
           taskTemplateId: source.id,
           locationId: source.locationId,
           occurrenceDate: date,
           scheduledTime: time,
+          availableAt,
           dueAt,
           title: source.title,
           type: source.type,
@@ -134,7 +150,9 @@ function matchesDesired(
     existingRow.equipmentName === desiredRow.equipmentName &&
     existingRow.minTempC === desiredRow.minTempC &&
     existingRow.maxTempC === desiredRow.maxTempC &&
-    existingRow.dueAt.getTime() === desiredRow.dueAt.getTime()
+    existingRow.availableAt.getTime() === desiredRow.availableAt.getTime() &&
+    (existingRow.dueAt?.getTime() ?? null) ===
+      (desiredRow.dueAt?.getTime() ?? null)
   );
 }
 
@@ -144,6 +162,7 @@ function toInsertRow(row: DesiredOccurrence): NewTaskOccurrenceRow {
     locationId: row.locationId,
     occurrenceDate: row.occurrenceDate,
     scheduledTime: row.scheduledTime,
+    availableAt: row.availableAt,
     dueAt: row.dueAt,
     title: row.title,
     type: row.type,
@@ -198,20 +217,24 @@ async function reconcileTemplateIds(
 
   for (const existingRow of existing) {
     const key = existingKey(existingRow);
-    const isProtected =
-      existingRow.dueAt.getTime() <= now.getTime() ||
-      recordedOccurrenceIds.has(existingRow.id);
+    const isRecorded = recordedOccurrenceIds.has(existingRow.id);
+    const desiredRow = desired.get(key);
 
-    if (isProtected) {
-      // Never updated or replaced, and never re-desired — it already exists.
-      desired.delete(key);
+    if (!desiredRow) {
+      // No longer desired: the slot changed, or the template was archived. An occurrence
+      // that already opened (or holds a record, voided or not) is history now — it must
+      // survive even after dropping out of the desired set — so only delete one that was
+      // never opened and never recorded.
+      if (isRecorded || existingRow.availableAt.getTime() <= now.getTime()) {
+        continue;
+      }
+      toDeleteIds.push(existingRow.id);
       continue;
     }
 
-    const desiredRow = desired.get(key);
-    if (!desiredRow) {
-      // No longer desired: the slot changed, or the template was archived.
-      toDeleteIds.push(existingRow.id);
+    if (isRecorded) {
+      // A record (voided or not) locks the occurrence in permanently — never replaced.
+      desired.delete(key);
       continue;
     }
 

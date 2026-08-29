@@ -13,7 +13,8 @@ export type OccurrenceForRecording = {
   id: string;
   type: TaskTemplateType;
   occurrenceDate: string;
-  dueAt: Date;
+  availableAt: Date;
+  dueAt: Date | null;
   minTempC: string | null;
   maxTempC: string | null;
 };
@@ -29,7 +30,8 @@ export type RecordChainRow = {
   voidedByUserId: string | null;
   occurrenceType: TaskTemplateType;
   occurrenceDate: string;
-  dueAt: Date;
+  availableAt: Date;
+  dueAt: Date | null;
   minTempC: string | null;
   maxTempC: string | null;
   detailRecordedC: string | null;
@@ -58,6 +60,7 @@ export const taskRecordRepository = {
         id: taskOccurrences.id,
         type: taskOccurrences.type,
         occurrenceDate: taskOccurrences.occurrenceDate,
+        availableAt: taskOccurrences.availableAt,
         dueAt: taskOccurrences.dueAt,
         minTempC: taskOccurrences.minTempC,
         maxTempC: taskOccurrences.maxTempC,
@@ -90,6 +93,7 @@ export const taskRecordRepository = {
         voidedByUserId: taskRecords.voidedByUserId,
         occurrenceType: taskOccurrences.type,
         occurrenceDate: taskOccurrences.occurrenceDate,
+        availableAt: taskOccurrences.availableAt,
         dueAt: taskOccurrences.dueAt,
         minTempC: taskOccurrences.minTempC,
         maxTempC: taskOccurrences.maxTempC,

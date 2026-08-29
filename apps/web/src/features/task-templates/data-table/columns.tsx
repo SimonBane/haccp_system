@@ -5,6 +5,10 @@ import type { ColumnDef } from "@tanstack/react-table";
 import type { useTranslations } from "next-intl";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 import { formatScheduleSummary } from "@/features/task-templates/lib/format-schedule";
+import {
+  formatCompactWindowSummary,
+  type CompactWindowSummaryLabels,
+} from "@/features/task-templates/lib/completion-window";
 import { DataTableRowActions } from "@/components/ui/data-table/data-table-row-actions";
 import type { GetRowActions } from "@/components/ui/data-table/row-action";
 
@@ -18,6 +22,7 @@ type GetColumnsParams = {
     weekdays: string;
     formatShort: (weekday: import("@haccp/shared").TaskTemplateWeekday) => string;
   };
+  windowSummaryLabels: CompactWindowSummaryLabels;
   getRowActions: GetRowActions<TaskTemplateResponse>;
 };
 
@@ -25,6 +30,7 @@ export function getColumns({
   t,
   typeLabels,
   scheduleLabels,
+  windowSummaryLabels,
   getRowActions,
 }: GetColumnsParams): ColumnDef<TaskTemplateResponse>[] {
   return [
@@ -43,7 +49,11 @@ export function getColumns({
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title={t("columns.type")} />
       ),
-      cell: ({ row }) => typeLabels[row.original.type],
+      cell: ({ row }) => (
+        <span className="whitespace-nowrap">
+          {typeLabels[row.original.type]}
+        </span>
+      ),
       sortingFn: (rowA, rowB) =>
         typeLabels[rowA.original.type].localeCompare(
           typeLabels[rowB.original.type],
@@ -69,12 +79,37 @@ export function getColumns({
       ),
     },
     {
+      id: "window",
+      accessorFn: (row) =>
+        formatCompactWindowSummary({
+          completionOpensBeforeMinutes: row.completionOpensBeforeMinutes,
+          completionDueAfterMinutes: row.completionDueAfterMinutes,
+          labels: windowSummaryLabels,
+        }),
+      enableSorting: false,
+      meta: { view_label: t("columns.window") },
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t("columns.window")} />
+      ),
+      cell: ({ row }) => (
+        <span className="text-muted-foreground">
+          {formatCompactWindowSummary({
+            completionOpensBeforeMinutes: row.original.completionOpensBeforeMinutes,
+            completionDueAfterMinutes: row.original.completionDueAfterMinutes,
+            labels: windowSummaryLabels,
+          })}
+        </span>
+      ),
+    },
+    {
       accessorKey: "equipmentName",
       meta: { view_label: t("columns.equipment") },
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title={t("columns.equipment")} />
       ),
-      cell: ({ row }) => row.original.equipmentName,
+      cell: ({ row }) => (
+        <span className="whitespace-nowrap">{row.original.equipmentName}</span>
+      ),
     },
     {
       id: "actions",

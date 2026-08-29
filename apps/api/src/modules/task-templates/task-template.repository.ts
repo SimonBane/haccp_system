@@ -20,6 +20,8 @@ export type TaskTemplateSourceRow = {
   weekdays: string[];
   scheduledTimes: string[];
   equipmentId: string | null;
+  completionOpensBeforeMinutes: number;
+  completionDueAfterMinutes: number | null;
   createdAt: Date;
   equipmentName: string | null;
   minTempC: string | null;
@@ -178,6 +180,8 @@ export const taskTemplateRepository = {
         weekdays: taskTemplates.weekdays,
         scheduledTimes: taskTemplates.scheduledTimes,
         equipmentId: taskTemplates.equipmentId,
+        completionOpensBeforeMinutes: taskTemplates.completionOpensBeforeMinutes,
+        completionDueAfterMinutes: taskTemplates.completionDueAfterMinutes,
         createdAt: taskTemplates.createdAt,
         equipmentName: equipment.name,
         minTempC: equipment.minTempC,

@@ -1,16 +1,12 @@
-import type { TodayTaskItem } from "@haccp/shared";
+import type { TodayTaskItem, TodayTaskStatus } from "@haccp/shared";
 import {
+  deriveTodayTaskStatusFromOccurrence,
   TEMPERATURE_RESULT,
   wallClockToInstant,
   zonedDateString,
   zonedMinutesOfDay,
 } from "@haccp/shared";
-import {
-  isDueNow,
-  minutesUntilScheduled,
-  occurrenceKey,
-  parseScheduledTimeToMinutes,
-} from "./today-grouping";
+import { occurrenceKey, parseScheduledTimeToMinutes } from "./today-grouping";
 
 export type TimeGroupState = "done" | "overdue" | "now" | "upcoming";
 
@@ -25,6 +21,7 @@ export type TodayTimelineItem = {
   isCompleted: boolean;
   isDeviation: boolean;
   priorReading: TodayPriorReading | null;
+  liveStatus: TodayTaskStatus;
 };
 
 export type TodayTaskGroup = {
@@ -161,25 +158,26 @@ function minutesUntilOccurrence(
   return Math.round((target.getTime() - now.getTime()) / 60_000);
 }
 
-function deriveGroupState(params: {
-  remainingCount: number;
-  scheduledTime: string;
-  now: Date;
-  selectedDate: string;
-  timeZone: string;
-}): TimeGroupState {
-  const { remainingCount, scheduledTime, now, selectedDate, timeZone } = params;
+function deriveLiveStatus(task: TodayTaskItem, now: Date): TodayTaskStatus {
+  return deriveTodayTaskStatusFromOccurrence({
+    recordState: task.recordState,
+    availableAt: new Date(task.availableAt),
+    dueAt: task.dueAt === null ? null : new Date(task.dueAt),
+    now,
+  });
+}
 
-  if (remainingCount === 0) return "done";
-
-  const todayDate = zonedDateString(now, timeZone);
-  if (selectedDate < todayDate) return "overdue";
-  if (selectedDate > todayDate) return "upcoming";
-
-  if (isDueNow(scheduledTime, now, timeZone)) return "now";
-  return minutesUntilScheduled(scheduledTime, now, timeZone) < 0
-    ? "overdue"
-    : "upcoming";
+function deriveGroupState(
+  items: TodayTimelineItem[],
+  isCurrentOrPast: boolean,
+): TimeGroupState {
+  const remaining = items.filter((item) => !item.isCompleted);
+  if (remaining.length === 0) return "done";
+  if (remaining.some((item) => item.liveStatus === "overdue")) return "overdue";
+  if (isCurrentOrPast && remaining.some((item) => item.liveStatus === "pending")) {
+    return "now";
+  }
+  return "upcoming";
 }
 
 /** Grouping and counts from the response alone so item identity survives clock ticks. */
@@ -200,6 +198,7 @@ export function buildTodayTaskGroups(tasks: TodayTaskItem[]): TodayTaskGroups {
       isDeviation: isDeviation(task),
       priorReading:
         priorReadings.get(task.occurrenceId) ?? null,
+      liveStatus: task.status,
     });
     byTime.set(task.scheduledTime, items);
   }
@@ -236,39 +235,49 @@ export function buildTodayTaskGroups(tasks: TodayTaskItem[]): TodayTaskGroups {
   };
 }
 
-/** Layers live state on the groups; `items` is carried by reference so a tick does not re-render every row. */
+/** Layers live state on the groups; an item keeps its reference unless its own liveStatus changed. */
 export function applyClock(
   base: TodayTaskGroups,
   now: Date,
   selectedDate: string,
   timeZone: string,
 ): TodayTimeline {
-  const groups: TodayTimeGroup[] = base.groups.map((group) => ({
-    ...group,
-    state: deriveGroupState({
-      remainingCount: group.remainingCount,
-      scheduledTime: group.scheduledTime,
-      now,
-      selectedDate,
-      timeZone,
-    }),
-    minutesUntil: minutesUntilOccurrence(
-      selectedDate,
-      group.scheduledTime,
-      now,
-      timeZone,
-    ),
-  }));
-
-  const overdueCount = groups
-    .filter((group) => group.state === "overdue")
-    .reduce((sum, group) => sum + group.remainingCount, 0);
-
-  // Before the first round still ahead of the clock, or at the end when every round has passed.
   const nowMinutes = zonedMinutesOfDay(now, timeZone);
   const isToday = selectedDate === zonedDateString(now, timeZone);
-  const upcomingIndex = groups.findIndex(
+
+  // First group still ahead of the clock; the slot right before it is the one "now" is inside.
+  const upcomingIndex = base.groups.findIndex(
     (group) => parseScheduledTimeToMinutes(group.scheduledTime) > nowMinutes,
+  );
+  const currentGroupIndex =
+    upcomingIndex === -1 ? base.groups.length - 1 : upcomingIndex - 1;
+
+  const groups: TodayTimeGroup[] = base.groups.map((group, index) => {
+    const items = group.items.map((item) => {
+      const liveStatus = deriveLiveStatus(item.task, now);
+      return liveStatus === item.liveStatus ? item : { ...item, liveStatus };
+    });
+
+    return {
+      ...group,
+      items,
+      state: deriveGroupState(items, !isToday || index <= currentGroupIndex),
+      minutesUntil: minutesUntilOccurrence(
+        selectedDate,
+        group.scheduledTime,
+        now,
+        timeZone,
+      ),
+    };
+  });
+
+  const overdueCount = groups.reduce(
+    (sum, group) =>
+      sum +
+      group.items.filter(
+        (item) => !item.isCompleted && item.liveStatus === "overdue",
+      ).length,
+    0,
   );
 
   return {

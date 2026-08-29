@@ -36,6 +36,7 @@ const LABELS = {
     submitted: "Изпълнена",
     missed: "Пропусната",
     voided: "Анулирана",
+    open: "Отворена",
   },
   resultOptions: {
     pass: "В диапазона",
@@ -365,6 +366,7 @@ describe("filter definitions", () => {
       "submitted",
       "missed",
       "voided",
+      "open",
     ]);
     expect(definitions[2]!.options.map((option) => option.value)).toEqual([
       "pass",
@@ -467,6 +469,7 @@ describe("non-temperature presentation", () => {
     taskTemplateId: "tpl",
     occurrenceDate: "2026-08-23",
     scheduledTime: "08:00",
+    availableAt: "2026-08-23T00:00:00.000Z",
     dueAt: "2026-08-23T05:00:00.000Z",
     title: "Clean prep surface",
     equipmentId: null,

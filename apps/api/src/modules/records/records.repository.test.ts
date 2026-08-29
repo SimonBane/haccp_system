@@ -33,9 +33,13 @@ describe("base condition", () => {
     expect(params).toContain(SCOPE.dateTo);
   });
 
-  it("includes a row once a record exists or the due time has passed", () => {
+  it("includes a row once a record exists, a finite deadline has passed, or a no-deadline occurrence has opened", () => {
+    expect(sql).toContain('"task_records"."id" is not null');
     expect(sql).toContain(
-      '("task_records"."id" is not null or "task_occurrences"."due_at" <= ',
+      '("task_occurrences"."due_at" is not null and "task_occurrences"."due_at" <= ',
+    );
+    expect(sql).toContain(
+      '("task_occurrences"."due_at" is null and "task_occurrences"."available_at" <= ',
     );
     // The captured instant travels as a bound parameter, not a database clock call.
     expect(params).toContain(SCOPE.now.toISOString());
@@ -64,10 +68,20 @@ describe("display-state predicates", () => {
     );
   });
 
-  it("treats missed as the absence of a record — the base predicate already made it due", () => {
+  it("treats missed as no record with a finite deadline — the base predicate already made it due", () => {
     expect(
       render(recordsQueryInternals.displayStateCondition("missed")).sql,
-    ).toBe('"task_records"."id" is null');
+    ).toBe(
+      '("task_records"."id" is null and "task_occurrences"."due_at" is not null)',
+    );
+  });
+
+  it("treats open as no record and no deadline — the base predicate already made it eligible", () => {
+    expect(
+      render(recordsQueryInternals.displayStateCondition("open")).sql,
+    ).toBe(
+      '("task_records"."id" is null and "task_occurrences"."due_at" is null)',
+    );
   });
 });
 

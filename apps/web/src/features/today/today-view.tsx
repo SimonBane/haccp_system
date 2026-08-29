@@ -45,7 +45,6 @@ import {
   applyClock,
   buildTodayTaskGroups,
   findTimelineItem,
-  isFutureSelection,
   isStaleResponse,
   type TodayTimelineItem,
 } from "./lib/today-timeline";
@@ -95,7 +94,6 @@ export function TodayView({
   const { createRecord, updateRecord, voidRecord } =
     useTodayMutations(currentUserId);
 
-  const isFutureDate = isFutureSelection(selectedDate, now, timeZone);
   const isStale = isStaleResponse(response?.date, selectedDate);
 
   // Depend on the stable mutate functions, not the result object (fresh every render).
@@ -400,7 +398,8 @@ export function TodayView({
 
   const handleActivate = useCallback(
     (item: TodayTimelineItem) => {
-      if (isStale || isFutureDate) return;
+      if (isStale) return;
+      if (!item.isCompleted && item.liveStatus === "upcoming") return;
 
       if (item.isCompleted) {
         setRecordKey(occurrenceKey(item.task));
@@ -423,7 +422,7 @@ export function TodayView({
 
       void handleComplete(item.task);
     },
-    [handleComplete, isFutureDate, isStale, openRound, t],
+    [handleComplete, isStale, openRound, t],
   );
 
   const isToday = selectedDate === todayDate;
@@ -512,7 +511,6 @@ export function TodayView({
               scrollKey={selectedDate}
               syncingKeys={syncingKeys}
               currentUserId={currentUserId}
-              disableActions={isFutureDate}
               onActivate={handleActivate}
             />
 

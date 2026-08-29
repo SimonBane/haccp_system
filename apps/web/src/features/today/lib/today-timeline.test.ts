@@ -18,13 +18,34 @@ function at(localTime: string): Date {
   return new Date(Date.UTC(2026, 0, 15, h - 2, m));
 }
 
+/** `localTime` on `date` (Sofia, flat UTC+2 in winter), offset by `offsetMinutes`. */
+function instantAt(
+  date: string,
+  localTime: string,
+  offsetMinutes = 0,
+): string {
+  const [year, month, day] = date.split("-").map(Number);
+  const [h, m] = localTime.split(":").map(Number);
+  return new Date(
+    Date.UTC(year, month - 1, day, h - 2, m) + offsetMinutes * 60_000,
+  ).toISOString();
+}
+
 let seq = 0;
 function uuid(): string {
   seq += 1;
   return `00000000-0000-4000-8000-${String(seq).padStart(12, "0")}`;
 }
 
+/**
+ * Default window: opens 30 minutes before its scheduled time, overdue 30 minutes after —
+ * chosen only to make these fixtures exercise upcoming/now/overdue transitions; the actual
+ * default template window (a full day) is covered in the shared/API tests.
+ */
 function task(overrides: Partial<TodayTaskItem> = {}): TodayTaskItem {
+  const date = overrides.date ?? DATE;
+  const scheduledTime = overrides.scheduledTime ?? "07:00";
+
   return {
     occurrenceId: uuid(),
     templateId: uuid(),
@@ -34,10 +55,11 @@ function task(overrides: Partial<TodayTaskItem> = {}): TodayTaskItem {
     equipmentName: null,
     minTempC: null,
     maxTempC: null,
-    scheduledTime: "07:00",
+    scheduledTime,
     timeSlot: "morning",
-    date: DATE,
-    dueAt: `${DATE}T07:00:00.000Z`,
+    date,
+    availableAt: instantAt(date, scheduledTime, -30),
+    dueAt: instantAt(date, scheduledTime, 30),
     recordState: "none",
     status: "pending",
     completedAt: null,
@@ -61,6 +83,7 @@ function buildTasks(): TodayTaskItem[] {
       equipmentName: "Fridge 1",
       minTempC: 0,
       maxTempC: 5,
+      recordState: "active",
       status: "completed",
       completedAt: "2026-01-15T10:05:00.000Z",
       temperatureReading: {
@@ -80,6 +103,7 @@ function buildTasks(): TodayTaskItem[] {
       equipmentName: "Fridge 1",
       minTempC: 0,
       maxTempC: 5,
+      recordState: "active",
       status: "completed",
       completedAt: "2026-01-15T05:04:00.000Z",
       temperatureReading: {
@@ -94,6 +118,7 @@ function buildTasks(): TodayTaskItem[] {
     task({
       scheduledTime: "07:00",
       title: "Morning surfaces",
+      recordState: "active",
       status: "completed",
       completedAt: "2026-01-15T05:20:00.000Z",
     }),
@@ -234,13 +259,14 @@ describe("buildTodayTimeline", () => {
       expect(timeline.nowMinutes).toBe(1260);
     });
 
-    it("a past date has no now line and marks unfinished rounds overdue", () => {
-      const timeline = buildTodayTimeline(
-        tasks,
-        at("09:00"),
-        "2026-01-14",
-        SOFIA,
-      );
+    it("a past date's occurrences are overdue by their own window, not a blanket date rule", () => {
+      const pastDate = "2026-01-14";
+      const pastTasks = [
+        task({ date: pastDate, scheduledTime: "07:00" }),
+        task({ date: pastDate, scheduledTime: "12:00" }),
+        task({ date: pastDate, scheduledTime: "18:00" }),
+      ];
+      const timeline = buildTodayTimeline(pastTasks, at("09:00"), pastDate, SOFIA);
 
       expect(timeline.groups.map((g) => g.state)).toEqual([
         "overdue",
@@ -252,11 +278,17 @@ describe("buildTodayTimeline", () => {
       expect(timeline.groups[0].minutesUntil).toBe(-1560);
     });
 
-    it("a future date is entirely upcoming with no now line", () => {
+    it("a future date's occurrences are upcoming because they have not opened, not because of the date", () => {
+      const futureDate = "2026-01-16";
+      const futureTasks = [
+        task({ date: futureDate, scheduledTime: "07:00" }),
+        task({ date: futureDate, scheduledTime: "12:00" }),
+        task({ date: futureDate, scheduledTime: "18:00" }),
+      ];
       const timeline = buildTodayTimeline(
-        tasks,
+        futureTasks,
         at("09:00"),
-        "2026-01-16",
+        futureDate,
         SOFIA,
       );
 
@@ -266,6 +298,134 @@ describe("buildTodayTimeline", () => {
         "upcoming",
       ]);
       expect(timeline.nowLineIndex).toBeNull();
+    });
+
+    it("mixed windows at one scheduled time: each row keeps its own status, and any overdue item wins the group", () => {
+      const opened = task({
+        scheduledTime: "08:00",
+        title: "Opens early",
+        availableAt: instantAt(DATE, "08:00", -120),
+        dueAt: instantAt(DATE, "08:00", 60),
+      });
+      const notYetOpen = task({
+        scheduledTime: "08:00",
+        title: "Opens late",
+        availableAt: instantAt(DATE, "08:00", 90),
+        dueAt: instantAt(DATE, "08:00", 180),
+      });
+
+      // now = 08:00 + 45min: "opened" is pending (available); "notYetOpen" has not opened yet.
+      const now = new Date(instantAt(DATE, "08:00", 45));
+      const timeline = buildTodayTimeline([opened, notYetOpen], now, DATE, SOFIA);
+
+      expect(timeline.groups).toHaveLength(1);
+      const [group] = timeline.groups;
+      const byTitle = Object.fromEntries(
+        group.items.map((item) => [item.task.title, item.liveStatus]),
+      );
+      expect(byTitle["Opens early"]).toBe("pending");
+      expect(byTitle["Opens late"]).toBe("upcoming");
+      // At least one remaining item is available, so the group reads "now".
+      expect(group.state).toBe("now");
+
+      // "Opens early" is now overdue while "Opens late" still has not opened — overdue wins.
+      const later = new Date(instantAt(DATE, "08:00", 61));
+      const overdueTimeline = buildTodayTimeline(
+        [opened, notYetOpen],
+        later,
+        DATE,
+        SOFIA,
+      );
+      const laterByTitle = Object.fromEntries(
+        overdueTimeline.groups[0].items.map((item) => [
+          item.task.title,
+          item.liveStatus,
+        ]),
+      );
+      expect(laterByTitle["Opens early"]).toBe("overdue");
+      expect(laterByTitle["Opens late"]).toBe("upcoming");
+      expect(overdueTimeline.groups[0].state).toBe("overdue");
+    });
+
+    it("a never-overdue remaining item keeps its group at now, never overdue, on a past date", () => {
+      const pastDate = "2026-01-14";
+      const neverOverdue = task({
+        date: pastDate,
+        scheduledTime: "07:00",
+        dueAt: null,
+      });
+      const timeline = buildTodayTimeline(
+        [neverOverdue],
+        at("09:00"),
+        pastDate,
+        SOFIA,
+      );
+
+      expect(timeline.groups[0].state).toBe("now");
+      expect(timeline.overdueCount).toBe(0);
+    });
+
+    it("only the group whose range contains the clock reads now, even when a later group's window has already opened", () => {
+      // A wide completion window (opens 5h early) lets 18:30's item become "available" well
+      // before 14:00's own slot has passed — it must still read "upcoming", not "now".
+      const current = task({
+        scheduledTime: "14:00",
+        availableAt: instantAt(DATE, "14:00", -30),
+        dueAt: instantAt(DATE, "14:00", 30),
+      });
+      const opensEarly = task({
+        scheduledTime: "18:30",
+        availableAt: instantAt(DATE, "18:30", -300),
+        dueAt: instantAt(DATE, "18:30", 30),
+      });
+
+      const timeline = buildTodayTimeline(
+        [current, opensEarly],
+        at("14:10"),
+        DATE,
+        SOFIA,
+      );
+
+      expect(timeline.groups.map((g) => g.scheduledTime)).toEqual([
+        "14:00",
+        "18:30",
+      ]);
+      expect(timeline.groups.map((g) => g.state)).toEqual(["now", "upcoming"]);
+    });
+
+    it("a still-pending earlier slot stays now once the clock moves into a later slot, until it's overdue", () => {
+      // 14:00's window is long (closes at 16:00), so it's still open when the clock reaches
+      // 14:53 — it already started, so it should read "now" alongside the current slot, not
+      // "upcoming".
+      const stillOpen = task({
+        scheduledTime: "14:00",
+        availableAt: instantAt(DATE, "14:00", -30),
+        dueAt: instantAt(DATE, "14:00", 120),
+      });
+      const current = task({
+        scheduledTime: "14:53",
+        availableAt: instantAt(DATE, "14:53", -10),
+        dueAt: instantAt(DATE, "14:53", 30),
+      });
+
+      const now = new Date(instantAt(DATE, "14:53"));
+      const timeline = buildTodayTimeline([stillOpen, current], now, DATE, SOFIA);
+
+      expect(timeline.groups.map((g) => g.scheduledTime)).toEqual([
+        "14:00",
+        "14:53",
+      ]);
+      expect(timeline.groups.map((g) => g.state)).toEqual(["now", "now"]);
+
+      // Once 14:00's own window lapses, it becomes overdue rather than staying "now".
+      const later = new Date(instantAt(DATE, "14:00", 121));
+      const overdueTimeline = buildTodayTimeline(
+        [stillOpen, current],
+        later,
+        DATE,
+        SOFIA,
+      );
+      expect(overdueTimeline.groups[0].state).toBe("overdue");
     });
 
     it("a fully completed group reads done regardless of the clock", () => {
@@ -336,13 +496,37 @@ describe("buildTodayTaskGroups + applyClock", () => {
       }
     });
 
-    it("keeps item identity stable across clock ticks", () => {
-      const base = buildTodayTaskGroups(tasks);
-      const a = applyClock(base, at("09:00"), DATE, SOFIA);
-      const b = applyClock(base, at("09:01"), DATE, SOFIA);
+    it("keeps an item's identity stable across ticks that stay inside its own window", () => {
+      const pending = task({
+        scheduledTime: "12:00",
+        status: "pending",
+        availableAt: instantAt(DATE, "12:00", -30),
+        dueAt: instantAt(DATE, "12:00", 30),
+      });
+      const base = buildTodayTaskGroups([pending]);
+      const a = applyClock(base, at("12:05"), DATE, SOFIA);
+      const b = applyClock(base, at("12:06"), DATE, SOFIA);
 
+      expect(a.groups[0].state).toBe("now");
       expect(a.groups[0].items[0]).toBe(b.groups[0].items[0]);
-      expect(a.groups[0].items).toBe(b.groups[0].items);
+    });
+
+    it("allocates a fresh item once its liveStatus crosses out of the seeded value, leaving completed items untouched", () => {
+      const base = buildTodayTaskGroups(tasks);
+      // "Midday wipe" (group 1, seeded pending) is still pending at 12:05 and overdue by 21:00.
+      const before = applyClock(base, at("12:05"), DATE, SOFIA);
+      const after = applyClock(base, at("21:00"), DATE, SOFIA);
+
+      expect(before.groups[1].state).toBe("now");
+      expect(after.groups[1].state).toBe("overdue");
+
+      const completedIndex = before.groups[0].items.findIndex(
+        (item) => item.isCompleted,
+      );
+      expect(completedIndex).toBeGreaterThanOrEqual(0);
+      expect(before.groups[0].items[completedIndex]).toBe(
+        after.groups[0].items[completedIndex],
+      );
     });
 
     it("still produces a fresh timeline when the tasks change", () => {
@@ -357,14 +541,22 @@ describe("buildTodayTaskGroups + applyClock", () => {
       expect(a.groups[0].items[0]).not.toBe(b.groups[0].items[0]);
     });
 
-    it("recomputes clock-derived state while reusing the items", () => {
+    it("recomputes clock-derived state while reusing completed items across the tick", () => {
       const base = buildTodayTaskGroups(tasks);
       const morning = applyClock(base, at("06:00"), DATE, SOFIA);
       const evening = applyClock(base, at("21:00"), DATE, SOFIA);
 
       expect(morning.groups[0].state).toBe("upcoming");
       expect(evening.groups[0].state).toBe("overdue");
-      expect(morning.groups[0].items).toBe(evening.groups[0].items);
+
+      // The two completed items in the 07:00 group never depend on the clock.
+      const completedIndexes = morning.groups[0].items
+        .map((item, index) => (item.isCompleted ? index : -1))
+        .filter((index) => index !== -1);
+      expect(completedIndexes).toHaveLength(2);
+      for (const index of completedIndexes) {
+        expect(morning.groups[0].items[index]).toBe(evening.groups[0].items[index]);
+      }
     });
   });
 });

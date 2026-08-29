@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ConflictError,
-  InternalError,
   NotFoundError,
   ValidationError,
 } from "../../core/errors/app-errors.js";
@@ -20,7 +19,6 @@ vi.mock("./task-record.repository.js", () => ({ taskRecordRepository }));
 
 const { taskRecordService } = await import("./task-record.service.js");
 
-const TZ = "Europe/Sofia";
 const LOCATION_ID = "00000000-0000-4000-8000-0000000000l1";
 const OCCURRENCE_ID = "00000000-0000-4000-8000-0000000000x1";
 const RECORD_ID = "00000000-0000-4000-8000-0000000000r1";
@@ -37,6 +35,7 @@ function makeOccurrence(overrides: Record<string, unknown> = {}) {
     id: OCCURRENCE_ID,
     type: "temperature",
     occurrenceDate: "2026-08-19",
+    availableAt: new Date("2026-08-19T00:00:00Z"),
     dueAt: new Date("2026-08-19T08:00:00Z"),
     minTempC: "0.0",
     maxTempC: "5.0",
@@ -56,6 +55,7 @@ function makeChain(overrides: Record<string, unknown> = {}) {
     voidedByUserId: null,
     occurrenceType: "temperature",
     occurrenceDate: "2026-08-19",
+    availableAt: new Date("2026-08-19T00:00:00Z"),
     dueAt: new Date("2026-08-19T08:00:00Z"),
     minTempC: "0.0",
     maxTempC: "5.0",
@@ -99,38 +99,53 @@ afterEach(() => {
 });
 
 describe("create", () => {
-  it("rejects an invalid organization timezone", async () => {
-    await expect(
-      taskRecordService.create(fakeDb(), SCOPE, "Not/AZone", { kind: "ordinary" }),
-    ).rejects.toBeInstanceOf(InternalError);
-  });
-
   it("404s when the occurrence is not found within the location/organization scope", async () => {
     taskRecordRepository.findOccurrenceForRecording.mockResolvedValue(null);
 
     await expect(
-      taskRecordService.create(fakeDb(), SCOPE, TZ, { kind: "ordinary" }),
+      taskRecordService.create(fakeDb(), SCOPE, { kind: "ordinary" }),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it("rejects an occurrence whose local date is after the organization's current local date", async () => {
+  it("rejects a write before the occurrence's availableAt", async () => {
     taskRecordRepository.findOccurrenceForRecording.mockResolvedValue(
-      makeOccurrence({ type: "cleaning", occurrenceDate: "2026-08-20" }),
+      makeOccurrence({
+        type: "cleaning",
+        availableAt: new Date("2026-08-19T12:00:00.001Z"), // one ms after the fixed now
+      }),
     );
 
     await expect(
-      taskRecordService.create(fakeDb(), SCOPE, TZ, { kind: "ordinary" }),
+      taskRecordService.create(fakeDb(), SCOPE, { kind: "ordinary" }),
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
-  it("accepts a past occurrence date", async () => {
+  it("accepts a write at exactly availableAt", async () => {
     taskRecordRepository.findOccurrenceForRecording.mockResolvedValue(
-      makeOccurrence({ type: "cleaning", occurrenceDate: "2020-01-01" }),
+      makeOccurrence({
+        type: "cleaning",
+        availableAt: new Date("2026-08-19T12:00:00.000Z"), // exactly the fixed now
+      }),
     );
     taskRecordRepository.insertRecord.mockResolvedValue(makeRecordRow());
 
     await expect(
-      taskRecordService.create(fakeDb(), SCOPE, TZ, { kind: "ordinary" }),
+      taskRecordService.create(fakeDb(), SCOPE, { kind: "ordinary" }),
+    ).resolves.toMatchObject({ id: RECORD_ID });
+  });
+
+  it("accepts a late, no-deadline write long after availableAt", async () => {
+    taskRecordRepository.findOccurrenceForRecording.mockResolvedValue(
+      makeOccurrence({
+        type: "cleaning",
+        availableAt: new Date("2020-01-01T00:00:00Z"),
+        dueAt: null,
+      }),
+    );
+    taskRecordRepository.insertRecord.mockResolvedValue(makeRecordRow());
+
+    await expect(
+      taskRecordService.create(fakeDb(), SCOPE, { kind: "ordinary" }),
     ).resolves.toMatchObject({ id: RECORD_ID });
   });
 
@@ -140,7 +155,7 @@ describe("create", () => {
     );
 
     await expect(
-      taskRecordService.create(fakeDb(), SCOPE, TZ, { kind: "ordinary" }),
+      taskRecordService.create(fakeDb(), SCOPE, { kind: "ordinary" }),
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
@@ -150,7 +165,7 @@ describe("create", () => {
     );
 
     await expect(
-      taskRecordService.create(fakeDb(), SCOPE, TZ, {
+      taskRecordService.create(fakeDb(), SCOPE, {
         kind: "temperature",
         recordedC: 3,
       }),
@@ -163,7 +178,7 @@ describe("create", () => {
     );
 
     await expect(
-      taskRecordService.create(fakeDb(), SCOPE, TZ, {
+      taskRecordService.create(fakeDb(), SCOPE, {
         kind: "temperature",
         recordedC: 12,
       }),
@@ -184,7 +199,7 @@ describe("create", () => {
       correctiveAction: null,
     });
 
-    await taskRecordService.create(fakeDb(), SCOPE, TZ, {
+    await taskRecordService.create(fakeDb(), SCOPE, {
       kind: "temperature",
       recordedC: 3,
       correctiveAction: "not needed",
@@ -210,7 +225,7 @@ describe("create", () => {
       correctiveAction: "Moved stock",
     });
 
-    await taskRecordService.create(fakeDb(), SCOPE, TZ, {
+    await taskRecordService.create(fakeDb(), SCOPE, {
       kind: "temperature",
       recordedC: 12,
       correctiveAction: "  Moved stock  ",
@@ -234,7 +249,7 @@ describe("create", () => {
     );
 
     await expect(
-      taskRecordService.create(fakeDb(), SCOPE, TZ, { kind: "ordinary" }),
+      taskRecordService.create(fakeDb(), SCOPE, { kind: "ordinary" }),
     ).rejects.toBeInstanceOf(ConflictError);
   });
 
@@ -248,7 +263,7 @@ describe("create", () => {
     );
 
     await expect(
-      taskRecordService.create(fakeDb(), SCOPE, TZ, {
+      taskRecordService.create(fakeDb(), SCOPE, {
         kind: "temperature",
         recordedC: 3,
       }),
@@ -263,8 +278,18 @@ describe("update", () => {
     taskRecordRepository.findRecordChain.mockResolvedValue(null);
 
     await expect(
-      taskRecordService.update(fakeDb(), SCOPE, TZ, { kind: "ordinary" }),
+      taskRecordService.update(fakeDb(), SCOPE, { kind: "ordinary" }),
     ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("rejects a reactivation before the occurrence's availableAt", async () => {
+    taskRecordRepository.findRecordChain.mockResolvedValue(
+      makeChain({ availableAt: new Date("2026-08-19T12:00:00.001Z") }),
+    );
+
+    await expect(
+      taskRecordService.update(fakeDb(), SCOPE, { kind: "ordinary" }),
+    ).rejects.toBeInstanceOf(ValidationError);
   });
 
   it("revalidates the payload kind against the immutable occurrence type, not any prior detail", async () => {
@@ -273,7 +298,7 @@ describe("update", () => {
     );
 
     await expect(
-      taskRecordService.update(fakeDb(), SCOPE, TZ, {
+      taskRecordService.update(fakeDb(), SCOPE, {
         kind: "temperature",
         recordedC: 3,
       }),
@@ -294,7 +319,7 @@ describe("update", () => {
       correctiveAction: null,
     });
 
-    const response = await taskRecordService.update(fakeDb(), SCOPE, TZ, {
+    const response = await taskRecordService.update(fakeDb(), SCOPE, {
       kind: "temperature",
       recordedC: 1,
     });
@@ -324,7 +349,7 @@ describe("update", () => {
       makeRecordRow({ voidedAt: null, voidedByUserId: null }),
     );
 
-    const response = await taskRecordService.update(fakeDb(), SCOPE, TZ, {
+    const response = await taskRecordService.update(fakeDb(), SCOPE, {
       kind: "ordinary",
     });
 

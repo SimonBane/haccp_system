@@ -61,6 +61,7 @@ export function toTodayTaskItem(
     maxTempC: row.maxTempC === null ? null : Number(row.maxTempC),
     scheduledTime: row.scheduledTime,
     date: row.occurrenceDate,
+    availableAt: row.availableAt,
     dueAt: row.dueAt,
     now,
     record,

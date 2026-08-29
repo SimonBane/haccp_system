@@ -11,6 +11,7 @@ import { DataTableAddButton } from "@/components/ui/data-table/data-table-add-bu
 import { getColumns } from "@/features/task-templates/data-table/columns";
 import { TaskTemplatesMobileCard } from "@/features/task-templates/data-table/mobile-card";
 import { getTaskTemplateRowActions } from "@/features/task-templates/data-table/row-actions";
+import type { CompactWindowSummaryLabels } from "@/features/task-templates/lib/completion-window";
 
 type TaskTemplatesDataProps = {
   items: TaskTemplateResponse[];
@@ -70,9 +71,28 @@ export function TaskTemplatesData({
     [t, onEdit, onDuplicate, onDelete],
   );
 
+  const windowSummaryLabels = useMemo<CompactWindowSummaryLabels>(
+    () => ({
+      fromStartOfDay: t("completionWindow.compactFromStartOfDay"),
+      opensBefore: (minutes) =>
+        t("completionWindow.compactOpensBefore", { minutes }),
+      neverOverdue: t("completionWindow.compactNeverOverdue"),
+      overdueAfter: (minutes) =>
+        t("completionWindow.compactOverdueAfter", { minutes }),
+    }),
+    [t],
+  );
+
   const columns = useMemo(
-    () => getColumns({ t, typeLabels, scheduleLabels, getRowActions }),
-    [t, typeLabels, scheduleLabels, getRowActions],
+    () =>
+      getColumns({
+        t,
+        typeLabels,
+        scheduleLabels,
+        windowSummaryLabels,
+        getRowActions,
+      }),
+    [t, typeLabels, scheduleLabels, windowSummaryLabels, getRowActions],
   );
 
   const renderMobileRow = useCallback(
@@ -81,9 +101,10 @@ export function TaskTemplatesData({
         row={row}
         typeLabels={typeLabels}
         scheduleLabels={scheduleLabels}
+        windowSummaryLabels={windowSummaryLabels}
       />
     ),
-    [typeLabels, scheduleLabels],
+    [typeLabels, scheduleLabels, windowSummaryLabels],
   );
 
   return (

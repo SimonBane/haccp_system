@@ -60,7 +60,8 @@ export type RecordRow = {
   taskTemplateId: string;
   occurrenceDate: string;
   scheduledTime: string;
-  dueAt: Date;
+  availableAt: Date;
+  dueAt: Date | null;
   title: string;
   type: string;
   equipmentId: string | null;
@@ -88,9 +89,9 @@ export type RecordRow = {
 };
 
 /**
- * Location scope plus the historical-eligibility rule: a row belongs to Records only
- * once a record exists or its due time has passed. The organization predicate rides on
- * the `locations` join because `task_occurrences` carries no organization column.
+ * Location scope plus the historical-eligibility rule: a row belongs to Records once a
+ * record exists, a finite deadline has passed, or a no-deadline occurrence has opened —
+ * unrecorded work with a deadline still ahead stays operational, not historical.
  */
 function baseCondition(scope: RecordsScope): SQL {
   return and(
@@ -98,7 +99,11 @@ function baseCondition(scope: RecordsScope): SQL {
     eq(locations.organizationId, scope.organizationId),
     gte(taskOccurrences.occurrenceDate, scope.dateFrom),
     lte(taskOccurrences.occurrenceDate, scope.dateTo),
-    or(isNotNull(taskRecords.id), lte(taskOccurrences.dueAt, scope.now)),
+    or(
+      isNotNull(taskRecords.id),
+      and(isNotNull(taskOccurrences.dueAt), lte(taskOccurrences.dueAt, scope.now)),
+      and(isNull(taskOccurrences.dueAt), lte(taskOccurrences.availableAt, scope.now)),
+    ),
   )!;
 }
 
@@ -109,7 +114,9 @@ function displayStateCondition(state: RecordDisplayState): SQL {
     case RECORD_DISPLAY_STATE.VOIDED:
       return and(isNotNull(taskRecords.id), isNotNull(taskRecords.voidedAt))!;
     case RECORD_DISPLAY_STATE.MISSED:
-      return isNull(taskRecords.id);
+      return and(isNull(taskRecords.id), isNotNull(taskOccurrences.dueAt))!;
+    case RECORD_DISPLAY_STATE.OPEN:
+      return and(isNull(taskRecords.id), isNull(taskOccurrences.dueAt))!;
   }
 }
 
@@ -175,6 +182,7 @@ export const recordsRepository = {
         taskTemplateId: taskOccurrences.taskTemplateId,
         occurrenceDate: taskOccurrences.occurrenceDate,
         scheduledTime: taskOccurrences.scheduledTime,
+        availableAt: taskOccurrences.availableAt,
         dueAt: taskOccurrences.dueAt,
         title: taskOccurrences.title,
         type: taskOccurrences.type,

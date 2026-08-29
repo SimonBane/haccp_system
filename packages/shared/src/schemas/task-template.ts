@@ -69,6 +69,11 @@ export const TASK_TEMPLATE_SLOT_THRESHOLDS = {
   afternoonEnd: 16 * 60 + 59,
 } as const;
 
+export const TASK_TEMPLATE_COMPLETION_MINUTES_MIN = 0;
+export const TASK_TEMPLATE_COMPLETION_MINUTES_MAX = 1440;
+export const TASK_TEMPLATE_COMPLETION_OPENS_BEFORE_DEFAULT_MINUTES = 1440;
+export const TASK_TEMPLATE_COMPLETION_DUE_AFTER_DEFAULT_MINUTES = 0;
+
 const scheduledTimePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 export const scheduledTimeSchema = z
@@ -148,6 +153,19 @@ export function formatScheduledTimes(times: string[]): string {
   return sortScheduledTimes(times).join(", ");
 }
 
+export const completionOpensBeforeMinutesSchema = z
+  .number()
+  .int()
+  .min(TASK_TEMPLATE_COMPLETION_MINUTES_MIN)
+  .max(TASK_TEMPLATE_COMPLETION_MINUTES_MAX);
+
+export const completionDueAfterMinutesSchema = z
+  .number()
+  .int()
+  .min(TASK_TEMPLATE_COMPLETION_MINUTES_MIN)
+  .max(TASK_TEMPLATE_COMPLETION_MINUTES_MAX)
+  .nullable();
+
 const taskTemplateFieldsSchema = z.object({
   title: z.string().trim().min(1).max(200),
   type: taskTemplateTypeSchema,
@@ -179,6 +197,12 @@ const taskTemplateFieldsSchema = z.object({
       }
     }),
   equipmentId: z.uuid().nullable().optional(),
+  completionOpensBeforeMinutes: completionOpensBeforeMinutesSchema.default(
+    TASK_TEMPLATE_COMPLETION_OPENS_BEFORE_DEFAULT_MINUTES,
+  ),
+  completionDueAfterMinutes: completionDueAfterMinutesSchema.default(
+    TASK_TEMPLATE_COMPLETION_DUE_AFTER_DEFAULT_MINUTES,
+  ),
 });
 
 function withTaskTemplateValidation<T extends z.ZodType>(schema: T) {
@@ -227,6 +251,8 @@ export const taskTemplateResponseSchema = z.object({
   scheduledTimes: z.array(scheduledTimeSchema),
   equipmentId: z.uuid().nullable(),
   equipmentName: z.string().nullable(),
+  completionOpensBeforeMinutes: z.number().int(),
+  completionDueAfterMinutes: z.number().int().nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });
