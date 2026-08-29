@@ -18,6 +18,7 @@ export const RECORD_DISPLAY_STATE_VARIANT: Record<
   [RECORD_DISPLAY_STATE.SUBMITTED]: "success",
   [RECORD_DISPLAY_STATE.MISSED]: "destructive",
   [RECORD_DISPLAY_STATE.VOIDED]: "outline",
+  [RECORD_DISPLAY_STATE.OPEN]: "secondary",
 };
 
 export const RECORD_RESULT_VARIANT: Record<RecordResult, RecordsBadgeVariant> =
@@ -32,6 +33,7 @@ export const RECORD_TIMING_VARIANT: Record<RecordTiming, RecordsBadgeVariant> =
     [RECORD_TIMING.ON_TIME]: "secondary",
     [RECORD_TIMING.LATE]: "warning",
     [RECORD_TIMING.NOT_SUBMITTED]: "outline",
+    [RECORD_TIMING.NO_DEADLINE]: "outline",
   };
 
 export type RecordsLabels = {
@@ -42,7 +44,7 @@ export type RecordsLabels = {
   type: Record<"temperature" | "cleaning" | "other", string>;
 };
 
-/** Timing only qualifies an active submission. */
+/** Timing only qualifies an active submission — an Open row's own badge already reads "Open". */
 export function showsTiming(
   displayState: RecordDisplayState,
   timing: RecordTiming,
@@ -51,4 +53,27 @@ export function showsTiming(
     displayState === RECORD_DISPLAY_STATE.SUBMITTED &&
     timing !== RECORD_TIMING.NOT_SUBMITTED
   );
+}
+
+/** A submitted no-deadline record reads "On time"; an Open row stays "Not submitted" — no record exists yet. */
+export function resolvedTiming(item: {
+  displayState: RecordDisplayState;
+  timing: RecordTiming;
+}): RecordTiming {
+  return item.timing === RECORD_TIMING.NO_DEADLINE
+    ? RECORD_TIMING.ON_TIME
+    : item.timing;
+}
+
+/** Badge value for the compact grid/mobile views — null when nothing should render. */
+export function timingBadgeValue(item: {
+  displayState: RecordDisplayState;
+  timing: RecordTiming;
+}): RecordTiming | null {
+  if (!showsTiming(item.displayState, item.timing)) {
+    return null;
+  }
+  return item.timing === RECORD_TIMING.NO_DEADLINE
+    ? RECORD_TIMING.ON_TIME
+    : item.timing;
 }

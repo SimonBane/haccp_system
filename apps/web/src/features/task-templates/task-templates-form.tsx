@@ -1,10 +1,10 @@
 "use client";
 
 import {
+  TASK_TEMPLATE_COMPLETION_MINUTES_MAX,
+  TASK_TEMPLATE_COMPLETION_MINUTES_MIN,
   TASK_TEMPLATE_MAX_SCHEDULED_TIMES,
-  TASK_TEMPLATE_ALL_WEEKDAYS,
   TASK_TEMPLATE_TYPE,
-  TASK_TEMPLATE_WEEKDAYS,
   scheduledTimeSchema,
   taskTemplateTypeSchema,
   taskTemplateWeekdaySchema,
@@ -21,6 +21,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Controller,
+  useController,
   useFieldArray,
   useForm,
   useFormState,
@@ -30,17 +31,16 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { ApiRequestError } from "@/lib/api-utils";
+import { cn } from "@/lib/utils";
 import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
-import {
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { DialogFooter } from "@/components/ui/dialog";
 import {
   REQUIRED_LABEL_CLASS,
   Field,
   FieldError,
-  FieldGroup,
   FieldLabel,
   FieldLegend,
+  FieldSeparator,
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -53,25 +53,31 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  buildDefaultCompletionWindow,
   buildDefaultTimeRows,
   buildDefaultWeekdays,
+  findDuplicateScheduledTimeIndices,
+  getNextDefaultScheduledTime,
   getScheduledTimeRowsErrorMessage,
-  getWeekdayPreset,
-  hasDuplicateScheduledTimes,
   hasTaskChanges,
-  TASK_TYPES,
-  WEEKDAY_PRESET_OPTIONS,
+  type CompletionWindowValues,
   type ScheduledTimeRowValue,
-  type WeekdayPreset,
 } from "@/features/task-templates/lib/form-helpers";
+import {
+  COMPLETION_DUE_PRESET_MINUTES,
+  COMPLETION_OPENS_PRESET_MINUTES,
+  CUSTOM_MINUTES_INITIAL_VALUE,
+  resolveDuePreset,
+  resolveOpensPreset,
+  type CompletionDuePreset,
+  type CompletionOpensPreset,
+} from "@/features/task-templates/lib/completion-window";
 import { ScheduledTimeRow } from "@/features/task-templates/components/scheduled-time-row";
-import { WeekdayMultiSelect } from "@/features/task-templates/components/weekday-multi-select";
-import { cn } from "@/lib/utils";
+import { TaskTypeToggle } from "@/features/task-templates/components/task-type-toggle";
+import { WeekdayToggleStrip } from "@/features/task-templates/components/weekday-toggle-strip";
+import { CompletionWindowFields } from "@/features/task-templates/components/completion-window-fields";
 
 const TASK_TEMPLATES_FORM_ID = "task-templates-form";
-
-const SCHEDULED_TIME_SLOT_CLASS =
-  "w-full min-w-0 sm:w-[calc((100%-1.5rem)/3)] md:w-[calc((100%-1.5rem)/4)]";
 
 type TaskTemplatesFormProps = {
   open: boolean;
@@ -139,6 +145,9 @@ export function TaskTemplatesForm({
           .min(1, t("validation.timesRequired"))
           .max(TASK_TEMPLATE_MAX_SCHEDULED_TIMES, t("validation.timesMax")),
         equipmentId: z.uuid().nullable(),
+        completionOpensBeforeMinutes: z.string(),
+        completionDueAfterMinutes: z.string(),
+        neverOverdue: z.boolean(),
       })
       .superRefine((data, ctx) => {
         if (data.type === TASK_TEMPLATE_TYPE.TEMPERATURE && !data.equipmentId) {
@@ -148,7 +157,56 @@ export function TaskTemplatesForm({
             path: ["equipmentId"],
           });
         }
+
+        validateMinutesField(
+          data.completionOpensBeforeMinutes,
+          ctx,
+          "completionOpensBeforeMinutes",
+          t("validation.completionAvailableRequired"),
+        );
+
+        if (!data.neverOverdue) {
+          validateMinutesField(
+            data.completionDueAfterMinutes,
+            ctx,
+            "completionDueAfterMinutes",
+            t("validation.completionDeadlineRequired"),
+          );
+        }
       });
+
+    function validateMinutesField(
+      value: string,
+      ctx: z.core.$RefinementCtx,
+      path: string,
+      requiredMessage: string,
+    ) {
+      if (value === "") {
+        ctx.addIssue({ code: "custom", message: requiredMessage, path: [path] });
+        return;
+      }
+
+      if (!/^\d+$/.test(value)) {
+        ctx.addIssue({
+          code: "custom",
+          message: t("validation.completionMinutesInteger"),
+          path: [path],
+        });
+        return;
+      }
+
+      const parsed = Number(value);
+      if (
+        parsed < TASK_TEMPLATE_COMPLETION_MINUTES_MIN ||
+        parsed > TASK_TEMPLATE_COMPLETION_MINUTES_MAX
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          message: t("validation.completionMinutesRange"),
+          path: [path],
+        });
+      }
+    }
   }, [t]);
 
   type TaskTemplatesFormValues = {
@@ -157,7 +215,7 @@ export function TaskTemplatesForm({
     weekdays: TaskTemplateWeekday[];
     scheduledTimeRows: ScheduledTimeRowValue[];
     equipmentId: string | null;
-  };
+  } & CompletionWindowValues;
 
   const defaultValues = useMemo((): TaskTemplatesFormValues => {
     const source = task ?? duplicateSource;
@@ -172,6 +230,7 @@ export function TaskTemplatesForm({
       weekdays: buildDefaultWeekdays(task, duplicateSource),
       scheduledTimeRows: buildDefaultTimeRows(task, duplicateSource),
       equipmentId: source?.equipmentId ?? null,
+      ...buildDefaultCompletionWindow(task, duplicateSource),
     };
   }, [task, duplicateSource, suggestedDuplicateTitle]);
 
@@ -188,25 +247,25 @@ export function TaskTemplatesForm({
     name: "scheduledTimeRows",
   });
 
-  // One object so reset-on-open is a single update (three useStates inside an effect remounted and killed the slide-in).
-  const [scheduleUi, setScheduleUi] = useState<{
-    weekdayPreset: WeekdayPreset;
+  // One object so reset-on-open is a single update (separate useStates in an effect killed the
+  // sheet slide-in) — covers the add-time autofocus target and the two completion-window preset
+  // selections, none of which live in RHF state.
+  const [formUi, setFormUi] = useState<{
     autoFocusTimeIndex: number | null;
-    duplicateTimesError: string | null;
+    opensPreset: CompletionOpensPreset | null;
+    duePreset: CompletionDuePreset | null;
   }>(() => ({
-    weekdayPreset: getWeekdayPreset(defaultValues.weekdays),
     autoFocusTimeIndex: null,
-    duplicateTimesError: null,
+    opensPreset: resolveOpensPreset(defaultValues.completionOpensBeforeMinutes),
+    duePreset: resolveDuePreset(
+      defaultValues.completionDueAfterMinutes,
+      defaultValues.neverOverdue,
+    ),
   }));
-  const { weekdayPreset, autoFocusTimeIndex, duplicateTimesError } = scheduleUi;
+  const { autoFocusTimeIndex, opensPreset, duePreset } = formUi;
 
-  const setWeekdayPreset = (next: WeekdayPreset) =>
-    setScheduleUi((previous) => ({ ...previous, weekdayPreset: next }));
   const setAutoFocusTimeIndex = (next: number | null) =>
-    setScheduleUi((previous) => ({ ...previous, autoFocusTimeIndex: next }));
-  const setDuplicateTimesError = (next: string | null) =>
-    setScheduleUi((previous) => ({ ...previous, duplicateTimesError: next }));
-  const skipWeekdaysBlurRef = useRef(false);
+    setFormUi((previous) => ({ ...previous, autoFocusTimeIndex: next }));
   const titleRef = useRef<HTMLInputElement | null>(null);
 
   // Reset on open via the prop: the parent never calls `onOpenChange`. Adjust UI during render; `form.reset` stays in an effect.
@@ -219,10 +278,15 @@ export function TaskTemplatesForm({
   if (openedValues !== openedTarget) {
     setOpenedValues(openedTarget);
     if (openedTarget) {
-      setScheduleUi({
-        weekdayPreset: getWeekdayPreset(openedTarget.weekdays),
+      setFormUi({
         autoFocusTimeIndex: null,
-        duplicateTimesError: null,
+        opensPreset: resolveOpensPreset(
+          openedTarget.completionOpensBeforeMinutes,
+        ),
+        duePreset: resolveDuePreset(
+          openedTarget.completionDueAfterMinutes,
+          openedTarget.neverOverdue,
+        ),
       });
     }
   }
@@ -248,27 +312,79 @@ export function TaskTemplatesForm({
     sunday: t("weekdaysShort.sunday"),
   };
 
+  const weekdayFullLabels: Record<TaskTemplateWeekday, string> = {
+    monday: t("weekdaysFull.monday"),
+    tuesday: t("weekdaysFull.tuesday"),
+    wednesday: t("weekdaysFull.wednesday"),
+    thursday: t("weekdaysFull.thursday"),
+    friday: t("weekdaysFull.friday"),
+    saturday: t("weekdaysFull.saturday"),
+    sunday: t("weekdaysFull.sunday"),
+  };
+
   const selectedType = useWatch({ control: form.control, name: "type" });
+  const watchedScheduledTimes = useWatch({
+    control: form.control,
+    name: "scheduledTimeRows",
+  });
   const { isSubmitting, errors, isDirty } = useFormState({
     control: form.control,
   });
 
   const hasChanges = !isEditing || !task || isDirty;
 
-  function validateScheduledTimeUniqueness() {
-    const times = form.getValues("scheduledTimeRows").map((row) => row.time);
+  const duplicateTimeIndices = findDuplicateScheduledTimeIndices(
+    watchedScheduledTimes.map((row) => row.time),
+  );
 
-    if (hasDuplicateScheduledTimes(times)) {
-      setDuplicateTimesError(t("validation.timesUnique"));
-      return false;
+  const opensField = useController({
+    name: "completionOpensBeforeMinutes",
+    control: form.control,
+  });
+  const dueField = useController({
+    name: "completionDueAfterMinutes",
+    control: form.control,
+  });
+
+  function handleOpensPresetChange(preset: CompletionOpensPreset) {
+    setFormUi((previous) => ({ ...previous, opensPreset: preset }));
+
+    form.setValue(
+      "completionOpensBeforeMinutes",
+      preset === "custom"
+        ? CUSTOM_MINUTES_INITIAL_VALUE
+        : String(COMPLETION_OPENS_PRESET_MINUTES[preset]),
+      { shouldDirty: true, shouldTouch: true },
+    );
+    form.clearErrors("completionOpensBeforeMinutes");
+  }
+
+  function handleDuePresetChange(preset: CompletionDuePreset) {
+    setFormUi((previous) => ({ ...previous, duePreset: preset }));
+
+    if (preset === "never") {
+      form.setValue("neverOverdue", true, { shouldDirty: true });
+      form.clearErrors("completionDueAfterMinutes");
+      return;
     }
 
-    setDuplicateTimesError(null);
-    return true;
+    form.setValue("neverOverdue", false, { shouldDirty: true });
+    form.setValue(
+      "completionDueAfterMinutes",
+      preset === "custom"
+        ? CUSTOM_MINUTES_INITIAL_VALUE
+        : String(COMPLETION_DUE_PRESET_MINUTES[preset]),
+      { shouldDirty: true, shouldTouch: true },
+    );
+    form.clearErrors("completionDueAfterMinutes");
   }
 
   async function handleValidSubmit(values: TaskTemplatesFormValues) {
-    if (!validateScheduledTimeUniqueness()) {
+    if (
+      findDuplicateScheduledTimeIndices(
+        values.scheduledTimeRows.map((row) => row.time),
+      ).size > 0
+    ) {
       return;
     }
 
@@ -288,6 +404,10 @@ export function TaskTemplatesForm({
         values.type === TASK_TEMPLATE_TYPE.TEMPERATURE
           ? values.equipmentId
           : null,
+      completionOpensBeforeMinutes: Number(values.completionOpensBeforeMinutes),
+      completionDueAfterMinutes: values.neverOverdue
+        ? null
+        : Number(values.completionDueAfterMinutes),
     };
 
     try {
@@ -305,30 +425,28 @@ export function TaskTemplatesForm({
   }
 
   const scheduledTimeRowsError = errors.scheduledTimeRows;
-  const scheduledTimeRowsErrorMessage =
-    duplicateTimesError ??
-    getScheduledTimeRowsErrorMessage(scheduledTimeRowsError);
-
-  function handleScheduledTimesChange(update: () => void) {
-    update();
-    setDuplicateTimesError(null);
-  }
-
-  function handleScheduledTimeBlur(
-    onBlur: () => void,
-    index: number,
-  ) {
-    onBlur();
-    void form.trigger(`scheduledTimeRows.${index}.time`).then(() => {
-      validateScheduledTimeUniqueness();
-    });
-  }
+  const scheduledTimeRowsErrorMessage = getScheduledTimeRowsErrorMessage(
+    scheduledTimeRowsError,
+  );
+  const scheduledTimeRowsGroupError = scheduledTimeRowsErrorMessage
+    ? scheduledTimeRowsErrorMessage
+    : duplicateTimeIndices.size > 0
+      ? t("validation.timesUnique")
+      : undefined;
 
   const submitLabel = isEditing ? t("save") : t("add");
   const SubmitIcon = isEditing ? SaveIcon : PlusIcon;
 
   const formFooter = (
     <DialogFooter>
+      <Button
+        type="button"
+        variant="outline"
+        className="max-md:hidden"
+        onClick={() => onOpenChange(false)}
+      >
+        {t("cancel")}
+      </Button>
       <Button
         type="submit"
         form={TASK_TEMPLATES_FORM_ID}
@@ -362,13 +480,16 @@ export function TaskTemplatesForm({
       initialFocus={isEditing || isDuplicating ? undefined : false}
       closeLabel={t("cancel")}
       footer={formFooter}
+      className="sm:max-w-lg"
     >
         <form
           id={TASK_TEMPLATES_FORM_ID}
           onSubmit={form.handleSubmit(handleValidSubmit)}
           className="grid gap-6"
         >
-          <FieldGroup>
+          <FieldSet className="gap-4">
+            <FieldLegend variant="label">{t("sections.details")}</FieldLegend>
+
             <Controller
               name="title"
               control={form.control}
@@ -408,43 +529,19 @@ export function TaskTemplatesForm({
                   >
                     {t("typeLabel")}
                   </FieldLabel>
-                  <Select
-                    name={field.name}
-                    items={TASK_TYPES.map((type) => ({
-                      label: typeLabels[type],
-                      value: type,
-                    }))}
-                    value={field.value || null}
-                    onValueChange={(value: unknown) => {
-                      const nextType = value as TaskTemplateType;
+                  <TaskTypeToggle
+                    id={`${TASK_TEMPLATES_FORM_ID}-type`}
+                    value={field.value}
+                    labels={typeLabels}
+                    invalid={fieldState.invalid}
+                    onValueChange={(nextType) => {
                       field.onChange(nextType);
                       if (nextType !== TASK_TEMPLATE_TYPE.TEMPERATURE) {
                         form.setValue("equipmentId", null);
                       }
                     }}
-                    onOpenChange={(nextOpen) => {
-                      if (!nextOpen) {
-                        field.onBlur();
-                      }
-                    }}
-                  >
-                    <SelectTrigger
-                      id={`${TASK_TEMPLATES_FORM_ID}-type`}
-                      aria-invalid={fieldState.invalid}
-                      className="w-full"
-                    >
-                      <SelectValue placeholder={t("typePlaceholder")} />
-                    </SelectTrigger>
-                    <SelectContent alignItemWithTrigger={false}>
-                      <SelectGroup>
-                        {TASK_TYPES.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {typeLabels[type]}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
+                    onBlur={field.onBlur}
+                  />
                   {fieldState.invalid && (
                     <FieldError errors={[fieldState.error]} />
                   )}
@@ -506,208 +603,133 @@ export function TaskTemplatesForm({
                 )}
               />
             ) : null}
+          </FieldSet>
+
+          <FieldSeparator />
+
+          <FieldSet className="gap-4">
+            <FieldLegend variant="label">{t("sections.schedule")}</FieldLegend>
 
             <Controller
               name="weekdays"
               control={form.control}
               render={({ field, fieldState }) => (
-                <>
-                  <Field
-                    data-invalid={
-                      fieldState.invalid && weekdayPreset !== "custom"
+                <WeekdayToggleStrip
+                  id={`${TASK_TEMPLATES_FORM_ID}-weekdays`}
+                  label={t("weekdaysLabel")}
+                  value={field.value}
+                  shortLabels={weekdayShortLabels}
+                  fullLabels={weekdayFullLabels}
+                  everyDayLabel={t("presets.everyDay")}
+                  weekdaysLabel={t("presets.weekdays")}
+                  invalid={fieldState.invalid}
+                  errorMessage={fieldState.error?.message}
+                  onValueChange={(nextValue) => {
+                    field.onChange(nextValue);
+                    if (nextValue.length > 0) {
+                      form.clearErrors("weekdays");
                     }
-                  >
-                    <FieldLabel
-                      htmlFor={`${TASK_TEMPLATES_FORM_ID}-schedule`}
-                      className={REQUIRED_LABEL_CLASS}
-                    >
-                      {t("weekdaysLabel")}
-                    </FieldLabel>
-                    <Select
-                      items={WEEKDAY_PRESET_OPTIONS.map((preset) => ({
-                        label: t(`presets.${preset}`),
-                        value: preset,
-                      }))}
-                      value={weekdayPreset === "none" ? null : weekdayPreset}
-                      onValueChange={(value: unknown) => {
-                        const nextPreset = value as
-                          | Exclude<WeekdayPreset, "none">
-                          | null;
-
-                        if (!nextPreset) return;
-
-                        if (nextPreset === "everyDay") {
-                          setWeekdayPreset("everyDay");
-                          field.onChange([...TASK_TEMPLATE_ALL_WEEKDAYS]);
-                          field.onBlur();
-                          return;
-                        }
-
-                        if (nextPreset === "weekdays") {
-                          setWeekdayPreset("weekdays");
-                          field.onChange([...TASK_TEMPLATE_WEEKDAYS]);
-                          field.onBlur();
-                          return;
-                        }
-
-                        setWeekdayPreset("custom");
-                        skipWeekdaysBlurRef.current = true;
-                        form.resetField("weekdays", {
-                          defaultValue: [],
-                          keepDirty: true,
-                          keepTouched: false,
-                          keepError: false,
-                        });
-                      }}
-                      onOpenChange={(nextOpen) => {
-                        if (!nextOpen) {
-                          if (skipWeekdaysBlurRef.current) {
-                            skipWeekdaysBlurRef.current = false;
-                            return;
-                          }
-                          field.onBlur();
-                        }
-                      }}
-                    >
-                      <SelectTrigger
-                        id={`${TASK_TEMPLATES_FORM_ID}-schedule`}
-                        aria-invalid={
-                          fieldState.invalid && weekdayPreset !== "custom"
-                        }
-                        className="w-full"
-                      >
-                        <SelectValue placeholder={t("schedulePlaceholder")} />
-                      </SelectTrigger>
-                      <SelectContent alignItemWithTrigger={false}>
-                        <SelectGroup>
-                          {WEEKDAY_PRESET_OPTIONS.map((preset) => (
-                            <SelectItem key={preset} value={preset}>
-                              {t(`presets.${preset}`)}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                    {fieldState.invalid && weekdayPreset !== "custom" ? (
-                      <FieldError errors={[fieldState.error]} />
-                    ) : null}
-                  </Field>
-                  {weekdayPreset === "custom" ? (
-                    <Field
-                      data-invalid={
-                        fieldState.invalid &&
-                        (fieldState.isTouched || form.formState.isSubmitted)
-                      }
-                    >
-                      <FieldLabel
-                        htmlFor={`${TASK_TEMPLATES_FORM_ID}-weekdays`}
-                        className={REQUIRED_LABEL_CLASS}
-                      >
-                        {t("daysOfWeekLabel")}
-                      </FieldLabel>
-                      <WeekdayMultiSelect
-                        id={`${TASK_TEMPLATES_FORM_ID}-weekdays`}
-                        selectOnly
-                        value={field.value}
-                        labels={weekdayShortLabels}
-                        invalid={
-                          fieldState.invalid &&
-                          (fieldState.isTouched || form.formState.isSubmitted)
-                        }
-                        placeholder={t("weekdaysPlaceholder")}
-                        emptyMessage={t("weekdaysEmpty")}
-                        moreSelectedLabel={(count) => t("moreSelected", { count })}
-                        overflowRemoveLabel={(count) =>
-                          t("overflowRemoveLabel", { count })
-                        }
-                        onValueChange={(nextValue) => {
-                          field.onChange(nextValue);
-                          if (nextValue.length > 0) {
-                            form.clearErrors("weekdays");
-                          }
-                        }}
-                        onBlur={field.onBlur}
-                      />
-                      {fieldState.invalid &&
-                      (fieldState.isTouched || form.formState.isSubmitted) ? (
-                        <FieldError errors={[fieldState.error]} />
-                      ) : null}
-                    </Field>
-                  ) : null}
-                </>
+                  }}
+                  onBlur={field.onBlur}
+                />
               )}
             />
-          </FieldGroup>
 
-          <FieldSet
-            className="gap-2"
-            data-invalid={Boolean(scheduledTimeRowsErrorMessage)}
-          >
-            <FieldLegend variant="label" className={REQUIRED_LABEL_CLASS}>
-              {t("timesLabel")}
-            </FieldLegend>
-            <div className="flex flex-row flex-wrap items-start gap-2">
-              {fields.map((field, index) => (
-                <Controller
-                  key={field.id}
-                  name={`scheduledTimeRows.${index}.time`}
-                  control={form.control}
-                  render={({ field: timeField, fieldState }) => (
-                    <Field
-                      className={SCHEDULED_TIME_SLOT_CLASS}
-                      data-invalid={fieldState.invalid}
-                    >
-                      <ScheduledTimeRow
-                        id={`${TASK_TEMPLATES_FORM_ID}-time-${index}`}
-                        value={timeField.value}
-                        aria-invalid={fieldState.invalid}
-                        autoFocus={autoFocusTimeIndex === index}
-                        onChange={(time) => {
-                          handleScheduledTimesChange(() =>
-                            timeField.onChange(time),
-                          );
-                        }}
-                        onBlur={() =>
-                          handleScheduledTimeBlur(timeField.onBlur, index)
-                        }
-                        onRemove={() => {
-                          handleScheduledTimesChange(() => remove(index));
-                          setAutoFocusTimeIndex(null);
-                        }}
-                        canRemove
+            <FieldSet
+              className="gap-3"
+              data-invalid={Boolean(scheduledTimeRowsGroupError)}
+            >
+              <div className="flex items-baseline justify-between gap-2">
+                <FieldLegend
+                  variant="label"
+                  className={cn(REQUIRED_LABEL_CLASS, "mb-0")}
+                >
+                  {t("timesLabel")}
+                </FieldLegend>
+                <span className="text-xs tabular-nums text-muted-foreground">
+                  {fields.length}/{TASK_TEMPLATE_MAX_SCHEDULED_TIMES}
+                </span>
+              </div>
+              {fields.length > 0 ? (
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {fields.map((field, index) => {
+                    const isDuplicate = duplicateTimeIndices.has(index);
+                    return (
+                      <Controller
+                        key={field.id}
+                        name={`scheduledTimeRows.${index}.time`}
+                        control={form.control}
+                        render={({ field: timeField, fieldState }) => (
+                          <ScheduledTimeRow
+                            id={`${TASK_TEMPLATES_FORM_ID}-time-${index}`}
+                            value={timeField.value}
+                            aria-invalid={fieldState.invalid || isDuplicate}
+                            autoFocus={autoFocusTimeIndex === index}
+                            onChange={timeField.onChange}
+                            onBlur={timeField.onBlur}
+                            onRemove={() => {
+                              remove(index);
+                              setAutoFocusTimeIndex(null);
+                            }}
+                          />
+                        )}
                       />
-                      {fieldState.invalid && (
-                        <FieldError errors={[fieldState.error]} />
-                      )}
-                    </Field>
-                  )}
-                />
-              ))}
+                    );
+                  })}
+                </div>
+              ) : null}
               {fields.length < TASK_TEMPLATE_MAX_SCHEDULED_TIMES ? (
                 <Button
                   type="button"
                   variant="outline"
-                  className={cn(
-                    SCHEDULED_TIME_SLOT_CLASS,
-                    "h-(--control-h) shrink-0 px-2",
-                  )}
+                  className="h-(--control-h) w-full"
                   onClick={() => {
                     const nextIndex = fields.length;
-                    handleScheduledTimesChange(() =>
-                      append({ time: "08:00" }, { shouldFocus: false }),
+                    append(
+                      {
+                        time: getNextDefaultScheduledTime(
+                          watchedScheduledTimes.map((row) => row.time),
+                        ),
+                      },
+                      { shouldFocus: false },
                     );
                     setAutoFocusTimeIndex(nextIndex);
                   }}
                 >
                   <PlusIcon />
-                  <span className="truncate">{t("add")}</span>
+                  {t("addTime")}
                 </Button>
               ) : null}
-            </div>
-            {scheduledTimeRowsErrorMessage ? (
-              <FieldError>{scheduledTimeRowsErrorMessage}</FieldError>
-            ) : null}
+              {scheduledTimeRowsGroupError ? (
+                <FieldError>{scheduledTimeRowsGroupError}</FieldError>
+              ) : null}
+            </FieldSet>
+
+            <FieldSet className="gap-3">
+              <FieldLegend variant="label">
+                {t("completionWindow.legend")}
+              </FieldLegend>
+              <CompletionWindowFields
+                idPrefix={TASK_TEMPLATES_FORM_ID}
+                opensValue={opensField.field.value}
+                onOpensChange={opensField.field.onChange}
+                onOpensBlur={opensField.field.onBlur}
+                opensInvalid={opensField.fieldState.invalid}
+                opensErrorMessage={opensField.fieldState.error?.message}
+                opensPreset={opensPreset}
+                onOpensPresetChange={handleOpensPresetChange}
+                dueValue={dueField.field.value}
+                onDueChange={dueField.field.onChange}
+                onDueBlur={dueField.field.onBlur}
+                dueInvalid={dueField.fieldState.invalid}
+                dueErrorMessage={dueField.fieldState.error?.message}
+                duePreset={duePreset}
+                onDuePresetChange={handleDuePresetChange}
+              />
+            </FieldSet>
           </FieldSet>
+
+          <FieldSeparator />
         </form>
     </ResponsiveFormDialog>
   );

@@ -30,3 +30,6 @@ coverage/
 
 # Claude Code — project config is shared; personal overrides stay local
 .claude/settings.local.json
+
+# pnpm local content-addressable store
+.pnpm-store/

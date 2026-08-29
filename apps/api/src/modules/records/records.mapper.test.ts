@@ -19,6 +19,7 @@ function row(overrides: Partial<RecordRow> = {}): RecordRow {
     taskTemplateId: TEMPLATE_ID,
     occurrenceDate: "2026-08-23",
     scheduledTime: "08:00",
+    availableAt: new Date("2026-08-23T00:00:00.000Z"),
     dueAt: DUE_AT,
     title: "Morning fridge check",
     type: "temperature",
@@ -140,6 +141,28 @@ describe("toRecordItem state derivation", () => {
         }),
       ).timing,
     ).toBe("late");
+  });
+
+  it("maps an opened, unrecorded no-deadline occurrence to open / none / not_submitted", () => {
+    expect(toRecordItem(row({ dueAt: null }))).toMatchObject({
+      displayState: "open",
+      recordState: "none",
+      timing: "not_submitted",
+      result: "not_evaluated",
+      record: null,
+    });
+  });
+
+  it("maps a submitted no-deadline record to no_deadline timing, not late", () => {
+    expect(
+      toRecordItem(
+        row({
+          dueAt: null,
+          ...submittedRecord,
+          recordedAt: new Date("2026-09-01T00:00:00.000Z"),
+        }),
+      ).timing,
+    ).toBe("no_deadline");
   });
 
   it("maps a voided record to voided with no timing claim", () => {

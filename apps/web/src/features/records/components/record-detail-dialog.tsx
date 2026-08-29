@@ -17,6 +17,7 @@ import {
   RECORD_DISPLAY_STATE_VARIANT,
   RECORD_RESULT_VARIANT,
   RECORD_TIMING_VARIANT,
+  resolvedTiming,
   type RecordsLabels,
 } from "@/features/records/lib/labels";
 
@@ -67,12 +68,14 @@ export function RecordDetailDialog({
     return null;
   }
 
+  const isTemperature = item.type === "temperature";
   const temperature = item.record?.temperature ?? null;
   const permittedRange = formatTemperatureRange(
     temperature?.minTempC ?? item.minTempC,
     temperature?.maxTempC ?? item.maxTempC,
     locale,
   );
+  const timing = resolvedTiming(item);
 
   return (
     <ResponsiveFormDialog
@@ -89,15 +92,23 @@ export function RecordDetailDialog({
           <span className="tabular-nums">{item.scheduledTime}</span>
         </DetailRow>
 
+        <DetailRow label={t("available")}>
+          {formatRecordInstant(item.availableAt, locale, timeZone)}
+        </DetailRow>
+
         <DetailRow label={t("due")}>
-          {formatRecordInstant(item.dueAt, locale, timeZone)}
+          {item.dueAt === null
+            ? t("noDeadline")
+            : formatRecordInstant(item.dueAt, locale, timeZone)}
         </DetailRow>
 
         <DetailRow label={t("type")}>{labels.type[item.type]}</DetailRow>
 
-        <DetailRow label={t("monitoringPoint")}>
-          {item.equipmentName ?? EM_DASH}
-        </DetailRow>
+        {isTemperature ? (
+          <DetailRow label={t("monitoringPoint")}>
+            {item.equipmentName ?? EM_DASH}
+          </DetailRow>
+        ) : null}
 
         <DetailRow label={t("displayState")}>
           <Badge variant={RECORD_DISPLAY_STATE_VARIANT[item.displayState]}>
@@ -110,36 +121,40 @@ export function RecordDetailDialog({
         </DetailRow>
 
         <DetailRow label={t("timing")}>
-          <Badge variant={RECORD_TIMING_VARIANT[item.timing]}>
-            {labels.timing[item.timing]}
+          <Badge variant={RECORD_TIMING_VARIANT[timing]}>
+            {labels.timing[timing]}
           </Badge>
         </DetailRow>
 
-        <DetailRow label={t("result")}>
-          {item.type === "temperature" ? (
+        {isTemperature ? (
+          <DetailRow label={t("result")}>
             <Badge variant={RECORD_RESULT_VARIANT[item.result]}>
               {labels.result[item.result]}
             </Badge>
-          ) : (
-            EM_DASH
-          )}
-        </DetailRow>
+          </DetailRow>
+        ) : null}
 
-        <DetailRow label={t("reading")}>
-          {temperature
-            ? formatTemperatureValue(temperature.recordedC, locale)
-            : EM_DASH}
-        </DetailRow>
+        {isTemperature ? (
+          <DetailRow label={t("reading")}>
+            {temperature
+              ? formatTemperatureValue(temperature.recordedC, locale)
+              : EM_DASH}
+          </DetailRow>
+        ) : null}
 
-        <DetailRow label={t("permittedRange")}>
-          {permittedRange ?? EM_DASH}
-        </DetailRow>
+        {isTemperature ? (
+          <DetailRow label={t("permittedRange")}>
+            {permittedRange ?? EM_DASH}
+          </DetailRow>
+        ) : null}
 
-        <DetailRow label={t("correctiveAction")}>
-          <span className="whitespace-pre-wrap">
-            {temperature?.correctiveAction ?? EM_DASH}
-          </span>
-        </DetailRow>
+        {temperature?.correctiveAction ? (
+          <DetailRow label={t("correctiveAction")}>
+            <span className="whitespace-pre-wrap">
+              {temperature.correctiveAction}
+            </span>
+          </DetailRow>
+        ) : null}
 
         <DetailRow label={t("createdBy")}>
           {item.record
@@ -153,11 +168,11 @@ export function RecordDetailDialog({
             : EM_DASH}
         </DetailRow>
 
-        <DetailRow label={t("voidedBy")}>
-          {item.record?.voidedAt
-            ? `${actorName(item.record.voidedBy) ?? EM_DASH} · ${formatRecordInstant(item.record.voidedAt, locale, timeZone)}`
-            : EM_DASH}
-        </DetailRow>
+        {item.record?.voidedAt ? (
+          <DetailRow label={t("voidedBy")}>
+            {`${actorName(item.record.voidedBy) ?? EM_DASH} · ${formatRecordInstant(item.record.voidedAt, locale, timeZone)}`}
+          </DetailRow>
+        ) : null}
 
         <DetailRow label={t("recordedTime")}>
           {item.record

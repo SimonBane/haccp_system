@@ -16,7 +16,8 @@ export type OccurrenceWithRecordRow = {
   maxTempC: string | null;
   scheduledTime: string;
   occurrenceDate: string;
-  dueAt: Date;
+  availableAt: Date;
+  dueAt: Date | null;
   recordedAt: Date | null;
   recordedByUserId: string | null;
   recordedByFirstName: string | null;
@@ -47,6 +48,7 @@ export const todayRepository = {
         maxTempC: taskOccurrences.maxTempC,
         scheduledTime: taskOccurrences.scheduledTime,
         occurrenceDate: taskOccurrences.occurrenceDate,
+        availableAt: taskOccurrences.availableAt,
         dueAt: taskOccurrences.dueAt,
         recordedAt: taskRecords.recordedAt,
         recordedByUserId: taskRecords.recordedByUserId,

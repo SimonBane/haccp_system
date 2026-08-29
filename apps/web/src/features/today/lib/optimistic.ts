@@ -102,7 +102,8 @@ export function applyOptimisticVoid(
     recordState: RECORD_STATE.VOIDED,
     status: deriveTodayTaskStatusFromOccurrence({
       recordState: RECORD_STATE.NONE,
-      dueAt: new Date(task.dueAt),
+      availableAt: new Date(task.availableAt),
+      dueAt: task.dueAt === null ? null : new Date(task.dueAt),
       now,
     }),
     completedAt: null,

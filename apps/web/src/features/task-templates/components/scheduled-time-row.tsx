@@ -3,9 +3,12 @@
 import { normalizeScheduledTimeInput } from "@haccp/shared";
 import { XIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 
 function toTimeInputValue(time: string): string {
   if (!time) return "";
@@ -30,7 +33,6 @@ type ScheduledTimeRowProps = {
   onChange: (time: string) => void;
   onBlur: () => void;
   onRemove: () => void;
-  canRemove: boolean;
   autoFocus?: boolean;
   "aria-invalid"?: boolean;
 };
@@ -41,37 +43,14 @@ export function ScheduledTimeRow({
   onChange,
   onBlur,
   onRemove,
-  canRemove,
   autoFocus = false,
   "aria-invalid": ariaInvalid,
 }: ScheduledTimeRowProps) {
   const t = useTranslations("TasksPage");
 
   return (
-    <div className="group relative w-full min-w-0">
-      {canRemove ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label={t("removeTime")}
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            onRemove();
-          }}
-          className={cn(
-            "absolute top-1/2 right-2 z-10 -translate-y-1/2 text-muted-foreground",
-            "opacity-100 transition-opacity",
-            "sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100",
-            "hover:text-foreground",
-            "focus-visible:opacity-100",
-          )}
-        >
-          <XIcon aria-hidden />
-        </Button>
-      ) : null}
-      <Input
+    <InputGroup>
+      <InputGroupInput
         id={id}
         type="time"
         step="60"
@@ -82,11 +61,21 @@ export function ScheduledTimeRow({
           onChange(fromTimeInputValue(event.target.value));
         }}
         onBlur={onBlur}
-        className={cn(
-          "appearance-none bg-background [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none",
-          canRemove && "pr-7",
-        )}
+        className="appearance-none pr-0 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
       />
-    </div>
+      <InputGroupAddon align="inline-end">
+        <InputGroupButton
+          size="icon-xs"
+          aria-label={t("removeTime")}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onRemove();
+          }}
+        >
+          <XIcon aria-hidden />
+        </InputGroupButton>
+      </InputGroupAddon>
+    </InputGroup>
   );
 }

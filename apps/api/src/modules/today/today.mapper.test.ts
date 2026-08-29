@@ -62,6 +62,7 @@ describe("toTodayTaskItem", () => {
       maxTempC: "5.0",
       scheduledTime: "07:00",
       occurrenceDate: "2026-01-15",
+      availableAt: new Date("2026-01-15T00:00:00Z"),
       dueAt: new Date("2026-01-15T07:00:00Z"),
       recordedAt: null,
       recordedByUserId: null,
@@ -86,6 +87,25 @@ describe("toTodayTaskItem", () => {
     expect(item.completedAt).toBeNull();
     expect(item.completedBy).toBeNull();
     expect(item.temperatureReading).toBeNull();
+  });
+
+  it("maps an unopened occurrence to status upcoming before availableAt", () => {
+    const item = toTodayTaskItem(
+      occurrenceRow({ availableAt: new Date("2026-01-15T09:00:00Z") }),
+      NOW,
+    );
+
+    expect(item.status).toBe("upcoming");
+  });
+
+  it("maps a no-deadline occurrence to pending, never overdue, and a null dueAt", () => {
+    const item = toTodayTaskItem(
+      occurrenceRow({ dueAt: null }),
+      new Date("2026-06-01T00:00:00Z"),
+    );
+
+    expect(item.status).toBe("pending");
+    expect(item.dueAt).toBeNull();
   });
 
   it("maps an active record to recordState active with its reading", () => {

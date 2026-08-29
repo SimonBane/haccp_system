@@ -17,6 +17,8 @@ export function toTaskTemplateResponse(
     scheduledTimes: sortScheduledTimes(row.scheduledTimes),
     equipmentId: row.equipmentId,
     equipmentName,
+    completionOpensBeforeMinutes: row.completionOpensBeforeMinutes,
+    completionDueAfterMinutes: row.completionDueAfterMinutes,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

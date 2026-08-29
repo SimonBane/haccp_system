@@ -43,6 +43,7 @@ function item(overrides: Record<string, unknown> = {}) {
     taskTemplateId: TEMPLATE_ID,
     occurrenceDate: DATE_TO,
     scheduledTime: "08:00",
+    availableAt: "2026-08-23T00:00:00.000Z",
     dueAt: "2026-08-23T05:00:00.000Z",
     title: "Morning fridge check",
     type: "temperature",
@@ -89,6 +90,7 @@ describe("records constants", () => {
       "submitted",
       "missed",
       "voided",
+      "open",
     ]);
     expect(RECORDS_RESULT_FILTER_VALUES).toEqual([
       "pass",
@@ -371,6 +373,22 @@ describe("recordItemSchema", () => {
     ).toBe(false);
   });
 
+  it("accepts an opened no-deadline row with a null dueAt", () => {
+    const parsed = recordItemSchema.parse(
+      item({
+        dueAt: null,
+        displayState: "open",
+        recordState: "none",
+        timing: "not_submitted",
+        result: "not_evaluated",
+        record: null,
+      }),
+    );
+
+    expect(parsed.dueAt).toBeNull();
+    expect(parsed.displayState).toBe("open");
+  });
+
   it("has no last-edit or void-reason metadata M0 does not store", () => {
     const parsed = recordItemSchema.parse(item());
 
@@ -381,32 +399,66 @@ describe("recordItemSchema", () => {
 });
 
 describe("record eligibility", () => {
+  const availableAt = new Date("2026-08-23T00:00:00.000Z");
   const dueAt = new Date("2026-08-23T05:00:00.000Z");
   const before = new Date("2026-08-23T04:00:00.000Z");
   const after = new Date("2026-08-23T06:00:00.000Z");
 
   it("includes a submitted record immediately, even before its due time", () => {
-    expect(isRecordEligible({ hasRecord: true, dueAt, now: before })).toBe(
-      true,
-    );
+    expect(
+      isRecordEligible({ hasRecord: true, availableAt, dueAt, now: before }),
+    ).toBe(true);
   });
 
   it("includes a retained voided record immediately", () => {
-    expect(isRecordEligible({ hasRecord: true, dueAt, now: before })).toBe(
-      true,
-    );
+    expect(
+      isRecordEligible({ hasRecord: true, availableAt, dueAt, now: before }),
+    ).toBe(true);
   });
 
-  it("includes an unrecorded occurrence only once it is due", () => {
-    expect(isRecordEligible({ hasRecord: false, dueAt, now: before })).toBe(
-      false,
-    );
-    expect(isRecordEligible({ hasRecord: false, dueAt, now: dueAt })).toBe(
-      true,
-    );
-    expect(isRecordEligible({ hasRecord: false, dueAt, now: after })).toBe(
-      true,
-    );
+  it("includes an unrecorded occurrence with a finite deadline only once it is due", () => {
+    expect(
+      isRecordEligible({ hasRecord: false, availableAt, dueAt, now: before }),
+    ).toBe(false);
+    expect(
+      isRecordEligible({ hasRecord: false, availableAt, dueAt, now: dueAt }),
+    ).toBe(true);
+    expect(
+      isRecordEligible({ hasRecord: false, availableAt, dueAt, now: after }),
+    ).toBe(true);
+  });
+
+  it("excludes a finite, unrecorded occurrence before its deadline even once it has opened", () => {
+    expect(
+      isRecordEligible({
+        hasRecord: false,
+        availableAt,
+        dueAt,
+        now: new Date(availableAt.getTime() + 60_000),
+      }),
+    ).toBe(false);
+  });
+
+  it("includes an unrecorded no-deadline occurrence once it opens, not before", () => {
+    expect(
+      isRecordEligible({
+        hasRecord: false,
+        availableAt,
+        dueAt: null,
+        now: new Date(availableAt.getTime() - 60_000),
+      }),
+    ).toBe(false);
+    expect(
+      isRecordEligible({ hasRecord: false, availableAt, dueAt: null, now: availableAt }),
+    ).toBe(true);
+    expect(
+      isRecordEligible({
+        hasRecord: false,
+        availableAt,
+        dueAt: null,
+        now: new Date(availableAt.getTime() + 60_000),
+      }),
+    ).toBe(true);
   });
 });
 
@@ -415,7 +467,7 @@ describe("state derivation", () => {
 
   it("derives submitted for an active record", () => {
     const record = { recordedAt: dueAt, voidedAt: null };
-    expect(deriveRecordDisplayState(record)).toBe("submitted");
+    expect(deriveRecordDisplayState({ record, dueAt })).toBe("submitted");
     expect(deriveRecordEntryState(record)).toBe("submitted");
   });
 
@@ -424,13 +476,19 @@ describe("state derivation", () => {
       recordedAt: dueAt,
       voidedAt: new Date("2026-08-23T07:00:00.000Z"),
     };
-    expect(deriveRecordDisplayState(record)).toBe("voided");
+    expect(deriveRecordDisplayState({ record, dueAt })).toBe("voided");
     expect(deriveRecordEntryState(record)).toBe("voided");
   });
 
-  it("derives missed when there is no record", () => {
-    expect(deriveRecordDisplayState(null)).toBe("missed");
+  it("derives missed when there is no record and a finite deadline", () => {
+    expect(deriveRecordDisplayState({ record: null, dueAt })).toBe("missed");
     expect(deriveRecordEntryState(null)).toBe("none");
+  });
+
+  it("derives open when there is no record and no deadline", () => {
+    expect(deriveRecordDisplayState({ record: null, dueAt: null })).toBe(
+      "open",
+    );
   });
 });
 
@@ -473,6 +531,24 @@ describe("timing derivation", () => {
       deriveRecordTiming({
         record: { recordedAt: dueAt, voidedAt: new Date() },
         dueAt,
+      }),
+    ).toBe("not_submitted");
+  });
+
+  it("is no_deadline for an active record against a null dueAt, not late", () => {
+    expect(
+      deriveRecordTiming({
+        record: { recordedAt: new Date("2026-09-01T00:00:00.000Z"), voidedAt: null },
+        dueAt: null,
+      }),
+    ).toBe("no_deadline");
+  });
+
+  it("is not_submitted, not no_deadline, for a voided record against a null dueAt", () => {
+    expect(
+      deriveRecordTiming({
+        record: { recordedAt: dueAt, voidedAt: new Date() },
+        dueAt: null,
       }),
     ).toBe("not_submitted");
   });

@@ -7,11 +7,9 @@ import type {
 } from "@haccp/shared";
 import {
   classifyTemperatureResult,
-  isValidTimeZone,
   RECORD_KIND,
   TASK_TEMPLATE_TYPE,
   TEMPERATURE_RESULT,
-  zonedDateString,
 } from "@haccp/shared";
 import type { Db } from "../../core/db/client.js";
 import {
@@ -43,19 +41,9 @@ type EvaluatedTemperature = {
   correctiveAction: string | null;
 };
 
-function assertValidTimeZone(timeZone: string): void {
-  if (!isValidTimeZone(timeZone)) {
-    throw new InternalError("Organization timezone configuration is invalid");
-  }
-}
-
-function assertNotFutureDate(occurrenceDate: string, timeZone: string): void {
-  const currentLocalDate = zonedDateString(new Date(), timeZone);
-
-  if (occurrenceDate > currentLocalDate) {
-    throw new ValidationError(
-      "Cannot record a task for a future occurrence date",
-    );
+function assertOpened(availableAt: Date, now: Date): void {
+  if (now.getTime() < availableAt.getTime()) {
+    throw new ValidationError("This task is not open for completion yet");
   }
 }
 
@@ -112,10 +100,9 @@ export const taskRecordService = {
   async create(
     db: Db,
     scope: WriteScope,
-    timeZone: string,
     input: TaskRecordInput,
   ): Promise<TaskRecordResponse> {
-    assertValidTimeZone(timeZone);
+    const now = new Date();
 
     const occurrence: OccurrenceForRecording | null =
       await taskRecordRepository.findOccurrenceForRecording(db, scope);
@@ -124,15 +111,13 @@ export const taskRecordService = {
       throw new NotFoundError("Task occurrence not found");
     }
 
-    assertNotFutureDate(occurrence.occurrenceDate, timeZone);
+    assertOpened(occurrence.availableAt, now);
     assertKindMatches(input, occurrence.type);
 
     const temperature =
       input.kind === RECORD_KIND.TEMPERATURE
         ? evaluateTemperature(input, occurrence)
         : null;
-
-    const now = new Date();
 
     try {
       return await db.transaction(async (tx) => {
@@ -184,10 +169,9 @@ export const taskRecordService = {
   async update(
     db: Db,
     scope: WriteScope,
-    timeZone: string,
     input: TaskRecordInput,
   ): Promise<TaskRecordResponse> {
-    assertValidTimeZone(timeZone);
+    const now = new Date();
 
     const chain: RecordChainRow | null =
       await taskRecordRepository.findRecordChain(db, scope);
@@ -196,15 +180,13 @@ export const taskRecordService = {
       throw new NotFoundError("Task record not found");
     }
 
-    assertNotFutureDate(chain.occurrenceDate, timeZone);
+    assertOpened(chain.availableAt, now);
     assertKindMatches(input, chain.occurrenceType);
 
     const temperature =
       input.kind === RECORD_KIND.TEMPERATURE
         ? evaluateTemperature(input, chain)
         : null;
-
-    const now = new Date();
 
     return db.transaction(async (tx) => {
       const updatedRecord = await taskRecordRepository.updateRecordForReactivation(

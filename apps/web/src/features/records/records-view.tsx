@@ -115,6 +115,7 @@ export function RecordsView({
         submitted: t("displayState.submitted"),
         missed: t("displayState.missed"),
         voided: t("displayState.voided"),
+        open: t("displayState.open"),
       },
       recordState: {
         none: t("recordState.none"),
@@ -125,6 +126,7 @@ export function RecordsView({
         not_submitted: t("timing.notSubmitted"),
         on_time: t("timing.onTime"),
         late: t("timing.late"),
+        no_deadline: t("timing.noDeadline"),
       },
       result: {
         pass: t("result.pass"),
@@ -166,6 +168,7 @@ export function RecordsView({
             submitted: labels.displayState.submitted,
             missed: labels.displayState.missed,
             voided: labels.displayState.voided,
+            open: labels.displayState.open,
           },
           resultOptions: labels.result,
         },

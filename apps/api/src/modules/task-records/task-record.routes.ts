@@ -12,7 +12,6 @@ import {
 import { bearerSecurity } from "../../core/openapi/responses.js";
 import {
   getCurrentLocation,
-  getCurrentOrganization,
   getDb,
   requireOrgContext,
 } from "../../lib/context.js";
@@ -94,7 +93,6 @@ taskRecordRoutes.openapi(
     const result = await taskRecordService.create(
       getDb(c),
       { locationId, occurrenceId, actorUserId: userDbId },
-      getCurrentOrganization(c).timezone,
       input,
     );
 
@@ -113,7 +111,6 @@ taskRecordRoutes.openapi(
     const result = await taskRecordService.update(
       getDb(c),
       { locationId, occurrenceId, actorUserId: userDbId },
-      getCurrentOrganization(c).timezone,
       input,
     );
 

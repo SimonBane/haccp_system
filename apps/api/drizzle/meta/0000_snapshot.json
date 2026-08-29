@@ -1,5 +1,5 @@
 {
-  "id": "fa2c4d15-cd97-45df-b839-debc4a921171",
+  "id": "c789a23b-a339-4734-947a-2175774ac983",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -775,6 +775,20 @@
           "primaryKey": false,
           "notNull": false
         },
+        "completion_opens_before_minutes": {
+          "name": "completion_opens_before_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1440
+        },
+        "completion_due_after_minutes": {
+          "name": "completion_due_after_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
         "archived_at": {
           "name": "archived_at",
           "type": "timestamp with time zone",
@@ -870,7 +884,16 @@
         }
       },
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "task_templates_completion_opens_before_range": {
+          "name": "task_templates_completion_opens_before_range",
+          "value": "\"task_templates\".\"completion_opens_before_minutes\" >= 0 AND \"task_templates\".\"completion_opens_before_minutes\" <= 1440"
+        },
+        "task_templates_completion_due_after_range": {
+          "name": "task_templates_completion_due_after_range",
+          "value": "\"task_templates\".\"completion_due_after_minutes\" IS NULL OR (\"task_templates\".\"completion_due_after_minutes\" >= 0 AND \"task_templates\".\"completion_due_after_minutes\" <= 1440)"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.task_occurrences": {
@@ -908,11 +931,17 @@
           "primaryKey": false,
           "notNull": true
         },
+        "available_at": {
+          "name": "available_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
         "due_at": {
           "name": "due_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "title": {
           "name": "title",

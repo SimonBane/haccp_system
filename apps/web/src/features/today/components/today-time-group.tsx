@@ -44,8 +44,6 @@ type Props = {
   isTail: boolean;
   syncingKeys: ReadonlySet<string>;
   currentUserId: string | null;
-  /** True for a future-dated view — rows render but are not interactive. */
-  disableActions: boolean;
   onActivate: (item: TodayTimelineItem) => void;
 };
 
@@ -108,7 +106,6 @@ export const TodayTimeGroup = memo(function TodayTimeGroup({
   isTail,
   syncingKeys,
   currentUserId,
-  disableActions,
   onActivate,
 }: Props) {
   const t = useTranslations("TodayPage");
@@ -238,7 +235,6 @@ export const TodayTimeGroup = memo(function TodayTimeGroup({
                 time: group.scheduledTime,
                 count: roundItems.length,
               })}
-              disabled={disableActions}
               onClick={() => onActivate(roundStart)}
             >
               <ThermometerIcon className="size-3.5" />
@@ -263,11 +259,9 @@ export const TodayTimeGroup = memo(function TodayTimeGroup({
               <li key={occurrenceKey(item.task)}>
                 <TodayTaskRow
                   item={item}
-                  groupState={state}
                   timeZone={timeZone}
                   isSyncing={syncingKeys.has(occurrenceKey(item.task))}
                   currentUserId={currentUserId}
-                  disableActions={disableActions}
                   onActivate={onActivate}
                 />
               </li>
