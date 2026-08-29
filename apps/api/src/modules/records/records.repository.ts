@@ -22,7 +22,7 @@ import {
   type SQL,
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import type { Db } from "../../core/db/client.js";
+import type { DbClient } from "../../core/db/client.js";
 import { locations } from "../../core/db/schema/locations.js";
 import { taskOccurrences } from "../../core/db/schema/task-occurrences.js";
 import { taskRecordTemperatures } from "../../core/db/schema/task-record-temperatures.js";
@@ -101,8 +101,14 @@ function baseCondition(scope: RecordsScope): SQL {
     lte(taskOccurrences.occurrenceDate, scope.dateTo),
     or(
       isNotNull(taskRecords.id),
-      and(isNotNull(taskOccurrences.dueAt), lte(taskOccurrences.dueAt, scope.now)),
-      and(isNull(taskOccurrences.dueAt), lte(taskOccurrences.availableAt, scope.now)),
+      and(
+        isNotNull(taskOccurrences.dueAt),
+        lte(taskOccurrences.dueAt, scope.now),
+      ),
+      and(
+        isNull(taskOccurrences.dueAt),
+        lte(taskOccurrences.availableAt, scope.now),
+      ),
     ),
   )!;
 }
@@ -170,7 +176,10 @@ function orderByTerms(sortBy: RecordsSortField, sortOrder: SortOrder): SQL[] {
 }
 
 export const recordsRepository = {
-  async findPage(db: Db, params: RecordsPageParams): Promise<RecordRow[]> {
+  async findPage(
+    db: DbClient,
+    params: RecordsPageParams,
+  ): Promise<RecordRow[]> {
     const filters = filterCondition(params.filters);
     const where = filters
       ? and(baseCondition(params), filters)!
@@ -232,7 +241,7 @@ export const recordsRepository = {
   },
 
   async countPage(
-    db: Db,
+    db: DbClient,
     params: RecordsScope & { filters: RecordsFilters },
   ): Promise<number> {
     const filters = filterCondition(params.filters);
