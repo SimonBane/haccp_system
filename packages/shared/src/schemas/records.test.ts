@@ -9,6 +9,8 @@ import {
   isRecordEligible,
   RECORDS_DEFAULT_RANGE_DAYS,
   RECORDS_DEFAULT_SORT,
+  RECORDS_PRINT_MAX_ROWS,
+  RECORDS_REPORT_STATUS,
   RECORDS_RESULT_FILTER_VALUES,
   RECORDS_SORT_FIELDS,
   RECORDS_STATE_FILTER_VALUES,
@@ -16,6 +18,9 @@ import {
   recordItemSchema,
   recordsListQuerySchema,
   recordsListResponseSchema,
+  recordsReportQuerySchema,
+  recordsReportResponseSchema,
+  recordsReportSearchParamsSchema,
   validateRecordsDateRange,
 } from "./records.js";
 
@@ -82,10 +87,7 @@ describe("records constants", () => {
       sortBy: "scheduledAt",
       sortOrder: "asc",
     });
-    expect(RECORDS_TYPE_FILTER_VALUES).toEqual([
-      "temperature",
-      "cleaning",
-    ]);
+    expect(RECORDS_TYPE_FILTER_VALUES).toEqual(["temperature", "cleaning"]);
     expect(RECORDS_STATE_FILTER_VALUES).toEqual([
       "submitted",
       "missed",
@@ -449,7 +451,12 @@ describe("record eligibility", () => {
       }),
     ).toBe(false);
     expect(
-      isRecordEligible({ hasRecord: false, availableAt, dueAt: null, now: availableAt }),
+      isRecordEligible({
+        hasRecord: false,
+        availableAt,
+        dueAt: null,
+        now: availableAt,
+      }),
     ).toBe(true);
     expect(
       isRecordEligible({
@@ -538,7 +545,10 @@ describe("timing derivation", () => {
   it("is no_deadline for an active record against a null dueAt, not late", () => {
     expect(
       deriveRecordTiming({
-        record: { recordedAt: new Date("2026-09-01T00:00:00.000Z"), voidedAt: null },
+        record: {
+          recordedAt: new Date("2026-09-01T00:00:00.000Z"),
+          voidedAt: null,
+        },
         dueAt: null,
       }),
     ).toBe("no_deadline");
@@ -562,5 +572,159 @@ describe("result derivation", () => {
 
   it("is not_evaluated without a temperature detail", () => {
     expect(deriveRecordResult(null)).toBe("not_evaluated");
+  });
+});
+
+const LOCATION_ID = "66666666-6666-4666-8666-666666666666";
+
+function parseReport(query: Record<string, unknown> = {}) {
+  return recordsReportQuerySchema.safeParse({
+    dateFrom: DATE_FROM,
+    dateTo: DATE_TO,
+    ...query,
+  });
+}
+
+describe("recordsReportQuerySchema", () => {
+  it("keeps the report constants pinned", () => {
+    expect(RECORDS_PRINT_MAX_ROWS).toBe(5000);
+    expect(RECORDS_REPORT_STATUS).toEqual({ OK: "ok", TOO_LARGE: "too_large" });
+  });
+
+  it("accepts a bare date range with no filters", () => {
+    const result = parseReport();
+
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({
+      dateFrom: DATE_FROM,
+      dateTo: DATE_TO,
+      type: undefined,
+      state: undefined,
+      result: undefined,
+    });
+  });
+
+  it.each(["page", "pageSize", "sortBy", "sortOrder", "search"])(
+    "rejects the grid-only field %s",
+    (field) => {
+      expect(parseReport({ [field]: "1" }).success).toBe(false);
+    },
+  );
+
+  it("normalizes comma multi-select values the same way the grid does", () => {
+    const result = parseReport({ state: "voided,submitted,submitted" });
+
+    expect(result.data?.state).toEqual(["submitted", "voided"]);
+  });
+
+  it("round-trips state=open", () => {
+    expect(parseReport({ state: "open" }).data?.state).toEqual(["open"]);
+  });
+
+  it.each(["pending", "upcoming"])(
+    "rejects the operational state %s",
+    (state) => {
+      expect(parseReport({ state }).success).toBe(false);
+    },
+  );
+
+  it("rejects a reversed range", () => {
+    expect(parseReport({ dateFrom: DATE_TO, dateTo: DATE_FROM }).success).toBe(
+      false,
+    );
+  });
+
+  it("rejects a date that is not a real calendar day", () => {
+    expect(parseReport({ dateFrom: "2026-02-30" }).success).toBe(false);
+  });
+
+  it.each([
+    ["60-day", "2026-06-25", "2026-08-23"],
+    ["90-day", "2026-05-26", "2026-08-23"],
+    ["one-year", "2025-08-23", "2026-08-23"],
+    ["leap-year", "2028-02-01", "2028-03-01"],
+    ["DST boundary", "2026-03-28", "2026-03-30"],
+  ])("imposes no span cap on a %s range", (_label, dateFrom, dateTo) => {
+    expect(parseReport({ dateFrom, dateTo }).success).toBe(true);
+  });
+});
+
+describe("recordsReportSearchParamsSchema", () => {
+  it("requires a uuid locationId", () => {
+    expect(
+      recordsReportSearchParamsSchema.safeParse({
+        dateFrom: DATE_FROM,
+        dateTo: DATE_TO,
+        locationId: LOCATION_ID,
+      }).success,
+    ).toBe(true);
+
+    expect(
+      recordsReportSearchParamsSchema.safeParse({
+        dateFrom: DATE_FROM,
+        dateTo: DATE_TO,
+        locationId: "not-a-uuid",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects a repeated search param arriving as an array", () => {
+    expect(
+      recordsReportSearchParamsSchema.safeParse({
+        dateFrom: DATE_FROM,
+        dateTo: DATE_TO,
+        locationId: LOCATION_ID,
+        state: ["open", "missed"],
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("recordsReportResponseSchema", () => {
+  const generatedAt = "2026-08-23T09:00:00.000Z";
+
+  it("parses a complete report", () => {
+    const result = recordsReportResponseSchema.safeParse({
+      status: "ok",
+      generatedAt,
+      total: 1,
+      items: [item()],
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("parses a zero-record report", () => {
+    const result = recordsReportResponseSchema.safeParse({
+      status: "ok",
+      generatedAt,
+      total: 0,
+      items: [],
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("parses the size-limit outcome with its count", () => {
+    const result = recordsReportResponseSchema.safeParse({
+      status: "too_large",
+      generatedAt,
+      total: 5001,
+      limit: RECORDS_PRINT_MAX_ROWS,
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("never lets the size-limit outcome carry rows", () => {
+    const result = recordsReportResponseSchema.safeParse({
+      status: "too_large",
+      generatedAt,
+      total: 5001,
+      limit: RECORDS_PRINT_MAX_ROWS,
+      items: [item()],
+    });
+
+    expect(result.success).toBe(false);
   });
 });
