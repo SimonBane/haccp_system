@@ -4,7 +4,11 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
 import "./globals.css";
 
-const inter = Inter({subsets:['latin'],variable:'--font-sans'});
+/** Cyrillic is not optional: without it every Bulgarian glyph silently falls back to the system font. */
+const inter = Inter({
+  subsets: ["latin", "cyrillic"],
+  variable: "--font-sans",
+});
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
