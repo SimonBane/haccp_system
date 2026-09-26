@@ -8,22 +8,19 @@ import {
   formatOccurrenceDate,
   formatRecordInstant,
 } from "@/features/records/lib/format";
-import type { RecordsFilterLabels } from "@/features/records/lib/records-filters";
 import { ReportActions } from "./components/report-actions";
 import { ReportBody } from "./components/report-body";
 import { ReportFooter } from "./components/report-footer";
 import { ReportHeader } from "./components/report-header";
 import { ReportNotice } from "./components/report-notice";
-import { buildReportFilterSummary } from "./lib/report-filter-summary";
 import { toReportRows } from "./lib/report-rows";
 
 export function RecordsReport(props: {
   report: RecordsReportResponse;
   params: RecordsReportSearchParams;
   organizationName: string;
-  locationName: string;
+  locationName: string | null;
   generatedBy: string | null;
-  filterLabels: RecordsFilterLabels;
   locale: string;
   timeZone: string;
   backHref: string;
@@ -44,10 +41,7 @@ export function RecordsReport(props: {
     );
   }
 
-  const rows = toReportRows(props.report.items, {
-    locale: props.locale,
-    timeZone: props.timeZone,
-  });
+  const rows = toReportRows(props.report.items, { locale: props.locale });
 
   return (
     <div className="flex flex-col gap-4">
@@ -64,10 +58,6 @@ export function RecordsReport(props: {
           props.timeZone,
         )}
         generatedBy={props.generatedBy}
-        filters={buildReportFilterSummary({
-          params: props.params,
-          labels: props.filterLabels,
-        })}
         recordCount={props.report.total}
       />
 

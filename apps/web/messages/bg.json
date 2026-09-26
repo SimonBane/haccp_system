@@ -406,31 +406,29 @@
     "title": "Отчет за записите",
     "documentTitle": "Отчет за записите — {location}",
     "brand": "SafeCheck",
-    "storedNotice": "Текущо съхранени записи",
     "organization": "Организация",
     "location": "Обект",
     "dateRange": "Период",
     "dateRangeValue": "{dateFrom} – {dateTo}",
     "generatedAt": "Генериран на",
     "generatedBy": "Генериран от",
-    "appliedFilters": "Филтри",
-    "noFilters": "Няма",
     "recordCount": "{count, plural, one {# запис} other {# записа}}",
     "columns": {
-      "scheduled": "Планирано",
+      "time": "Час",
       "task": "Задача/точка за контрол",
-      "status": "Статус",
-      "timing": "Навременност",
       "reading": "Отчет",
-      "outcome": "Резултат"
+      "status": "Статус",
+      "by": "Изпълнил"
     },
+    "status": {
+      "done": "Изпълнена",
+      "fail": "Извън диапазона",
+      "missed": "Пропусната",
+      "open": "Отворена",
+      "voided": "Анулирана"
+    },
+    "lateSuffix": "закъсняла",
     "fields": {
-      "availableFrom": "Достъпна от",
-      "deadline": "Краен срок",
-      "permittedRange": "Допустим диапазон",
-      "created": "Първоначално създаден",
-      "recorded": "Текущ запис",
-      "voided": "Анулиран",
       "correctiveAction": "Коригиращо действие"
     },
     "unknownUser": "Неизвестен потребител",
