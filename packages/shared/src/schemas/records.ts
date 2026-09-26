@@ -94,10 +94,7 @@ export const RECORDS_DEFAULT_SORT = {
   sortOrder: SORT_ORDER.ASC,
 } as const;
 
-export const RECORDS_TYPE_FILTER_VALUES = [
-  "temperature",
-  "cleaning",
-] as const;
+export const RECORDS_TYPE_FILTER_VALUES = ["temperature", "cleaning"] as const;
 
 export const RECORDS_STATE_FILTER_VALUES = [
   RECORD_DISPLAY_STATE.SUBMITTED,
@@ -160,6 +157,28 @@ export function validateRecordsDateRange(input: {
   return null;
 }
 
+function checkDateRangeOrder(
+  ctx: z.core.ParsePayload<{
+    dateFrom: string;
+    dateTo: string;
+  }>,
+): void {
+  const { dateFrom, dateTo } = ctx.value;
+
+  if (
+    isCalendarDate(dateFrom) &&
+    isCalendarDate(dateTo) &&
+    compareCalendarDates(dateFrom, dateTo) > 0
+  ) {
+    ctx.issues.push({
+      code: "custom",
+      message: "dateFrom must be on or before dateTo",
+      path: ["dateFrom"],
+      input: ctx.value,
+    });
+  }
+}
+
 export const recordsListQuerySchema = createGridQuerySchema({
   sortFields: RECORDS_SORT_FIELDS,
   search: false,
@@ -173,24 +192,47 @@ export const recordsListQuerySchema = createGridQuerySchema({
     dateFrom: recordsCalendarDateSchema,
     dateTo: recordsCalendarDateSchema,
   })
-  .check((ctx) => {
-    const { dateFrom, dateTo } = ctx.value;
-
-    if (
-      isCalendarDate(dateFrom) &&
-      isCalendarDate(dateTo) &&
-      compareCalendarDates(dateFrom, dateTo) > 0
-    ) {
-      ctx.issues.push({
-        code: "custom",
-        message: "dateFrom must be on or before dateTo",
-        path: ["dateFrom"],
-        input: ctx.value,
-      });
-    }
-  });
+  .check(checkDateRangeOrder);
 
 export type RecordsListQuery = z.infer<typeof recordsListQuerySchema>;
+
+/**
+ * Browser printing must render the complete result, so the report is guarded by rows,
+ * not by date span. This is an operational rendering limit — a later measured renderer
+ * can raise it deliberately; it is not a retention or audit-period rule.
+ */
+export const RECORDS_PRINT_MAX_ROWS = 5000;
+
+export const RECORDS_REPORT_STATUS = {
+  OK: "ok",
+  TOO_LARGE: "too_large",
+} as const;
+
+export type RecordsReportStatus =
+  (typeof RECORDS_REPORT_STATUS)[keyof typeof RECORDS_REPORT_STATUS];
+
+/** strictObject is what rejects page/pageSize/sort: the report always covers the whole dataset. */
+const recordsReportBaseSchema = z.strictObject({
+  dateFrom: recordsCalendarDateSchema,
+  dateTo: recordsCalendarDateSchema,
+  type: createGridFilterSchema(RECORDS_TYPE_FILTER_VALUES),
+  state: createGridFilterSchema(RECORDS_STATE_FILTER_VALUES),
+  result: createGridFilterSchema(RECORDS_RESULT_FILTER_VALUES),
+});
+
+export const recordsReportQuerySchema =
+  recordsReportBaseSchema.check(checkDateRangeOrder);
+
+export type RecordsReportQuery = z.infer<typeof recordsReportQuerySchema>;
+
+/** The print page carries locationId in the URL; the API takes it as a path segment. */
+export const recordsReportSearchParamsSchema = recordsReportBaseSchema
+  .safeExtend({ locationId: z.uuid() })
+  .check(checkDateRangeOrder);
+
+export type RecordsReportSearchParams = z.infer<
+  typeof recordsReportSearchParamsSchema
+>;
 
 export const recordTemperatureDetailSchema = z.object({
   recordedC: z.number(),
@@ -243,6 +285,37 @@ export const recordsListResponseSchema = createGridPageSchema(recordItemSchema);
 
 export type RecordsListResponse = z.infer<typeof recordsListResponseSchema>;
 
+/**
+ * Over-limit is an expected answer, not a failed request, so it rides on a 200 — the
+ * error envelope carries no structured payload and could not report the count.
+ */
+export const recordsReportResponseSchema = z.discriminatedUnion("status", [
+  z.strictObject({
+    status: z.literal(RECORDS_REPORT_STATUS.OK),
+    generatedAt: z.iso.datetime(),
+    total: z.int().nonnegative(),
+    items: z.array(recordItemSchema),
+  }),
+  z.strictObject({
+    status: z.literal(RECORDS_REPORT_STATUS.TOO_LARGE),
+    generatedAt: z.iso.datetime(),
+    total: z.int().nonnegative(),
+    limit: z.int().positive(),
+  }),
+]);
+
+export type RecordsReportResponse = z.infer<typeof recordsReportResponseSchema>;
+
+export type RecordsReportOk = Extract<
+  RecordsReportResponse,
+  { status: typeof RECORDS_REPORT_STATUS.OK }
+>;
+
+export type RecordsReportTooLarge = Extract<
+  RecordsReportResponse,
+  { status: typeof RECORDS_REPORT_STATUS.TOO_LARGE }
+>;
+
 export type RecordEligibilityInput = {
   hasRecord: boolean;
   availableAt: Date;
@@ -285,7 +358,9 @@ export function deriveRecordDisplayState(input: {
       : RECORD_DISPLAY_STATE.VOIDED;
   }
 
-  return dueAt === null ? RECORD_DISPLAY_STATE.OPEN : RECORD_DISPLAY_STATE.MISSED;
+  return dueAt === null
+    ? RECORD_DISPLAY_STATE.OPEN
+    : RECORD_DISPLAY_STATE.MISSED;
 }
 
 /** A voided record has no active submission, so it carries no timing claim; a submitted no-deadline record is No deadline, not Late. */

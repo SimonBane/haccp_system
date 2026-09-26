@@ -5,6 +5,7 @@ import {
   equipmentListResponseSchema,
   locationListResponseSchema,
   recordsListResponseSchema,
+  recordsReportResponseSchema,
   taskTemplateListResponseSchema,
   tenantContextResponseSchema,
   todayResponseSchema,
@@ -12,6 +13,7 @@ import {
   type EquipmentListResponse,
   type LocationListResponse,
   type RecordsListResponse,
+  type RecordsReportResponse,
   type TaskTemplateListResponse,
   type TenantContextResponse,
   type TodayResponse,
@@ -126,5 +128,16 @@ export async function getRecordsPage(
   return fetchJson(
     `${locationScopedPath(locationId, "records")}?${query}`,
     recordsListResponseSchema,
+  );
+}
+
+/** One request for the whole report: the API captures generatedAt and reads it in one snapshot. */
+export async function getRecordsReport(
+  locationId: string,
+  query: string,
+): Promise<RecordsReportResponse> {
+  return fetchJson(
+    `${locationScopedPath(locationId, "records")}/report?${query}`,
+    recordsReportResponseSchema,
   );
 }

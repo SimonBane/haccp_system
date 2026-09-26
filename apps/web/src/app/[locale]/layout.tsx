@@ -1,5 +1,9 @@
 import { NextIntlClientProvider } from "next-intl";
-import { getMessages, getTranslations, setRequestLocale } from "next-intl/server";
+import {
+  getMessages,
+  getTranslations,
+  setRequestLocale,
+} from "next-intl/server";
 import { hasLocale } from "next-intl";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
@@ -89,7 +93,8 @@ export default async function LocaleLayout({
         <ServiceWorkerRegistration />
         <QueryProvider>
           <TooltipProvider>
-            <div className="flex h-dvh flex-col overflow-hidden bg-background">
+            {/* `print:contents` drops the box so h-dvh/overflow-hidden cannot clip a print job to one viewport. */}
+            <div className="flex h-dvh flex-col overflow-hidden bg-background print:contents">
               {children}
             </div>
             <Toaster position="bottom-right" />
