@@ -4,10 +4,13 @@ import {
   endOfCalendarMonth,
   getWeekdayFromDate,
   recordsListResponseSchema,
+  recordsReportResponseSchema,
   wallClockToInstant,
   zonedDateString,
   type RecordItem,
   type RecordsListResponse,
+  type RecordsReportOk,
+  type RecordsReportResponse,
 } from "@haccp/shared";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -25,6 +28,7 @@ import {
   type SeededOrg,
   type TwoTenantWorld,
 } from "./harness/fixtures.js";
+import { recordsRepository } from "../../src/modules/records/records.repository.js";
 import { apiRequest, asAdmin, asEmployee } from "./harness/request.js";
 
 /**
@@ -1033,6 +1037,364 @@ describe("Records list (GET)", () => {
     it("accepts a range ending exactly on the organization's local today", async () => {
       const response = await apiRequest(
         recordsPath({ dateFrom: today(), dateTo: today() }),
+        { actor: asAdmin(org) },
+      );
+
+      expect(response.status).toBe(200);
+    });
+  });
+  /**
+   * HACCP-17: the same canonical dataset read whole, from one snapshot, for browser
+   * printing — paging and interactive sort are not accepted here.
+   */
+  describe("report", () => {
+    function reportPath(
+      query: Record<string, string> = {},
+      locationId = org.locations.main.id,
+    ): string {
+      const params = new URLSearchParams({
+        dateFrom: daysAgo(6),
+        dateTo: today(),
+        ...query,
+      });
+
+      return `/locations/${locationId}/records/report?${params.toString()}`;
+    }
+
+    async function getReport(
+      query: Record<string, string> = {},
+    ): Promise<RecordsReportResponse> {
+      const response = await apiRequest(reportPath(query), {
+        actor: asAdmin(org),
+      });
+
+      expect(response.status).toBe(200);
+      return recordsReportResponseSchema.parse(await response.json());
+    }
+
+    async function getCompleteReport(
+      query: Record<string, string> = {},
+    ): Promise<RecordsReportOk> {
+      const report = await getReport(query);
+      expect(report.status).toBe("ok");
+      return report as RecordsReportOk;
+    }
+
+    it("returns a valid zero-record report for a range with nothing eligible", async () => {
+      const report = await getCompleteReport();
+
+      expect(report).toMatchObject({ total: 0, items: [] });
+      expect(Date.parse(report.generatedAt)).not.toBeNaN();
+    });
+
+    it("includes submitted, missed, voided and opened no-deadline rows", async () => {
+      const submittedId = await insertOccurrence({
+        type: "cleaning",
+        scheduledTime: "07:00",
+      });
+      await insertRecord(submittedId, {
+        recordedAt: wallClockToInstant(daysAgo(1), "06:50", org.timeZone),
+      });
+
+      const missedId = await insertOccurrence({
+        type: "cleaning",
+        scheduledTime: "09:00",
+      });
+
+      const voidedId = await insertOccurrence({
+        type: "cleaning",
+        scheduledTime: "10:00",
+      });
+      await insertRecord(voidedId, {
+        recordedAt: wallClockToInstant(daysAgo(1), "09:55", org.timeZone),
+        voidedAt: new Date(),
+        voidedByUserId: org.admin.userId,
+      });
+
+      const openId = await insertOccurrence({
+        type: "cleaning",
+        scheduledTime: "11:00",
+        dueAt: null,
+      });
+
+      const report = await getCompleteReport();
+      const byId = new Map(
+        report.items.map((item) => [item.occurrenceId, item]),
+      );
+
+      expect(byId.get(submittedId)?.displayState).toBe("submitted");
+      expect(byId.get(missedId)?.displayState).toBe("missed");
+      expect(byId.get(voidedId)?.displayState).toBe("voided");
+      expect(byId.get(openId)?.displayState).toBe("open");
+      expect(report.total).toBe(4);
+    });
+
+    it("excludes finite-deadline work that is not yet due", async () => {
+      await insertOccurrence({
+        type: "cleaning",
+        occurrenceDate: today(),
+        scheduledTime: "23:59",
+        dueAt: new Date(Date.now() + 60 * 60 * 1000),
+      });
+
+      await expect(getCompleteReport()).resolves.toMatchObject({ total: 0 });
+    });
+
+    it("excludes no-deadline work that has not opened yet", async () => {
+      await insertOccurrence({
+        type: "cleaning",
+        occurrenceDate: today(),
+        availableAt: new Date(Date.now() + 60 * 60 * 1000),
+        dueAt: null,
+      });
+
+      await expect(getCompleteReport()).resolves.toMatchObject({ total: 0 });
+    });
+
+    it("includes no-deadline work from the moment it opens", async () => {
+      const openedId = await insertOccurrence({
+        type: "cleaning",
+        occurrenceDate: today(),
+        availableAt: new Date(Date.now() - 1000),
+        dueAt: null,
+      });
+
+      const report = await getCompleteReport();
+
+      expect(report.items.map((item) => item.occurrenceId)).toEqual([openedId]);
+      expect(report.items[0]).toMatchObject({
+        displayState: "open",
+        dueAt: null,
+      });
+    });
+
+    it("includes a submission made before a finite deadline", async () => {
+      const earlyId = await insertOccurrence({
+        type: "cleaning",
+        occurrenceDate: today(),
+        scheduledTime: "23:59",
+        dueAt: new Date(Date.now() + 60 * 60 * 1000),
+      });
+      await insertRecord(earlyId, { recordedAt: new Date() });
+
+      const report = await getCompleteReport();
+
+      expect(report.items.map((item) => item.occurrenceId)).toEqual([earlyId]);
+      expect(report.items[0]!.displayState).toBe("submitted");
+    });
+
+    it("reports a submitted no-deadline record as having no deadline", async () => {
+      const openId = await insertOccurrence({
+        type: "cleaning",
+        occurrenceDate: today(),
+        availableAt: new Date(Date.now() - 1000),
+        dueAt: null,
+      });
+      await insertRecord(openId, { recordedAt: new Date() });
+
+      const report = await getCompleteReport();
+
+      expect(report.items[0]).toMatchObject({
+        displayState: "submitted",
+        timing: "no_deadline",
+        dueAt: null,
+      });
+    });
+
+    it("matches the grid total for identical filters", async () => {
+      for (const scheduledTime of ["07:00", "08:00", "09:00"]) {
+        await insertOccurrence({ type: "cleaning", scheduledTime });
+      }
+      const submittedId = await insertOccurrence({
+        type: "temperature",
+        scheduledTime: "10:00",
+      });
+      await insertRecord(submittedId, {
+        recordedAt: wallClockToInstant(daysAgo(1), "09:50", org.timeZone),
+        temperature: { recordedC: "3.0", result: "ok" },
+      });
+
+      const filterSets: Record<string, string>[] = [
+        {},
+        { state: "missed" },
+        { type: "temperature" },
+        { state: "missed,submitted" },
+      ];
+
+      for (const filters of filterSets) {
+        const [grid, report] = await Promise.all([
+          listRecords({ ...filters, page: "1", pageSize: "100" }),
+          getCompleteReport(filters),
+        ]);
+
+        expect(report.total).toBe(grid.total);
+        expect(report.items).toHaveLength(grid.total);
+      }
+    });
+
+    it("returns the complete dataset in canonical chronological order", async () => {
+      const ids: string[] = [];
+      for (const day of [3, 1, 2]) {
+        for (const scheduledTime of ["09:00", "07:00"]) {
+          ids.push(
+            await insertOccurrence({
+              type: "cleaning",
+              occurrenceDate: daysAgo(day),
+              scheduledTime,
+            }),
+          );
+        }
+      }
+
+      const report = await getCompleteReport();
+      const keys = report.items.map(
+        (item) => `${item.occurrenceDate} ${item.scheduledTime}`,
+      );
+
+      expect(report.total).toBe(ids.length);
+      expect(keys).toEqual([...keys].sort());
+      expect(new Set(report.items.map((item) => item.occurrenceId)).size).toBe(
+        ids.length,
+      );
+    });
+
+    it("breaks ties on occurrence id so the order is deterministic", async () => {
+      // The template/date/time triple is unique, so a genuine tie needs two templates.
+      const tied = [
+        await insertOccurrence({
+          type: "cleaning",
+          occurrenceDate: daysAgo(2),
+          scheduledTime: "08:00",
+        }),
+        await insertOccurrence({
+          type: "temperature",
+          occurrenceDate: daysAgo(2),
+          scheduledTime: "08:00",
+        }),
+      ];
+
+      const first = await getCompleteReport();
+      const second = await getCompleteReport();
+      const order = first.items.map((item) => item.occurrenceId);
+
+      expect(order).toEqual(second.items.map((item) => item.occurrenceId));
+      expect(order).toEqual([...tied].sort());
+    });
+
+    it("covers a multi-month range with no date-span limit", async () => {
+      for (const day of [70, 45, 20, 1]) {
+        await insertOccurrence({
+          type: "cleaning",
+          occurrenceDate: daysAgo(day),
+          scheduledTime: "08:00",
+        });
+      }
+
+      await expect(
+        getCompleteReport({ dateFrom: daysAgo(90), dateTo: today() }),
+      ).resolves.toMatchObject({ total: 4 });
+    });
+
+    it("reads the count and the rows from one repeatable-read transaction", async () => {
+      const selects: string[] = [];
+      const runTransaction = db.transaction.bind(db);
+      const transaction = vi
+        .spyOn(db, "transaction")
+        .mockImplementation((callback, config) =>
+          runTransaction(async (tx) => {
+            const select = tx.select.bind(tx);
+            vi.spyOn(tx, "select").mockImplementation(((...args: unknown[]) => {
+              selects.push("select");
+              return (select as (...a: unknown[]) => unknown)(...args);
+            }) as typeof tx.select);
+
+            return callback(tx);
+          }, config),
+        );
+
+      await insertOccurrence({ type: "cleaning", scheduledTime: "08:00" });
+      await getCompleteReport();
+
+      expect(transaction.mock.calls[0]![1]).toEqual({
+        isolationLevel: "repeatable read",
+        accessMode: "read only",
+      });
+      expect(selects).toHaveLength(2);
+    });
+
+    it("stays consistent when a record lands between the count and the read", async () => {
+      const occurrenceId = await insertOccurrence({
+        type: "cleaning",
+        scheduledTime: "08:00",
+      });
+
+      const findPage = recordsRepository.findPage.bind(recordsRepository);
+      vi.spyOn(recordsRepository, "findPage").mockImplementation(
+        async (client, params) => {
+          await insertRecord(occurrenceId, { recordedAt: new Date() });
+          return findPage(client, params);
+        },
+      );
+
+      const report = await getCompleteReport({ state: "missed" });
+
+      expect(report.total).toBe(1);
+      expect(report.items).toHaveLength(1);
+    });
+
+    it.each([
+      ["a page", { page: "1", pageSize: "25" }],
+      ["a page size", { pageSize: "25" }],
+      ["a sort field", { sortBy: "title" }],
+      ["a sort direction", { sortOrder: "desc" }],
+      ["a search term", { search: "fridge" }],
+      ["a pending status", { state: "pending" }],
+    ] as [string, Record<string, string>][])(
+      "rejects %s",
+      async (_label, query) => {
+        const response = await apiRequest(reportPath(query), {
+          actor: asAdmin(org),
+        });
+
+        expect(response.status).toBe(400);
+      },
+    );
+
+    it("rejects a dateTo after the organization's local today", async () => {
+      const response = await apiRequest(
+        reportPath({ dateTo: addCalendarDays(today(), 1) }),
+        { actor: asAdmin(org) },
+      );
+
+      expect(response.status).toBe(400);
+    });
+
+    it("denies an employee, an unknown location and another tenant", async () => {
+      const employee = await apiRequest(reportPath(), {
+        actor: asEmployee(org),
+      });
+      expect(employee.status).toBe(403);
+
+      const unknown = await apiRequest(
+        reportPath({}, "00000000-0000-4000-8000-000000000000"),
+        { actor: asAdmin(org) },
+      );
+      expect(unknown.status).toBe(403);
+
+      const world = await seedTwoTenants(db);
+      const otherTenant = await apiRequest(
+        `/locations/${world.beta.locations.main.id}/records/report?dateFrom=${zonedDateString(new Date(), world.alpha.timeZone)}&dateTo=${zonedDateString(new Date(), world.alpha.timeZone)}`,
+        { actor: asAdmin(world.alpha) },
+      );
+      expect(otherTenant.status).toBe(403);
+
+      const anonymous = await apiRequest(reportPath());
+      expect(anonymous.status).toBe(401);
+    });
+
+    it("allows an admin any location in their organization", async () => {
+      const response = await apiRequest(
+        reportPath({}, org.locations.annex.id),
         { actor: asAdmin(org) },
       );
 

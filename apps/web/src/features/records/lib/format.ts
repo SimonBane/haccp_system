@@ -1,6 +1,12 @@
-import type { RecordItem } from "@haccp/shared";
+import type { RecordItem, UserSummary } from "@haccp/shared";
 
 export const EM_DASH = "—";
+
+export function actorName(user: UserSummary | null): string | null {
+  if (!user) return null;
+  const name = `${user.firstName} ${user.lastName}`.trim();
+  return name === "" ? null : name;
+}
 
 /** Always rendered as `DD.MM.YYYY`, independent of locale, per product decision. */
 export function formatOccurrenceDate(date: string): string {
