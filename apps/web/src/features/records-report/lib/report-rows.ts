@@ -1,52 +1,57 @@
-import type {
-  RecordDisplayState,
-  RecordItem,
-  RecordResult,
-  RecordTiming,
+import {
+  RECORD_DISPLAY_STATE,
+  RECORD_RESULT,
+  RECORD_TIMING,
+  type RecordItem,
 } from "@haccp/shared";
 import {
   actorName,
   formatOccurrenceDate,
-  formatRecordInstant,
-  formatTemperatureRange,
   formatTemperatureValue,
   hasTemperatureOutcome,
 } from "@/features/records/lib/format";
 import { resolvedTiming, showsTiming } from "@/features/records/lib/labels";
 
-export type ReportAttribution = {
-  at: string;
-  by: string | null;
-};
+export type ReportStatus = "done" | "fail" | "missed" | "open" | "voided";
 
-/**
- * Optional facts are absent keys, not nulls: the report must print no deadline label, value
- * or placeholder for a no-deadline occurrence, and an absent key is what makes that testable.
- */
+/** Optional facts are absent keys, not nulls, so a row with nothing to say prints nothing. */
 export type ReportRow = {
   occurrenceId: string;
   scheduledDate: string;
   scheduledTime: string;
   title: string;
-  displayState: RecordDisplayState;
-  availableAt: string;
+  status: ReportStatus;
+  late: boolean;
   equipmentName?: string;
-  dueAt?: string;
-  timing?: RecordTiming;
   reading?: string;
-  permittedRange?: string;
-  result?: RecordResult;
-  created?: ReportAttribution;
-  recorded?: ReportAttribution;
-  voided?: ReportAttribution;
+  recordedBy?: string | null;
   correctiveAction?: string;
 };
 
+export type ReportDateGroup = {
+  date: string;
+  rows: ReportRow[];
+};
+
+function reportStatus(item: RecordItem): ReportStatus {
+  switch (item.displayState) {
+    case RECORD_DISPLAY_STATE.MISSED:
+      return "missed";
+    case RECORD_DISPLAY_STATE.OPEN:
+      return "open";
+    case RECORD_DISPLAY_STATE.VOIDED:
+      return "voided";
+    default:
+      return hasTemperatureOutcome(item) && item.result === RECORD_RESULT.FAIL
+        ? "fail"
+        : "done";
+  }
+}
+
 export function toReportRow(
   item: RecordItem,
-  context: { locale: string; timeZone: string },
+  context: { locale: string },
 ): ReportRow {
-  const { locale, timeZone } = context;
   const record = item.record;
   const temperature = record?.temperature ?? null;
 
@@ -55,58 +60,25 @@ export function toReportRow(
     scheduledDate: formatOccurrenceDate(item.occurrenceDate),
     scheduledTime: item.scheduledTime,
     title: item.title,
-    displayState: item.displayState,
-    availableAt: formatRecordInstant(item.availableAt, locale, timeZone),
+    status: reportStatus(item),
+    late:
+      showsTiming(item.displayState, item.timing) &&
+      resolvedTiming(item) === RECORD_TIMING.LATE,
   };
 
   if (item.equipmentName !== null) {
     row.equipmentName = item.equipmentName;
   }
 
-  if (item.dueAt !== null) {
-    row.dueAt = formatRecordInstant(item.dueAt, locale, timeZone);
-  }
-
-  if (showsTiming(item.displayState, item.timing)) {
-    row.timing = resolvedTiming(item);
-  }
-
-  const permittedRange = formatTemperatureRange(
-    item.minTempC,
-    item.maxTempC,
-    locale,
-  );
-  if (permittedRange !== null) {
-    row.permittedRange = permittedRange;
-  }
-
   if (temperature) {
-    row.reading = formatTemperatureValue(temperature.recordedC, locale);
+    row.reading = formatTemperatureValue(temperature.recordedC, context.locale);
     if (temperature.correctiveAction !== null) {
       row.correctiveAction = temperature.correctiveAction;
     }
   }
 
-  if (hasTemperatureOutcome(item)) {
-    row.result = item.result;
-  }
-
   if (record) {
-    row.created = {
-      at: formatRecordInstant(record.createdAt, locale, timeZone),
-      by: actorName(record.createdBy),
-    };
-    row.recorded = {
-      at: formatRecordInstant(record.recordedAt, locale, timeZone),
-      by: actorName(record.recordedBy),
-    };
-
-    if (record.voidedAt !== null) {
-      row.voided = {
-        at: formatRecordInstant(record.voidedAt, locale, timeZone),
-        by: actorName(record.voidedBy),
-      };
-    }
+    row.recordedBy = actorName(record.recordedBy);
   }
 
   return row;
@@ -114,7 +86,23 @@ export function toReportRow(
 
 export function toReportRows(
   items: readonly RecordItem[],
-  context: { locale: string; timeZone: string },
+  context: { locale: string },
 ): ReportRow[] {
   return items.map((item) => toReportRow(item, context));
+}
+
+/** Groups consecutive rows only — the API order is the report order and must not be re-sorted. */
+export function groupReportRowsByDate(
+  rows: readonly ReportRow[],
+): ReportDateGroup[] {
+  const groups: ReportDateGroup[] = [];
+  for (const row of rows) {
+    const last = groups.at(-1);
+    if (last?.date === row.scheduledDate) {
+      last.rows.push(row);
+    } else {
+      groups.push({ date: row.scheduledDate, rows: [row] });
+    }
+  }
+  return groups;
 }

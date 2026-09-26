@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { hasMultipleLocations } from "@/features/tenant/lib/multiple-locations";
 import { useTenant } from "@/features/tenant/tenant-provider";
 
 /** Default site first — it is the one most people want — then alphabetical. */
@@ -26,7 +27,7 @@ function orderLocations(locations: LocationResponse[]): LocationResponse[] {
 
 export function useHasLocationSwitcher(): boolean {
   const { organization, locations } = useTenant();
-  return organization.multipleLocationsEnabled && locations.length > 1;
+  return hasMultipleLocations(organization, locations);
 }
 
 export function LocationSwitcherSidebarItem() {

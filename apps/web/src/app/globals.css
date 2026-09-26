@@ -198,9 +198,13 @@
     display: table-header-group;
   }
 
-  /* A record is a summary row plus its detail row — they must not be split. */
+  /* A record and its corrective-action line must not be split. */
   tbody[data-report-record] {
     break-inside: avoid;
+  }
+
+  tbody[data-report-date] {
+    break-after: avoid;
   }
 
   h1,

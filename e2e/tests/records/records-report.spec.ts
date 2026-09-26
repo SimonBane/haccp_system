@@ -101,8 +101,6 @@ test("the report carries a status filter chosen on Records", async ({
   await expect(
     page.getByRole("heading", { name: "Records report" }),
   ).toBeVisible();
-  await expect(page.getByText("Status: Missed")).toBeVisible();
-
   const states = await recordRows(page).evaluateAll((nodes) =>
     nodes.map((node) => node.textContent?.includes("Missed") ?? false),
   );
@@ -200,14 +198,14 @@ test("an opened no-deadline occurrence prints as Open with no deadline content",
   const row = recordRows(page).filter({ hasText: title });
   await expect(row).toHaveCount(1);
 
-  // "Open" only: no timing suffix, and no deadline label, value or placeholder.
+  // "Open" only: no timing suffix, and no deadline or scheduling-window content.
   await expect(row).toContainText("Open");
+  await expect(row).not.toContainText("late");
   await expect(row).not.toContainText("Deadline");
-  await expect(row).not.toContainText("No deadline");
-  await expect(row).toContainText("Available from");
+  await expect(row).not.toContainText("Available from");
 });
 
-test("a submitted record with no deadline prints its timing as On time", async ({
+test("a submitted record with no deadline prints as Done, never late", async ({
   page,
 }) => {
   const locationId = await defaultLocationId(page);
@@ -239,11 +237,11 @@ test("a submitted record with no deadline prints its timing as On time", async (
   await openReportFromRecords(page);
 
   const row = recordRows(page).filter({ hasText: title });
-  await expect(row).toContainText("On time");
-  await expect(row).not.toContainText("Deadline");
+  await expect(row).toContainText("Done");
+  await expect(row).not.toContainText("late");
 });
 
-test("a submitted row carries distinct first-created and current-record attribution", async ({
+test("a submitted row names its recorder on a single line", async ({
   page,
 }) => {
   await page.goto(RECORDS_PATH);
@@ -251,8 +249,8 @@ test("a submitted row carries distinct first-created and current-record attribut
 
   const row = recordRows(page).filter({ hasText: CLEANING_TASK }).first();
 
-  await expect(row).toContainText("First created");
-  await expect(row).toContainText("Current record");
+  await expect(row.getByRole("row")).toHaveCount(1);
+  await expect(row.getByRole("cell").last()).not.toBeEmpty();
 });
 
 test("a future date in a crafted URL is refused without a table", async ({

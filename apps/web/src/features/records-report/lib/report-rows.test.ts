@@ -1,8 +1,12 @@
 import type { RecordItem } from "@haccp/shared";
 import { describe, expect, it } from "vitest";
-import { toReportRow, toReportRows } from "./report-rows";
+import {
+  groupReportRowsByDate,
+  toReportRow,
+  toReportRows,
+} from "./report-rows";
 
-const CONTEXT = { locale: "bg", timeZone: "Europe/Sofia" };
+const CONTEXT = { locale: "bg" };
 
 const OCCURRENCE_ID = "11111111-1111-4111-8111-111111111111";
 const ADA = {
@@ -53,27 +57,40 @@ function record(overrides: Record<string, unknown> = {}) {
   } as RecordItem["record"];
 }
 
-describe("toReportRow deadline presentation", () => {
-  it("prints a finite deadline", () => {
-    expect(toReportRow(item(), CONTEXT).dueAt).toBe("23.08.2026, 08:00");
+describe("toReportRow status", () => {
+  it("prints a passing submission as done and on time", () => {
+    const row = toReportRow(item({ record: record() }), CONTEXT);
+
+    expect(row.status).toBe("done");
+    expect(row.late).toBe(false);
   });
 
-  it("emits no deadline key at all when dueAt is null", () => {
-    const row = toReportRow(item({ dueAt: null }), CONTEXT);
+  it("prints a failed temperature submission as out of range", () => {
+    const row = toReportRow(item({ result: "fail", record: record() }), CONTEXT);
 
-    expect("dueAt" in row).toBe(false);
-    expect(JSON.stringify(row)).not.toContain("dueAt");
+    expect(row.status).toBe("fail");
   });
 
-  it("always prints available-from, which a no-deadline row still has", () => {
-    expect(toReportRow(item({ dueAt: null }), CONTEXT).availableAt).toBe(
-      "23.08.2026, 03:00",
+  it("keeps lateness alongside an out-of-range result", () => {
+    const row = toReportRow(
+      item({ result: "fail", timing: "late", record: record() }),
+      CONTEXT,
     );
-  });
-});
 
-describe("toReportRow state and timing", () => {
-  it("renders an open row with no timing suffix", () => {
+    expect(row.status).toBe("fail");
+    expect(row.late).toBe(true);
+  });
+
+  it("never marks a submitted no-deadline record late", () => {
+    const row = toReportRow(
+      item({ dueAt: null, timing: "no_deadline", record: record() }),
+      CONTEXT,
+    );
+
+    expect(row.late).toBe(false);
+  });
+
+  it("prints an open row as open, with no lateness or recorder", () => {
     const row = toReportRow(
       item({
         dueAt: null,
@@ -85,29 +102,12 @@ describe("toReportRow state and timing", () => {
       CONTEXT,
     );
 
-    expect(row.displayState).toBe("open");
-    expect("timing" in row).toBe(false);
+    expect(row.status).toBe("open");
+    expect(row.late).toBe(false);
+    expect("recordedBy" in row).toBe(false);
   });
 
-  it("renders a submitted no-deadline record as on time", () => {
-    const row = toReportRow(
-      item({ dueAt: null, timing: "no_deadline", record: record() }),
-      CONTEXT,
-    );
-
-    expect(row.timing).toBe("on_time");
-  });
-
-  it("keeps a late submission late", () => {
-    const row = toReportRow(
-      item({ timing: "late", record: record() }),
-      CONTEXT,
-    );
-
-    expect(row.timing).toBe("late");
-  });
-
-  it("carries no timing claim on a missed row", () => {
+  it("prints a missed row as missed", () => {
     const row = toReportRow(
       item({
         displayState: "missed",
@@ -117,49 +117,11 @@ describe("toReportRow state and timing", () => {
       CONTEXT,
     );
 
-    expect("timing" in row).toBe(false);
-  });
-});
-
-describe("toReportRow attribution", () => {
-  it("keeps the first creator and the current recorder distinct", () => {
-    const row = toReportRow(item({ record: record() }), CONTEXT);
-
-    expect(row.created).toEqual({ at: "23.08.2026, 07:40", by: "Ада Админ" });
-    expect(row.recorded).toEqual({
-      at: "23.08.2026, 07:55",
-      by: "Борис Оператор",
-    });
+    expect(row.status).toBe("missed");
+    expect(row.late).toBe(false);
   });
 
-  it("reports a missing user as unknown rather than an empty name", () => {
-    const row = toReportRow(
-      item({ record: record({ createdBy: null }) }),
-      CONTEXT,
-    );
-
-    expect(row.created?.by).toBeNull();
-  });
-
-  it("adds voided attribution only on a voided row", () => {
-    expect("voided" in toReportRow(item({ record: record() }), CONTEXT)).toBe(
-      false,
-    );
-
-    const voided = toReportRow(
-      item({
-        displayState: "voided",
-        recordState: "voided",
-        timing: "not_submitted",
-        record: record({ voidedAt: "2026-08-23T06:10:00.000Z", voidedBy: ADA }),
-      }),
-      CONTEXT,
-    );
-
-    expect(voided.voided).toEqual({ at: "23.08.2026, 09:10", by: "Ада Админ" });
-  });
-
-  it("keeps the retained temperature payload on a voided row", () => {
+  it("prints a voided row as voided even when its reading failed", () => {
     const row = toReportRow(
       item({
         displayState: "voided",
@@ -181,18 +143,46 @@ describe("toReportRow attribution", () => {
       CONTEXT,
     );
 
+    expect(row.status).toBe("voided");
     expect(row.reading).toBe("8,4 °C");
     expect(row.correctiveAction).toBe("Преместени продукти");
-    expect(row.result).toBe("fail");
   });
 });
 
-describe("toReportRow temperature presentation", () => {
-  it("prints the stored permitted range", () => {
-    expect(toReportRow(item(), CONTEXT).permittedRange).toBe("0 °C – 5 °C");
+describe("toReportRow minimal facts", () => {
+  it("names the current recorder, not the first creator", () => {
+    expect(toReportRow(item({ record: record() }), CONTEXT).recordedBy).toBe(
+      "Борис Оператор",
+    );
   });
 
-  it("omits reading, range and outcome on a cleaning row", () => {
+  it("keeps a missing recorder distinguishable from no record at all", () => {
+    const row = toReportRow(
+      item({ record: record({ recordedBy: null }) }),
+      CONTEXT,
+    );
+
+    expect(row.recordedBy).toBeNull();
+  });
+
+  it("carries no scheduling window, range or audit trail", () => {
+    const row = toReportRow(item({ record: record() }), CONTEXT);
+
+    expect(Object.keys(row).sort()).toEqual(
+      [
+        "equipmentName",
+        "late",
+        "occurrenceId",
+        "recordedBy",
+        "scheduledDate",
+        "scheduledTime",
+        "status",
+        "title",
+      ].sort(),
+    );
+  });
+
+  it("omits reading and equipment on a cleaning row", () => {
     const row = toReportRow(
       item({
         type: "cleaning",
@@ -201,13 +191,13 @@ describe("toReportRow temperature presentation", () => {
         minTempC: null,
         maxTempC: null,
         result: "not_evaluated",
+        record: record(),
       }),
       CONTEXT,
     );
 
+    expect(row.status).toBe("done");
     expect("reading" in row).toBe(false);
-    expect("permittedRange" in row).toBe(false);
-    expect("result" in row).toBe(false);
     expect("equipmentName" in row).toBe(false);
   });
 
@@ -227,6 +217,7 @@ describe("toReportRow temperature presentation", () => {
       CONTEXT,
     );
 
+    expect(row.reading).toBe("3,5 °C");
     expect("correctiveAction" in row).toBe(false);
   });
 });
@@ -243,5 +234,32 @@ describe("toReportRows", () => {
     );
 
     expect(rows.map((row) => row.occurrenceId)).toEqual(ids);
+  });
+});
+
+describe("groupReportRowsByDate", () => {
+  it("groups consecutive rows under their date without re-sorting", () => {
+    const rows = toReportRows(
+      [
+        item({ occurrenceId: "1", occurrenceDate: "2026-08-23" }),
+        item({ occurrenceId: "2", occurrenceDate: "2026-08-23" }),
+        item({ occurrenceId: "3", occurrenceDate: "2026-08-24" }),
+      ],
+      CONTEXT,
+    );
+
+    expect(
+      groupReportRowsByDate(rows).map((group) => ({
+        date: group.date,
+        ids: group.rows.map((row) => row.occurrenceId),
+      })),
+    ).toEqual([
+      { date: "23.08.2026", ids: ["1", "2"] },
+      { date: "24.08.2026", ids: ["3"] },
+    ]);
+  });
+
+  it("returns no groups for no rows", () => {
+    expect(groupReportRowsByDate([])).toEqual([]);
   });
 });
