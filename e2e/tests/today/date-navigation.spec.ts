@@ -4,7 +4,7 @@ import { ensurePending, row } from "../../support/today.js";
 
 /**
  * HACCP-59 also requires that changing the date or location closes an open
- * temperature round or record sheet. That isn't covered by an e2e spec here:
+ * record round or record sheet. That isn't covered by an e2e spec here:
  * on desktop the round renders as a modal `Dialog` (`responsive-form-dialog.tsx`),
  * which dismisses itself on an outside click — so a click aimed at the sticky
  * header's date-nav trigger while the round is open gets consumed closing the

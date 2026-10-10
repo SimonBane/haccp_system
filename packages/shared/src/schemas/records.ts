@@ -10,11 +10,17 @@ import {
   createGridQuerySchema,
   SORT_ORDER,
 } from "./grid.js";
+import { recordValuesSchema } from "../lib/form-answers.js";
 import {
-  scheduledTimeSchema,
-  taskTemplateTypeSchema,
-} from "./task-template.js";
-import { temperatureResultSchema } from "./today.js";
+  FORM_CATEGORY_VALUES,
+  formCategorySchema,
+  formVersionSummaryMapSchema,
+  RECORD_RESULT,
+  recordResultSchema,
+  resolvedLimitsSchema,
+  type RecordResult,
+} from "./form.js";
+import { scheduledTimeSchema } from "./task-template.js";
 import { userSummarySchema } from "./user.js";
 
 export const RECORD_DISPLAY_STATE = {
@@ -63,20 +69,6 @@ export const recordTimingSchema = z.enum([
 
 export type RecordTiming = z.infer<typeof recordTimingSchema>;
 
-export const RECORD_RESULT = {
-  PASS: "pass",
-  FAIL: "fail",
-  NOT_EVALUATED: "not_evaluated",
-} as const;
-
-export const recordResultSchema = z.enum([
-  RECORD_RESULT.PASS,
-  RECORD_RESULT.FAIL,
-  RECORD_RESULT.NOT_EVALUATED,
-]);
-
-export type RecordResult = z.infer<typeof recordResultSchema>;
-
 export function isRealCalendarDate(value: string): boolean {
   return isCalendarDate(value) && addCalendarDays(value, 0) === value;
 }
@@ -94,7 +86,7 @@ export const RECORDS_DEFAULT_SORT = {
   sortOrder: SORT_ORDER.ASC,
 } as const;
 
-export const RECORDS_TYPE_FILTER_VALUES = ["temperature", "cleaning"] as const;
+export const RECORDS_CATEGORY_FILTER_VALUES = FORM_CATEGORY_VALUES;
 
 export const RECORDS_STATE_FILTER_VALUES = [
   RECORD_DISPLAY_STATE.SUBMITTED,
@@ -183,7 +175,7 @@ export const recordsListQuerySchema = createGridQuerySchema({
   sortFields: RECORDS_SORT_FIELDS,
   search: false,
   filters: {
-    type: createGridFilterSchema(RECORDS_TYPE_FILTER_VALUES),
+    category: createGridFilterSchema(RECORDS_CATEGORY_FILTER_VALUES),
     state: createGridFilterSchema(RECORDS_STATE_FILTER_VALUES),
     result: createGridFilterSchema(RECORDS_RESULT_FILTER_VALUES),
   },
@@ -215,7 +207,7 @@ export type RecordsReportStatus =
 const recordsReportBaseSchema = z.strictObject({
   dateFrom: recordsCalendarDateSchema,
   dateTo: recordsCalendarDateSchema,
-  type: createGridFilterSchema(RECORDS_TYPE_FILTER_VALUES),
+  category: createGridFilterSchema(RECORDS_CATEGORY_FILTER_VALUES),
   state: createGridFilterSchema(RECORDS_STATE_FILTER_VALUES),
   result: createGridFilterSchema(RECORDS_RESULT_FILTER_VALUES),
 });
@@ -234,18 +226,6 @@ export type RecordsReportSearchParams = z.infer<
   typeof recordsReportSearchParamsSchema
 >;
 
-export const recordTemperatureDetailSchema = z.object({
-  recordedC: z.number(),
-  minTempC: z.number(),
-  maxTempC: z.number(),
-  result: temperatureResultSchema,
-  correctiveAction: z.string().nullable(),
-});
-
-export type RecordTemperatureDetail = z.infer<
-  typeof recordTemperatureDetailSchema
->;
-
 export const recordDetailSchema = z.object({
   recordId: z.uuid(),
   createdAt: z.iso.datetime(),
@@ -254,7 +234,8 @@ export const recordDetailSchema = z.object({
   recordedBy: userSummarySchema.nullable(),
   voidedAt: z.iso.datetime().nullable(),
   voidedBy: userSummarySchema.nullable(),
-  temperature: recordTemperatureDetailSchema.nullable(),
+  values: recordValuesSchema,
+  correctiveAction: z.string().nullable(),
 });
 
 export type RecordDetail = z.infer<typeof recordDetailSchema>;
@@ -267,11 +248,11 @@ export const recordItemSchema = z.object({
   availableAt: z.iso.datetime(),
   dueAt: z.iso.datetime().nullable(),
   title: z.string(),
-  type: taskTemplateTypeSchema,
-  equipmentId: z.uuid().nullable(),
-  equipmentName: z.string().nullable(),
-  minTempC: z.number().nullable(),
-  maxTempC: z.number().nullable(),
+  formVersionId: z.uuid(),
+  category: formCategorySchema,
+  targetId: z.uuid().nullable(),
+  targetName: z.string().nullable(),
+  resolvedLimits: resolvedLimitsSchema,
   displayState: recordDisplayStateSchema,
   recordState: recordEntryStateSchema,
   timing: recordTimingSchema,
@@ -281,7 +262,11 @@ export const recordItemSchema = z.object({
 
 export type RecordItem = z.infer<typeof recordItemSchema>;
 
-export const recordsListResponseSchema = createGridPageSchema(recordItemSchema);
+export const recordsListResponseSchema = createGridPageSchema(
+  recordItemSchema,
+).extend({
+  formVersions: formVersionSummaryMapSchema,
+});
 
 export type RecordsListResponse = z.infer<typeof recordsListResponseSchema>;
 
@@ -295,6 +280,7 @@ export const recordsReportResponseSchema = z.discriminatedUnion("status", [
     generatedAt: z.iso.datetime(),
     total: z.int().nonnegative(),
     items: z.array(recordItemSchema),
+    formVersions: formVersionSummaryMapSchema,
   }),
   z.strictObject({
     status: z.literal(RECORDS_REPORT_STATUS.TOO_LARGE),
@@ -383,10 +369,9 @@ export function deriveRecordTiming(input: {
     : RECORD_TIMING.LATE;
 }
 
-/** The retained temperature payload describes the reading even when the record is voided. */
+/** A voided record keeps the result it was judged with; an occurrence without a record was never evaluated. */
 export function deriveRecordResult(
-  temperature: { result: z.infer<typeof temperatureResultSchema> } | null,
+  record: { result: RecordResult } | null,
 ): RecordResult {
-  if (!temperature) return RECORD_RESULT.NOT_EVALUATED;
-  return temperature.result === "ok" ? RECORD_RESULT.PASS : RECORD_RESULT.FAIL;
+  return record?.result ?? RECORD_RESULT.NOT_EVALUATED;
 }

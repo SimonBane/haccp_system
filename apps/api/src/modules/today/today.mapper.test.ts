@@ -7,8 +7,10 @@ const OCCURRENCE_A = "00000000-0000-4000-8000-00000000000a";
 const OCCURRENCE_B = "00000000-0000-4000-8000-00000000000b";
 
 describe("sortItemsByScheduledTime", () => {
-  const item = (scheduledTime: string, occurrenceId = OCCURRENCE_A): TodayTaskItem =>
-    ({ scheduledTime, occurrenceId }) as TodayTaskItem;
+  const item = (
+    scheduledTime: string,
+    occurrenceId = OCCURRENCE_A,
+  ): TodayTaskItem => ({ scheduledTime, occurrenceId }) as TodayTaskItem;
 
   it("orders by clock time, not string order", () => {
     // Lexical "09:00" > "12:00"; clock order must put 9am first.
@@ -55,11 +57,10 @@ describe("toTodayTaskItem", () => {
       occurrenceId: OCCURRENCE_A,
       taskTemplateId: "00000000-0000-4000-8000-00000000000t",
       title: "Check walk-in fridge",
-      type: "temperature",
-      equipmentId: "00000000-0000-4000-8000-00000000000e",
-      equipmentName: "Walk-in fridge",
-      minTempC: "0.0",
-      maxTempC: "5.0",
+      formVersionId: "00000000-0000-4000-8000-0000000000f1",
+      targetId: "00000000-0000-4000-8000-00000000000e",
+      targetName: "Walk-in fridge",
+      resolvedLimits: { temperature: { min: 0, max: 5 } },
       scheduledTime: "07:00",
       occurrenceDate: "2026-01-15",
       availableAt: new Date("2026-01-15T00:00:00Z"),
@@ -69,11 +70,9 @@ describe("toTodayTaskItem", () => {
       recordedByFirstName: null,
       recordedByLastName: null,
       voidedAt: null,
-      detailRecordedC: null,
-      detailMinTempC: null,
-      detailMaxTempC: null,
-      detailResult: null,
-      detailCorrectiveAction: null,
+      result: null,
+      values: null,
+      correctiveAction: null,
       ...overrides,
     };
   }
@@ -86,7 +85,9 @@ describe("toTodayTaskItem", () => {
     expect(item.status).toBe("overdue");
     expect(item.completedAt).toBeNull();
     expect(item.completedBy).toBeNull();
-    expect(item.temperatureReading).toBeNull();
+    expect(item.result).toBeNull();
+    expect(item.targetName).toBe("Walk-in fridge");
+    expect(item.resolvedLimits).toEqual({ temperature: { min: 0, max: 5 } });
   });
 
   it("maps an unopened occurrence to status upcoming before availableAt", () => {
@@ -108,18 +109,25 @@ describe("toTodayTaskItem", () => {
     expect(item.dueAt).toBeNull();
   });
 
-  it("maps an active record to recordState active with its reading", () => {
+  it("maps an active record to recordState active with its answers", () => {
     const row = occurrenceRow({
       recordedAt: new Date("2026-01-15T07:05:00Z"),
       recordedByUserId: "00000000-0000-4000-8000-00000000000u",
       recordedByFirstName: "Ann",
       recordedByLastName: "Lee",
       voidedAt: null,
-      detailRecordedC: "3.1",
-      detailMinTempC: "0.0",
-      detailMaxTempC: "5.0",
-      detailResult: "ok",
-      detailCorrectiveAction: null,
+      result: "pass",
+      values: {
+        temperature: {
+          type: "measurement",
+          value: 3.1,
+          unit: "celsius",
+          min: 0,
+          max: 5,
+          fails: false,
+        },
+      },
+      correctiveAction: null,
     });
 
     const item = toTodayTaskItem(row, NOW);
@@ -132,27 +140,32 @@ describe("toTodayTaskItem", () => {
       firstName: "Ann",
       lastName: "Lee",
     });
-    expect(item.temperatureReading).toEqual({
-      recordedC: 3.1,
-      minTempC: 0,
-      maxTempC: 5,
-      result: "ok",
-      correctiveAction: null,
+    expect(item.result).toBe("pass");
+    expect(item.values?.temperature).toMatchObject({
+      value: 3.1,
+      fails: false,
     });
   });
 
-  it("renders a voided record as uncompleted and does not expose its old reading", () => {
+  it("renders a voided record as uncompleted and does not expose its old answers", () => {
     const row = occurrenceRow({
       recordedAt: new Date("2026-01-15T07:05:00Z"),
       recordedByUserId: "00000000-0000-4000-8000-00000000000u",
       recordedByFirstName: "Ann",
       recordedByLastName: "Lee",
       voidedAt: new Date("2026-01-15T07:10:00Z"),
-      detailRecordedC: "3.1",
-      detailMinTempC: "0.0",
-      detailMaxTempC: "5.0",
-      detailResult: "ok",
-      detailCorrectiveAction: null,
+      result: "pass",
+      values: {
+        temperature: {
+          type: "measurement",
+          value: 3.1,
+          unit: "celsius",
+          min: 0,
+          max: 5,
+          fails: false,
+        },
+      },
+      correctiveAction: null,
     });
 
     const item = toTodayTaskItem(row, NOW);
@@ -160,6 +173,7 @@ describe("toTodayTaskItem", () => {
     expect(item.recordState).toBe("voided");
     expect(item.completedAt).toBeNull();
     expect(item.completedBy).toBeNull();
-    expect(item.temperatureReading).toBeNull();
+    expect(item.result).toBeNull();
+    expect(item.values).toBeNull();
   });
 });

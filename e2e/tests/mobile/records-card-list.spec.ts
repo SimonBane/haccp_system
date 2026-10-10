@@ -29,15 +29,15 @@ test("Records renders as a card list on a phone, with no horizontal scroll", asy
 
   // The compact date and filter controls must not push the page sideways.
   await expect(dateRangeTrigger(page)).toBeVisible();
-  await expect(filterTrigger(page, "Type")).toBeVisible();
+  await expect(filterTrigger(page, "Category")).toBeVisible();
   expect(await hasHorizontalOverflow(page)).toBe(false);
 
   const filtered = await nextRecordsQuery(page, async () => {
-    await filterTrigger(page, "Type").click();
+    await filterTrigger(page, "Category").click();
     await page.getByRole("checkbox", { name: "Cleaning" }).click();
     await page.keyboard.press("Escape");
   });
-  expect(filtered.get("type")).toBe("cleaning");
+  expect(filtered.get("category")).toBe("cleaning");
   expect(await hasHorizontalOverflow(page)).toBe(false);
 
   // The print action is an icon-only control, so it must carry an accessible name.

@@ -8,9 +8,7 @@ import { Button } from "@/components/ui/button";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 import {
   formatOccurrenceDate,
-  formatTemperatureValue,
-  hasTemperatureOutcome,
-  recordReading,
+  hasJudgedResult,
 } from "@/features/records/lib/format";
 import {
   RECORD_DISPLAY_STATE_VARIANT,
@@ -25,22 +23,25 @@ export type RecordsColumnCopy = {
   task: string;
   status: string;
   timing: string;
-  reading: string;
-  outcome: string;
+  answers: string;
+  result: string;
   viewDetails: string;
 };
+
+/** One line of a record's answers, or null when there is no record. */
+export type SummarizeRecord = (item: RecordItem) => string | null;
 
 type GetColumnsParams = {
   copy: RecordsColumnCopy;
   labels: RecordsLabels;
-  locale: string;
+  summarize: SummarizeRecord;
   onViewDetails: (item: RecordItem) => void;
 };
 
 export function getRecordsColumns({
   copy,
   labels,
-  locale,
+  summarize,
   onViewDetails,
 }: GetColumnsParams): ColumnDef<RecordItem>[] {
   return [
@@ -76,7 +77,7 @@ export function getRecordsColumns({
         <div className="flex flex-col">
           <span className="font-medium">{row.original.title}</span>
           <span className="text-muted-foreground">
-            {row.original.equipmentName ?? labels.type[row.original.type]}
+            {row.original.targetName ?? labels.category[row.original.category]}
           </span>
         </div>
       ),
@@ -108,29 +109,25 @@ export function getRecordsColumns({
       },
     },
     {
-      id: "reading",
+      id: "answers",
       enableSorting: false,
-      meta: { view_label: copy.reading },
-      header: () => copy.reading,
+      meta: { view_label: copy.answers },
+      header: () => copy.answers,
       cell: ({ row }) => {
-        const reading = recordReading(row.original);
+        const summary = summarize(row.original);
 
-        if (reading === null) return null;
-
-        return (
-          <span className="tabular-nums">
-            {formatTemperatureValue(reading, locale)}
-          </span>
+        return summary === null ? null : (
+          <span className="line-clamp-2 max-w-72 tabular-nums">{summary}</span>
         );
       },
     },
     {
-      id: "outcome",
+      id: "result",
       enableSorting: false,
-      meta: { view_label: copy.outcome },
-      header: () => copy.outcome,
+      meta: { view_label: copy.result },
+      header: () => copy.result,
       cell: ({ row }) =>
-        hasTemperatureOutcome(row.original) ? (
+        hasJudgedResult(row.original) ? (
           <Badge variant={RECORD_RESULT_VARIANT[row.original.result]}>
             {labels.result[row.original.result]}
           </Badge>

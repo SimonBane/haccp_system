@@ -1,7 +1,10 @@
 import { z } from "zod";
-import type { TemperatureResult } from "./today.js";
 
-export const occurrenceStatusSchema = z.enum(["pending", "completed", "missed"]);
+export const occurrenceStatusSchema = z.enum([
+  "pending",
+  "completed",
+  "missed",
+]);
 
 export type OccurrenceStatus = z.infer<typeof occurrenceStatusSchema>;
 
@@ -33,7 +36,8 @@ export function deriveOccurrenceState(params: {
 }): DerivedOccurrenceState {
   if (!isActiveRecord(params.record)) {
     return {
-      status: params.now.getTime() >= params.dueAt.getTime() ? "missed" : "pending",
+      status:
+        params.now.getTime() >= params.dueAt.getTime() ? "missed" : "pending",
       timeliness: null,
     };
   }
@@ -45,13 +49,6 @@ export function deriveOccurrenceState(params: {
         ? "on_time"
         : "late",
   };
-}
-
-/** The temperature result is read from the stored detail row, never recomputed from a possibly-stale occurrence range. */
-export function deriveTemperatureResult(
-  detail: { result: TemperatureResult } | null | undefined,
-): TemperatureResult | null {
-  return detail?.result ?? null;
 }
 
 /**

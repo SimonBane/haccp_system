@@ -2,18 +2,22 @@ import "server-only";
 
 import {
   employeeListResponseSchema,
-  equipmentListResponseSchema,
+  formListResponseSchema,
   locationListResponseSchema,
   recordsListResponseSchema,
   recordsReportResponseSchema,
+  targetListResponseSchema,
+  targetTypeListResponseSchema,
   taskTemplateListResponseSchema,
   tenantContextResponseSchema,
   todayResponseSchema,
   type EmployeeListResponse,
-  type EquipmentListResponse,
+  type FormListResponse,
   type LocationListResponse,
   type RecordsListResponse,
   type RecordsReportResponse,
+  type TargetListResponse,
+  type TargetTypeListResponse,
   type TaskTemplateListResponse,
   type TenantContextResponse,
   type TodayResponse,
@@ -91,13 +95,21 @@ export async function listEmployees(): Promise<EmployeeListResponse> {
   return fetchJson("/employees", employeeListResponseSchema);
 }
 
-export async function listEquipment(
+export async function listTargets(
   locationId: string,
-): Promise<EquipmentListResponse> {
+): Promise<TargetListResponse> {
   return fetchJson(
-    locationScopedPath(locationId, "equipment"),
-    equipmentListResponseSchema,
+    locationScopedPath(locationId, "targets"),
+    targetListResponseSchema,
   );
+}
+
+export async function listTargetTypes(): Promise<TargetTypeListResponse> {
+  return fetchJson("/target-types", targetTypeListResponseSchema);
+}
+
+export async function listForms(): Promise<FormListResponse> {
+  return fetchJson("/forms", formListResponseSchema);
 }
 
 export async function listTaskTemplates(

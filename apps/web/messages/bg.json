@@ -39,13 +39,17 @@
     "queryDescription": "Проверете връзката си и опитайте отново.",
     "retry": "Опитайте отново",
     "codes": {
-      "equipmentNameExists": "В тази локация вече има оборудване с това име.",
+      "targetNameExists": "Оборудване или зона с това име вече съществува в този обект.",
+      "targetTypeNameExists": "Тип с това име вече съществува.",
+      "targetTypeInUse": "Този тип все още се използва от оборудване или зона.",
+      "formNameExists": "Формуляр с това име вече съществува.",
+      "formInUse": "Този формуляр все още се използва от задача.",
       "employeeEmailExists": "Вече има служител с този имейл.",
       "locationNameExists": "Вече има локация с това име.",
       "multipleLocationsDisabled": "Допълнителните локации не са активирани за тази организация.",
       "defaultLocationDeleteForbidden": "Изберете друга основна локация, преди да изтриете тази.",
       "lastLocationDeleteForbidden": "Последната локация не може да бъде изтрита.",
-      "locationHasDependencies": "Локацията не може да бъде изтрита, докато има оборудване или данни за задачи.",
+      "locationHasDependencies": "Този обект не може да бъде изтрит, докато има оборудване, зони или данни за задачи.",
       "taskRecordAlreadyExists": "Задачата вече е записана. Показва се последната запазена стойност."
     }
   },
@@ -82,37 +86,35 @@
       "edit": "Редактирай",
       "viewRecord": "Виж записа"
     },
-    "taskTypes": {
-      "cleaning": "Почистване",
-      "temperature": "Температура",
-      "other": "Друго"
-    },
     "timeline": {
       "now": "Сега",
       "overdue": "Просрочени",
       "remaining": "{count, plural, one {остава #} other {остават #}}",
       "doneCount": "{count, plural, one {# изпълнена} other {# изпълнени}}",
-      "deviations": "{count, plural, one {# извън диапазона} other {# извън диапазона}}",
+      "deviations": "{count, plural, one {# изисква внимание} other {# изискват внимание}}",
       "jumpToOverdue": "Към просрочените задачи ({count})",
-      "jumpToDeviation": "Към отчитанията извън диапазона ({count})",
+      "jumpToDeviation": "Към проверките, които изискват внимание ({count})",
       "nowLine": "Сега, {time}",
       "jumpToNow": "Към сега",
-      "recordRound": "Запиши отчитанията за {time} ({count})"
+      "recordRound": "Запиши проверките за {time} ({count})"
     },
     "row": {
       "lastReadingAt": "Последно {time}",
-      "availableAt": "Достъпно от {time}"
+      "availableAt": "Достъпно от {time}",
+      "needsAttention": "Изисква внимание"
     },
     "record": {
       "close": "Затвори",
       "completedAt": "Изпълнено в",
       "completedBy": "Изпълнено от",
-      "taskType": "Тип"
+      "category": "Категория",
+      "pass": "Успешна",
+      "fail": "Изисква внимание"
     },
     "allDone": {
       "title": "Всичко е изпълнено",
       "description": "{count, plural, one {# задача за деня} other {# задачи за деня}}",
-      "withDeviations": "{count, plural, one {# отчитане изисква внимание} other {# отчитания изискват внимание}}"
+      "withDeviations": "{count, plural, one {# проверка изисква внимание} other {# проверки изискват внимание}}"
     },
     "progress": {
       "summary": "{completed} от {total} изпълнени"
@@ -135,50 +137,47 @@
       "you": "Вие",
       "correctiveAction": "Коригиращо действие"
     },
-    "temperatureDialog": {
-      "allowedRange": "Допустим диапазон",
-      "recordedCLabel": "Отчетена температура",
-      "ok": "ОК",
-      "outOfRange": "Извън диапазона",
-      "correctiveActionPlaceholder": "Напр. преместих продуктите и уведомих отговорника…",
+    "recordDialog": {
+      "allowed": "Допустимо {limits}",
+      "withinLimits": "В границите",
+      "outsideLimits": "Извън границите",
+      "srWithinLimits": "{value}, в допустимите граници",
+      "srOutsideLimits": "{value}, извън допустимите граници",
+      "noPriorReading": "Първо измерване днес",
+      "lastReading": "Последно: {value} в {time}",
       "presets": {
         "movedProduct": "Преместих продуктите",
         "adjustedThermostat": "Настроих термостата",
-        "notifiedManager": "Уведомих отговорника",
-        "calledService": "Извиках сервиз"
+        "calledService": "Извиках сервиз",
+        "rejectedDelivery": "Върнах доставката",
+        "discardedProduct": "Бракувах продукта",
+        "recleaned": "Почистих отново",
+        "rechecked": "Повторих проверката",
+        "notifiedManager": "Уведомих отговорника"
       },
-      "confirm": "Запиши",
       "validation": {
-        "required": "Въведете измерена температура",
-        "invalid": "Въведете валидно число",
-        "correctiveActionRequired": "Изберете или опишете предприетото коригиращо действие",
-        "outOfBounds": "Въведете температура между -99,9 и 99,9 °C",
-        "correctiveActionMax": "Бележките може да са до 900 знака"
+        "readingRequired": "Въведете измерена стойност",
+        "readingInvalid": "Въведете валидно число за тази мерна единица",
+        "correctiveRequired": "Изберете или опишете предприетото коригиращо действие",
+        "notesMax": "Бележките може да са до 900 знака"
       },
       "close": "Затвори",
       "back": "Назад",
-      "continueLabel": "Продължи",
+      "continue": "Продължи",
+      "save": "Запиши",
       "saveDeviation": "Запиши отклонението",
       "skip": "Пропусни",
       "skipLabel": "Пропусни {title}",
       "roundProgress": "{position} / {total}",
-      "roundProgressLabel": "Отчитане {position} от {total}",
-      "roundSummary": "{count, plural, one {Записано # отчитане} other {Записани # отчитания}}",
-      "roundSummaryDeviations": "{saved} записани · {deviations} извън диапазона",
-      "keyboardHint": "⏎ запиши · ↑↓ ±0,1",
-      "rangeIdle": "Допустим диапазон {min} – {max} °C",
-      "rangeInline": "{min} – {max} °C",
-      "implausibleHint": "Необичайно за това оборудване — проверете термометъра",
-      "lastReading": "Последно: {value} °C в {time}",
-      "noPriorReading": "Първо измерване днес",
-      "signToggleLabel": "Отрицателна температура",
+      "roundProgressLabel": "Проверка {position} от {total}",
+      "roundSummary": "{count, plural, one {Записана # проверка} other {Записани # проверки}}",
+      "roundSummaryDeviations": "{saved} записани · {deviations} изискват внимание",
+      "failedTitle": "Проверката е неуспешна",
       "correctiveTitle": "Какво предприехте?",
+      "correctiveTitleOptional": "Какво предприехте? (по желание)",
       "notesLabel": "Бележки",
-      "notesCharacterCount": "{current} / {max}",
-      "charactersLeft": "{count, plural, one {Остава # знак} other {Остават # знака}}",
-      "srVerdictOk": "{value} °C, в допустимите граници",
-      "srVerdictOutOfRange": "{value} °C, извън допустимите граници",
-      "readingLabel": "Отчетена температура в градуси Целзий"
+      "notesPlaceholder": "Напр. преместих продуктите и уведомих отговорника…",
+      "notesCharacterCount": "{current} / {max}"
     },
     "a11y": {
       "completed": "{title} е изпълнена",
@@ -197,10 +196,10 @@
     "toasts": {
       "completed": "Изпълнено · {title}",
       "recorded": "Записано · {title}",
-      "missingEquipment": "Липсва диапазон за оборудването",
       "undoError": "Неуспешно връщане назад",
       "doneError": "Неуспешно приключване",
-      "alreadyRecorded": "Вече е записано — показва се последната запазена стойност"
+      "alreadyRecorded": "Вече е записано — показва се последната запазена стойност",
+      "missingForm": "Формулярът на задачата не можа да се зареди. Презаредете и опитайте отново."
     }
   },
   "DataTable": {
@@ -246,72 +245,307 @@
       "clearAll": "Изчисти филтрите"
     }
   },
-  "EquipmentPage": {
-    "title": "Хладилна техника",
-    "description": "Регистрирайте хладилници, фризери и витрини с допустими температурни граници.",
-    "emptyTitle": "Няма хладилна техника",
-    "emptyDescription": "Добавете първия си хладилник или фризер, за да започнете температурния контрол.",
-    "searchPlaceholder": "Търсене на хладилна техника",
+  "TargetsPage": {
+    "title": "Оборудване и зони",
+    "description": "Регистрирайте оборудването, помещенията, повърхностите и превозните средства, които проверявате.",
+    "emptyTitle": "Все още няма оборудване и зони",
+    "emptyDescription": "Добавете хладилник, помещение или работна повърхност, за да ги свържете със задачи.",
+    "searchPlaceholder": "Търсене на оборудване и зони",
     "add": "Добави",
-    "addTitle": "Добавяне на хладилна техника",
-    "addDescription": "Въведете име, тип и допустим температурен диапазон.",
-    "editTitle": "Редактиране на хладилна техника",
-    "editDescription": "Актуализирайте данните за хладилната техника.",
+    "addTitle": "Добавяне на оборудване или зона",
+    "addDescription": "Въведете име и изберете тип.",
+    "editTitle": "Редактиране на оборудване или зона",
+    "editDescription": "Актуализирайте името или типа.",
+    "duplicateTitle": "Дублиране на оборудване или зона",
+    "duplicateDescription": "Създайте копие с ново име.",
+    "duplicateSuggestedName": "{name} (Копие)",
     "nameLabel": "Име",
     "namePlaceholder": "Складов фризер",
     "typeLabel": "Тип",
     "typePlaceholder": "Изберете тип",
-    "allowedTempLabel": "Допустима температура",
-    "tempTo": "до",
+    "noTypesHint": "Все още няма типове. Първо добавете тип.",
+    "manageTypes": "Управление на типовете",
+    "nameTaken": "Оборудване или зона с това име вече съществува в този обект.",
     "save": "Запази",
     "cancel": "Отказ",
-    "saving": "Запазване…",
     "edit": "Редактирай",
     "duplicate": "Дублирай",
-    "duplicateTitle": "Дублиране на хладилна техника",
-    "duplicateDescription": "Създайте копие с ново име.",
-    "duplicateSuggestedName": "{name} (Копие)",
     "delete": "Изтрий",
     "openMenu": "Отвори меню",
-    "deleteConfirm": "Изтриване на \"{name}\"? Това действие е необратимо.",
-    "bulkDeleteConfirm": "Изтриване на {count, plural, one {# елемент} other {# елемента}}? Това действие е необратимо.",
+    "deleteConfirm": "Изтриване на \"{name}\"? Задачите спират да се планират за него. Записите се запазват.",
+    "bulkDeleteConfirm": "Изтриване на {count, plural, one {# елемент} other {# елемента}}? Задачите спират да се планират за тях. Записите се запазват.",
     "deleteDialog": {
-      "title": "Изтриване на хладилна техника",
-      "bulkTitle": "Изтриване на хладилна техника",
-      "fallback": "Това ще изтрие хладилната техника завинаги.",
+      "title": "Изтриване на оборудване или зона",
+      "bulkTitle": "Изтриване на оборудване и зони",
+      "fallback": "Елементът ще бъде премахнат от бъдещите задачи.",
       "cancel": "Отказ",
       "confirm": "Изтрий"
     },
-    "submitError": "Възникна грешка. Опитайте отново.",
     "toast": {
-      "createSuccess": "Хладилната техника беше добавена.",
-      "updateSuccess": "Хладилната техника беше актуализирана.",
-      "duplicateSuccess": "Хладилната техника беше копирана.",
-      "deleteSuccess": "Хладилната техника беше изтрита.",
-      "deleteError": "Неуспешно изтриване. Опитайте отново.",
-      "bulkDeleteSuccess": "{count, plural, one {# елемент беше изтрит} other {# елемента бяха изтрити}}.",
-      "bulkDeleteError": "Неуспешно изтриване. Опитайте отново."
+      "createSuccess": "Добавено.",
+      "updateSuccess": "Актуализирано.",
+      "duplicateSuccess": "Копирано.",
+      "deleteSuccess": "Изтрито.",
+      "bulkDeleteSuccess": "{count, plural, one {# елемент беше изтрит} other {# елемента бяха изтрити}}."
     },
-    "nameTaken": "Хладилна техника с това име вече съществува.",
     "validation": {
       "nameRequired": "Името е задължително.",
       "nameMaxLength": "Името трябва да е най-много 100 символа.",
-      "typeRequired": "Типът е задължителен.",
-      "tempRequired": "Температурата е задължителна.",
-      "minTemp": "Температурата трябва да е поне -40°C.",
-      "maxTemp": "Температурата трябва да е най-много 15°C.",
-      "tempRange": "Минималната температура трябва да е по-ниска от максималната."
+      "typeRequired": "Типът е задължителен."
     },
     "columns": {
       "name": "Име",
       "type": "Тип",
-      "range": "Допустим диапазон",
-      "actions": "Действия"
+      "kind": "Вид"
+    },
+    "kinds": {
+      "equipment": "Оборудване",
+      "area": "Зона",
+      "surface": "Повърхност",
+      "vehicle": "Превозно средство"
+    },
+    "noTypes": {
+      "title": "Започнете с типовете, които проверявате",
+      "description": "Типовете групират оборудването и зоните, например Хладилник или Работна повърхност. Добавете предложените с едно натискане."
     },
     "types": {
-      "fridge": "Хладилник",
-      "freezer": "Фризер",
-      "displayCase": "Витрина"
+      "title": "Типове",
+      "description": "Типовете са общи за всички обекти на организацията.",
+      "close": "Затвори",
+      "empty": "Все още няма типове.",
+      "suggestions": "Предложени",
+      "addTitle": "Добавяне на тип",
+      "editTitle": "Редактиране на тип",
+      "nameLabel": "Име",
+      "namePlaceholder": "Шоков охладител",
+      "kindLabel": "Вид",
+      "add": "Добави тип",
+      "save": "Запази",
+      "cancelEdit": "Отказ",
+      "edit": "Редактирай {name}",
+      "delete": "Изтрий {name}",
+      "nameRequired": "Името е задължително.",
+      "nameTaken": "Тип с това име вече съществува.",
+      "created": "Типът беше добавен.",
+      "updated": "Типът беше актуализиран.",
+      "deleted": "Типът беше изтрит.",
+      "deleteTitle": "Изтриване на тип",
+      "deleteConfirm": "Изтриване на типа \"{name}\"? Могат да се изтриват само типове, които не се използват.",
+      "cancelDelete": "Отказ",
+      "confirmDelete": "Изтрий"
+    }
+  },
+  "FormsPage": {
+    "title": "Формуляри",
+    "description": "Създайте проверките, които служителите попълват: измервания, отметки, избори и бележки.",
+    "emptyTitle": "Все още няма формуляри",
+    "emptyDescription": "Започнете от готов формуляр или създайте свой.",
+    "searchPlaceholder": "Търсене на формуляри",
+    "add": "Добави",
+    "edit": "Редактирай",
+    "duplicate": "Дублирай",
+    "delete": "Изтрий",
+    "openMenu": "Отвори меню",
+    "duplicateSuggestedName": "{name} (Копие)",
+    "deleteConfirm": "Изтриване на \"{name}\"? Могат да се изтриват само формуляри, които не се използват от задачи. Записите запазват отговорите си.",
+    "deleteDialog": {
+      "title": "Изтриване на формуляр",
+      "cancel": "Отказ",
+      "confirm": "Изтрий"
+    },
+    "toast": {
+      "deleteSuccess": "Формулярът беше изтрит."
+    },
+    "columns": {
+      "name": "Име",
+      "category": "Категория",
+      "fields": "Полета",
+      "version": "Версия"
+    },
+    "versionBadge": "в{version}",
+    "fieldCount": "{count, plural, one {# поле} other {# полета}}",
+    "library": {
+      "title": "Нов формуляр",
+      "description": "Започнете от готов формуляр и го променете или създайте нов от нулата.",
+      "close": "Затвори",
+      "blank": "Празен формуляр",
+      "blankDescription": "Добавете свои полета едно по едно.",
+      "starters": "Готови формуляри",
+      "fieldCount": "{count, plural, one {# поле} other {# полета}}"
+    },
+    "builder": {
+      "addTitle": "Нов формуляр",
+      "addDescription": "Добавете полетата, които служителите попълват. Прегледът показва какво ще виждат.",
+      "editTitle": "Редактиране на формуляр",
+      "editDescription": "Версия {version}. Промяната на полетата публикува нова версия; записите запазват версията, с която са попълнени.",
+      "cancel": "Отказ",
+      "saveCreate": "Създай формуляр",
+      "saveEdit": "Запази",
+      "nameLabel": "Име",
+      "namePlaceholder": "Проверка на хладилник",
+      "categoryLabel": "Категория",
+      "categoryPlaceholder": "Изберете категория",
+      "correctiveLabel": "Изисквай коригиращо действие при неуспешна проверка",
+      "correctiveDescription": "Служителите описват предприетото, преди да запишат неуспешна проверка.",
+      "fieldsLabel": "Полета",
+      "addField": "Добави поле",
+      "fieldTypeHints": {
+        "checkbox": "Отметка, че нещо е направено",
+        "measurement": "Число с мерна единица и граници",
+        "choice": "Избор от отговори; някои могат да провалят проверката",
+        "text": "Кратка или дълга бележка",
+        "date": "Дата, например срок на годност"
+      },
+      "viewLabel": "Покажи",
+      "viewBuild": "Полета",
+      "viewPreview": "Преглед",
+      "untitled": "Поле без име",
+      "required": "Задължително",
+      "needsAttention": "Изисква корекция",
+      "moveUp": "Премести {label} нагоре",
+      "moveDown": "Премести {label} надолу",
+      "removeField": "Премахни {label}",
+      "labelLabel": "Въпрос",
+      "labelPlaceholder": {
+        "checkbox": "Уплътненията на вратата са здрави",
+        "measurement": "Температура в сърцевината",
+        "choice": "Опаковката е цяла",
+        "text": "Доставчик",
+        "date": "Годен до"
+      },
+      "helpLabel": "Пояснение",
+      "helpPlaceholder": "Незадължителна подсказка под въпроса",
+      "requiredLabel": "Задължителен отговор",
+      "requiredCheckbox": "Трябва да е отметнато, за да се запише",
+      "multiline": "Позволи няколко реда",
+      "unitLabel": "Мерна единица",
+      "limitsLabel": "Граници",
+      "limitMin": "Минимум",
+      "limitMax": "Максимум",
+      "limitsTo": "до",
+      "noLimit": "Без граница",
+      "limitsHint": "Стойност извън границите проваля проверката. Оставете едната страна празна за долна или горна граница. Задачите могат да задават свои граници за всяко оборудване или зона.",
+      "multiple": "Позволи няколко отговора",
+      "optionsLabel": "Отговори",
+      "optionsHint": "Отбележете отговорите, които означават неуспешна проверка.",
+      "optionLabel": "Отговор {index}",
+      "optionFails": "Неуспех",
+      "removeOption": "Премахни отговор {index}",
+      "addOption": "Добави отговор",
+      "errors": {
+        "name": "Името е задължително.",
+        "nameTaken": "Формуляр с това име вече съществува.",
+        "category": "Изберете категория.",
+        "noFields": "Добавете поне едно поле.",
+        "label": "Въведете въпроса.",
+        "optionLabel": "Всеки отговор трябва да има текст.",
+        "limits": {
+          "min": "Минимумът е извън обхвата или точността на мерната единица.",
+          "max": "Максимумът е извън обхвата или точността на мерната единица.",
+          "order": "Минимумът трябва да е по-малък от максимума."
+        }
+      },
+      "toast": {
+        "created": "Формулярът беше създаден.",
+        "updated": "Формулярът беше актуализиран.",
+        "published": "Публикувана е версия {version}."
+      }
+    },
+    "preview": {
+      "hint": "Изпробвайте — нищо не се записва.",
+      "emptyTitle": "Все още няма какво да се покаже",
+      "emptyDescription": "Добавете поле, за да видите формуляра като служителите.",
+      "result": {
+        "pass": "Успешна",
+        "fail": "Неуспешна",
+        "not_evaluated": "Без оценка"
+      },
+      "correctiveActionRequired": "При запис ще се изиска коригиращо действие."
+    },
+    "publish": {
+      "title": "Публикуване на версия {version}?",
+      "description": "Предстоящите задачи преминават към новата версия. Вече записаните остават с версията, с която са попълнени.",
+      "dropsTitle": "Някои специфични граници ще бъдат премахнати",
+      "dropsDescription": "Тези задачи имат свои граници за измерване, което тази версия премахва или сменя с друга мерна единица. При публикуване границите ще бъдат премахнати.",
+      "dropLine": "{field} в {location}: {limits}",
+      "noLimits": "без граници",
+      "cancel": "Отказ",
+      "confirm": "Публикувай",
+      "confirmDrops": "Публикувай и премахни"
+    }
+  },
+  "Forms": {
+    "units": {
+      "celsius": {
+        "name": "Градуси Целзий (°C)",
+        "symbol": "°C"
+      },
+      "ph": {
+        "name": "pH",
+        "symbol": "pH"
+      },
+      "percent": {
+        "name": "Процент (%)",
+        "symbol": "%"
+      },
+      "ppm": {
+        "name": "Части на милион (ppm)",
+        "symbol": "ppm"
+      },
+      "water_activity": {
+        "name": "Водна активност (aw)",
+        "symbol": "aw"
+      },
+      "grams": {
+        "name": "Грамове (г)",
+        "symbol": "г"
+      },
+      "kilograms": {
+        "name": "Килограми (кг)",
+        "symbol": "кг"
+      },
+      "minutes": {
+        "name": "Минути (мин)",
+        "symbol": "мин"
+      }
+    },
+    "categories": {
+      "temperature": "Температура",
+      "cleaning": "Почистване",
+      "goods_in": "Приемане на стоки",
+      "cooking": "Термична обработка",
+      "cooling": "Охлаждане",
+      "hygiene": "Хигиена",
+      "pest_control": "Контрол на вредители",
+      "other": "Друго"
+    },
+    "fieldTypes": {
+      "checkbox": "Отметка",
+      "measurement": "Измерване",
+      "choice": "Избор",
+      "text": "Текст",
+      "date": "Дата"
+    },
+    "answers": {
+      "yes": "Да",
+      "no": "Не"
+    },
+    "choicePlaceholder": "Изберете отговор",
+    "measurement": {
+      "signToggle": "Отрицателна стойност",
+      "withinLimits": "В границите",
+      "outsideLimits": "Извън границите",
+      "allowed": "Допустимо {limits}"
+    },
+    "answerValidation": {
+      "required": "Този отговор е задължителен.",
+      "invalid": {
+        "checkbox": "Поставете отметка.",
+        "measurement": "Въведете валидно число за тази мерна единица.",
+        "choice": "Изберете валиден отговор.",
+        "text": "Отговорът е твърде дълъг.",
+        "date": "Въведете валидна дата."
+      }
     }
   },
   "RecordsPage": {
@@ -327,18 +561,13 @@
       "task": "Задача/точка за контрол",
       "status": "Статус",
       "timing": "Навременност",
-      "reading": "Отчет",
-      "outcome": "Резултат"
+      "answers": "Отговори",
+      "result": "Резултат"
     },
     "filters": {
-      "type": "Вид",
+      "category": "Категория",
       "state": "Статус",
-      "result": "Температурен резултат"
-    },
-    "types": {
-      "temperature": "Температура",
-      "cleaning": "Почистване",
-      "other": "Друго"
+      "result": "Резултат"
     },
     "displayState": {
       "submitted": "Изпълнена",
@@ -358,9 +587,9 @@
       "noDeadline": "Без краен срок"
     },
     "result": {
-      "pass": "В диапазона",
-      "fail": "Извън диапазона",
-      "notEvaluated": "Няма измерена температура"
+      "pass": "Успешна",
+      "fail": "Неуспешна",
+      "notEvaluated": "Без оценка"
     },
     "dateRange": {
       "label": "Период",
@@ -385,21 +614,22 @@
       "close": "Затвори",
       "scheduled": "Планирано",
       "due": "Краен срок",
-      "type": "Вид",
-      "monitoringPoint": "Точка за контрол",
       "displayState": "Статус",
       "recordState": "Запис",
       "timing": "Навременност",
-      "result": "Температурен резултат",
-      "reading": "Отчет",
-      "permittedRange": "Допустим диапазон",
+      "result": "Резултат",
       "correctiveAction": "Коригиращо действие",
       "createdBy": "Първоначално създаден",
       "recordedBy": "Текущ запис",
       "voidedBy": "Анулиран",
       "recordedTime": "Час на записа",
       "available": "Достъпна от",
-      "noDeadline": "Без краен срок"
+      "noDeadline": "Без краен срок",
+      "category": "Категория",
+      "form": "Формуляр",
+      "formVersion": "{name} · версия {version}",
+      "target": "Оборудване или зона",
+      "answers": "Отговори"
     }
   },
   "RecordsReportPage": {
@@ -416,13 +646,13 @@
     "columns": {
       "time": "Час",
       "task": "Задача/точка за контрол",
-      "reading": "Отчет",
       "status": "Статус",
-      "by": "Изпълнил"
+      "by": "Изпълнил",
+      "answers": "Отговори"
     },
     "status": {
       "done": "Изпълнена",
-      "fail": "Извън диапазона",
+      "fail": "Неуспешна",
       "missed": "Пропусната",
       "open": "Отворена",
       "voided": "Анулирана"
@@ -481,9 +711,28 @@
     },
     "titleLabel": "Заглавие",
     "titlePlaceholder": "Проверка на складов хладилник",
-    "typeLabel": "Тип",
-    "equipmentLabel": "Хладилна техника",
-    "equipmentPlaceholder": "Изберете хладилна техника",
+    "formLabel": "Формуляр",
+    "formPlaceholder": "Изберете формуляр",
+    "noForms": "Все още няма формуляри.",
+    "manageForms": "Създайте формуляр",
+    "targets": {
+      "legend": "Оборудване и зони",
+      "description": "Всеки избран елемент получава собствена задача за всеки час. Оставете празно за задача, която не е свързана с оборудване или зона.",
+      "none": "В този обект все още няма оборудване или зони.",
+      "manage": "Добави оборудване и зони",
+      "customLimits": "Собствени граници за {field}",
+      "formDefault": "По подразбиране от формуляра: {limits}",
+      "noLimits": "без граници",
+      "to": "до",
+      "noLimit": "Без граница",
+      "min": "Минимум за {field} — {target}",
+      "max": "Максимум за {field} — {target}",
+      "issues": {
+        "min_out_of_range": "Минимумът е извън обхвата или точността на мерната единица.",
+        "max_out_of_range": "Максимумът е извън обхвата или точността на мерната единица.",
+        "order": "Минимумът трябва да е по-малък от максимума."
+      }
+    },
     "weekdaysLabel": "Повтаря се на",
     "moreSelected": "+ още {count}",
     "overflowRemoveLabel": "Премахни още {count} дни",
@@ -496,6 +745,7 @@
     "duplicate": "Дублирай",
     "delete": "Изтрий",
     "openMenu": "Отвори меню",
+    "moreTargets": "+{count}",
     "deleteConfirm": "Изтриване на \"{title}\"? Това действие е необратимо.",
     "bulkDeleteConfirm": "Изтриване на {count, plural, one {# задача} other {# задачи}}? Това действие е необратимо.",
     "deleteDialog": {
@@ -540,31 +790,25 @@
     "validation": {
       "titleRequired": "Заглавието е задължително.",
       "titleMaxLength": "Заглавието трябва да е най-много 200 символа.",
-      "typeRequired": "Типът е задължителен.",
       "weekdaysRequired": "Изберете поне един ден от седмицата.",
       "timesRequired": "Добавете поне един час.",
       "timesMax": "Най-много 4 часа на задача.",
       "timesUnique": "Часовете трябва да са уникални.",
       "timeRequired": "Часът е задължителен.",
       "timeInvalid": "Въведете валиден час във формат ЧЧ:ММ.",
-      "equipmentRequired": "Хладилната техника е задължителна за температурни задачи.",
       "completionMinutesRange": "Въведете стойност между 0 и 1440 минути.",
       "completionAvailableRequired": "Изберете кога задачата става достъпна.",
       "completionDeadlineRequired": "Изберете краен срок.",
-      "completionMinutesInteger": "Въведете цяло число."
+      "completionMinutesInteger": "Въведете цяло число.",
+      "formRequired": "Изберете формуляр."
     },
     "columns": {
       "title": "Заглавие",
-      "type": "Тип",
       "schedule": "График",
-      "equipment": "Хладилна техника",
       "actions": "Действия",
-      "window": "Диапазон на изпълнение"
-    },
-    "types": {
-      "temperature": "Температура",
-      "cleaning": "Почистване",
-      "other": "Друго"
+      "window": "Диапазон на изпълнение",
+      "form": "Формуляр",
+      "targets": "Оборудване и зони"
     },
     "completionWindow": {
       "legend": "Диапазон на изпълнение",
@@ -619,7 +863,8 @@
       "today": "Днес",
       "organization": "Организация",
       "tasks": "Задачи",
-      "equipment": "Хладилна техника",
+      "forms": "Формуляри",
+      "targets": "Оборудване и зони",
       "locations": "Локации",
       "employees": "Служители",
       "records": "Записи"

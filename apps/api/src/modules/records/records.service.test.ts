@@ -5,7 +5,7 @@ import {
   type RecordsListQuery,
   type RecordsReportQuery,
 } from "@haccp/shared";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "../../core/db/client.js";
 import {
   InternalError,
@@ -16,6 +16,7 @@ import {
   normalizeRecordsReportQuery,
   recordsService,
 } from "./records.service.js";
+import { formRepository } from "../forms/form.repository.js";
 import { recordsRepository, type RecordRow } from "./records.repository.js";
 
 const LOCATION_ID = "11111111-1111-4111-8111-111111111111";
@@ -53,6 +54,10 @@ function listAt(instant: string, input: RecordsListQuery = query()) {
     query: input,
   });
 }
+
+beforeEach(() => {
+  vi.spyOn(formRepository, "findVersionSummariesByIds").mockResolvedValue([]);
+});
 
 afterEach(() => {
   vi.useRealTimers();
@@ -96,13 +101,13 @@ describe("normalizeRecordsQuery", () => {
     expect(
       normalizeRecordsQuery(
         query({
-          type: "temperature",
+          category: "temperature",
           state: "voided,submitted",
           result: "fail",
         }),
       ).filters,
     ).toEqual({
-      type: ["temperature"],
+      category: ["temperature"],
       state: ["submitted", "voided"],
       result: ["fail"],
     });
@@ -218,10 +223,10 @@ describe("repository dispatch", () => {
 
     await listAt(
       "2026-08-23T09:00:00.000Z",
-      query({ type: "temperature", state: "submitted" }),
+      query({ category: "temperature", state: "submitted" }),
     );
 
-    const filters = { type: ["temperature"], state: ["submitted"] };
+    const filters = { category: ["temperature"], state: ["submitted"] };
     expect(findPage.mock.calls[0]![1]!.filters).toMatchObject(filters);
     expect(countPage.mock.calls[0]![1]!.filters).toMatchObject(filters);
   });
@@ -241,7 +246,7 @@ describe("repository dispatch", () => {
 
     await expect(
       listAt("2026-08-23T09:00:00.000Z", query({ page: "9", pageSize: "25" })),
-    ).resolves.toEqual({ items: [], total: 18 });
+    ).resolves.toEqual({ items: [], total: 18, formVersions: {} });
   });
 });
 
@@ -264,11 +269,11 @@ function row(occurrenceId: string): RecordRow {
     availableAt: new Date("2026-08-23T00:00:00.000Z"),
     dueAt: new Date("2026-08-23T05:00:00.000Z"),
     title: "Morning fridge check",
-    type: "temperature",
-    equipmentId: null,
-    equipmentName: null,
-    minTempC: null,
-    maxTempC: null,
+    formVersionId: "44444444-4444-4444-8444-444444444444",
+    category: "temperature",
+    targetId: null,
+    targetName: null,
+    resolvedLimits: {},
     recordId: null,
     recordCreatedAt: null,
     recordedAt: null,
@@ -282,10 +287,8 @@ function row(occurrenceId: string): RecordRow {
     voidedById: null,
     voidedByFirstName: null,
     voidedByLastName: null,
-    temperatureRecordedC: null,
-    temperatureMinTempC: null,
-    temperatureMaxTempC: null,
-    temperatureResult: null,
+    recordResult: null,
+    values: null,
     correctiveAction: null,
   };
 }
@@ -336,7 +339,7 @@ describe("normalizeRecordsReportQuery", () => {
       sortBy: "scheduledAt",
       sortOrder: "asc",
       offset: 0,
-      filters: { type: undefined, state: undefined, result: undefined },
+      filters: { category: undefined, state: undefined, result: undefined },
     });
   });
 

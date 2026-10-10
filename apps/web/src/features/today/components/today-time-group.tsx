@@ -4,7 +4,7 @@ import {
   CheckIcon,
   ChevronDownIcon,
   CircleAlertIcon,
-  ThermometerIcon,
+  ListChecksIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { memo, useState } from "react";
@@ -16,7 +16,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
-import { chainableTemperatureItems } from "../lib/today-round";
+import { chainableItems } from "../lib/today-round";
 import { occurrenceKey } from "../lib/today-grouping";
 import type {
   TimeGroupState,
@@ -119,7 +119,7 @@ export const TodayTimeGroup = memo(function TodayTimeGroup({
   const headingId = `${group.id}-heading`;
   const railClassName = getRailClassName(state, group.deviationCount);
 
-  const roundItems = chainableTemperatureItems(group);
+  const roundItems = chainableItems(group);
   const roundStart = roundItems.length >= 2 ? roundItems[0] : null;
 
   const summaryText = (() => {
@@ -237,7 +237,7 @@ export const TodayTimeGroup = memo(function TodayTimeGroup({
               })}
               onClick={() => onActivate(roundStart)}
             >
-              <ThermometerIcon className="size-3.5" />
+              <ListChecksIcon className="size-3.5" />
               {t("actions.recordAll")}
             </Button>
           ) : null}

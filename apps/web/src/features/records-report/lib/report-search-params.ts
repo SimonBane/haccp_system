@@ -56,7 +56,7 @@ export function reportApiQuery(params: RecordsReportSearchParams): string {
     dateTo: params.dateTo,
   });
 
-  for (const key of ["type", "state", "result"] as const) {
+  for (const key of ["category", "state", "result"] as const) {
     const values = params[key];
     if (values && values.length > 0) {
       query.set(key, values.join(","));

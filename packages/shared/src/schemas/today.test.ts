@@ -16,9 +16,9 @@ describe("deriveRecordState", () => {
   });
 
   it("is active when the record is not voided", () => {
-    expect(
-      deriveRecordState({ recordedAt: DUE_AT, voidedAt: null }),
-    ).toBe(RECORD_STATE.ACTIVE);
+    expect(deriveRecordState({ recordedAt: DUE_AT, voidedAt: null })).toBe(
+      RECORD_STATE.ACTIVE,
+    );
   });
 
   it("is voided when the record has a voidedAt", () => {
@@ -123,11 +123,10 @@ describe("buildTodayTaskItemFromOccurrence", () => {
     occurrenceId: "00000000-0000-4000-8000-00000000000a",
     templateId: "00000000-0000-4000-8000-00000000000t",
     title: "Check walk-in fridge",
-    type: "temperature" as const,
-    equipmentId: "00000000-0000-4000-8000-00000000000e",
-    equipmentName: "Walk-in fridge",
-    minTempC: 0,
-    maxTempC: 5,
+    formVersionId: "00000000-0000-4000-8000-00000000000f",
+    targetId: "00000000-0000-4000-8000-00000000000e",
+    targetName: "Walk-in fridge",
+    resolvedLimits: { temperature: { min: 0, max: 5 } },
     scheduledTime: "07:00",
     date: "2026-01-15",
     availableAt: AVAILABLE_AT,
@@ -138,13 +137,23 @@ describe("buildTodayTaskItemFromOccurrence", () => {
     const item = buildTodayTaskItemFromOccurrence({
       ...BASE,
       now: new Date("2026-01-15T08:00:00Z"),
-      record: { recordedAt: DUE_AT, voidedAt: new Date("2026-01-15T07:30:00Z") },
+      record: {
+        recordedAt: DUE_AT,
+        voidedAt: new Date("2026-01-15T07:30:00Z"),
+      },
       recordedBy: { id: "u1", firstName: "Ann", lastName: "Lee" },
-      temperatureReading: {
-        recordedC: 3.1,
-        minTempC: 0,
-        maxTempC: 5,
-        result: "ok",
+      answers: {
+        result: "pass",
+        values: {
+          temperature: {
+            type: "measurement",
+            value: 3.1,
+            unit: "celsius",
+            min: 0,
+            max: 5,
+            fails: false,
+          },
+        },
         correctiveAction: null,
       },
     });
@@ -153,21 +162,29 @@ describe("buildTodayTaskItemFromOccurrence", () => {
     expect(item.status).toBe("overdue");
     expect(item.completedAt).toBeNull();
     expect(item.completedBy).toBeNull();
-    expect(item.temperatureReading).toBeNull();
+    expect(item.result).toBeNull();
+    expect(item.values).toBeNull();
   });
 
-  it("carries the reading for an active record", () => {
+  it("carries the answers for an active record", () => {
     const recordedAt = new Date("2026-01-15T06:55:00Z");
     const item = buildTodayTaskItemFromOccurrence({
       ...BASE,
       now: new Date("2026-01-15T08:00:00Z"),
       record: { recordedAt, voidedAt: null },
       recordedBy: { id: "u1", firstName: "Ann", lastName: "Lee" },
-      temperatureReading: {
-        recordedC: 3.1,
-        minTempC: 0,
-        maxTempC: 5,
-        result: "ok",
+      answers: {
+        result: "pass",
+        values: {
+          temperature: {
+            type: "measurement",
+            value: 3.1,
+            unit: "celsius",
+            min: 0,
+            max: 5,
+            fails: false,
+          },
+        },
         correctiveAction: null,
       },
     });
@@ -175,8 +192,16 @@ describe("buildTodayTaskItemFromOccurrence", () => {
     expect(item.recordState).toBe("active");
     expect(item.status).toBe("completed");
     expect(item.completedAt).toBe(recordedAt.toISOString());
-    expect(item.completedBy).toEqual({ id: "u1", firstName: "Ann", lastName: "Lee" });
-    expect(item.temperatureReading?.recordedC).toBe(3.1);
+    expect(item.completedBy).toEqual({
+      id: "u1",
+      firstName: "Ann",
+      lastName: "Lee",
+    });
+    expect(item.result).toBe("pass");
+    expect(item.values?.temperature).toMatchObject({
+      value: 3.1,
+      fails: false,
+    });
   });
 
   it("derives upcoming/pending/overdue by availableAt and dueAt when there is no record", () => {

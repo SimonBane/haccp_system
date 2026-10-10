@@ -1,15 +1,21 @@
 "use client";
 
-import { TASK_TEMPLATE_TYPE } from "@haccp/shared";
-import { CheckIcon, CircleAlertIcon, PencilIcon, RotateCcwIcon } from "lucide-react";
+import { FORM_CATEGORY, RECORD_RESULT } from "@haccp/shared";
+import {
+  CheckIcon,
+  CircleAlertIcon,
+  PencilIcon,
+  RotateCcwIcon,
+} from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
+import { AnswerList } from "@/features/forms/components/answer-list";
 import { useOrgTimeZone } from "@/features/tenant/use-org-timezone";
-import { cn } from "@/lib/utils";
-import { formatTemperature, formatTimeOfDay } from "../lib/format";
+import { formatTimeOfDay } from "../lib/format";
+import { needsRecordFlow } from "../lib/today-round";
 import type { TodayTimelineItem } from "../lib/today-timeline";
 
 type Props = {
@@ -42,11 +48,13 @@ export function TodayRecordSheet({
   onEdit,
 }: Props) {
   const t = useTranslations("TodayPage");
+  const tForms = useTranslations("Forms");
   const locale = useLocale();
   const timeZone = useOrgTimeZone();
-  const { task, isDeviation } = item;
-  const reading = task.temperatureReading;
-  const canEdit = task.type === TASK_TEMPLATE_TYPE.TEMPERATURE;
+  const { task, form, isDeviation } = item;
+  const canEdit = needsRecordFlow(item);
+  const isJudged =
+    task.result === RECORD_RESULT.PASS || task.result === RECORD_RESULT.FAIL;
 
   const userLabel = task.completedBy
     ? task.completedBy.id === currentUserId
@@ -63,7 +71,7 @@ export function TodayRecordSheet({
       title={task.title}
       description={
         <>
-          {task.equipmentName ? `${task.equipmentName} · ` : ""}
+          {task.targetName ? `${task.targetName} · ` : ""}
           {task.scheduledTime}
         </>
       }
@@ -102,52 +110,44 @@ export function TodayRecordSheet({
       }
     >
       <div className="space-y-4">
-        {reading ? (
-          <div
-            className={cn(
-              "flex flex-col items-center gap-2 rounded-xl px-4 py-5 text-center ring-1",
-              isDeviation
-                ? "bg-destructive/[0.06] ring-destructive/20"
-                : "bg-success/[0.06] ring-success/20",
-            )}
-          >
-            <div className="text-4xl font-semibold tabular-nums">
-              {formatTemperature(reading.recordedC, locale)}
-              <span className="ml-1 text-2xl text-muted-foreground">°C</span>
-            </div>
+        {isJudged ? (
+          <div className="flex justify-center">
             <Badge variant={isDeviation ? "destructive" : "success"}>
               {isDeviation ? <CircleAlertIcon /> : <CheckIcon />}
-              {isDeviation
-                ? t("temperatureDialog.outOfRange")
-                : t("temperatureDialog.ok")}
+              {isDeviation ? t("record.fail") : t("record.pass")}
             </Badge>
-            <p className="text-xs text-muted-foreground">
-              {t("temperatureDialog.allowedRange")}:{" "}
-              {formatTemperature(reading.minTempC, locale)} –{" "}
-              {formatTemperature(reading.maxTempC, locale)} °C
-            </p>
           </div>
+        ) : null}
+
+        {task.values ? (
+          <AnswerList
+            definition={form?.definition ?? null}
+            values={task.values}
+            className="rounded-xl border px-3"
+          />
         ) : null}
 
         <div className="divide-y">
           <DetailRow
             label={t("record.completedAt")}
             value={
-              task.completedAt ? formatTimeOfDay(task.completedAt, locale, timeZone) : "—"
+              task.completedAt
+                ? formatTimeOfDay(task.completedAt, locale, timeZone)
+                : "—"
             }
           />
           <DetailRow label={t("record.completedBy")} value={userLabel} />
           <DetailRow
-            label={t("record.taskType")}
-            value={t(`taskTypes.${task.type}`)}
+            label={t("record.category")}
+            value={tForms(`categories.${form?.category ?? FORM_CATEGORY.OTHER}`)}
           />
         </div>
 
-        {reading?.correctiveAction ? (
+        {task.correctiveAction ? (
           <div className="rounded-lg bg-destructive/[0.06] p-3">
             <p className="text-sm font-medium">{t("audit.correctiveAction")}</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {reading.correctiveAction}
+            <p className="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">
+              {task.correctiveAction}
             </p>
           </div>
         ) : null}

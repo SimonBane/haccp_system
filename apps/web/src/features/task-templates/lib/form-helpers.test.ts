@@ -1,11 +1,32 @@
-import type { TaskTemplateResponse } from "@haccp/shared";
+import type { FormDefinition, TaskTemplateResponse } from "@haccp/shared";
 import { describe, expect, it } from "vitest";
 import {
   buildDefaultCompletionWindow,
+  buildDefaultTargets,
   findDuplicateScheduledTimeIndices,
   getNextDefaultScheduledTime,
   hasTaskChanges,
+  overrideIssueKey,
+  toTargetInputs,
 } from "./form-helpers";
+
+const FRIDGE_ID = "00000000-0000-4000-8000-0000000000f1";
+const FREEZER_ID = "00000000-0000-4000-8000-0000000000f2";
+
+const FRIDGE_CHECK: FormDefinition = {
+  correctiveAction: "required_on_fail",
+  fields: [
+    {
+      id: "temperature",
+      type: "measurement",
+      label: "Temperature",
+      required: true,
+      unit: "celsius",
+      limits: { min: 0, max: 4 },
+    },
+    { id: "door", type: "checkbox", label: "Door closed", required: true },
+  ],
+};
 
 function makeTask(
   overrides: Partial<TaskTemplateResponse> = {},
@@ -14,11 +35,12 @@ function makeTask(
     id: "00000000-0000-4000-8000-000000000001",
     locationId: "00000000-0000-4000-8000-000000000002",
     title: "Morning check",
-    type: "cleaning",
+    formId: "00000000-0000-4000-8000-000000000003",
+    formName: "Fridge check",
+    formCategory: "temperature",
     weekdays: ["monday"],
     scheduledTimes: ["08:00"],
-    equipmentId: null,
-    equipmentName: null,
+    targets: [],
     completionOpensBeforeMinutes: 1440,
     completionDueAfterMinutes: 0,
     createdAt: "2026-01-01T00:00:00.000Z",
@@ -81,10 +103,10 @@ describe("hasTaskChanges — completion window", () => {
 
   const baseValues = {
     title: task.title,
-    type: task.type,
+    formId: task.formId,
     weekdays: task.weekdays,
     scheduledTimeRows: task.scheduledTimes.map((time) => ({ time })),
-    equipmentId: task.equipmentId,
+    targets: task.targets,
     completionOpensBeforeMinutes: "30",
     completionDueAfterMinutes: "60",
     neverOverdue: false,
@@ -168,5 +190,141 @@ describe("getNextDefaultScheduledTime", () => {
 
   it("wraps hour 23 to 00", () => {
     expect(getNextDefaultScheduledTime(["23:00"])).toBe("00:00");
+  });
+});
+
+describe("buildDefaultTargets", () => {
+  it("turns stored overrides into enabled drafts in the locale's separator", () => {
+    const task = makeTask({
+      targets: [
+        {
+          targetId: FREEZER_ID,
+          targetName: "Freezer",
+          limitOverrides: { temperature: { min: -22.5, max: null } },
+        },
+      ],
+    });
+
+    expect(buildDefaultTargets(task, null, ",")).toEqual([
+      {
+        targetId: FREEZER_ID,
+        overrides: {
+          temperature: { enabled: true, min: "-22,5", max: "" },
+        },
+      },
+    ]);
+  });
+});
+
+describe("toTargetInputs", () => {
+  it("sends only enabled overrides for fields the form still measures", () => {
+    const { targets, issues } = toTargetInputs(
+      [
+        {
+          targetId: FRIDGE_ID,
+          overrides: {
+            temperature: { enabled: true, min: "1,5", max: "3" },
+            humidity: { enabled: true, min: "40", max: "60" },
+          },
+        },
+        {
+          targetId: FREEZER_ID,
+          overrides: { temperature: { enabled: false, min: "-25", max: "-18" } },
+        },
+      ],
+      FRIDGE_CHECK,
+    );
+
+    expect(issues).toEqual({});
+    expect(targets).toEqual([
+      { targetId: FRIDGE_ID, limitOverrides: { temperature: { min: 1.5, max: 3 } } },
+      { targetId: FREEZER_ID, limitOverrides: {} },
+    ]);
+  });
+
+  it("reports an invalid override against its target and field", () => {
+    const { targets, issues } = toTargetInputs(
+      [
+        {
+          targetId: FRIDGE_ID,
+          overrides: { temperature: { enabled: true, min: "5", max: "2" } },
+        },
+      ],
+      FRIDGE_CHECK,
+    );
+
+    expect(issues).toEqual({
+      [overrideIssueKey(FRIDGE_ID, "temperature")]: "order",
+    });
+    expect(targets[0]?.limitOverrides).toEqual({});
+  });
+
+  it("keeps the selection without overrides until a form is chosen", () => {
+    expect(
+      toTargetInputs([{ targetId: FRIDGE_ID, overrides: {} }], null).targets,
+    ).toEqual([{ targetId: FRIDGE_ID, limitOverrides: {} }]);
+  });
+});
+
+describe("hasTaskChanges — form and targets", () => {
+  const task = makeTask({
+    targets: [
+      {
+        targetId: FRIDGE_ID,
+        targetName: "Fridge",
+        limitOverrides: { temperature: { min: 0, max: 3 } },
+      },
+    ],
+  });
+  const values = {
+    title: task.title,
+    formId: task.formId,
+    weekdays: task.weekdays,
+    scheduledTimeRows: task.scheduledTimes.map((time) => ({ time })),
+    targets: [
+      {
+        targetId: FRIDGE_ID,
+        limitOverrides: { temperature: { min: 0, max: 3 } },
+      },
+    ],
+    completionOpensBeforeMinutes: "1440",
+    completionDueAfterMinutes: "0",
+    neverOverdue: false,
+  };
+
+  it("is false for the same targets and overrides", () => {
+    expect(hasTaskChanges(values, task)).toBe(false);
+  });
+
+  it("is true when an override changes or a target is added", () => {
+    expect(
+      hasTaskChanges(
+        {
+          ...values,
+          targets: [
+            { targetId: FRIDGE_ID, limitOverrides: { temperature: { min: 0, max: 4 } } },
+          ],
+        },
+        task,
+      ),
+    ).toBe(true);
+    expect(
+      hasTaskChanges(
+        {
+          ...values,
+          targets: [...values.targets, { targetId: FREEZER_ID, limitOverrides: {} }],
+        },
+        task,
+      ),
+    ).toBe(true);
+  });
+
+  it("is true when the form changes", () => {
+    expect(
+      hasTaskChanges(
+        { ...values, formId: "00000000-0000-4000-8000-000000000009" },
+        task,
+      ),
+    ).toBe(true);
   });
 });

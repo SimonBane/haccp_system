@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { InternalError, ValidationError } from "../../core/errors/app-errors.js";
+import type { FormDefinition } from "@haccp/shared";
+import { InternalError } from "../../core/errors/app-errors.js";
 
 const locationRepository = vi.hoisted(() => ({
   findOrganizationContextByLocationId: vi.fn(),
@@ -8,8 +9,7 @@ const organizationRepository = vi.hoisted(() => ({
   findAllActive: vi.fn(),
 }));
 const taskTemplateRepository = vi.hoisted(() => ({
-  findActiveWithEquipmentByIds: vi.fn(),
-  findActiveIdsByLocationAndEquipment: vi.fn(),
+  findActiveSourcesByIds: vi.fn(),
   findActiveIdsByOrganization: vi.fn(),
 }));
 const taskOccurrenceRepository = vi.hoisted(() => ({
@@ -26,7 +26,9 @@ vi.mock("../organizations/organization.repository.js", () => ({
 vi.mock("../task-templates/task-template.repository.js", () => ({
   taskTemplateRepository,
 }));
-vi.mock("./task-occurrence.repository.js", () => ({ taskOccurrenceRepository }));
+vi.mock("./task-occurrence.repository.js", () => ({
+  taskOccurrenceRepository,
+}));
 
 const { taskOccurrenceService } = await import("./task-occurrence.service.js");
 type TaskTemplateSourceRow =
@@ -38,7 +40,30 @@ const TZ = "Europe/Sofia";
 const LOCATION_ID = "00000000-0000-4000-8000-0000000000l1";
 const TEMPLATE_ID = "00000000-0000-4000-8000-0000000000t1";
 const ORG_ID = "00000000-0000-4000-8000-0000000000o1";
-const EQUIPMENT_ID = "00000000-0000-4000-8000-0000000000e1";
+const VERSION_ID = "00000000-0000-4000-8000-0000000000v1";
+const TARGET_A = "00000000-0000-4000-8000-0000000000a1";
+const TARGET_B = "00000000-0000-4000-8000-0000000000a2";
+
+const CLEANING: FormDefinition = {
+  fields: [
+    { id: "cleaned", type: "checkbox", label: "Cleaned", required: true },
+  ],
+  correctiveAction: "required_on_fail",
+};
+
+const FRIDGE: FormDefinition = {
+  fields: [
+    {
+      id: "temperature",
+      type: "measurement",
+      label: "Temperature",
+      required: true,
+      unit: "celsius",
+      limits: { min: 0, max: 5 },
+    },
+  ],
+  correctiveAction: "required_on_fail",
+};
 const ALL_WEEKDAYS = [
   "monday",
   "tuesday",
@@ -58,16 +83,14 @@ function makeSource(
     id: TEMPLATE_ID,
     locationId: LOCATION_ID,
     title: "Wipe counters",
-    type: "cleaning",
     weekdays: ALL_WEEKDAYS,
     scheduledTimes: ["08:00"],
-    equipmentId: null,
     completionOpensBeforeMinutes: 1440,
     completionDueAfterMinutes: 0,
     createdAt: new Date("2020-01-01T00:00:00Z"),
-    equipmentName: null,
-    minTempC: null,
-    maxTempC: null,
+    formVersionId: VERSION_ID,
+    definition: CLEANING,
+    targets: [],
     ...overrides,
   };
 }
@@ -86,20 +109,21 @@ function makeExistingRow(
     availableAt: new Date("2026-08-18T21:00:00Z"),
     dueAt: new Date("2026-08-19T05:00:00Z"),
     title: "Wipe counters",
-    type: "cleaning",
-    equipmentId: null,
-    equipmentName: null,
-    minTempC: null,
-    maxTempC: null,
+    formVersionId: VERSION_ID,
+    targetId: null,
+    targetName: null,
+    resolvedLimits: {},
     createdAt: new Date("2020-01-01T00:00:00Z"),
     ...overrides,
   } as TaskOccurrenceRow;
 }
 
 function defaultRepos(): void {
-  taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([]);
+  taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([]);
   taskOccurrenceRepository.findByTemplateIds.mockResolvedValue([]);
-  taskOccurrenceRepository.findRecordedOccurrenceIds.mockResolvedValue(new Set());
+  taskOccurrenceRepository.findRecordedOccurrenceIds.mockResolvedValue(
+    new Set(),
+  );
   taskOccurrenceRepository.insertMany.mockResolvedValue([]);
   taskOccurrenceRepository.deleteByIds.mockResolvedValue(undefined);
 }
@@ -118,7 +142,7 @@ describe("reconcileTemplateIds — window and expansion", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-19T10:00:00Z")); // 13:00 Sofia (summer, UTC+3)
 
-    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([
+    taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([
       makeSource({ scheduledTimes: ["09:00"] }),
     ]);
 
@@ -130,7 +154,9 @@ describe("reconcileTemplateIds — window and expansion", () => {
     const inserted = taskOccurrenceRepository.insertMany.mock.calls[0]![1] as {
       occurrenceDate: string;
     }[];
-    const dates = [...new Set(inserted.map((row) => row.occurrenceDate))].sort();
+    const dates = [
+      ...new Set(inserted.map((row) => row.occurrenceDate)),
+    ].sort();
 
     expect(dates).toHaveLength(14);
     expect(dates[0]).toBe("2026-08-19");
@@ -141,7 +167,7 @@ describe("reconcileTemplateIds — window and expansion", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-19T05:00:00Z")); // 08:00 Sofia, before either slot
 
-    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([
+    taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([
       makeSource({ weekdays: ["monday"], scheduledTimes: ["09:00", "08:00"] }),
     ]);
 
@@ -172,7 +198,7 @@ describe("reconcileTemplateIds — window and expansion", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-19T10:00:00Z"));
 
-    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([
+    taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([
       makeSource({
         scheduledTimes: ["09:00"],
         createdAt: new Date("2026-08-19T10:00:00Z"), // created just now, this afternoon
@@ -200,7 +226,7 @@ describe("reconcileTemplateIds — window and expansion", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-19T10:00:00Z")); // after today's 09:00 slot, Sofia
 
-    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([
+    taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([
       makeSource({
         scheduledTimes: ["09:00"],
         createdAt: new Date("2020-01-01T00:00:00Z"), // long-existing template
@@ -226,7 +252,7 @@ describe("reconcileTemplateIds — window and expansion", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-03-27T10:00:00Z"));
 
-    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([
+    taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([
       makeSource({ weekdays: ["sunday"], scheduledTimes: ["03:30"] }),
     ]);
 
@@ -239,7 +265,9 @@ describe("reconcileTemplateIds — window and expansion", () => {
       occurrenceDate: string;
       dueAt: Date;
     }[];
-    const gapDayRow = inserted.find((row) => row.occurrenceDate === "2026-03-29");
+    const gapDayRow = inserted.find(
+      (row) => row.occurrenceDate === "2026-03-29",
+    );
 
     expect(gapDayRow).toBeDefined();
     expect(Number.isNaN(gapDayRow!.dueAt.getTime())).toBe(false);
@@ -253,7 +281,7 @@ describe("reconcileTemplateIds — completion window derivation", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-19T04:00:00Z"));
 
-    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([
+    taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([
       makeSource({
         weekdays: ["wednesday"],
         scheduledTimes: ["08:00"],
@@ -283,7 +311,7 @@ describe("reconcileTemplateIds — completion window derivation", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-19T00:00:00Z"));
 
-    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([
+    taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([
       makeSource({
         weekdays: ["wednesday"],
         scheduledTimes: ["08:00"],
@@ -311,7 +339,7 @@ describe("reconcileTemplateIds — completion window derivation", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-19T04:00:00Z"));
 
-    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([
+    taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([
       makeSource({
         weekdays: ["wednesday"],
         scheduledTimes: ["08:00"],
@@ -339,7 +367,7 @@ describe("reconcileTemplateIds — completion window derivation", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-19T06:00:00Z"));
 
-    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([
+    taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([
       makeSource({
         weekdays: ["wednesday"],
         scheduledTimes: ["08:00"],
@@ -368,7 +396,7 @@ describe("reconcileTemplateIds — stored-value comparison and protection", () =
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-19T04:00:00Z")); // before the 05:00Z (08:00 Sofia) dueAt
 
-    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([
+    taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([
       makeSource({ weekdays: ["wednesday"], scheduledTimes: ["08:00"] }),
     ]);
     taskOccurrenceRepository.findByTemplateIds.mockResolvedValue([
@@ -385,8 +413,7 @@ describe("reconcileTemplateIds — stored-value comparison and protection", () =
 
     expect(taskOccurrenceRepository.deleteByIds).not.toHaveBeenCalled();
     const inserted = taskOccurrenceRepository.insertMany.mock.calls[0]?.[1] as
-      | { occurrenceDate: string }[]
-      | undefined;
+      { occurrenceDate: string }[] | undefined;
     expect(
       inserted?.some((row) => row.occurrenceDate === "2026-08-19"),
     ).toBeFalsy();
@@ -396,7 +423,7 @@ describe("reconcileTemplateIds — stored-value comparison and protection", () =
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-19T04:00:00Z")); // before the 05:00Z (08:00 Sofia) dueAt
 
-    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([
+    taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([
       makeSource({
         weekdays: ["wednesday"],
         scheduledTimes: ["08:00"],
@@ -430,7 +457,7 @@ describe("reconcileTemplateIds — stored-value comparison and protection", () =
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-19T10:00:00Z"));
 
-    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([
+    taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([
       makeSource({
         weekdays: ALL_WEEKDAYS,
         scheduledTimes: ["08:00"],
@@ -465,7 +492,7 @@ describe("reconcileTemplateIds — stored-value comparison and protection", () =
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-19T10:00:00Z"));
 
-    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([
+    taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([
       makeSource({
         weekdays: ALL_WEEKDAYS,
         scheduledTimes: ["08:00"],
@@ -493,7 +520,7 @@ describe("reconcileTemplateIds — stored-value comparison and protection", () =
   });
 
   it("replaces an unrecorded, mismatched occurrence whether or not its availableAt has passed", async () => {
-    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([
+    taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([
       makeSource({
         weekdays: ALL_WEEKDAYS,
         scheduledTimes: ["08:00"],
@@ -517,7 +544,7 @@ describe("reconcileTemplateIds — stored-value comparison and protection", () =
 
     vi.clearAllMocks();
     defaultRepos();
-    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([
+    taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([
       makeSource({
         weekdays: ALL_WEEKDAYS,
         scheduledTimes: ["08:00"],
@@ -540,7 +567,7 @@ describe("reconcileTemplateIds — stored-value comparison and protection", () =
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-19T05:00:00Z"));
 
-    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([
+    taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([
       makeSource({
         weekdays: ALL_WEEKDAYS,
         scheduledTimes: ["08:00"],
@@ -574,7 +601,7 @@ describe("reconcileTemplateIds — stored-value comparison and protection", () =
     vi.setSystemTime(new Date("2026-08-19T05:00:00Z"));
 
     // Template is no longer active for this template id, so no sources resolve.
-    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([]);
+    taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([]);
     const existingId = "00000000-0000-4000-8000-0000000000x3";
     taskOccurrenceRepository.findByTemplateIds.mockResolvedValue([
       makeExistingRow({
@@ -601,7 +628,7 @@ describe("reconcileTemplateIds — stored-value comparison and protection", () =
     vi.setSystemTime(new Date("2026-08-19T05:00:00Z"));
 
     // Template is no longer active for this template id, so no sources resolve.
-    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([]);
+    taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([]);
     taskOccurrenceRepository.findByTemplateIds.mockResolvedValue([
       makeExistingRow({
         availableAt: new Date("2026-08-19T04:00:00Z"), // already past "now"
@@ -619,6 +646,225 @@ describe("reconcileTemplateIds — stored-value comparison and protection", () =
   });
 });
 
+describe("reconcileTemplateIds — targets and forms", () => {
+  const fridgeSource = () =>
+    makeSource({
+      title: "Fridge round",
+      definition: FRIDGE,
+      targets: [
+        { targetId: TARGET_A, targetName: "Dairy fridge", limitOverrides: {} },
+        {
+          targetId: TARGET_B,
+          targetName: "Fish fridge",
+          limitOverrides: { temperature: { min: 0, max: 2 } },
+        },
+      ],
+    });
+
+  function fridgeRow(overrides: Partial<TaskOccurrenceRow> = {}) {
+    return makeExistingRow({
+      title: "Fridge round",
+      targetId: TARGET_A,
+      targetName: "Dairy fridge",
+      resolvedLimits: { temperature: { min: 0, max: 5 } },
+      ...overrides,
+    });
+  }
+
+  it("creates one occurrence per target per slot, each with its own resolved limits", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-19T04:00:00Z"));
+    taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([
+      fridgeSource(),
+    ]);
+
+    await taskOccurrenceService.reconcileTemplateIds(db, {
+      templateIds: [TEMPLATE_ID],
+      timeZone: TZ,
+    });
+
+    const inserted = (
+      taskOccurrenceRepository.insertMany.mock.calls[0]![1] as {
+        occurrenceDate: string;
+        targetId: string;
+        targetName: string;
+        formVersionId: string;
+        resolvedLimits: unknown;
+      }[]
+    ).filter((row) => row.occurrenceDate === "2026-08-19");
+
+    expect(inserted).toEqual([
+      expect.objectContaining({
+        targetId: TARGET_A,
+        targetName: "Dairy fridge",
+        formVersionId: VERSION_ID,
+        resolvedLimits: { temperature: { min: 0, max: 5 } },
+      }),
+      expect.objectContaining({
+        targetId: TARGET_B,
+        targetName: "Fish fridge",
+        resolvedLimits: { temperature: { min: 0, max: 2 } },
+      }),
+    ]);
+  });
+
+  it("creates one untargeted occurrence per slot for a template with no targets", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-19T04:00:00Z"));
+    taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([
+      makeSource(),
+    ]);
+
+    await taskOccurrenceService.reconcileTemplateIds(db, {
+      templateIds: [TEMPLATE_ID],
+      timeZone: TZ,
+    });
+
+    const today = (
+      taskOccurrenceRepository.insertMany.mock.calls[0]![1] as {
+        occurrenceDate: string;
+        targetId: string | null;
+      }[]
+    ).filter((row) => row.occurrenceDate === "2026-08-19");
+
+    expect(today.map((row) => row.targetId)).toEqual([null]);
+  });
+
+  it("keeps a matching occurrence whose stored limits come back in another key order", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-19T04:00:00Z"));
+    const twoFields: FormDefinition = {
+      ...FRIDGE,
+      fields: [
+        ...FRIDGE.fields,
+        {
+          ...FRIDGE.fields[0]!,
+          id: "core",
+        } as FormDefinition["fields"][number],
+      ],
+    };
+    taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([
+      makeSource({
+        title: "Fridge round",
+        definition: twoFields,
+        scheduledTimes: ["08:00"],
+        weekdays: ["wednesday"],
+        targets: [
+          {
+            targetId: TARGET_A,
+            targetName: "Dairy fridge",
+            limitOverrides: {},
+          },
+        ],
+      }),
+    ]);
+    taskOccurrenceRepository.findByTemplateIds.mockResolvedValue([
+      fridgeRow({
+        resolvedLimits: {
+          core: { min: 0, max: 5 },
+          temperature: { min: 0, max: 5 },
+        },
+      }),
+    ]);
+
+    const summary = await taskOccurrenceService.reconcileTemplateIds(db, {
+      templateIds: [TEMPLATE_ID],
+      timeZone: TZ,
+    });
+
+    expect(taskOccurrenceRepository.deleteByIds).not.toHaveBeenCalled();
+    expect(summary.replaced).toBe(0);
+  });
+
+  it("replaces an unrecorded occurrence whose target's limits changed", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-19T04:00:00Z"));
+    taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([
+      makeSource({
+        title: "Fridge round",
+        definition: FRIDGE,
+        weekdays: ["wednesday"],
+        targets: [
+          {
+            targetId: TARGET_A,
+            targetName: "Dairy fridge",
+            limitOverrides: { temperature: { min: 1, max: 4 } },
+          },
+        ],
+      }),
+    ]);
+    taskOccurrenceRepository.findByTemplateIds.mockResolvedValue([fridgeRow()]);
+
+    const summary = await taskOccurrenceService.reconcileTemplateIds(db, {
+      templateIds: [TEMPLATE_ID],
+      timeZone: TZ,
+    });
+
+    expect(summary.replaced).toBe(1);
+    expect(taskOccurrenceRepository.deleteByIds).toHaveBeenCalledWith(db, [
+      "00000000-0000-4000-8000-0000000000x1",
+    ]);
+  });
+
+  it("replaces an unrecorded occurrence when the form has a newer version", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-19T04:00:00Z"));
+    taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([
+      makeSource({
+        weekdays: ["wednesday"],
+        formVersionId: "00000000-0000-4000-8000-0000000000v2",
+      }),
+    ]);
+    taskOccurrenceRepository.findByTemplateIds.mockResolvedValue([
+      makeExistingRow(),
+    ]);
+
+    const summary = await taskOccurrenceService.reconcileTemplateIds(db, {
+      templateIds: [TEMPLATE_ID],
+      timeZone: TZ,
+    });
+
+    expect(summary.replaced).toBe(1);
+  });
+
+  it("retires a dropped target's unopened occurrence but keeps the others", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-18T12:00:00Z"));
+    taskTemplateRepository.findActiveSourcesByIds.mockResolvedValue([
+      makeSource({
+        title: "Fridge round",
+        definition: FRIDGE,
+        weekdays: ["wednesday"],
+        targets: [
+          {
+            targetId: TARGET_A,
+            targetName: "Dairy fridge",
+            limitOverrides: {},
+          },
+        ],
+      }),
+    ]);
+    taskOccurrenceRepository.findByTemplateIds.mockResolvedValue([
+      fridgeRow({ id: "00000000-0000-4000-8000-0000000000x1" }),
+      fridgeRow({
+        id: "00000000-0000-4000-8000-0000000000x2",
+        targetId: TARGET_B,
+        targetName: "Fish fridge",
+        resolvedLimits: { temperature: { min: 0, max: 2 } },
+      }),
+    ]);
+
+    await taskOccurrenceService.reconcileTemplateIds(db, {
+      templateIds: [TEMPLATE_ID],
+      timeZone: TZ,
+    });
+
+    expect(taskOccurrenceRepository.deleteByIds).toHaveBeenCalledWith(db, [
+      "00000000-0000-4000-8000-0000000000x2",
+    ]);
+  });
+});
+
 describe("reconcileTemplateIds — validation", () => {
   it("rejects an invalid organization timezone", async () => {
     await expect(
@@ -629,40 +875,25 @@ describe("reconcileTemplateIds — validation", () => {
     ).rejects.toBeInstanceOf(InternalError);
   });
 
-  it("fails clearly for a temperature template with no resolvable equipment", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-08-19T05:00:00Z"));
-
-    taskTemplateRepository.findActiveWithEquipmentByIds.mockResolvedValue([
-      makeSource({
-        type: "temperature",
-        equipmentId: EQUIPMENT_ID,
-        equipmentName: null, // join failed to resolve — no valid same-location equipment
-      }),
-    ]);
-
-    await expect(
-      taskOccurrenceService.reconcileTemplateIds(db, {
-        templateIds: [TEMPLATE_ID],
-        timeZone: TZ,
-      }),
-    ).rejects.toBeInstanceOf(ValidationError);
-
-    expect(taskOccurrenceRepository.insertMany).not.toHaveBeenCalled();
-  });
-
   it("returns a zero summary without querying anything for an empty template scope", async () => {
     const summary = await taskOccurrenceService.reconcileTemplateIds(db, {
       templateIds: [],
       timeZone: TZ,
     });
 
-    expect(summary).toEqual({ processed: 0, created: 0, replaced: 0, deleted: 0 });
-    expect(taskTemplateRepository.findActiveWithEquipmentByIds).not.toHaveBeenCalled();
+    expect(summary).toEqual({
+      processed: 0,
+      created: 0,
+      replaced: 0,
+      deleted: 0,
+    });
+    expect(
+      taskTemplateRepository.findActiveSourcesByIds,
+    ).not.toHaveBeenCalled();
   });
 });
 
-describe("reconcileTemplate / reconcileEquipment / reconcileOrganization", () => {
+describe("reconcileTemplate / reconcileTemplatesAtLocation / reconcileOrganization", () => {
   beforeEach(() => {
     locationRepository.findOrganizationContextByLocationId.mockResolvedValue({
       organizationId: ORG_ID,
@@ -676,36 +907,52 @@ describe("reconcileTemplate / reconcileEquipment / reconcileOrganization", () =>
     expect(
       locationRepository.findOrganizationContextByLocationId,
     ).toHaveBeenCalledWith(db, LOCATION_ID);
-    expect(
-      taskTemplateRepository.findActiveWithEquipmentByIds,
-    ).toHaveBeenCalledWith(db, [TEMPLATE_ID]);
+    expect(taskTemplateRepository.findActiveSourcesByIds).toHaveBeenCalledWith(
+      db,
+      [TEMPLATE_ID],
+    );
   });
 
   it("reconcileTemplate raises when the location has no organization", async () => {
-    locationRepository.findOrganizationContextByLocationId.mockResolvedValue(null);
+    locationRepository.findOrganizationContextByLocationId.mockResolvedValue(
+      null,
+    );
 
     await expect(
       taskOccurrenceService.reconcileTemplate(db, LOCATION_ID, TEMPLATE_ID),
     ).rejects.toBeInstanceOf(InternalError);
   });
 
-  it("reconcileEquipment scopes to active templates using that equipment", async () => {
-    taskTemplateRepository.findActiveIdsByLocationAndEquipment.mockResolvedValue([
+  it("reconcileTemplatesAtLocation scopes to the templates it is given", async () => {
+    await taskOccurrenceService.reconcileTemplatesAtLocation(db, LOCATION_ID, [
       TEMPLATE_ID,
     ]);
 
-    await taskOccurrenceService.reconcileEquipment(
+    expect(
+      locationRepository.findOrganizationContextByLocationId,
+    ).toHaveBeenCalledWith(db, LOCATION_ID);
+    expect(taskTemplateRepository.findActiveSourcesByIds).toHaveBeenCalledWith(
+      db,
+      [TEMPLATE_ID],
+    );
+  });
+
+  it("reconcileTemplatesAtLocation does nothing for no templates", async () => {
+    const summary = await taskOccurrenceService.reconcileTemplatesAtLocation(
       db,
       LOCATION_ID,
-      EQUIPMENT_ID,
+      [],
     );
 
+    expect(summary).toEqual({
+      processed: 0,
+      created: 0,
+      replaced: 0,
+      deleted: 0,
+    });
     expect(
-      taskTemplateRepository.findActiveIdsByLocationAndEquipment,
-    ).toHaveBeenCalledWith(db, LOCATION_ID, EQUIPMENT_ID);
-    expect(
-      taskTemplateRepository.findActiveWithEquipmentByIds,
-    ).toHaveBeenCalledWith(db, [TEMPLATE_ID]);
+      locationRepository.findOrganizationContextByLocationId,
+    ).not.toHaveBeenCalled();
   });
 
   it("reconcileOrganization scopes to every active template in the organization", async () => {
@@ -715,13 +962,13 @@ describe("reconcileTemplate / reconcileEquipment / reconcileOrganization", () =>
 
     await taskOccurrenceService.reconcileOrganization(db, ORG_ID, TZ);
 
-    expect(taskTemplateRepository.findActiveIdsByOrganization).toHaveBeenCalledWith(
-      db,
-      ORG_ID,
-    );
     expect(
-      taskTemplateRepository.findActiveWithEquipmentByIds,
-    ).toHaveBeenCalledWith(db, [TEMPLATE_ID]);
+      taskTemplateRepository.findActiveIdsByOrganization,
+    ).toHaveBeenCalledWith(db, ORG_ID);
+    expect(taskTemplateRepository.findActiveSourcesByIds).toHaveBeenCalledWith(
+      db,
+      [TEMPLATE_ID],
+    );
   });
 });
 
@@ -734,14 +981,20 @@ describe("reconcileAllOrganizations", () => {
 
     const reconcileOrgSpy = vi
       .spyOn(taskOccurrenceService, "reconcileOrganization")
-      .mockResolvedValueOnce({ processed: 2, created: 1, replaced: 0, deleted: 0 })
+      .mockResolvedValueOnce({
+        processed: 2,
+        created: 1,
+        replaced: 0,
+        deleted: 0,
+      })
       .mockRejectedValueOnce(new Error("boom"));
 
     const fakeDb = {
       transaction: (fn: (tx: unknown) => unknown) => fn(fakeDb),
     } as never;
 
-    const result = await taskOccurrenceService.reconcileAllOrganizations(fakeDb);
+    const result =
+      await taskOccurrenceService.reconcileAllOrganizations(fakeDb);
 
     expect(result).toEqual({
       organizations: 2,

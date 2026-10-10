@@ -4,7 +4,7 @@ import { LOCALE_PREFIX } from "../../support/env.js";
 test("a supported card action is visible and usable without a long press", async ({
   page,
 }) => {
-  await page.goto(`${LOCALE_PREFIX}/dashboard/equipment`);
+  await page.goto(`${LOCALE_PREFIX}/dashboard/targets`);
 
   const firstCard = page.getByTestId("data-table-card").first();
   await expect(firstCard).toBeVisible();

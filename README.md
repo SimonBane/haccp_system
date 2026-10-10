@@ -1,8 +1,8 @@
 # HACCP System
 
 HACCP (Hazard Analysis and Critical Control Points) management platform for food-service
-sites: an admin configures locations, equipment and recurring task templates; staff work a
-daily "Today" checklist and log fridge/freezer temperatures.
+sites: an admin configures locations, equipment & areas, versioned forms and recurring task
+templates; staff fill those forms in from a daily "Today" checklist.
 
 ## Stack
 

@@ -14,11 +14,13 @@ import {
   type RecordsSortField,
   type SortOrder,
 } from "@haccp/shared";
-import type { Db } from "../../core/db/client.js";
+import type { Db, DbClient } from "../../core/db/client.js";
 import {
   InternalError,
   ValidationError,
 } from "../../core/errors/app-errors.js";
+import { toFormVersionSummaryMap } from "../forms/form.mapper.js";
+import { formRepository } from "../forms/form.repository.js";
 import { toRecordItem } from "./records.mapper.js";
 import {
   recordsRepository,
@@ -48,7 +50,7 @@ export function normalizeRecordsQuery(
     sortBy: query.sortBy ?? RECORDS_DEFAULT_SORT.sortBy,
     sortOrder: query.sortOrder ?? RECORDS_DEFAULT_SORT.sortOrder,
     filters: {
-      type: query.type,
+      category: query.category,
       state: query.state,
       result: query.result,
     },
@@ -78,7 +80,7 @@ export function normalizeRecordsReportQuery(
     sortOrder: RECORDS_DEFAULT_SORT.sortOrder,
     offset: 0,
     filters: {
-      type: query.type,
+      category: query.category,
       state: query.state,
       result: query.result,
     },
@@ -141,6 +143,14 @@ function assertCompleteReport(rows: RecordRow[], total: number): void {
   }
 }
 
+async function formVersionsFor(db: DbClient, rows: RecordRow[]) {
+  return toFormVersionSummaryMap(
+    await formRepository.findVersionSummariesByIds(db, [
+      ...new Set(rows.map((row) => row.formVersionId)),
+    ]),
+  );
+}
+
 export const recordsService = {
   async listRecords(
     db: Db,
@@ -167,6 +177,7 @@ export const recordsService = {
     return {
       items: rows.map(toRecordItem),
       total,
+      formVersions: await formVersionsFor(db, rows),
     };
   },
 
@@ -216,6 +227,7 @@ export const recordsService = {
           generatedAt,
           total,
           items: rows.map(toRecordItem),
+          formVersions: await formVersionsFor(tx, rows),
         };
       },
       { isolationLevel: "repeatable read", accessMode: "read only" },

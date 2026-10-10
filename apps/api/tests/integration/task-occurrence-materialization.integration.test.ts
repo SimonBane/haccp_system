@@ -8,12 +8,13 @@ import { and, eq, inArray } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../../src/core/db/client.js";
 import {
-  organizations,
   taskOccurrences,
   taskRecords,
   taskTemplates,
 } from "../../src/core/db/schema/index.js";
 import {
+  CLEANING_DEFINITION,
+  FRIDGE_FIELD_ID,
   seedOrganization,
   type SeededOrg,
   type TwoTenantWorld,
@@ -58,6 +59,47 @@ async function findOccurrence(
   return row ?? null;
 }
 
+/** Any record — voided or not — locks its occurrence against reconciliation. */
+async function recordOccurrence(
+  world: SeededOrg,
+  occurrence: { id: string; formVersionId: string },
+  options: { voided?: boolean } = {},
+): Promise<void> {
+  await db.insert(taskRecords).values({
+    occurrenceId: occurrence.id,
+    formVersionId: occurrence.formVersionId,
+    values: {},
+    result: "not_evaluated",
+    createdByUserId: world.admin.userId,
+    recordedAt: new Date(),
+    recordedByUserId: world.admin.userId,
+    ...(options.voided
+      ? { voidedAt: new Date(), voidedByUserId: world.admin.userId }
+      : {}),
+  });
+}
+
+function cleaningTemplateBody(
+  world: SeededOrg,
+  overrides: Record<string, unknown> = {},
+): string {
+  return JSON.stringify({
+    title: world.templates.cleaning.title,
+    formId: world.forms.cleaning.id,
+    weekdays: [
+      "monday",
+      "tuesday",
+      "wednesday",
+      "thursday",
+      "friday",
+      "saturday",
+      "sunday",
+    ],
+    scheduledTimes: ["09:00"],
+    ...overrides,
+  });
+}
+
 async function findOccurrencesByTemplate(templateId: string) {
   return db
     .select()
@@ -95,24 +137,34 @@ describe("Task occurrence materialization — daily job", () => {
     const response = await materialize();
     expect(response.status).toBe(200);
 
-    const rows = await findOccurrencesByTemplate(world.templates.temperature.id);
+    const rows = await findOccurrencesByTemplate(
+      world.templates.temperature.id,
+    );
     // Weekdays cover every day, one scheduled time -> exactly 14 rows.
     expect(rows).toHaveLength(14);
     expect(rows.map((r) => r.occurrenceDate).sort()).toEqual(
-      Array.from({ length: 14 }, (_, i) => addCalendarDays(todayLocal(), i)).sort(),
+      Array.from({ length: 14 }, (_, i) =>
+        addCalendarDays(todayLocal(), i),
+      ).sort(),
     );
   });
 
   it("repeated generation creates no duplicates", async () => {
     await materialize();
-    const first = await findOccurrencesByTemplate(world.templates.temperature.id);
+    const first = await findOccurrencesByTemplate(
+      world.templates.temperature.id,
+    );
 
     const second = await materialize();
     expect(second.status).toBe(200);
-    const after = await findOccurrencesByTemplate(world.templates.temperature.id);
+    const after = await findOccurrencesByTemplate(
+      world.templates.temperature.id,
+    );
 
     expect(after).toHaveLength(first.length);
-    expect(after.map((r) => r.id).sort()).toEqual(first.map((r) => r.id).sort());
+    expect(after.map((r) => r.id).sort()).toEqual(
+      first.map((r) => r.id).sort(),
+    );
   });
 
   it("restores a past-due occurrence a delayed run missed, when the template existed before dueAt", async () => {
@@ -122,7 +174,7 @@ describe("Task occurrence materialization — daily job", () => {
       .values({
         locationId: world.locations.main.id,
         title: "Long-lived cleaning check",
-        type: "cleaning",
+        formId: world.forms.cleaning.id,
         weekdays: [weekday],
         scheduledTimes: [pastTimeToday()],
         createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000), // created yesterday
@@ -142,13 +194,18 @@ describe("Task occurrence materialization — daily job", () => {
   });
 
   it("reaches only locations belonging to each organization", async () => {
-    const two: TwoTenantWorld = { alpha: world, beta: await seedOrganization(db, { slug: "beta" }) };
+    const two: TwoTenantWorld = {
+      alpha: world,
+      beta: await seedOrganization(db, { slug: "beta" }),
+    };
 
     const response = await materialize();
     expect(response.status).toBe(200);
 
     for (const org of [two.alpha, two.beta]) {
-      const rows = await findOccurrencesByTemplate(org.templates.temperature.id);
+      const rows = await findOccurrencesByTemplate(
+        org.templates.temperature.id,
+      );
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
         expect(row.locationId).toBe(org.locations.main.id);
@@ -164,9 +221,12 @@ describe("Task occurrence materialization — cron secret", () => {
   });
 
   it("rejects a request with the wrong secret", async () => {
-    const response = await apiRequest("/internal/task-occurrences/materialize", {
-      headers: { Authorization: "Bearer wrong-secret" },
-    });
+    const response = await apiRequest(
+      "/internal/task-occurrences/materialize",
+      {
+        headers: { Authorization: "Bearer wrong-secret" },
+      },
+    );
     expect(response.status).toBe(401);
   });
 
@@ -175,7 +235,13 @@ describe("Task occurrence materialization — cron secret", () => {
     expect(response.status).toBe(200);
 
     const body = (await response.json()) as Record<string, number>;
-    for (const key of ["organizations", "processed", "created", "replaced", "deleted"]) {
+    for (const key of [
+      "organizations",
+      "processed",
+      "created",
+      "replaced",
+      "deleted",
+    ]) {
       expect(typeof body[key]).toBe("number");
     }
   });
@@ -198,7 +264,7 @@ describe("Task occurrence materialization — configuration writes", () => {
         actor: asAdmin(world),
         body: JSON.stringify({
           title: "Evening close-down",
-          type: "cleaning",
+          formId: world.forms.cleaning.id,
           weekdays: [weekday],
           scheduledTimes: ["23:59"],
         }),
@@ -221,7 +287,7 @@ describe("Task occurrence materialization — configuration writes", () => {
         actor: asAdmin(world),
         body: JSON.stringify({
           title: "Should skip today",
-          type: "cleaning",
+          formId: world.forms.cleaning.id,
           weekdays: [weekday],
           scheduledTimes: [pastTimeToday()],
         }),
@@ -269,7 +335,7 @@ describe("Task occurrence materialization — configuration writes", () => {
     expect(after.map((row) => row.id)).toEqual([protectedRow.id]);
   });
 
-  it("equipment name/range changes replace only future unrecorded occurrences", async () => {
+  it("a target rename or override change replaces only future unrecorded occurrences", async () => {
     await materialize();
 
     const protectedRow = await findOccurrence(
@@ -287,28 +353,50 @@ describe("Task occurrence materialization — configuration writes", () => {
     expect(futureRowBefore).not.toBeNull();
 
     // A record is what locks values in now — an already-open but unrecorded occurrence
-    // would otherwise get corrected to the new equipment details.
-    await db.insert(taskRecords).values({
-      occurrenceId: protectedRow!.id,
-      createdByUserId: world.admin.userId,
-      recordedAt: new Date(),
-      recordedByUserId: world.admin.userId,
-    });
+    // would otherwise get corrected to the new target name and limits.
+    await recordOccurrence(world, protectedRow!);
 
-    const response = await apiRequest(
-      `/locations/${world.locations.main.id}/equipment/${world.equipment.fridge.id}`,
+    const renamed = await apiRequest(
+      `/locations/${world.locations.main.id}/targets/${world.targets.fridge.id}`,
       {
         method: "PATCH",
         actor: asAdmin(world),
         body: JSON.stringify({
           name: "Fridge 1 (relabeled)",
-          type: "fridge",
-          minTempC: -2,
-          maxTempC: 6,
+          targetTypeId: world.targetTypes.fridge.id,
         }),
       },
     );
-    expect(response.status).toBe(200);
+    expect(renamed.status).toBe(200);
+
+    const overridden = await apiRequest(
+      `/locations/${world.locations.main.id}/task-templates/${world.templates.temperature.id}`,
+      {
+        method: "PATCH",
+        actor: asAdmin(world),
+        body: JSON.stringify({
+          title: world.templates.temperature.title,
+          formId: world.forms.fridgeCheck.id,
+          weekdays: [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+          ],
+          scheduledTimes: ["08:00"],
+          targets: [
+            {
+              targetId: world.targets.fridge.id,
+              limitOverrides: { [FRIDGE_FIELD_ID]: { min: -2, max: 6 } },
+            },
+          ],
+        }),
+      },
+    );
+    expect(overridden.status).toBe(200);
 
     const protectedAfter = await findOccurrence(
       world.templates.temperature.id,
@@ -316,8 +404,10 @@ describe("Task occurrence materialization — configuration writes", () => {
       "08:00",
     );
     expect(protectedAfter!.id).toBe(protectedRow!.id);
-    expect(protectedAfter!.equipmentName).toBe("Fridge 1");
-    expect(protectedAfter!.minTempC).toBe("0.0");
+    expect(protectedAfter!.targetName).toBe("Fridge 1");
+    expect(protectedAfter!.resolvedLimits).toEqual({
+      [FRIDGE_FIELD_ID]: { min: 0, max: 5 },
+    });
 
     const futureAfter = await findOccurrence(
       world.templates.temperature.id,
@@ -326,9 +416,150 @@ describe("Task occurrence materialization — configuration writes", () => {
     );
     expect(futureAfter).not.toBeNull();
     expect(futureAfter!.id).not.toBe(futureRowBefore!.id);
-    expect(futureAfter!.equipmentName).toBe("Fridge 1 (relabeled)");
-    expect(futureAfter!.minTempC).toBe("-2.0");
-    expect(futureAfter!.maxTempC).toBe("6.0");
+    expect(futureAfter!.targetName).toBe("Fridge 1 (relabeled)");
+    expect(futureAfter!.resolvedLimits).toEqual({
+      [FRIDGE_FIELD_ID]: { min: -2, max: 6 },
+    });
+  });
+
+  it("materializes one occurrence per target per slot, with each target's limits", async () => {
+    const created = await apiRequest(
+      `/locations/${world.locations.main.id}/targets`,
+      {
+        method: "POST",
+        actor: asAdmin(world),
+        body: JSON.stringify({
+          name: "Fish fridge",
+          targetTypeId: world.targetTypes.fridge.id,
+        }),
+      },
+    );
+    const fishFridge = (await created.json()) as { id: string };
+
+    const response = await apiRequest(
+      `/locations/${world.locations.main.id}/task-templates/${world.templates.temperature.id}`,
+      {
+        method: "PATCH",
+        actor: asAdmin(world),
+        body: JSON.stringify({
+          title: world.templates.temperature.title,
+          formId: world.forms.fridgeCheck.id,
+          weekdays: [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+          ],
+          scheduledTimes: ["08:00"],
+          targets: [
+            { targetId: world.targets.fridge.id },
+            {
+              targetId: fishFridge.id,
+              limitOverrides: { [FRIDGE_FIELD_ID]: { min: 0, max: 2 } },
+            },
+          ],
+        }),
+      },
+    );
+    expect(response.status).toBe(200);
+
+    const futureDate = addCalendarDays(todayLocal(), 2);
+    const rows = (
+      await findOccurrencesByTemplate(world.templates.temperature.id)
+    ).filter((row) => row.occurrenceDate === futureDate);
+
+    expect(
+      rows
+        .map((row) => ({
+          targetName: row.targetName,
+          limits: row.resolvedLimits,
+        }))
+        .sort((a, b) => a.targetName!.localeCompare(b.targetName!)),
+    ).toEqual([
+      {
+        targetName: "Fish fridge",
+        limits: { [FRIDGE_FIELD_ID]: { min: 0, max: 2 } },
+      },
+      {
+        targetName: "Fridge 1",
+        limits: { [FRIDGE_FIELD_ID]: { min: 0, max: 5 } },
+      },
+    ]);
+  });
+
+  it("archiving a target retires its future unrecorded occurrences", async () => {
+    await materialize();
+    const futureDate = addCalendarDays(todayLocal(), 2);
+    expect(
+      await findOccurrence(world.templates.temperature.id, futureDate, "08:00"),
+    ).not.toBeNull();
+
+    const response = await apiRequest(
+      `/locations/${world.locations.main.id}/targets/${world.targets.fridge.id}`,
+      { method: "DELETE", actor: asAdmin(world) },
+    );
+    expect(response.status).toBe(204);
+
+    const futureRows = (
+      await findOccurrencesByTemplate(world.templates.temperature.id)
+    ).filter((row) => row.occurrenceDate === futureDate);
+    // The template has no targets left, so it falls back to one untargeted check per slot.
+    expect(futureRows.map((row) => row.targetId)).toEqual([null]);
+  });
+
+  it("a new form version moves future unrecorded occurrences to it and leaves recorded ones", async () => {
+    await materialize();
+
+    const protectedRow = await findOccurrence(
+      world.templates.cleaning.id,
+      todayLocal(),
+      "09:00",
+    );
+    await recordOccurrence(world, protectedRow!);
+
+    const response = await apiRequest(
+      `/forms/${world.forms.cleaning.id}/versions`,
+      {
+        method: "POST",
+        actor: asAdmin(world),
+        body: JSON.stringify({
+          definition: {
+            ...CLEANING_DEFINITION,
+            fields: [
+              ...CLEANING_DEFINITION.fields,
+              {
+                id: "note",
+                type: "text",
+                label: "Note",
+                required: false,
+                multiline: true,
+              },
+            ],
+          },
+        }),
+      },
+    );
+    expect(response.status).toBe(201);
+    const published = (await response.json()) as {
+      latestVersion: { id: string };
+    };
+
+    const protectedAfter = await findOccurrence(
+      world.templates.cleaning.id,
+      todayLocal(),
+      "09:00",
+    );
+    expect(protectedAfter!.formVersionId).toBe(world.forms.cleaning.versionId);
+
+    const futureAfter = await findOccurrence(
+      world.templates.cleaning.id,
+      addCalendarDays(todayLocal(), 2),
+      "09:00",
+    );
+    expect(futureAfter!.formVersionId).toBe(published.latestVersion.id);
   });
 
   it("an organization timezone change replaces only future unrecorded occurrences", async () => {
@@ -350,12 +581,7 @@ describe("Task occurrence materialization — configuration writes", () => {
 
     // A record is what locks values in now — an already-open but unrecorded occurrence
     // would otherwise get recomputed under the new timezone.
-    await db.insert(taskRecords).values({
-      occurrenceId: protectedRow!.id,
-      createdByUserId: world.admin.userId,
-      recordedAt: new Date(),
-      recordedByUserId: world.admin.userId,
-    });
+    await recordOccurrence(world, protectedRow!);
 
     const response = await apiRequest("/organizations/current", {
       method: "PATCH",
@@ -392,19 +618,7 @@ describe("Task occurrence materialization — configuration writes", () => {
       {
         method: "PATCH",
         actor: asAdmin(world),
-        body: JSON.stringify({
-          title: world.templates.cleaning.title,
-          type: "cleaning",
-          weekdays: [
-            "monday",
-            "tuesday",
-            "wednesday",
-            "thursday",
-            "friday",
-            "saturday",
-            "sunday",
-          ],
-          scheduledTimes: ["09:00"],
+        body: cleaningTemplateBody(world, {
           completionOpensBeforeMinutes: 30,
           completionDueAfterMinutes: 60,
         }),
@@ -440,19 +654,7 @@ describe("Task occurrence materialization — configuration writes", () => {
       {
         method: "PATCH",
         actor: asAdmin(world),
-        body: JSON.stringify({
-          title: world.templates.cleaning.title,
-          type: "cleaning",
-          weekdays: [
-            "monday",
-            "tuesday",
-            "wednesday",
-            "thursday",
-            "friday",
-            "saturday",
-            "sunday",
-          ],
-          scheduledTimes: ["09:00"],
+        body: cleaningTemplateBody(world, {
           completionOpensBeforeMinutes: 1440,
           completionDueAfterMinutes: null,
         }),
@@ -488,31 +690,14 @@ describe("Task occurrence materialization — configuration writes", () => {
     expect(futureRowBefore).not.toBeNull();
 
     // A record is what locks values in now, regardless of whether the window already opened.
-    await db.insert(taskRecords).values({
-      occurrenceId: protectedRow!.id,
-      createdByUserId: world.admin.userId,
-      recordedAt: new Date(),
-      recordedByUserId: world.admin.userId,
-    });
+    await recordOccurrence(world, protectedRow!);
 
     const response = await apiRequest(
       `/locations/${world.locations.main.id}/task-templates/${world.templates.cleaning.id}`,
       {
         method: "PATCH",
         actor: asAdmin(world),
-        body: JSON.stringify({
-          title: world.templates.cleaning.title,
-          type: "cleaning",
-          weekdays: [
-            "monday",
-            "tuesday",
-            "wednesday",
-            "thursday",
-            "friday",
-            "saturday",
-            "sunday",
-          ],
-          scheduledTimes: ["09:00"],
+        body: cleaningTemplateBody(world, {
           completionOpensBeforeMinutes: 15,
           completionDueAfterMinutes: 30,
         }),
@@ -562,19 +747,7 @@ describe("Task occurrence materialization — configuration writes", () => {
       {
         method: "PATCH",
         actor: asAdmin(world),
-        body: JSON.stringify({
-          title: world.templates.cleaning.title,
-          type: "cleaning",
-          weekdays: [
-            "monday",
-            "tuesday",
-            "wednesday",
-            "thursday",
-            "friday",
-            "saturday",
-            "sunday",
-          ],
-          scheduledTimes: ["09:00"],
+        body: cleaningTemplateBody(world, {
           completionOpensBeforeMinutes: 15,
           completionDueAfterMinutes: 30,
         }),
@@ -612,40 +785,15 @@ describe("Task occurrence materialization — configuration writes", () => {
     expect(recordedRow).not.toBeNull();
     expect(voidedRow).not.toBeNull();
 
-    await db.insert(taskRecords).values({
-      occurrenceId: recordedRow!.id,
-      createdByUserId: world.admin.userId,
-      recordedAt: new Date(),
-      recordedByUserId: world.admin.userId,
-    });
-    await db.insert(taskRecords).values({
-      occurrenceId: voidedRow!.id,
-      createdByUserId: world.admin.userId,
-      recordedAt: new Date(),
-      recordedByUserId: world.admin.userId,
-      voidedAt: new Date(),
-      voidedByUserId: world.admin.userId,
-    });
+    await recordOccurrence(world, recordedRow!);
+    await recordOccurrence(world, voidedRow!, { voided: true });
 
     const response = await apiRequest(
       `/locations/${world.locations.main.id}/task-templates/${world.templates.cleaning.id}`,
       {
         method: "PATCH",
         actor: asAdmin(world),
-        body: JSON.stringify({
-          title: "Renamed cleaning check",
-          type: "cleaning",
-          weekdays: [
-            "monday",
-            "tuesday",
-            "wednesday",
-            "thursday",
-            "friday",
-            "saturday",
-            "sunday",
-          ],
-          scheduledTimes: ["09:00"],
-        }),
+        body: cleaningTemplateBody(world, { title: "Renamed cleaning check" }),
       },
     );
     expect(response.status).toBe(200);
@@ -665,28 +813,5 @@ describe("Task occurrence materialization — configuration writes", () => {
     expect(recordedAfter!.title).toBe("Clean prep surface");
     expect(voidedAfter!.id).toBe(voidedRow!.id);
     expect(voidedAfter!.title).toBe("Clean prep surface");
-  });
-
-  it("rolls back the write together with reconciliation when a temperature source cannot resolve, and fails clearly", async () => {
-    // Directly corrupt the row to a state the API can never legitimately produce
-    // (schema validation requires equipmentId for a temperature template).
-    await db
-      .update(taskTemplates)
-      .set({ equipmentId: null })
-      .where(eq(taskTemplates.id, world.templates.temperature.id));
-
-    const response = await apiRequest("/organizations/current", {
-      method: "PATCH",
-      actor: asAdmin(world),
-      body: JSON.stringify({ timezone: "America/New_York" }),
-    });
-
-    expect(response.status).toBe(400);
-
-    const [org] = await db
-      .select()
-      .from(organizations)
-      .where(eq(organizations.id, world.organizationId));
-    expect(org?.timezone).toBe("Europe/Sofia");
   });
 });

@@ -18,7 +18,15 @@ export const openApiDocument = {
     { name: "Health", description: "Service health checks" },
     { name: "Me", description: "Authenticated user context" },
     { name: "Locations", description: "Organization locations" },
-    { name: "Equipment", description: "Temperature-monitored equipment" },
+    {
+      name: "Target Types",
+      description: "Organisation types of equipment and areas",
+    },
+    {
+      name: "Targets",
+      description: "Equipment and areas that checks are about",
+    },
+    { name: "Forms", description: "Versioned check forms built by admins" },
     { name: "Task Templates", description: "Recurring HACCP task templates" },
     { name: "Today", description: "Daily task board and completions" },
   ],

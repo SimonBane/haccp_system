@@ -1,8 +1,7 @@
-import type { TemperatureResult, TodayTaskItem } from "@haccp/shared";
+import type { RecordResult, TodayTaskItem } from "@haccp/shared";
 import {
   buildTodayTaskItemFromOccurrence,
   parseScheduledTimeToMinutes,
-  type TaskTemplateType,
 } from "@haccp/shared";
 import type { OccurrenceWithRecordRow } from "./today.repository.js";
 
@@ -36,17 +35,12 @@ export function toTodayTaskItem(
         }
       : null;
 
-  const temperatureReading =
-    row.detailRecordedC !== null &&
-    row.detailMinTempC !== null &&
-    row.detailMaxTempC !== null &&
-    row.detailResult !== null
+  const answers =
+    row.result !== null && row.values !== null
       ? {
-          recordedC: Number(row.detailRecordedC),
-          minTempC: Number(row.detailMinTempC),
-          maxTempC: Number(row.detailMaxTempC),
-          result: row.detailResult as TemperatureResult,
-          correctiveAction: row.detailCorrectiveAction,
+          result: row.result as RecordResult,
+          values: row.values,
+          correctiveAction: row.correctiveAction,
         }
       : null;
 
@@ -54,11 +48,10 @@ export function toTodayTaskItem(
     occurrenceId: row.occurrenceId,
     templateId: row.taskTemplateId,
     title: row.title,
-    type: row.type as TaskTemplateType,
-    equipmentId: row.equipmentId,
-    equipmentName: row.equipmentName,
-    minTempC: row.minTempC === null ? null : Number(row.minTempC),
-    maxTempC: row.maxTempC === null ? null : Number(row.maxTempC),
+    formVersionId: row.formVersionId,
+    targetId: row.targetId,
+    targetName: row.targetName,
+    resolvedLimits: row.resolvedLimits,
     scheduledTime: row.scheduledTime,
     date: row.occurrenceDate,
     availableAt: row.availableAt,
@@ -66,6 +59,6 @@ export function toTodayTaskItem(
     now,
     record,
     recordedBy,
-    temperatureReading,
+    answers,
   });
 }

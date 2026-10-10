@@ -105,59 +105,52 @@ test("sortable headers ask the server for the allowlisted sort keys", async ({
   expect(byTitle.get("sortBy")).toBe("title");
   expect(byTitle.get("sortOrder")).toBe("asc");
 
-  // Status, Reading and Outcome are presentation only in this task.
-  for (const column of ["Status", "Reading", "Outcome"]) {
+  // Status, Answers and Result are presentation only.
+  for (const column of ["Status", "Answers", "Result"]) {
     await expect(sortHeader(page, column)).toHaveCount(0);
   }
 });
 
-test("Type and Status filters send canonical values, never translated labels", async ({
+test("Category and Status filters send canonical values, never translated labels", async ({
   page,
 }) => {
   await page.goto(RECORDS_PATH);
   await expect(recordsTable(page)).toBeVisible();
 
-  const byType = await nextRecordsQuery(page, () =>
-    toggleFilterOption(page, "Type", "Cleaning"),
+  const byCategory = await nextRecordsQuery(page, () =>
+    toggleFilterOption(page, "Category", "Cleaning"),
   );
-  expect(byType.get("type")).toBe("cleaning");
-  expect(byType.get("page")).toBe("1");
+  expect(byCategory.get("category")).toBe("cleaning");
+  expect(byCategory.get("page")).toBe("1");
 
   const byStatus = await nextRecordsQuery(page, () =>
     toggleFilterOption(page, "Status", "Submitted"),
   );
-  expect(byStatus.get("type")).toBe("cleaning");
+  expect(byStatus.get("category")).toBe("cleaning");
   expect(byStatus.get("state")).toBe("submitted");
 
   await expect(page.getByText(CLEANING_TASK).first()).toBeVisible();
 });
 
-test("the temperature-result filter appears only for a pure temperature selection", async ({
+test("the Result filter is always offered and sends the canonical outcome", async ({
   page,
 }) => {
   await page.goto(RECORDS_PATH);
   await expect(recordsTable(page)).toBeVisible();
 
-  const resultFilter = filterTrigger(page, "Temperature result");
-  await expect(resultFilter).toHaveCount(0);
-
-  await nextRecordsQuery(page, () =>
-    toggleFilterOption(page, "Type", "Temperature"),
-  );
-  await expect(resultFilter).toBeVisible();
+  await expect(filterTrigger(page, "Result")).toBeVisible();
 
   const withResult = await nextRecordsQuery(page, () =>
-    toggleFilterOption(page, "Temperature result", "Within range"),
+    toggleFilterOption(page, "Result", "Failed"),
   );
-  expect(withResult.get("result")).toBe("pass");
+  expect(withResult.get("result")).toBe("fail");
 
-  // Widening Type past temperature hides the control and drops the outcome filter.
+  // Widening Category keeps the outcome: every form can pass or fail.
   const widened = await nextRecordsQuery(page, () =>
-    toggleFilterOption(page, "Type", "Cleaning"),
+    toggleFilterOption(page, "Category", "Cleaning"),
   );
-  expect(widened.get("type")).toBe("cleaning,temperature");
-  expect(widened.get("result")).toBeNull();
-  await expect(resultFilter).toHaveCount(0);
+  expect(widened.get("category")).toBe("cleaning");
+  expect(widened.get("result")).toBe("fail");
 });
 
 test("the date range blocks the future and accepts a multi-month span", async ({

@@ -1,4 +1,8 @@
-import type { RecordItem, UserSummary } from "@haccp/shared";
+import {
+  RECORD_RESULT,
+  type RecordItem,
+  type UserSummary,
+} from "@haccp/shared";
 
 export const EM_DASH = "—";
 
@@ -58,24 +62,7 @@ export function formatRecordTimeOfDay(
   }).format(new Date(timestamp));
 }
 
-export function formatTemperatureValue(value: number, locale: string): string {
-  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(value)} °C`;
-}
-
-export function formatTemperatureRange(
-  minTempC: number | null,
-  maxTempC: number | null,
-  locale: string,
-): string | null {
-  if (minTempC === null || maxTempC === null) return null;
-  return `${formatTemperatureValue(minTempC, locale)} – ${formatTemperatureValue(maxTempC, locale)}`;
-}
-
-export function recordReading(item: RecordItem): number | null {
-  return item.record?.temperature?.recordedC ?? null;
-}
-
-/** Non-temperature rows have no temperature outcome to report in the grid. */
-export function hasTemperatureOutcome(item: RecordItem): boolean {
-  return item.type === "temperature";
+/** Pass and fail are worth a badge; a record with nothing to judge is not. */
+export function hasJudgedResult(item: RecordItem): boolean {
+  return item.result !== RECORD_RESULT.NOT_EVALUATED;
 }

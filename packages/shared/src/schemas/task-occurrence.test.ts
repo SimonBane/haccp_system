@@ -4,7 +4,6 @@ import {
   computeAvailableAt,
   computeDueAt,
   deriveOccurrenceState,
-  deriveTemperatureResult,
   isActiveRecord,
 } from "./task-occurrence.js";
 
@@ -186,19 +185,5 @@ describe("computeDueAt", () => {
     expect(
       computeDueAt({ scheduledInstant, completionDueAfterMinutes: null }),
     ).toBeNull();
-  });
-});
-
-describe("deriveTemperatureResult", () => {
-  it("reads the result straight from the stored detail", () => {
-    expect(deriveTemperatureResult({ result: "ok" })).toBe("ok");
-    expect(deriveTemperatureResult({ result: "out_of_range" })).toBe(
-      "out_of_range",
-    );
-  });
-
-  it("is null when there is no temperature detail", () => {
-    expect(deriveTemperatureResult(null)).toBeNull();
-    expect(deriveTemperatureResult(undefined)).toBeNull();
   });
 });
