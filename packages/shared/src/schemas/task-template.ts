@@ -1,18 +1,5 @@
 import { z } from "zod";
-
-export const TASK_TEMPLATE_TYPE = {
-  TEMPERATURE: "temperature",
-  CLEANING: "cleaning",
-  OTHER: "other",
-} as const;
-
-export const taskTemplateTypeSchema = z.enum([
-  TASK_TEMPLATE_TYPE.TEMPERATURE,
-  TASK_TEMPLATE_TYPE.CLEANING,
-  TASK_TEMPLATE_TYPE.OTHER,
-]);
-
-export type TaskTemplateType = z.infer<typeof taskTemplateTypeSchema>;
+import { formCategorySchema, limitOverridesSchema } from "./form.js";
 
 export const taskTemplateWeekdaySchema = z.enum([
   "monday",
@@ -108,9 +95,10 @@ export function normalizeScheduledTimeInput(input: string): string | null {
   return scheduledTimePattern.test(candidate) ? candidate : null;
 }
 
-export function splitScheduledTime(
-  time: string,
-): { hour: string; minute: string } {
+export function splitScheduledTime(time: string): {
+  hour: string;
+  minute: string;
+} {
   const [hour, minute] = time.split(":");
   return { hour, minute };
 }
@@ -166,9 +154,20 @@ export const completionDueAfterMinutesSchema = z
   .max(TASK_TEMPLATE_COMPLETION_MINUTES_MAX)
   .nullable();
 
+export const TASK_TEMPLATE_MAX_TARGETS = 50;
+
+export const taskTemplateTargetInputSchema = z.object({
+  targetId: z.uuid(),
+  limitOverrides: limitOverridesSchema.default({}),
+});
+
+export type TaskTemplateTargetInput = z.infer<
+  typeof taskTemplateTargetInputSchema
+>;
+
 const taskTemplateFieldsSchema = z.object({
   title: z.string().trim().min(1).max(200),
-  type: taskTemplateTypeSchema,
+  formId: z.uuid(),
   weekdays: z
     .array(taskTemplateWeekdaySchema)
     .min(1, { error: "Select at least one weekday" })
@@ -196,7 +195,19 @@ const taskTemplateFieldsSchema = z.object({
         });
       }
     }),
-  equipmentId: z.uuid().nullable().optional(),
+  targets: z
+    .array(taskTemplateTargetInputSchema)
+    .max(TASK_TEMPLATE_MAX_TARGETS)
+    .default([])
+    .superRefine((value, ctx) => {
+      const unique = new Set(value.map((target) => target.targetId));
+      if (unique.size !== value.length) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Targets must be unique",
+        });
+      }
+    }),
   completionOpensBeforeMinutes: completionOpensBeforeMinutesSchema.default(
     TASK_TEMPLATE_COMPLETION_OPENS_BEFORE_DEFAULT_MINUTES,
   ),
@@ -205,34 +216,7 @@ const taskTemplateFieldsSchema = z.object({
   ),
 });
 
-function withTaskTemplateValidation<T extends z.ZodType>(schema: T) {
-  return schema.superRefine((data, ctx) => {
-    const value = data as {
-      type: TaskTemplateType;
-      equipmentId?: string | null;
-    };
-
-    if (value.type === TASK_TEMPLATE_TYPE.TEMPERATURE && !value.equipmentId) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Equipment is required for temperature tasks",
-        path: ["equipmentId"],
-      });
-    }
-
-    if (value.type !== TASK_TEMPLATE_TYPE.TEMPERATURE && value.equipmentId) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Equipment applies only to temperature tasks",
-        path: ["equipmentId"],
-      });
-    }
-  });
-}
-
-export const createTaskTemplateSchema = withTaskTemplateValidation(
-  taskTemplateFieldsSchema,
-);
+export const createTaskTemplateSchema = taskTemplateFieldsSchema;
 
 export type CreateTaskTemplateInput = z.infer<typeof createTaskTemplateSchema>;
 
@@ -242,15 +226,26 @@ export const updateTaskTemplateSchema = createTaskTemplateSchema;
 
 export type UpdateTaskTemplateInput = CreateTaskTemplateInput;
 
+export const taskTemplateTargetResponseSchema = z.object({
+  targetId: z.uuid(),
+  targetName: z.string(),
+  limitOverrides: limitOverridesSchema,
+});
+
+export type TaskTemplateTargetResponse = z.infer<
+  typeof taskTemplateTargetResponseSchema
+>;
+
 export const taskTemplateResponseSchema = z.object({
   id: z.uuid(),
   locationId: z.uuid(),
   title: z.string(),
-  type: taskTemplateTypeSchema,
+  formId: z.uuid(),
+  formName: z.string(),
+  formCategory: formCategorySchema,
   weekdays: z.array(taskTemplateWeekdaySchema),
   scheduledTimes: z.array(scheduledTimeSchema),
-  equipmentId: z.uuid().nullable(),
-  equipmentName: z.string().nullable(),
+  targets: z.array(taskTemplateTargetResponseSchema),
   completionOpensBeforeMinutes: z.number().int(),
   completionDueAfterMinutes: z.number().int().nullable(),
   createdAt: z.iso.datetime(),
