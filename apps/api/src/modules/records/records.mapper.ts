@@ -3,11 +3,10 @@ import {
   deriveRecordEntryState,
   deriveRecordResult,
   deriveRecordTiming,
+  type FormCategory,
   type RecordDetail,
   type RecordItem,
-  type RecordTemperatureDetail,
-  type TaskTemplateType,
-  type TemperatureResult,
+  type RecordResult,
   type UserSummary,
 } from "@haccp/shared";
 import type { RecordRow } from "./records.repository.js";
@@ -21,33 +20,12 @@ function toUserSummary(
   return { id, firstName: firstName ?? "", lastName: lastName ?? "" };
 }
 
-function toTemperatureDetail(row: RecordRow): RecordTemperatureDetail | null {
-  if (
-    row.temperatureRecordedC === null ||
-    row.temperatureMinTempC === null ||
-    row.temperatureMaxTempC === null ||
-    row.temperatureResult === null
-  ) {
-    return null;
-  }
-
-  return {
-    recordedC: Number(row.temperatureRecordedC),
-    minTempC: Number(row.temperatureMinTempC),
-    maxTempC: Number(row.temperatureMaxTempC),
-    result: row.temperatureResult as TemperatureResult,
-    correctiveAction: row.correctiveAction,
-  };
-}
-
-function toRecordDetail(
-  row: RecordRow,
-  temperature: RecordTemperatureDetail | null,
-): RecordDetail | null {
+function toRecordDetail(row: RecordRow): RecordDetail | null {
   if (
     row.recordId === null ||
     row.recordCreatedAt === null ||
-    row.recordedAt === null
+    row.recordedAt === null ||
+    row.values === null
   ) {
     return null;
   }
@@ -72,12 +50,12 @@ function toRecordDetail(
       row.voidedByFirstName,
       row.voidedByLastName,
     ),
-    temperature,
+    values: row.values,
+    correctiveAction: row.correctiveAction,
   };
 }
 
 export function toRecordItem(row: RecordRow): RecordItem {
-  const temperature = toTemperatureDetail(row);
   const record =
     row.recordId === null || row.recordedAt === null
       ? null
@@ -91,15 +69,19 @@ export function toRecordItem(row: RecordRow): RecordItem {
     availableAt: row.availableAt.toISOString(),
     dueAt: row.dueAt === null ? null : row.dueAt.toISOString(),
     title: row.title,
-    type: row.type as TaskTemplateType,
-    equipmentId: row.equipmentId,
-    equipmentName: row.equipmentName,
-    minTempC: row.minTempC === null ? null : Number(row.minTempC),
-    maxTempC: row.maxTempC === null ? null : Number(row.maxTempC),
+    formVersionId: row.formVersionId,
+    category: row.category as FormCategory,
+    targetId: row.targetId,
+    targetName: row.targetName,
+    resolvedLimits: row.resolvedLimits,
     displayState: deriveRecordDisplayState({ record, dueAt: row.dueAt }),
     recordState: deriveRecordEntryState(record),
     timing: deriveRecordTiming({ record, dueAt: row.dueAt }),
-    result: deriveRecordResult(temperature),
-    record: toRecordDetail(row, temperature),
+    result: deriveRecordResult(
+      row.recordResult === null
+        ? null
+        : { result: row.recordResult as RecordResult },
+    ),
+    record: toRecordDetail(row),
   };
 }

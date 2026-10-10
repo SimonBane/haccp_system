@@ -1,25 +1,35 @@
 import type { TaskTemplateResponse } from "@haccp/shared";
 import { sortScheduledTimes, sortWeekdays } from "@haccp/shared";
-import { taskTemplates } from "../../core/db/schema/task-templates.js";
-
-type TaskTemplateRow = typeof taskTemplates.$inferSelect;
+import type {
+  TaskTemplateWithFormRow,
+  TemplateTargetRow,
+} from "./task-template.repository.js";
 
 export function toTaskTemplateResponse(
-  row: TaskTemplateRow,
-  equipmentName: string | null,
+  row: TaskTemplateWithFormRow,
+  targets: TemplateTargetRow[],
 ): TaskTemplateResponse {
+  const { template } = row;
+
   return {
-    id: row.id,
-    locationId: row.locationId,
-    title: row.title,
-    type: row.type as TaskTemplateResponse["type"],
-    weekdays: sortWeekdays(row.weekdays as TaskTemplateResponse["weekdays"]),
-    scheduledTimes: sortScheduledTimes(row.scheduledTimes),
-    equipmentId: row.equipmentId,
-    equipmentName,
-    completionOpensBeforeMinutes: row.completionOpensBeforeMinutes,
-    completionDueAfterMinutes: row.completionDueAfterMinutes,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
+    id: template.id,
+    locationId: template.locationId,
+    title: template.title,
+    formId: template.formId,
+    formName: row.formName,
+    formCategory: row.formCategory as TaskTemplateResponse["formCategory"],
+    weekdays: sortWeekdays(
+      template.weekdays as TaskTemplateResponse["weekdays"],
+    ),
+    scheduledTimes: sortScheduledTimes(template.scheduledTimes),
+    targets: targets.map((target) => ({
+      targetId: target.targetId,
+      targetName: target.targetName,
+      limitOverrides: target.limitOverrides,
+    })),
+    completionOpensBeforeMinutes: template.completionOpensBeforeMinutes,
+    completionDueAfterMinutes: template.completionDueAfterMinutes,
+    createdAt: template.createdAt.toISOString(),
+    updatedAt: template.updatedAt.toISOString(),
   };
 }

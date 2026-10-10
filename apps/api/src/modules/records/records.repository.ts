@@ -1,10 +1,11 @@
 import {
   RECORD_DISPLAY_STATE,
   RECORD_RESULT,
-  TEMPERATURE_RESULT,
   type RecordDisplayState,
   type RecordResult,
+  type RecordValues,
   type RecordsSortField,
+  type ResolvedLimits,
   type SortOrder,
 } from "@haccp/shared";
 import {
@@ -23,9 +24,10 @@ import {
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { DbClient } from "../../core/db/client.js";
+import { formVersions } from "../../core/db/schema/form-versions.js";
+import { forms } from "../../core/db/schema/forms.js";
 import { locations } from "../../core/db/schema/locations.js";
 import { taskOccurrences } from "../../core/db/schema/task-occurrences.js";
-import { taskRecordTemperatures } from "../../core/db/schema/task-record-temperatures.js";
 import { taskRecords } from "../../core/db/schema/task-records.js";
 import { users } from "../../core/db/schema/users.js";
 
@@ -42,7 +44,7 @@ export type RecordsScope = {
 };
 
 export type RecordsFilters = {
-  type?: string[];
+  category?: string[];
   state?: RecordDisplayState[];
   result?: RecordResult[];
 };
@@ -63,11 +65,11 @@ export type RecordRow = {
   availableAt: Date;
   dueAt: Date | null;
   title: string;
-  type: string;
-  equipmentId: string | null;
-  equipmentName: string | null;
-  minTempC: string | null;
-  maxTempC: string | null;
+  formVersionId: string;
+  category: string;
+  targetId: string | null;
+  targetName: string | null;
+  resolvedLimits: ResolvedLimits;
   recordId: string | null;
   recordCreatedAt: Date | null;
   recordedAt: Date | null;
@@ -81,10 +83,8 @@ export type RecordRow = {
   voidedById: string | null;
   voidedByFirstName: string | null;
   voidedByLastName: string | null;
-  temperatureRecordedC: string | null;
-  temperatureMinTempC: string | null;
-  temperatureMaxTempC: string | null;
-  temperatureResult: string | null;
+  recordResult: string | null;
+  values: RecordValues | null;
   correctiveAction: string | null;
 };
 
@@ -129,19 +129,22 @@ function displayStateCondition(state: RecordDisplayState): SQL {
 function resultCondition(result: RecordResult): SQL {
   switch (result) {
     case RECORD_RESULT.PASS:
-      return eq(taskRecordTemperatures.result, TEMPERATURE_RESULT.OK);
+      return eq(taskRecords.result, RECORD_RESULT.PASS);
     case RECORD_RESULT.FAIL:
-      return eq(taskRecordTemperatures.result, TEMPERATURE_RESULT.OUT_OF_RANGE);
+      return eq(taskRecords.result, RECORD_RESULT.FAIL);
     case RECORD_RESULT.NOT_EVALUATED:
-      return isNull(taskRecordTemperatures.taskRecordId);
+      return or(
+        isNull(taskRecords.id),
+        eq(taskRecords.result, RECORD_RESULT.NOT_EVALUATED),
+      )!;
   }
 }
 
 function filterCondition(filters: RecordsFilters): SQL | undefined {
   const conditions: SQL[] = [];
 
-  if (filters.type && filters.type.length > 0) {
-    conditions.push(inArray(taskOccurrences.type, filters.type));
+  if (filters.category && filters.category.length > 0) {
+    conditions.push(inArray(forms.category, filters.category));
   }
 
   if (filters.state && filters.state.length > 0) {
@@ -194,11 +197,11 @@ export const recordsRepository = {
         availableAt: taskOccurrences.availableAt,
         dueAt: taskOccurrences.dueAt,
         title: taskOccurrences.title,
-        type: taskOccurrences.type,
-        equipmentId: taskOccurrences.equipmentId,
-        equipmentName: taskOccurrences.equipmentName,
-        minTempC: taskOccurrences.minTempC,
-        maxTempC: taskOccurrences.maxTempC,
+        formVersionId: taskOccurrences.formVersionId,
+        category: forms.category,
+        targetId: taskOccurrences.targetId,
+        targetName: taskOccurrences.targetName,
+        resolvedLimits: taskOccurrences.resolvedLimits,
         recordId: taskRecords.id,
         recordCreatedAt: taskRecords.createdAt,
         recordedAt: taskRecords.recordedAt,
@@ -212,19 +215,18 @@ export const recordsRepository = {
         voidedById: voidedByUser.id,
         voidedByFirstName: voidedByUser.firstName,
         voidedByLastName: voidedByUser.lastName,
-        temperatureRecordedC: taskRecordTemperatures.recordedC,
-        temperatureMinTempC: taskRecordTemperatures.minTempC,
-        temperatureMaxTempC: taskRecordTemperatures.maxTempC,
-        temperatureResult: taskRecordTemperatures.result,
-        correctiveAction: taskRecordTemperatures.correctiveAction,
+        recordResult: taskRecords.result,
+        values: taskRecords.values,
+        correctiveAction: taskRecords.correctiveAction,
       })
       .from(taskOccurrences)
       .innerJoin(locations, eq(locations.id, taskOccurrences.locationId))
       .leftJoin(taskRecords, eq(taskRecords.occurrenceId, taskOccurrences.id))
-      .leftJoin(
-        taskRecordTemperatures,
-        eq(taskRecordTemperatures.taskRecordId, taskRecords.id),
+      .innerJoin(
+        formVersions,
+        eq(formVersions.id, taskOccurrences.formVersionId),
       )
+      .innerJoin(forms, eq(forms.id, formVersions.formId))
       .leftJoin(
         createdByUser,
         eq(createdByUser.id, taskRecords.createdByUserId),
@@ -254,10 +256,11 @@ export const recordsRepository = {
       .from(taskOccurrences)
       .innerJoin(locations, eq(locations.id, taskOccurrences.locationId))
       .leftJoin(taskRecords, eq(taskRecords.occurrenceId, taskOccurrences.id))
-      .leftJoin(
-        taskRecordTemperatures,
-        eq(taskRecordTemperatures.taskRecordId, taskRecords.id),
+      .innerJoin(
+        formVersions,
+        eq(formVersions.id, taskOccurrences.formVersionId),
       )
+      .innerJoin(forms, eq(forms.id, formVersions.formId))
       .where(where);
 
     return row?.total ?? 0;

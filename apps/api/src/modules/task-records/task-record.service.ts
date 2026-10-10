@@ -1,16 +1,13 @@
 import type {
-  RecordKind,
+  EvaluatedAnswers,
   TaskRecordInput,
   TaskRecordResponse,
-  TaskTemplateType,
-  TemperatureResult,
 } from "@haccp/shared";
 import {
   API_ERROR_CODE,
-  classifyTemperatureResult,
-  RECORD_KIND,
-  TASK_TEMPLATE_TYPE,
-  TEMPERATURE_RESULT,
+  buildAnswerSchema,
+  evaluateAnswers,
+  requiresCorrectiveAction,
 } from "@haccp/shared";
 import type { Db } from "../../core/db/client.js";
 import {
@@ -21,11 +18,10 @@ import {
   ValidationError,
 } from "../../core/errors/app-errors.js";
 import { mapDbMutationError } from "../../lib/db-errors.js";
-import { toTaskRecordResponse } from "./task-record.mapper.js";
+import { toReadingRows, toTaskRecordResponse } from "./task-record.mapper.js";
 import {
   taskRecordRepository,
   type OccurrenceForRecording,
-  type RecordChainRow,
 } from "./task-record.repository.js";
 
 type WriteScope = {
@@ -34,13 +30,7 @@ type WriteScope = {
   actorUserId: string;
 };
 
-type EvaluatedTemperature = {
-  recordedC: number;
-  minTempC: number;
-  maxTempC: number;
-  result: TemperatureResult;
-  correctiveAction: string | null;
-};
+type JudgedAnswers = EvaluatedAnswers & { correctiveAction: string | null };
 
 function assertOpened(availableAt: Date, now: Date): void {
   if (now.getTime() < availableAt.getTime()) {
@@ -48,52 +38,34 @@ function assertOpened(availableAt: Date, now: Date): void {
   }
 }
 
-function expectedKindFor(occurrenceType: TaskTemplateType): RecordKind {
-  return occurrenceType === TASK_TEMPLATE_TYPE.TEMPERATURE
-    ? RECORD_KIND.TEMPERATURE
-    : RECORD_KIND.ORDINARY;
-}
-
-function assertKindMatches(
+/**
+ * Validates against the occurrence's own form version and judges with the limits it was
+ * created with — never the form's current version — so a record means what it meant then.
+ */
+function judgeAnswers(
+  occurrence: OccurrenceForRecording,
   input: TaskRecordInput,
-  occurrenceType: TaskTemplateType,
-): void {
-  const expected = expectedKindFor(occurrenceType);
-
-  if (input.kind !== expected) {
-    throw new ValidationError(`This occurrence requires a ${expected} record`);
-  }
-}
-
-function evaluateTemperature(
-  input: Extract<TaskRecordInput, { kind: typeof RECORD_KIND.TEMPERATURE }>,
-  range: { minTempC: string | null; maxTempC: string | null },
-): EvaluatedTemperature {
-  if (range.minTempC === null || range.maxTempC === null) {
-    throw new InternalError(
-      "Temperature occurrence is missing its recorded range",
-    );
-  }
-
-  const recordedC = input.recordedC;
-  const minTempC = Number(range.minTempC);
-  const maxTempC = Number(range.maxTempC);
-  const result = classifyTemperatureResult({ recordedC, minTempC, maxTempC });
+): JudgedAnswers {
+  const answers = buildAnswerSchema(occurrence.definition).parse(input.values);
+  const evaluated = evaluateAnswers(
+    occurrence.definition,
+    occurrence.resolvedLimits,
+    answers,
+  );
   const correctiveAction = input.correctiveAction?.trim() || null;
 
-  if (result === TEMPERATURE_RESULT.OUT_OF_RANGE && !correctiveAction) {
+  if (
+    requiresCorrectiveAction(occurrence.definition, evaluated.result) &&
+    !correctiveAction
+  ) {
     throw new ValidationError(
-      "A corrective action is required for an out-of-range reading",
+      "A corrective action is required when a check fails",
     );
   }
 
   return {
-    recordedC,
-    minTempC,
-    maxTempC,
-    result,
-    correctiveAction:
-      result === TEMPERATURE_RESULT.OUT_OF_RANGE ? correctiveAction : null,
+    ...evaluated,
+    correctiveAction: evaluated.result === "fail" ? correctiveAction : null,
   };
 }
 
@@ -105,55 +77,48 @@ export const taskRecordService = {
   ): Promise<TaskRecordResponse> {
     const now = new Date();
 
-    const occurrence: OccurrenceForRecording | null =
-      await taskRecordRepository.findOccurrenceForRecording(db, scope);
+    const occurrence = await taskRecordRepository.findOccurrenceForRecording(
+      db,
+      scope,
+    );
 
     if (!occurrence) {
       throw new NotFoundError("Task occurrence not found");
     }
 
     assertOpened(occurrence.availableAt, now);
-    assertKindMatches(input, occurrence.type);
-
-    const temperature =
-      input.kind === RECORD_KIND.TEMPERATURE
-        ? evaluateTemperature(input, occurrence)
-        : null;
+    const judged = judgeAnswers(occurrence, input);
 
     try {
       return await db.transaction(async (tx) => {
-        const recordRow = await taskRecordRepository.insertRecord(tx, {
-          occurrenceId: scope.occurrenceId,
+        const record = await taskRecordRepository.insertRecord(tx, {
+          occurrenceId: occurrence.id,
+          formVersionId: occurrence.formVersionId,
+          values: judged.values,
+          result: judged.result,
+          correctiveAction: judged.correctiveAction,
           createdByUserId: scope.actorUserId,
           recordedAt: now,
           recordedByUserId: scope.actorUserId,
         });
 
-        if (!recordRow) {
+        if (!record) {
           throw new InternalError("Failed to create task record");
         }
 
-        if (!temperature) {
-          return toTaskRecordResponse(recordRow, null);
-        }
-
-        const detailRow = await taskRecordRepository.insertTemperatureDetail(
+        await taskRecordRepository.replaceReadings(
           tx,
-          {
-            taskRecordId: recordRow.id,
-            recordedC: String(temperature.recordedC),
-            minTempC: String(temperature.minTempC),
-            maxTempC: String(temperature.maxTempC),
-            result: temperature.result,
-            correctiveAction: temperature.correctiveAction,
-          },
+          record.id,
+          toReadingRows({
+            recordId: record.id,
+            locationId: occurrence.locationId,
+            targetId: occurrence.targetId,
+            recordedAt: now,
+            values: judged.values,
+          }),
         );
 
-        if (!detailRow) {
-          throw new InternalError("Failed to create temperature detail");
-        }
-
-        return toTaskRecordResponse(recordRow, detailRow);
+        return toTaskRecordResponse(record);
       });
     } catch (error) {
       if (error instanceof AppError) {
@@ -177,87 +142,65 @@ export const taskRecordService = {
   ): Promise<TaskRecordResponse> {
     const now = new Date();
 
-    const chain: RecordChainRow | null =
-      await taskRecordRepository.findRecordChain(db, scope);
+    const chain = await taskRecordRepository.findRecordChain(db, scope);
 
     if (!chain) {
       throw new NotFoundError("Task record not found");
     }
 
-    assertOpened(chain.availableAt, now);
-    assertKindMatches(input, chain.occurrenceType);
-
-    const temperature =
-      input.kind === RECORD_KIND.TEMPERATURE
-        ? evaluateTemperature(input, chain)
-        : null;
+    assertOpened(chain.occurrence.availableAt, now);
+    const judged = judgeAnswers(chain.occurrence, input);
 
     return db.transaction(async (tx) => {
-      const updatedRecord =
-        await taskRecordRepository.updateRecordForReactivation(
-          tx,
-          chain.recordId,
-          { recordedAt: now, recordedByUserId: scope.actorUserId },
-        );
-
-      if (!updatedRecord) {
-        throw new InternalError("Failed to update task record");
-      }
-
-      if (!temperature) {
-        return toTaskRecordResponse(updatedRecord, null);
-      }
-
-      const detailRow = await taskRecordRepository.replaceTemperatureDetail(
+      const record = await taskRecordRepository.updateRecordAnswers(
         tx,
-        chain.recordId,
+        chain.record.id,
         {
-          recordedC: String(temperature.recordedC),
-          minTempC: String(temperature.minTempC),
-          maxTempC: String(temperature.maxTempC),
-          result: temperature.result,
-          correctiveAction: temperature.correctiveAction,
+          values: judged.values,
+          result: judged.result,
+          correctiveAction: judged.correctiveAction,
+          recordedAt: now,
+          recordedByUserId: scope.actorUserId,
         },
       );
 
-      if (!detailRow) {
-        throw new InternalError("Failed to update temperature detail");
+      if (!record) {
+        throw new InternalError("Failed to update task record");
       }
 
-      return toTaskRecordResponse(updatedRecord, detailRow);
+      await taskRecordRepository.replaceReadings(
+        tx,
+        record.id,
+        toReadingRows({
+          recordId: record.id,
+          locationId: chain.occurrence.locationId,
+          targetId: chain.occurrence.targetId,
+          recordedAt: now,
+          values: judged.values,
+        }),
+      );
+
+      return toTaskRecordResponse(record);
     });
   },
 
   async remove(db: Db, scope: WriteScope): Promise<TaskRecordResponse> {
-    const chain: RecordChainRow | null =
-      await taskRecordRepository.findRecordChain(db, scope);
+    const chain = await taskRecordRepository.findRecordChain(db, scope);
 
-    if (!chain || chain.voidedAt !== null) {
+    if (!chain || chain.record.voidedAt !== null) {
       throw new NotFoundError("Task record not found");
     }
 
-    const now = new Date();
     const voided = await taskRecordRepository.voidActiveRecord(
       db,
-      chain.recordId,
-      { voidedAt: now, voidedByUserId: scope.actorUserId },
+      chain.record.id,
+      { voidedAt: new Date(), voidedByUserId: scope.actorUserId },
     );
 
     if (!voided) {
       throw new NotFoundError("Task record not found");
     }
 
-    const detail =
-      chain.detailRecordedC !== null
-        ? {
-            recordedC: chain.detailRecordedC,
-            minTempC: chain.detailMinTempC!,
-            maxTempC: chain.detailMaxTempC!,
-            result: chain.detailResult!,
-            correctiveAction: chain.detailCorrectiveAction,
-          }
-        : null;
-
-    return toTaskRecordResponse(voided, detail);
+    return toTaskRecordResponse(voided);
   },
 };

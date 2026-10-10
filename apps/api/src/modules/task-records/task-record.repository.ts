@@ -1,8 +1,12 @@
-import type { TaskTemplateType, TemperatureResult } from "@haccp/shared";
+import type { FormDefinition, ResolvedLimits } from "@haccp/shared";
 import { and, eq, isNull } from "drizzle-orm";
 import type { DbClient } from "../../core/db/client.js";
+import { formVersions } from "../../core/db/schema/form-versions.js";
 import { taskOccurrences } from "../../core/db/schema/task-occurrences.js";
-import { taskRecordTemperatures } from "../../core/db/schema/task-record-temperatures.js";
+import {
+  taskRecordReadings,
+  type NewTaskRecordReading,
+} from "../../core/db/schema/task-record-readings.js";
 import {
   taskRecords,
   type NewTaskRecord,
@@ -11,34 +15,17 @@ import {
 
 export type OccurrenceForRecording = {
   id: string;
-  type: TaskTemplateType;
-  occurrenceDate: string;
+  locationId: string;
+  targetId: string | null;
   availableAt: Date;
-  dueAt: Date | null;
-  minTempC: string | null;
-  maxTempC: string | null;
+  formVersionId: string;
+  definition: FormDefinition;
+  resolvedLimits: ResolvedLimits;
 };
 
 export type RecordChainRow = {
-  recordId: string;
-  occurrenceId: string;
-  createdAt: Date;
-  createdByUserId: string;
-  recordedAt: Date;
-  recordedByUserId: string;
-  voidedAt: Date | null;
-  voidedByUserId: string | null;
-  occurrenceType: TaskTemplateType;
-  occurrenceDate: string;
-  availableAt: Date;
-  dueAt: Date | null;
-  minTempC: string | null;
-  maxTempC: string | null;
-  detailRecordedC: string | null;
-  detailMinTempC: string | null;
-  detailMaxTempC: string | null;
-  detailResult: string | null;
-  detailCorrectiveAction: string | null;
+  record: TaskRecord;
+  occurrence: OccurrenceForRecording;
 };
 
 type OwnershipScope = {
@@ -46,9 +33,15 @@ type OwnershipScope = {
   occurrenceId: string;
 };
 
-export type NewTaskRecordTemperature =
-  typeof taskRecordTemperatures.$inferInsert;
-export type TaskRecordTemperature = typeof taskRecordTemperatures.$inferSelect;
+const occurrenceColumns = {
+  id: taskOccurrences.id,
+  locationId: taskOccurrences.locationId,
+  targetId: taskOccurrences.targetId,
+  availableAt: taskOccurrences.availableAt,
+  formVersionId: taskOccurrences.formVersionId,
+  definition: formVersions.definition,
+  resolvedLimits: taskOccurrences.resolvedLimits,
+};
 
 export const taskRecordRepository = {
   async findOccurrenceForRecording(
@@ -56,16 +49,12 @@ export const taskRecordRepository = {
     scope: OwnershipScope,
   ): Promise<OccurrenceForRecording | null> {
     const [row] = await db
-      .select({
-        id: taskOccurrences.id,
-        type: taskOccurrences.type,
-        occurrenceDate: taskOccurrences.occurrenceDate,
-        availableAt: taskOccurrences.availableAt,
-        dueAt: taskOccurrences.dueAt,
-        minTempC: taskOccurrences.minTempC,
-        maxTempC: taskOccurrences.maxTempC,
-      })
+      .select(occurrenceColumns)
       .from(taskOccurrences)
+      .innerJoin(
+        formVersions,
+        eq(formVersions.id, taskOccurrences.formVersionId),
+      )
       .where(
         and(
           eq(taskOccurrences.id, scope.occurrenceId),
@@ -74,7 +63,7 @@ export const taskRecordRepository = {
       )
       .limit(1);
 
-    return row ? { ...row, type: row.type as TaskTemplateType } : null;
+    return row ?? null;
   },
 
   async findRecordChain(
@@ -82,35 +71,15 @@ export const taskRecordRepository = {
     scope: OwnershipScope,
   ): Promise<RecordChainRow | null> {
     const [row] = await db
-      .select({
-        recordId: taskRecords.id,
-        occurrenceId: taskRecords.occurrenceId,
-        createdAt: taskRecords.createdAt,
-        createdByUserId: taskRecords.createdByUserId,
-        recordedAt: taskRecords.recordedAt,
-        recordedByUserId: taskRecords.recordedByUserId,
-        voidedAt: taskRecords.voidedAt,
-        voidedByUserId: taskRecords.voidedByUserId,
-        occurrenceType: taskOccurrences.type,
-        occurrenceDate: taskOccurrences.occurrenceDate,
-        availableAt: taskOccurrences.availableAt,
-        dueAt: taskOccurrences.dueAt,
-        minTempC: taskOccurrences.minTempC,
-        maxTempC: taskOccurrences.maxTempC,
-        detailRecordedC: taskRecordTemperatures.recordedC,
-        detailMinTempC: taskRecordTemperatures.minTempC,
-        detailMaxTempC: taskRecordTemperatures.maxTempC,
-        detailResult: taskRecordTemperatures.result,
-        detailCorrectiveAction: taskRecordTemperatures.correctiveAction,
-      })
+      .select({ record: taskRecords, occurrence: occurrenceColumns })
       .from(taskRecords)
       .innerJoin(
         taskOccurrences,
         eq(taskRecords.occurrenceId, taskOccurrences.id),
       )
-      .leftJoin(
-        taskRecordTemperatures,
-        eq(taskRecordTemperatures.taskRecordId, taskRecords.id),
+      .innerJoin(
+        formVersions,
+        eq(formVersions.id, taskOccurrences.formVersionId),
       )
       .where(
         and(
@@ -120,7 +89,7 @@ export const taskRecordRepository = {
       )
       .limit(1);
 
-    return row ? { ...row, occurrenceType: row.occurrenceType as TaskTemplateType } : null;
+    return row ?? null;
   },
 
   async insertRecord(
@@ -131,54 +100,40 @@ export const taskRecordRepository = {
     return created ?? null;
   },
 
-  async insertTemperatureDetail(
-    db: DbClient,
-    values: NewTaskRecordTemperature,
-  ): Promise<TaskRecordTemperature | null> {
-    const [created] = await db
-      .insert(taskRecordTemperatures)
-      .values(values)
-      .returning();
-    return created ?? null;
-  },
-
-  async updateRecordForReactivation(
+  /** Replaces the answers and reactivates a voided record; the occurrence and its form version never change. */
+  async updateRecordAnswers(
     db: DbClient,
     recordId: string,
-    values: { recordedAt: Date; recordedByUserId: string },
+    values: Pick<
+      NewTaskRecord,
+      | "values"
+      | "result"
+      | "correctiveAction"
+      | "recordedAt"
+      | "recordedByUserId"
+    >,
   ): Promise<TaskRecord | null> {
     const [updated] = await db
       .update(taskRecords)
-      .set({
-        recordedAt: values.recordedAt,
-        recordedByUserId: values.recordedByUserId,
-        voidedAt: null,
-        voidedByUserId: null,
-      })
+      .set({ ...values, voidedAt: null, voidedByUserId: null })
       .where(eq(taskRecords.id, recordId))
       .returning();
 
     return updated ?? null;
   },
 
-  async replaceTemperatureDetail(
+  async replaceReadings(
     db: DbClient,
-    taskRecordId: string,
-    values: {
-      recordedC: string;
-      minTempC: string;
-      maxTempC: string;
-      result: TemperatureResult;
-      correctiveAction: string | null;
-    },
-  ): Promise<TaskRecordTemperature | null> {
-    const [updated] = await db
-      .update(taskRecordTemperatures)
-      .set(values)
-      .where(eq(taskRecordTemperatures.taskRecordId, taskRecordId))
-      .returning();
+    recordId: string,
+    readings: NewTaskRecordReading[],
+  ): Promise<void> {
+    await db
+      .delete(taskRecordReadings)
+      .where(eq(taskRecordReadings.taskRecordId, recordId));
 
-    return updated ?? null;
+    if (readings.length > 0) {
+      await db.insert(taskRecordReadings).values(readings);
+    }
   },
 
   async voidActiveRecord(

@@ -7,11 +7,15 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../../src/core/db/client.js";
 import {
+  formVersions,
   taskOccurrences,
+  taskRecordReadings,
   taskRecords,
-  taskRecordTemperatures,
 } from "../../src/core/db/schema/index.js";
 import {
+  CLEANING_FIELD_ID,
+  FRIDGE_CHECK_DEFINITION,
+  FRIDGE_FIELD_ID,
   seedOrganization,
   seedTwoTenants,
   type SeededOrg,
@@ -23,6 +27,15 @@ import { apiRequest, asAdmin, asEmployee } from "./harness/request.js";
  * HACCP-13: the task-records service owns first submission, edit/reactivation
  * and soft void (Undo) for the single current record attached to an occurrence.
  */
+const CLEANED = { values: { [CLEANING_FIELD_ID]: true } };
+
+function reading(value: number, correctiveAction?: string) {
+  return {
+    values: { [FRIDGE_FIELD_ID]: value },
+    ...(correctiveAction === undefined ? {} : { correctiveAction }),
+  };
+}
+
 describe("Task record writes", () => {
   let org: SeededOrg;
 
@@ -38,9 +51,8 @@ describe("Task record writes", () => {
     type: "temperature" | "cleaning";
     occurrenceDate?: string;
     locationId?: string;
-    equipmentId?: string | null;
-    minTempC?: string | null;
-    maxTempC?: string | null;
+    formVersionId?: string;
+    maxTempC?: number;
     availableAt?: Date;
     dueAt?: Date | null;
   }): Promise<string> {
@@ -68,20 +80,18 @@ describe("Task record writes", () => {
             ? new Date(`${occurrenceDate}T08:00:00Z`)
             : overrides.dueAt,
         title: "Test occurrence",
-        type: overrides.type,
-        equipmentId:
+        formVersionId:
+          overrides.formVersionId ??
+          (overrides.type === "temperature"
+            ? org.forms.fridgeCheck.versionId
+            : org.forms.cleaning.versionId),
+        targetId:
+          overrides.type === "temperature" ? org.targets.fridge.id : null,
+        targetName: overrides.type === "temperature" ? "Fridge 1" : null,
+        resolvedLimits:
           overrides.type === "temperature"
-            ? (overrides.equipmentId ?? org.equipment.fridge.id)
-            : null,
-        equipmentName: overrides.type === "temperature" ? "Fridge 1" : null,
-        minTempC:
-          overrides.type === "temperature"
-            ? (overrides.minTempC ?? "0.0")
-            : null,
-        maxTempC:
-          overrides.type === "temperature"
-            ? (overrides.maxTempC ?? "5.0")
-            : null,
+            ? { [FRIDGE_FIELD_ID]: { min: 0, max: overrides.maxTempC ?? 5 } }
+            : {},
       })
       .returning({ id: taskOccurrences.id });
 
@@ -93,7 +103,7 @@ describe("Task record writes", () => {
   }
 
   describe("POST — first submission", () => {
-    it("submits an ordinary record", async () => {
+    it("submits a record for a form that cannot fail as not evaluated", async () => {
       const occurrenceId = await insertOccurrence({ type: "cleaning" });
 
       const response = await apiRequest(
@@ -101,7 +111,7 @@ describe("Task record writes", () => {
         {
           method: "POST",
           actor: asEmployee(org),
-          body: JSON.stringify({ kind: "ordinary" }),
+          body: JSON.stringify(CLEANED),
         },
       );
 
@@ -114,11 +124,14 @@ describe("Task record writes", () => {
         createdByUserId: org.employee.userId,
         voidedAt: null,
         voidedByUserId: null,
-        temperature: null,
+        formVersionId: org.forms.cleaning.versionId,
+        result: "not_evaluated",
+        values: { [CLEANING_FIELD_ID]: { type: "checkbox", value: true } },
+        correctiveAction: null,
       });
     });
 
-    it("submits a passing temperature record", async () => {
+    it("submits a passing reading and stores it as a typed reading", async () => {
       const occurrenceId = await insertOccurrence({ type: "temperature" });
 
       const response = await apiRequest(
@@ -126,22 +139,40 @@ describe("Task record writes", () => {
         {
           method: "POST",
           actor: asEmployee(org),
-          body: JSON.stringify({ kind: "temperature", recordedC: 3 }),
+          body: JSON.stringify(reading(3)),
         },
       );
 
       expect(response.status).toBe(201);
       const body = taskRecordResponseSchema.parse(await response.json());
-      expect(body.temperature).toEqual({
-        recordedC: 3,
-        minTempC: 0,
-        maxTempC: 5,
-        result: "ok",
-        correctiveAction: null,
+      expect(body.result).toBe("pass");
+      expect(body.values[FRIDGE_FIELD_ID]).toEqual({
+        type: "measurement",
+        value: 3,
+        unit: "celsius",
+        min: 0,
+        max: 5,
+        fails: false,
+      });
+
+      const readings = await db
+        .select()
+        .from(taskRecordReadings)
+        .where(eq(taskRecordReadings.taskRecordId, body.id));
+      expect(readings).toHaveLength(1);
+      expect(readings[0]).toMatchObject({
+        fieldId: FRIDGE_FIELD_ID,
+        targetId: org.targets.fridge.id,
+        locationId: org.locations.main.id,
+        unit: "celsius",
+        value: "3.0000",
+        minValue: "0.0000",
+        maxValue: "5.0000",
+        fails: false,
       });
     });
 
-    it("rejects a failing temperature reading with no corrective action", async () => {
+    it("rejects a failing reading with no corrective action", async () => {
       const occurrenceId = await insertOccurrence({ type: "temperature" });
 
       const response = await apiRequest(
@@ -149,7 +180,7 @@ describe("Task record writes", () => {
         {
           method: "POST",
           actor: asEmployee(org),
-          body: JSON.stringify({ kind: "temperature", recordedC: 12 }),
+          body: JSON.stringify(reading(12)),
         },
       );
 
@@ -162,7 +193,7 @@ describe("Task record writes", () => {
       expect(rows).toHaveLength(0);
     });
 
-    it("accepts a failing temperature reading with a corrective action", async () => {
+    it("accepts a failing reading with a corrective action", async () => {
       const occurrenceId = await insertOccurrence({ type: "temperature" });
 
       const response = await apiRequest(
@@ -170,26 +201,60 @@ describe("Task record writes", () => {
         {
           method: "POST",
           actor: asEmployee(org),
-          body: JSON.stringify({
-            kind: "temperature",
-            recordedC: 12,
-            correctiveAction: "Moved stock to backup fridge",
-          }),
+          body: JSON.stringify(reading(12, "Moved stock to backup fridge")),
         },
       );
 
       expect(response.status).toBe(201);
       const body = taskRecordResponseSchema.parse(await response.json());
-      expect(body.temperature).toEqual({
-        recordedC: 12,
-        minTempC: 0,
-        maxTempC: 5,
-        result: "out_of_range",
-        correctiveAction: "Moved stock to backup fridge",
+      expect(body.result).toBe("fail");
+      expect(body.values[FRIDGE_FIELD_ID]).toMatchObject({
+        value: 12,
+        fails: true,
       });
+      expect(body.correctiveAction).toBe("Moved stock to backup fridge");
     });
 
-    it("rejects a reading outside the -99.9..99.9 technical bound", async () => {
+    it("judges a reading against the occurrence's resolved limits, not the form's default", async () => {
+      const occurrenceId = await insertOccurrence({
+        type: "temperature",
+        maxTempC: 2,
+      });
+
+      const response = await apiRequest(
+        recordPath(org.locations.main.id, occurrenceId),
+        {
+          method: "POST",
+          actor: asEmployee(org),
+          body: JSON.stringify(reading(3)),
+        },
+      );
+
+      // 3 °C is inside the form's 0–5 default but outside this target's 0–2 override.
+      expect(response.status).toBe(400);
+    });
+
+    it("validates against the occurrence's own form version after a newer one exists", async () => {
+      const [newer] = await db
+        .insert(formVersions)
+        .values({
+          formId: org.forms.fridgeCheck.id,
+          version: 2,
+          definition: {
+            ...FRIDGE_CHECK_DEFINITION,
+            fields: [
+              ...FRIDGE_CHECK_DEFINITION.fields,
+              {
+                id: "door_closed",
+                type: "checkbox",
+                label: "Door closed",
+                required: true,
+              },
+            ],
+          },
+        })
+        .returning();
+      expect(newer).toBeDefined();
       const occurrenceId = await insertOccurrence({ type: "temperature" });
 
       const response = await apiRequest(
@@ -197,14 +262,31 @@ describe("Task record writes", () => {
         {
           method: "POST",
           actor: asEmployee(org),
-          body: JSON.stringify({ kind: "temperature", recordedC: 150 }),
+          body: JSON.stringify(reading(3)),
+        },
+      );
+
+      expect(response.status).toBe(201);
+      const body = taskRecordResponseSchema.parse(await response.json());
+      expect(body.formVersionId).toBe(org.forms.fridgeCheck.versionId);
+    });
+
+    it("rejects a reading outside the unit's range", async () => {
+      const occurrenceId = await insertOccurrence({ type: "temperature" });
+
+      const response = await apiRequest(
+        recordPath(org.locations.main.id, occurrenceId),
+        {
+          method: "POST",
+          actor: asEmployee(org),
+          body: JSON.stringify(reading(150)),
         },
       );
 
       expect(response.status).toBe(400);
     });
 
-    it("rejects a temperature payload against a cleaning occurrence", async () => {
+    it("rejects an answer for a field the occurrence's form does not have", async () => {
       const occurrenceId = await insertOccurrence({ type: "cleaning" });
 
       const response = await apiRequest(
@@ -212,14 +294,14 @@ describe("Task record writes", () => {
         {
           method: "POST",
           actor: asEmployee(org),
-          body: JSON.stringify({ kind: "temperature", recordedC: 3 }),
+          body: JSON.stringify(reading(3)),
         },
       );
 
       expect(response.status).toBe(400);
     });
 
-    it("rejects an ordinary payload against a temperature occurrence", async () => {
+    it("rejects a missing required answer", async () => {
       const occurrenceId = await insertOccurrence({ type: "temperature" });
 
       const response = await apiRequest(
@@ -227,7 +309,22 @@ describe("Task record writes", () => {
         {
           method: "POST",
           actor: asEmployee(org),
-          body: JSON.stringify({ kind: "ordinary" }),
+          body: JSON.stringify({ values: {} }),
+        },
+      );
+
+      expect(response.status).toBe(400);
+    });
+
+    it("rejects an unticked required checkbox", async () => {
+      const occurrenceId = await insertOccurrence({ type: "cleaning" });
+
+      const response = await apiRequest(
+        recordPath(org.locations.main.id, occurrenceId),
+        {
+          method: "POST",
+          actor: asEmployee(org),
+          body: JSON.stringify({ values: { [CLEANING_FIELD_ID]: false } }),
         },
       );
 
@@ -242,7 +339,7 @@ describe("Task record writes", () => {
         {
           method: "POST",
           actor: asEmployee(org),
-          body: JSON.stringify({ kind: "ordinary" }),
+          body: JSON.stringify(CLEANED),
         },
       );
       expect(first.status).toBe(201);
@@ -253,7 +350,7 @@ describe("Task record writes", () => {
         {
           method: "POST",
           actor: asAdmin(org),
-          body: JSON.stringify({ kind: "ordinary" }),
+          body: JSON.stringify(CLEANED),
         },
       );
       expect(second.status).toBe(409);
@@ -278,7 +375,7 @@ describe("Task record writes", () => {
         {
           method: "POST",
           actor: asEmployee(org),
-          body: JSON.stringify({ kind: "ordinary" }),
+          body: JSON.stringify(CLEANED),
         },
       );
 
@@ -296,7 +393,7 @@ describe("Task record writes", () => {
         {
           method: "POST",
           actor: asEmployee(org),
-          body: JSON.stringify({ kind: "ordinary" }),
+          body: JSON.stringify(CLEANED),
         },
       );
 
@@ -315,7 +412,7 @@ describe("Task record writes", () => {
         {
           method: "POST",
           actor: asEmployee(org),
-          body: JSON.stringify({ kind: "ordinary" }),
+          body: JSON.stringify(CLEANED),
         },
       );
 
@@ -333,7 +430,7 @@ describe("Task record writes", () => {
         {
           method: "POST",
           actor: asEmployee(org),
-          body: JSON.stringify({ kind: "ordinary" }),
+          body: JSON.stringify(CLEANED),
         },
       );
 
@@ -351,7 +448,7 @@ describe("Task record writes", () => {
         {
           method: "POST",
           actor: asEmployee(org),
-          body: JSON.stringify({ kind: "ordinary" }),
+          body: JSON.stringify(CLEANED),
         },
       );
 
@@ -371,7 +468,7 @@ describe("Task record writes", () => {
         {
           method: "POST",
           actor: asEmployee(org),
-          body: JSON.stringify({ kind: "ordinary" }),
+          body: JSON.stringify(CLEANED),
         },
       );
 
@@ -388,19 +485,19 @@ describe("Task record writes", () => {
         {
           method: "PUT",
           actor: asEmployee(org),
-          body: JSON.stringify({ kind: "ordinary" }),
+          body: JSON.stringify(CLEANED),
         },
       );
 
       expect(response.status).toBe(404);
     });
 
-    it("replaces the current temperature detail and attribution on an active record", async () => {
+    it("replaces the answers, readings and attribution on an active record", async () => {
       const occurrenceId = await insertOccurrence({ type: "temperature" });
       await apiRequest(recordPath(org.locations.main.id, occurrenceId), {
         method: "POST",
         actor: asEmployee(org),
-        body: JSON.stringify({ kind: "temperature", recordedC: 3 }),
+        body: JSON.stringify(reading(3)),
       });
 
       const response = await apiRequest(
@@ -408,38 +505,31 @@ describe("Task record writes", () => {
         {
           method: "PUT",
           actor: asAdmin(org),
-          body: JSON.stringify({
-            kind: "temperature",
-            recordedC: 12,
-            correctiveAction: "Moved stock",
-          }),
+          body: JSON.stringify(reading(12, "Moved stock")),
         },
       );
 
       expect(response.status).toBe(200);
       const body = taskRecordResponseSchema.parse(await response.json());
-      expect(body.temperature).toEqual({
-        recordedC: 12,
-        minTempC: 0,
-        maxTempC: 5,
-        result: "out_of_range",
-        correctiveAction: "Moved stock",
-      });
+      expect(body.result).toBe("fail");
+      expect(body.correctiveAction).toBe("Moved stock");
       expect(body.recordedByUserId).toBe(org.admin.userId);
 
-      const [detailRow] = await db
+      const readings = await db
         .select()
-        .from(taskRecordTemperatures)
-        .where(eq(taskRecordTemperatures.taskRecordId, body.id));
-      expect(detailRow?.recordedC).toBe("12.0");
+        .from(taskRecordReadings)
+        .where(eq(taskRecordReadings.taskRecordId, body.id));
+      expect(readings.map((row) => [row.value, row.fails])).toEqual([
+        ["12.0000", true],
+      ]);
     });
 
-    it("reactivates a voided ordinary record and clears void attribution", async () => {
+    it("reactivates a voided record and clears void attribution", async () => {
       const occurrenceId = await insertOccurrence({ type: "cleaning" });
       await apiRequest(recordPath(org.locations.main.id, occurrenceId), {
         method: "POST",
         actor: asEmployee(org),
-        body: JSON.stringify({ kind: "ordinary" }),
+        body: JSON.stringify(CLEANED),
       });
       await apiRequest(recordPath(org.locations.main.id, occurrenceId), {
         method: "DELETE",
@@ -451,7 +541,7 @@ describe("Task record writes", () => {
         {
           method: "PUT",
           actor: asEmployee(org),
-          body: JSON.stringify({ kind: "ordinary" }),
+          body: JSON.stringify(CLEANED),
         },
       );
 
@@ -462,12 +552,12 @@ describe("Task record writes", () => {
       expect(body.voidedByUserId).toBeNull();
     });
 
-    it("reactivates a voided temperature record, restoring its detail", async () => {
+    it("reactivates a voided reading with new answers", async () => {
       const occurrenceId = await insertOccurrence({ type: "temperature" });
       await apiRequest(recordPath(org.locations.main.id, occurrenceId), {
         method: "POST",
         actor: asEmployee(org),
-        body: JSON.stringify({ kind: "temperature", recordedC: 3 }),
+        body: JSON.stringify(reading(3)),
       });
       await apiRequest(recordPath(org.locations.main.id, occurrenceId), {
         method: "DELETE",
@@ -479,7 +569,7 @@ describe("Task record writes", () => {
         {
           method: "PUT",
           actor: asEmployee(org),
-          body: JSON.stringify({ kind: "temperature", recordedC: 2 }),
+          body: JSON.stringify(reading(2)),
         },
       );
 
@@ -487,19 +577,19 @@ describe("Task record writes", () => {
       const body = taskRecordResponseSchema.parse(await response.json());
       expect(body.active).toBe(true);
       expect(body.voidedAt).toBeNull();
-      expect(body.temperature?.recordedC).toBe(2);
+      expect(body.values[FRIDGE_FIELD_ID]).toMatchObject({ value: 2 });
     });
   });
 
   describe("DELETE — soft void / Undo", () => {
-    it("retains the row and temperature detail, setting void attribution", async () => {
+    it("retains the row, answers and readings, setting void attribution", async () => {
       const occurrenceId = await insertOccurrence({ type: "temperature" });
       const created = await apiRequest(
         recordPath(org.locations.main.id, occurrenceId),
         {
           method: "POST",
           actor: asEmployee(org),
-          body: JSON.stringify({ kind: "temperature", recordedC: 3 }),
+          body: JSON.stringify(reading(3)),
         },
       );
       const createdBody = taskRecordResponseSchema.parse(await created.json());
@@ -513,18 +603,19 @@ describe("Task record writes", () => {
       const body = taskRecordResponseSchema.parse(await response.json());
       expect(body.active).toBe(false);
       expect(body.voidedByUserId).toBe(org.admin.userId);
-      expect(body.temperature).toEqual(createdBody.temperature);
+      expect(body.values).toEqual(createdBody.values);
+      expect(body.result).toBe(createdBody.result);
 
       const [recordRow] = await db
         .select()
         .from(taskRecords)
         .where(eq(taskRecords.occurrenceId, occurrenceId));
       expect(recordRow).toBeDefined();
-      const [detailRow] = await db
+      const readings = await db
         .select()
-        .from(taskRecordTemperatures)
-        .where(eq(taskRecordTemperatures.taskRecordId, recordRow!.id));
-      expect(detailRow).toBeDefined();
+        .from(taskRecordReadings)
+        .where(eq(taskRecordReadings.taskRecordId, recordRow!.id));
+      expect(readings).toHaveLength(1);
     });
 
     it("accepts no reason payload", async () => {
@@ -532,7 +623,7 @@ describe("Task record writes", () => {
       await apiRequest(recordPath(org.locations.main.id, occurrenceId), {
         method: "POST",
         actor: asEmployee(org),
-        body: JSON.stringify({ kind: "ordinary" }),
+        body: JSON.stringify(CLEANED),
       });
 
       const response = await apiRequest(
@@ -548,7 +639,7 @@ describe("Task record writes", () => {
       await apiRequest(recordPath(org.locations.main.id, occurrenceId), {
         method: "POST",
         actor: asEmployee(org),
-        body: JSON.stringify({ kind: "ordinary" }),
+        body: JSON.stringify(CLEANED),
       });
       await apiRequest(recordPath(org.locations.main.id, occurrenceId), {
         method: "DELETE",
@@ -587,7 +678,7 @@ describe("Task record writes", () => {
         {
           method: "POST",
           actor: asAdmin(org),
-          body: JSON.stringify({ kind: "ordinary" }),
+          body: JSON.stringify(CLEANED),
         },
       );
 
@@ -606,7 +697,7 @@ describe("Task record writes", () => {
           availableAt: new Date(Date.now() - 60_000),
           dueAt: new Date(),
           title: "Alpha occurrence",
-          type: "cleaning",
+          formVersionId: world.alpha.forms.cleaning.versionId,
         })
         .returning({ id: taskOccurrences.id });
 
@@ -615,7 +706,7 @@ describe("Task record writes", () => {
         {
           method: "POST",
           actor: asAdmin(world.beta),
-          body: JSON.stringify({ kind: "ordinary" }),
+          body: JSON.stringify(CLEANED),
         },
       );
 

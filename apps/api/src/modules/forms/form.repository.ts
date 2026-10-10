@@ -51,7 +51,31 @@ function withLatest(
   });
 }
 
+export type FormVersionSummaryRow = {
+  version: FormVersionRow;
+  formName: string;
+  category: string;
+};
+
 export const formRepository = {
+  /** Versions in use by occurrences resolve here even after their form is archived. */
+  async findVersionSummariesByIds(
+    db: DbClient,
+    versionIds: string[],
+  ): Promise<FormVersionSummaryRow[]> {
+    if (versionIds.length === 0) return [];
+
+    return db
+      .select({
+        version: formVersions,
+        formName: forms.name,
+        category: forms.category,
+      })
+      .from(formVersions)
+      .innerJoin(forms, eq(forms.id, formVersions.formId))
+      .where(inArray(formVersions.id, versionIds));
+  },
+
   async findManyActiveWithLatestVersion(
     db: DbClient,
     organizationId: string,

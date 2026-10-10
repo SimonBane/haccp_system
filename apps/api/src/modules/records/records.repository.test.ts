@@ -86,19 +86,24 @@ describe("display-state predicates", () => {
 });
 
 describe("result predicates", () => {
-  it("maps pass and fail onto the stored temperature result", () => {
+  it("maps pass and fail onto the stored record result", () => {
     const pass = render(recordsQueryInternals.resultCondition("pass"));
     const fail = render(recordsQueryInternals.resultCondition("fail"));
 
-    expect(pass.sql).toBe('"task_record_temperatures"."result" = $1');
-    expect(pass.params).toEqual(["ok"]);
-    expect(fail.params).toEqual(["out_of_range"]);
+    expect(pass.sql).toBe('"task_records"."result" = $1');
+    expect(pass.params).toEqual(["pass"]);
+    expect(fail.params).toEqual(["fail"]);
   });
 
-  it("maps not_evaluated onto a missing temperature detail", () => {
-    expect(
-      render(recordsQueryInternals.resultCondition("not_evaluated")).sql,
-    ).toBe('"task_record_temperatures"."task_record_id" is null');
+  it("maps not_evaluated onto a record judged so, or no record at all", () => {
+    const notEvaluated = render(
+      recordsQueryInternals.resultCondition("not_evaluated"),
+    );
+
+    expect(notEvaluated.sql).toBe(
+      '("task_records"."id" is null or "task_records"."result" = $1)',
+    );
+    expect(notEvaluated.params).toEqual(["not_evaluated"]);
   });
 });
 
@@ -107,7 +112,7 @@ describe("filter composition", () => {
     expect(recordsQueryInternals.filterCondition({})).toBeUndefined();
     expect(
       recordsQueryInternals.filterCondition({
-        type: [],
+        category: [],
         state: [],
         result: [],
       }),
@@ -128,23 +133,23 @@ describe("filter composition", () => {
   it("ANDs different filters together", () => {
     const { sql, params } = render(
       recordsQueryInternals.filterCondition({
-        type: ["temperature", "cleaning"],
+        category: ["temperature", "cleaning"],
         state: ["voided"],
         result: ["fail"],
       })!,
     );
 
-    expect(sql).toContain('"task_occurrences"."type" in ');
+    expect(sql).toContain('"forms"."category" in ');
     expect(sql).toContain('"task_records"."voided_at" is not null');
-    expect(sql).toContain('"task_record_temperatures"."result" = ');
+    expect(sql).toContain('"task_records"."result" = ');
     expect(params).toEqual(
-      expect.arrayContaining(["temperature", "cleaning", "out_of_range"]),
+      expect.arrayContaining(["temperature", "cleaning", "fail"]),
     );
   });
 
   it("parameterizes every filter value instead of interpolating it", () => {
     const { sql } = render(
-      recordsQueryInternals.filterCondition({ type: ["temperature"] })!,
+      recordsQueryInternals.filterCondition({ category: ["temperature"] })!,
     );
 
     expect(sql).not.toContain("temperature");

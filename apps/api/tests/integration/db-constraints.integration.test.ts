@@ -2,14 +2,20 @@ import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../../src/core/db/client.js";
 import {
-  equipment,
   locations,
   organizationMemberLocations,
-  taskTemplates,
+  targets,
+  taskOccurrences,
+  taskRecords,
+  taskTemplateTargets,
   users,
 } from "../../src/core/db/schema/index.js";
 import { PG_ERROR, postgresErrorCode } from "./harness/db.js";
-import { seedTwoTenants, type TwoTenantWorld } from "./harness/fixtures.js";
+import {
+  seedOccurrence,
+  seedTwoTenants,
+  type TwoTenantWorld,
+} from "./harness/fixtures.js";
 
 /**
  * Invariants the database enforces without application code, so a service bug or a
@@ -91,90 +97,171 @@ describe("database constraints", () => {
     expect(betaDefaults).toHaveLength(1);
   });
 
-  it("rejects equipment whose minimum temperature is not below its maximum", async () => {
-    const code = await codeFor(
-      db.insert(equipment).values({
-        locationId: world.alpha.locations.main.id,
-        name: "Broken range",
-        type: "fridge",
-        minTempC: "8.0",
-        maxTempC: "4.0",
-      }),
-    );
-
-    expect(code).toBe(PG_ERROR.CHECK_VIOLATION);
-  });
-
-  it("rejects duplicate equipment names within a location but not across locations", async () => {
+  it("rejects duplicate active target names within a location but not across locations", async () => {
     const duplicate = await codeFor(
-      db.insert(equipment).values({
+      db.insert(targets).values({
         locationId: world.alpha.locations.main.id,
-        name: world.alpha.equipment.fridge.name,
-        type: "fridge",
-        minTempC: "0.0",
-        maxTempC: "5.0",
+        targetTypeId: world.alpha.targetTypes.fridge.id,
+        name: world.alpha.targets.fridge.name,
       }),
     );
 
     expect(duplicate).toBe(PG_ERROR.UNIQUE_VIOLATION);
 
     const sameNameElsewhere = await codeFor(
-      db.insert(equipment).values({
+      db.insert(targets).values({
         locationId: world.alpha.locations.annex.id,
-        name: world.alpha.equipment.fridge.name,
-        type: "fridge",
-        minTempC: "0.0",
-        maxTempC: "5.0",
+        targetTypeId: world.alpha.targetTypes.fridge.id,
+        name: world.alpha.targets.fridge.name,
       }),
     );
 
     expect(sameNameElsewhere).toBeNull();
   });
 
-  it("refuses a task template's equipment from another location in the same org", async () => {
-    // The composite (equipment_id, location_id) FK: HACCP-58's ownership guarantee.
-    const code = await codeFor(
-      db.insert(taskTemplates).values({
-        locationId: world.alpha.locations.annex.id,
-        title: "Cross-location check",
-        type: "temperature",
-        weekdays: ["monday"],
-        scheduledTimes: ["08:00"],
-        equipmentId: world.alpha.equipment.fridge.id,
-      }),
-    );
+  it("frees an archived target's name for a new one", async () => {
+    await db
+      .update(targets)
+      .set({ archivedAt: new Date() })
+      .where(sql`${targets.id} = ${world.alpha.targets.fridge.id}`);
 
-    expect(code).toBe(PG_ERROR.FOREIGN_KEY_VIOLATION);
-  });
-
-  it("refuses a task template's equipment from another organization", async () => {
     const code = await codeFor(
-      db.insert(taskTemplates).values({
+      db.insert(targets).values({
         locationId: world.alpha.locations.main.id,
-        title: "Cross-org check",
-        type: "temperature",
-        weekdays: ["monday"],
-        scheduledTimes: ["08:00"],
-        equipmentId: world.beta.equipment.fridge.id,
-      }),
-    );
-
-    expect(code).toBe(PG_ERROR.FOREIGN_KEY_VIOLATION);
-  });
-
-  it("accepts a task template's equipment from its own location", async () => {
-    const code = await codeFor(
-      db.insert(taskTemplates).values({
-        locationId: world.alpha.locations.main.id,
-        title: "Same-location check",
-        type: "temperature",
-        weekdays: ["monday"],
-        scheduledTimes: ["08:00"],
-        equipmentId: world.alpha.equipment.fridge.id,
+        targetTypeId: world.alpha.targetTypes.fridge.id,
+        name: world.alpha.targets.fridge.name,
       }),
     );
 
     expect(code).toBeNull();
+  });
+
+  it("refuses a target as its own parent", async () => {
+    const code = await codeFor(
+      db
+        .update(targets)
+        .set({ parentId: world.alpha.targets.fridge.id })
+        .where(sql`${targets.id} = ${world.alpha.targets.fridge.id}`),
+    );
+
+    expect(code).toBe(PG_ERROR.CHECK_VIOLATION);
+  });
+
+  it("refuses a parent target from another location", async () => {
+    const code = await codeFor(
+      db.insert(targets).values({
+        locationId: world.alpha.locations.annex.id,
+        targetTypeId: world.alpha.targetTypes.fridge.id,
+        name: "Annex shelf",
+        parentId: world.alpha.targets.fridge.id,
+      }),
+    );
+
+    expect(code).toBe(PG_ERROR.FOREIGN_KEY_VIOLATION);
+  });
+
+  it("refuses to link a template to a target from another location in the same org", async () => {
+    // Composite (target_id, location_id) and (task_template_id, location_id) FKs pin both to one location.
+    const asTargetsLocation = await codeFor(
+      db.insert(taskTemplateTargets).values({
+        taskTemplateId: world.alpha.templates.cleaning.id,
+        targetId: world.alpha.targets.fridge.id,
+        locationId: world.alpha.locations.annex.id,
+      }),
+    );
+    expect(asTargetsLocation).toBe(PG_ERROR.FOREIGN_KEY_VIOLATION);
+  });
+
+  it("refuses to link a template to a target from another organization", async () => {
+    const code = await codeFor(
+      db.insert(taskTemplateTargets).values({
+        taskTemplateId: world.alpha.templates.cleaning.id,
+        targetId: world.beta.targets.fridge.id,
+        locationId: world.alpha.locations.main.id,
+      }),
+    );
+
+    expect(code).toBe(PG_ERROR.FOREIGN_KEY_VIOLATION);
+  });
+
+  it("accepts a template's target from its own location", async () => {
+    const code = await codeFor(
+      db.insert(taskTemplateTargets).values({
+        taskTemplateId: world.alpha.templates.cleaning.id,
+        targetId: world.alpha.targets.fridge.id,
+        locationId: world.alpha.locations.main.id,
+      }),
+    );
+
+    expect(code).toBeNull();
+  });
+
+  it("keeps one untargeted occurrence per template and slot", async () => {
+    await seedOccurrence(db, world.alpha, {
+      type: "cleaning",
+      occurrenceDate: "2026-03-02",
+    });
+
+    const code = await codeFor(
+      seedOccurrence(db, world.alpha, {
+        type: "cleaning",
+        occurrenceDate: "2026-03-02",
+      }),
+    );
+
+    expect(code).toBe(PG_ERROR.UNIQUE_VIOLATION);
+  });
+
+  it("allows one occurrence per target in the same slot", async () => {
+    await seedOccurrence(db, world.alpha, {
+      type: "temperature",
+      occurrenceDate: "2026-03-02",
+    });
+    const [second] = await db
+      .insert(targets)
+      .values({
+        locationId: world.alpha.locations.main.id,
+        targetTypeId: world.alpha.targetTypes.fridge.id,
+        name: "Fridge 2",
+      })
+      .returning();
+
+    const code = await codeFor(
+      db.insert(taskOccurrences).values({
+        locationId: world.alpha.locations.main.id,
+        taskTemplateId: world.alpha.templates.temperature.id,
+        occurrenceDate: "2026-03-02",
+        scheduledTime: "08:00",
+        availableAt: new Date("2026-03-02T00:00:00Z"),
+        title: world.alpha.templates.temperature.title,
+        formVersionId: world.alpha.forms.fridgeCheck.versionId,
+        targetId: second!.id,
+        targetName: second!.name,
+      }),
+    );
+
+    expect(code).toBeNull();
+  });
+
+  it("refuses an unknown record result", async () => {
+    const occurrenceId = await seedOccurrence(db, world.alpha, {
+      type: "cleaning",
+      occurrenceDate: "2026-03-02",
+    });
+
+    const code = await codeFor(
+      db.insert(taskRecords).values({
+        occurrenceId,
+        formVersionId: world.alpha.forms.cleaning.versionId,
+        values: {},
+        result: "ok",
+        createdByUserId: world.alpha.admin.userId,
+        recordedAt: new Date(),
+        recordedByUserId: world.alpha.admin.userId,
+      }),
+    );
+
+    expect(code).toBe(PG_ERROR.CHECK_VIOLATION);
   });
 
   it("treats user email as globally unique, not per tenant", async () => {
@@ -191,7 +278,7 @@ describe("database constraints", () => {
     expect(code).toBe(PG_ERROR.UNIQUE_VIOLATION);
   });
 
-  it("no longer has task_completions or temperature_logs", async () => {
+  it("no longer has the retired equipment and temperature tables", async () => {
     const tables = (
       await db.execute<{ tablename: string }>(
         sql`select tablename from pg_tables where schemaname = 'public'`,
@@ -200,6 +287,11 @@ describe("database constraints", () => {
 
     expect(tables).not.toContain("task_completions");
     expect(tables).not.toContain("temperature_logs");
+    expect(tables).not.toContain("equipment");
+    expect(tables).not.toContain("task_record_temperatures");
+    expect(tables).toContain("targets");
+    expect(tables).toContain("form_versions");
+    expect(tables).toContain("task_record_readings");
     expect(tables).toContain("task_occurrences");
     expect(tables).toContain("task_records");
     expect(tables).toContain("task_templates");

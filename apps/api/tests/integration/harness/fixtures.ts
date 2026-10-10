@@ -1,14 +1,18 @@
-import { ORG_ROLE } from "@haccp/shared";
+import { ORG_ROLE, type FormDefinition } from "@haccp/shared";
 import { randomUUID } from "node:crypto";
 import type { Db } from "../../../src/core/db/client.js";
 import {
-  equipment,
+  forms,
+  formVersions,
   locations,
   organizationMemberLocations,
   organizationMemberships,
   organizations,
+  targets,
+  targetTypes,
   taskOccurrences,
   taskTemplates,
+  taskTemplateTargets,
   users,
 } from "../../../src/core/db/schema/index.js";
 import { MEMBERSHIP_STATUS } from "../../../src/core/db/schema/organization-memberships.js";
@@ -40,11 +44,46 @@ export type SeededOrg = {
   admin: SeededActor;
   /** Assigned to `main` only, so "assigned" and "same tenant" can be told apart. */
   employee: SeededActor;
-  equipment: { fridge: { id: string; name: string } };
+  targetTypes: { fridge: { id: string } };
+  targets: { fridge: { id: string; name: string } };
+  forms: {
+    fridgeCheck: { id: string; versionId: string };
+    cleaning: { id: string; versionId: string };
+  };
   templates: {
     temperature: { id: string; title: string };
     cleaning: { id: string; title: string };
   };
+};
+
+export const FRIDGE_FIELD_ID = "temperature";
+export const CLEANING_FIELD_ID = "cleaned";
+
+/** 0–5 °C, corrective action required when out of range: the old temperature task as a form. */
+export const FRIDGE_CHECK_DEFINITION: FormDefinition = {
+  fields: [
+    {
+      id: FRIDGE_FIELD_ID,
+      type: "measurement",
+      label: "Temperature",
+      required: true,
+      unit: "celsius",
+      limits: { min: 0, max: 5 },
+    },
+  ],
+  correctiveAction: "required_on_fail",
+};
+
+export const CLEANING_DEFINITION: FormDefinition = {
+  fields: [
+    {
+      id: CLEANING_FIELD_ID,
+      type: "checkbox",
+      label: "Cleaned",
+      required: true,
+    },
+  ],
+  correctiveAction: "required_on_fail",
 };
 
 export type TwoTenantWorld = { alpha: SeededOrg; beta: SeededOrg };
@@ -169,16 +208,55 @@ export async function seedOrganization(
       organizationId,
     });
 
+    const [fridgeType] = await tx
+      .insert(targetTypes)
+      .values({ organizationId, name: "Fridge", kind: "equipment" })
+      .returning();
+
     const [fridge] = await tx
-      .insert(equipment)
+      .insert(targets)
       .values({
         locationId: main.id,
+        targetTypeId: fridgeType!.id,
         name: "Fridge 1",
-        type: "fridge",
-        minTempC: "0.0",
-        maxTempC: "5.0",
       })
       .returning();
+
+    const insertedForms = await tx
+      .insert(forms)
+      .values([
+        { organizationId, name: "Fridge check", category: "temperature" },
+        { organizationId, name: "Cleaning", category: "cleaning" },
+      ])
+      .returning();
+    const fridgeForm = insertedForms.find(
+      (row) => row.category === "temperature",
+    )!;
+    const cleaningForm = insertedForms.find(
+      (row) => row.category === "cleaning",
+    )!;
+
+    const insertedVersions = await tx
+      .insert(formVersions)
+      .values([
+        {
+          formId: fridgeForm.id,
+          version: 1,
+          definition: FRIDGE_CHECK_DEFINITION,
+        },
+        {
+          formId: cleaningForm.id,
+          version: 1,
+          definition: CLEANING_DEFINITION,
+        },
+      ])
+      .returning();
+    const fridgeVersion = insertedVersions.find(
+      (row) => row.formId === fridgeForm.id,
+    )!;
+    const cleaningVersion = insertedVersions.find(
+      (row) => row.formId === cleaningForm.id,
+    )!;
 
     const insertedTemplates = await tx
       .insert(taskTemplates)
@@ -186,15 +264,14 @@ export async function seedOrganization(
         {
           locationId: main.id,
           title: "Morning fridge check",
-          type: "temperature",
+          formId: fridgeForm.id,
           weekdays: ALL_WEEKDAYS,
           scheduledTimes: ["08:00"],
-          equipmentId: fridge!.id,
         },
         {
           locationId: main.id,
           title: "Clean prep surface",
-          type: "cleaning",
+          formId: cleaningForm.id,
           weekdays: ALL_WEEKDAYS,
           scheduledTimes: ["09:00"],
         },
@@ -202,11 +279,17 @@ export async function seedOrganization(
       .returning();
 
     const temperatureTemplate = insertedTemplates.find(
-      (row) => row.type === "temperature",
+      (row) => row.formId === fridgeForm.id,
     )!;
     const cleaningTemplate = insertedTemplates.find(
-      (row) => row.type === "cleaning",
+      (row) => row.formId === cleaningForm.id,
     )!;
+
+    await tx.insert(taskTemplateTargets).values({
+      taskTemplateId: temperatureTemplate.id,
+      targetId: fridge!.id,
+      locationId: main.id,
+    });
 
     // Clerk must agree, or a cache miss sends provisioning to the fake and 404s.
     clerkFake.setOrganization(clerkOrgId, { name });
@@ -252,7 +335,12 @@ export async function seedOrganization(
         role: ORG_ROLE.EMPLOYEE,
         locationIds: [main.id],
       },
-      equipment: { fridge: { id: fridge!.id, name: fridge!.name } },
+      targetTypes: { fridge: { id: fridgeType!.id } },
+      targets: { fridge: { id: fridge!.id, name: fridge!.name } },
+      forms: {
+        fridgeCheck: { id: fridgeForm.id, versionId: fridgeVersion.id },
+        cleaning: { id: cleaningForm.id, versionId: cleaningVersion.id },
+      },
       templates: {
         temperature: {
           id: temperatureTemplate.id,
@@ -303,11 +391,14 @@ export async function seedOccurrence(
         (isTemperature
           ? org.templates.temperature.title
           : org.templates.cleaning.title),
-      type: overrides.type,
-      equipmentId: isTemperature ? org.equipment.fridge.id : null,
-      equipmentName: isTemperature ? org.equipment.fridge.name : null,
-      minTempC: isTemperature ? "0.0" : null,
-      maxTempC: isTemperature ? "5.0" : null,
+      formVersionId: isTemperature
+        ? org.forms.fridgeCheck.versionId
+        : org.forms.cleaning.versionId,
+      targetId: isTemperature ? org.targets.fridge.id : null,
+      targetName: isTemperature ? org.targets.fridge.name : null,
+      resolvedLimits: isTemperature
+        ? { [FRIDGE_FIELD_ID]: { min: 0, max: 5 } }
+        : {},
     })
     .returning({ id: taskOccurrences.id });
 

@@ -1,15 +1,9 @@
-import type { TaskTemplateType } from "@haccp/shared";
 import { inArray } from "drizzle-orm";
 import type { DbClient } from "../../core/db/client.js";
 import { taskOccurrences } from "../../core/db/schema/task-occurrences.js";
 import { taskRecords } from "../../core/db/schema/task-records.js";
 
-// `type` is stored as text, not a Postgres enum — narrowed here so callers
-// compare against the shared TaskTemplateType, not a bare string.
-export type TaskOccurrenceRow = Omit<
-  typeof taskOccurrences.$inferSelect,
-  "type"
-> & { type: TaskTemplateType };
+export type TaskOccurrenceRow = typeof taskOccurrences.$inferSelect;
 export type NewTaskOccurrenceRow = typeof taskOccurrences.$inferInsert;
 
 export const taskOccurrenceRepository = {
@@ -19,12 +13,10 @@ export const taskOccurrenceRepository = {
   ): Promise<TaskOccurrenceRow[]> {
     if (templateIds.length === 0) return [];
 
-    const rows = await db
+    return db
       .select()
       .from(taskOccurrences)
       .where(inArray(taskOccurrences.taskTemplateId, templateIds));
-
-    return rows as TaskOccurrenceRow[];
   },
 
   async findRecordedOccurrenceIds(
