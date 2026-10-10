@@ -84,11 +84,7 @@ export const taskTemplateRepository = {
       .orderBy(asc(taskTemplates.title));
   },
 
-  async findWithEquipmentById(
-    db: Db,
-    locationId: string,
-    templateId: string,
-  ) {
+  async findWithEquipmentById(db: Db, locationId: string, templateId: string) {
     const [row] = await db
       .select({
         template: taskTemplates,
@@ -115,7 +111,6 @@ export const taskTemplateRepository = {
 
     return row ?? null;
   },
-
 
   async insert(db: DbClient, data: typeof taskTemplates.$inferInsert) {
     const [created] = await db.insert(taskTemplates).values(data).returning();
@@ -180,7 +175,8 @@ export const taskTemplateRepository = {
         weekdays: taskTemplates.weekdays,
         scheduledTimes: taskTemplates.scheduledTimes,
         equipmentId: taskTemplates.equipmentId,
-        completionOpensBeforeMinutes: taskTemplates.completionOpensBeforeMinutes,
+        completionOpensBeforeMinutes:
+          taskTemplates.completionOpensBeforeMinutes,
         completionDueAfterMinutes: taskTemplates.completionDueAfterMinutes,
         createdAt: taskTemplates.createdAt,
         equipmentName: equipment.name,
@@ -203,25 +199,6 @@ export const taskTemplateRepository = {
       );
 
     return rows as TaskTemplateSourceRow[];
-  },
-
-  async findActiveIdsByLocationAndEquipment(
-    db: DbClient,
-    locationId: string,
-    equipmentId: string,
-  ): Promise<string[]> {
-    const rows = await db
-      .select({ id: taskTemplates.id })
-      .from(taskTemplates)
-      .where(
-        and(
-          eq(taskTemplates.locationId, locationId),
-          eq(taskTemplates.equipmentId, equipmentId),
-          isNull(taskTemplates.archivedAt),
-        ),
-      );
-
-    return rows.map((row) => row.id);
   },
 
   async findActiveIdsByOrganization(

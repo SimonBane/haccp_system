@@ -154,7 +154,7 @@ export const locationService = {
       mapDbMutationError(error, {
         foreignKey: () =>
           new ConflictError(
-            "Cannot delete location while it has equipment or task data",
+            "Cannot delete location while it has equipment, areas or task data",
             { code: API_ERROR_CODE.LOCATION_HAS_DEPENDENCIES },
           ),
       });

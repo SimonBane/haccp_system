@@ -2,6 +2,8 @@ import { API_ERROR_CODE, type ApiError } from "@haccp/shared";
 
 type AppErrorOptions = {
   code?: string;
+  /** Structured payload a client acts on; never set on a 5xx, whose body is sanitized. */
+  details?: unknown;
 };
 
 export class AppError extends Error {
@@ -9,6 +11,7 @@ export class AppError extends Error {
     public readonly code: string,
     public readonly statusCode: number,
     message: string,
+    public readonly details?: unknown,
   ) {
     super(message);
     this.name = "AppError";
@@ -18,6 +21,7 @@ export class AppError extends Error {
     return {
       error: this.code,
       message: this.message,
+      ...(this.details === undefined ? {} : { details: this.details }),
       requestId,
     };
   }
@@ -39,7 +43,12 @@ export class ValidationError extends AppError {
 
 export class ConflictError extends AppError {
   constructor(message = "Resource conflict", options?: AppErrorOptions) {
-    super(options?.code ?? API_ERROR_CODE.CONFLICT, 409, message);
+    super(
+      options?.code ?? API_ERROR_CODE.CONFLICT,
+      409,
+      message,
+      options?.details,
+    );
     this.name = "ConflictError";
   }
 }

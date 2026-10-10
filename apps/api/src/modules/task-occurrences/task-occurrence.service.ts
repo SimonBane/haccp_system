@@ -12,7 +12,10 @@ import {
   type TaskTemplateType,
 } from "@haccp/shared";
 import type { Db, DbClient } from "../../core/db/client.js";
-import { InternalError, ValidationError } from "../../core/errors/app-errors.js";
+import {
+  InternalError,
+  ValidationError,
+} from "../../core/errors/app-errors.js";
 import { logger } from "../../lib/logger.js";
 import { locationRepository } from "../locations/location.repository.js";
 import { organizationRepository } from "../organizations/organization.repository.js";
@@ -197,7 +200,10 @@ async function reconcileTemplateIds(
 
   const now = new Date();
   const currentLocalDate = zonedDateString(now, timeZone);
-  const dates = calendarDateRange(currentLocalDate, MATERIALIZATION_WINDOW_DAYS);
+  const dates = calendarDateRange(
+    currentLocalDate,
+    MATERIALIZATION_WINDOW_DAYS,
+  );
 
   const [sources, existing] = await Promise.all([
     taskTemplateRepository.findActiveWithEquipmentByIds(db, templateIds),
@@ -206,10 +212,11 @@ async function reconcileTemplateIds(
 
   const desired = buildDesiredOccurrences(sources, dates, timeZone);
 
-  const recordedOccurrenceIds = await taskOccurrenceRepository.findRecordedOccurrenceIds(
-    db,
-    existing.map((row) => row.id),
-  );
+  const recordedOccurrenceIds =
+    await taskOccurrenceRepository.findRecordedOccurrenceIds(
+      db,
+      existing.map((row) => row.id),
+    );
 
   const toDeleteIds: string[] = [];
   const newInserts: DesiredOccurrence[] = [];
@@ -292,11 +299,16 @@ export const taskOccurrenceService = {
     });
   },
 
-  async reconcileEquipment(
+  /** For a change outside a template (a renamed or archived target) that alters what its occurrences copy. */
+  async reconcileTemplatesAtLocation(
     db: DbClient,
     locationId: string,
-    equipmentId: string,
+    templateIds: string[],
   ): Promise<ReconcileSummary> {
+    if (templateIds.length === 0) {
+      return { processed: 0, created: 0, replaced: 0, deleted: 0 };
+    }
+
     const org = await locationRepository.findOrganizationContextByLocationId(
       db,
       locationId,
@@ -308,12 +320,6 @@ export const taskOccurrenceService = {
       );
     }
 
-    const templateIds = await taskTemplateRepository.findActiveIdsByLocationAndEquipment(
-      db,
-      locationId,
-      equipmentId,
-    );
-
     return reconcileTemplateIds(db, { templateIds, timeZone: org.timeZone });
   },
 
@@ -322,10 +328,11 @@ export const taskOccurrenceService = {
     organizationId: string,
     timeZone: string,
   ): Promise<ReconcileSummary> {
-    const templateIds = await taskTemplateRepository.findActiveIdsByOrganization(
-      db,
-      organizationId,
-    );
+    const templateIds =
+      await taskTemplateRepository.findActiveIdsByOrganization(
+        db,
+        organizationId,
+      );
 
     return reconcileTemplateIds(db, { templateIds, timeZone });
   },
