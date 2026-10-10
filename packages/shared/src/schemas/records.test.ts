@@ -14,7 +14,7 @@ import {
   RECORDS_RESULT_FILTER_VALUES,
   RECORDS_SORT_FIELDS,
   RECORDS_STATE_FILTER_VALUES,
-  RECORDS_TYPE_FILTER_VALUES,
+  RECORDS_CATEGORY_FILTER_VALUES,
   recordItemSchema,
   recordsListQuerySchema,
   recordsListResponseSchema,
@@ -30,7 +30,8 @@ const TODAY = "2026-08-23";
 
 const OCCURRENCE_ID = "11111111-1111-4111-8111-111111111111";
 const TEMPLATE_ID = "22222222-2222-4222-8222-222222222222";
-const EQUIPMENT_ID = "33333333-3333-4333-8333-333333333333";
+const TARGET_ID = "33333333-3333-4333-8333-333333333333";
+const FORM_VERSION_ID = "77777777-7777-4777-8777-777777777777";
 const RECORD_ID = "44444444-4444-4444-8444-444444444444";
 const USER_ID = "55555555-5555-4555-8555-555555555555";
 
@@ -51,11 +52,11 @@ function item(overrides: Record<string, unknown> = {}) {
     availableAt: "2026-08-23T00:00:00.000Z",
     dueAt: "2026-08-23T05:00:00.000Z",
     title: "Morning fridge check",
-    type: "temperature",
-    equipmentId: EQUIPMENT_ID,
-    equipmentName: "Fridge 1",
-    minTempC: 0,
-    maxTempC: 5,
+    formVersionId: FORM_VERSION_ID,
+    category: "temperature",
+    targetId: TARGET_ID,
+    targetName: "Fridge 1",
+    resolvedLimits: { temperature: { min: 0, max: 5 } },
     displayState: "submitted",
     recordState: "submitted",
     timing: "on_time",
@@ -68,13 +69,17 @@ function item(overrides: Record<string, unknown> = {}) {
       recordedBy: { id: USER_ID, firstName: "Ada", lastName: "Admin" },
       voidedAt: null,
       voidedBy: null,
-      temperature: {
-        recordedC: 3.5,
-        minTempC: 0,
-        maxTempC: 5,
-        result: "ok",
-        correctiveAction: null,
+      values: {
+        temperature: {
+          type: "measurement",
+          value: 3.5,
+          unit: "celsius",
+          min: 0,
+          max: 5,
+          fails: false,
+        },
       },
+      correctiveAction: null,
     },
     ...overrides,
   };
@@ -87,7 +92,16 @@ describe("records constants", () => {
       sortBy: "scheduledAt",
       sortOrder: "asc",
     });
-    expect(RECORDS_TYPE_FILTER_VALUES).toEqual(["temperature", "cleaning"]);
+    expect(RECORDS_CATEGORY_FILTER_VALUES).toEqual([
+      "temperature",
+      "cleaning",
+      "goods_in",
+      "cooking",
+      "cooling",
+      "hygiene",
+      "pest_control",
+      "other",
+    ]);
     expect(RECORDS_STATE_FILTER_VALUES).toEqual([
       "submitted",
       "missed",
@@ -209,13 +223,13 @@ describe("recordsListQuerySchema filters", () => {
   });
 
   it("treats an omitted or empty filter as absent", () => {
-    expect(parse({}).data?.type).toBeUndefined();
-    expect(parse({ type: "" }).data?.type).toBeUndefined();
-    expect(parse({ type: " , " }).data?.type).toBeUndefined();
+    expect(parse({}).data?.category).toBeUndefined();
+    expect(parse({ category: "" }).data?.category).toBeUndefined();
+    expect(parse({ category: " , " }).data?.category).toBeUndefined();
   });
 
   it("rejects a value outside the allowlist", () => {
-    expect(parse({ type: "temperature,delivery" }).success).toBe(false);
+    expect(parse({ category: "temperature,delivery" }).success).toBe(false);
     expect(parse({ result: "unknown" }).success).toBe(false);
     expect(parse({ state: "Submitted" }).success).toBe(false);
   });
@@ -328,6 +342,7 @@ describe("recordsListResponseSchema", () => {
     const parsed = recordsListResponseSchema.parse({
       items: [item()],
       total: 18,
+      formVersions: {},
     });
 
     expect(parsed.total).toBe(18);
@@ -350,15 +365,14 @@ describe("recordItemSchema", () => {
     ).toBeNull();
   });
 
-  it("accepts a non-temperature row with no equipment or range", () => {
+  it("accepts a row with no target and no measurement limits", () => {
     expect(
       recordItemSchema.safeParse(
         item({
-          type: "cleaning",
-          equipmentId: null,
-          equipmentName: null,
-          minTempC: null,
-          maxTempC: null,
+          category: "cleaning",
+          targetId: null,
+          targetName: null,
+          resolvedLimits: {},
           result: "not_evaluated",
           record: null,
           displayState: "missed",
@@ -565,12 +579,12 @@ describe("timing derivation", () => {
 });
 
 describe("result derivation", () => {
-  it("maps the stored temperature payload, including on a voided record", () => {
-    expect(deriveRecordResult({ result: "ok" })).toBe("pass");
-    expect(deriveRecordResult({ result: "out_of_range" })).toBe("fail");
+  it("keeps the stored record result, including on a voided record", () => {
+    expect(deriveRecordResult({ result: "pass" })).toBe("pass");
+    expect(deriveRecordResult({ result: "fail" })).toBe("fail");
   });
 
-  it("is not_evaluated without a temperature detail", () => {
+  it("is not_evaluated without a record", () => {
     expect(deriveRecordResult(null)).toBe("not_evaluated");
   });
 });
@@ -598,7 +612,7 @@ describe("recordsReportQuerySchema", () => {
     expect(result.data).toEqual({
       dateFrom: DATE_FROM,
       dateTo: DATE_TO,
-      type: undefined,
+      category: undefined,
       state: undefined,
       result: undefined,
     });
@@ -689,6 +703,7 @@ describe("recordsReportResponseSchema", () => {
       generatedAt,
       total: 1,
       items: [item()],
+      formVersions: {},
     });
 
     expect(result.success).toBe(true);
@@ -700,6 +715,7 @@ describe("recordsReportResponseSchema", () => {
       generatedAt,
       total: 0,
       items: [],
+      formVersions: {},
     });
 
     expect(result.success).toBe(true);
