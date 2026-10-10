@@ -1,7 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
   check,
-  foreignKey,
   index,
   integer,
   pgTable,
@@ -10,7 +9,7 @@ import {
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
-import { equipment } from "./equipment.js";
+import { forms } from "./forms.js";
 import { locations } from "./locations.js";
 
 export const taskTemplates = pgTable(
@@ -21,16 +20,17 @@ export const taskTemplates = pgTable(
       .notNull()
       .references(() => locations.id, { onDelete: "restrict" }),
     title: text("title").notNull(),
-    type: text("type").notNull(),
+    formId: uuid("form_id")
+      .notNull()
+      .references(() => forms.id, { onDelete: "restrict" }),
     weekdays: text("weekdays").array().notNull(),
     scheduledTimes: text("scheduled_times").array().notNull(),
-    equipmentId: uuid("equipment_id"),
     completionOpensBeforeMinutes: integer("completion_opens_before_minutes")
       .notNull()
       .default(1440),
-    completionDueAfterMinutes: integer(
-      "completion_due_after_minutes",
-    ).default(0),
+    completionDueAfterMinutes: integer("completion_due_after_minutes").default(
+      0,
+    ),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -41,11 +41,7 @@ export const taskTemplates = pgTable(
   },
   (table) => [
     index("task_templates_location_id_idx").on(table.locationId),
-    index("task_templates_equipment_id_idx").on(table.equipmentId),
-    foreignKey({
-      columns: [table.equipmentId, table.locationId],
-      foreignColumns: [equipment.id, equipment.locationId],
-    }).onDelete("restrict"),
+    index("task_templates_form_id_idx").on(table.formId),
     unique("task_templates_id_location_id_unique").on(
       table.id,
       table.locationId,
