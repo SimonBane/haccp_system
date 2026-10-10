@@ -23,7 +23,7 @@ export function buildRecordsReportUrl(input: {
   });
 
   for (const key of [
-    RECORDS_FILTER_KEY.TYPE,
+    RECORDS_FILTER_KEY.CATEGORY,
     RECORDS_FILTER_KEY.STATE,
     RECORDS_FILTER_KEY.RESULT,
   ]) {

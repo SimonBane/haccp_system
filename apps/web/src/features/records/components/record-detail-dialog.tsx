@@ -1,18 +1,17 @@
 "use client";
 
-import type { RecordItem } from "@haccp/shared";
+import type { FormVersionSummary, RecordItem } from "@haccp/shared";
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
+import { AnswerList } from "@/features/forms/components/answer-list";
 import {
   actorName,
   EM_DASH,
   formatOccurrenceDate,
   formatRecordInstant,
   formatRecordTimeOfDay,
-  formatTemperatureRange,
-  formatTemperatureValue,
 } from "@/features/records/lib/format";
 import {
   RECORD_DISPLAY_STATE_VARIANT,
@@ -34,7 +33,7 @@ function DetailRow({
       <dt className="shrink-0 text-xs text-muted-foreground sm:w-44">
         {label}
       </dt>
-      <dd className="min-w-0 text-sm">{children}</dd>
+      <dd className="min-w-0 flex-1 text-sm">{children}</dd>
     </div>
   );
 }
@@ -43,6 +42,8 @@ type RecordDetailDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   item: RecordItem | null;
+  /** The version the occurrence was recorded against, captured when the detail opened. */
+  formVersion: FormVersionSummary | null;
   labels: RecordsLabels;
   locale: string;
   timeZone: string;
@@ -52,6 +53,7 @@ export function RecordDetailDialog({
   open,
   onOpenChange,
   item,
+  formVersion,
   labels,
   locale,
   timeZone,
@@ -63,14 +65,8 @@ export function RecordDetailDialog({
     return null;
   }
 
-  const isTemperature = item.type === "temperature";
-  const temperature = item.record?.temperature ?? null;
-  const permittedRange = formatTemperatureRange(
-    temperature?.minTempC ?? item.minTempC,
-    temperature?.maxTempC ?? item.maxTempC,
-    locale,
-  );
   const timing = resolvedTiming(item);
+  const values = item.record?.values ?? null;
 
   return (
     <ResponsiveFormDialog
@@ -97,12 +93,21 @@ export function RecordDetailDialog({
             : formatRecordInstant(item.dueAt, locale, timeZone)}
         </DetailRow>
 
-        <DetailRow label={t("type")}>{labels.type[item.type]}</DetailRow>
+        <DetailRow label={t("category")}>
+          {labels.category[item.category]}
+        </DetailRow>
 
-        {isTemperature ? (
-          <DetailRow label={t("monitoringPoint")}>
-            {item.equipmentName ?? EM_DASH}
-          </DetailRow>
+        <DetailRow label={t("form")}>
+          {formVersion
+            ? t("formVersion", {
+                name: formVersion.formName,
+                version: formVersion.version,
+              })
+            : EM_DASH}
+        </DetailRow>
+
+        {item.targetName ? (
+          <DetailRow label={t("target")}>{item.targetName}</DetailRow>
         ) : null}
 
         <DetailRow label={t("displayState")}>
@@ -121,32 +126,28 @@ export function RecordDetailDialog({
           </Badge>
         </DetailRow>
 
-        {isTemperature ? (
-          <DetailRow label={t("result")}>
-            <Badge variant={RECORD_RESULT_VARIANT[item.result]}>
-              {labels.result[item.result]}
-            </Badge>
-          </DetailRow>
-        ) : null}
+        <DetailRow label={t("result")}>
+          <Badge variant={RECORD_RESULT_VARIANT[item.result]}>
+            {labels.result[item.result]}
+          </Badge>
+        </DetailRow>
 
-        {isTemperature ? (
-          <DetailRow label={t("reading")}>
-            {temperature
-              ? formatTemperatureValue(temperature.recordedC, locale)
-              : EM_DASH}
-          </DetailRow>
-        ) : null}
+        <DetailRow label={t("answers")}>
+          {values ? (
+            <AnswerList
+              definition={formVersion?.definition ?? null}
+              values={values}
+              className="-my-2"
+            />
+          ) : (
+            EM_DASH
+          )}
+        </DetailRow>
 
-        {isTemperature ? (
-          <DetailRow label={t("permittedRange")}>
-            {permittedRange ?? EM_DASH}
-          </DetailRow>
-        ) : null}
-
-        {temperature?.correctiveAction ? (
+        {item.record?.correctiveAction ? (
           <DetailRow label={t("correctiveAction")}>
             <span className="whitespace-pre-wrap">
-              {temperature.correctiveAction}
+              {item.record.correctiveAction}
             </span>
           </DetailRow>
         ) : null}

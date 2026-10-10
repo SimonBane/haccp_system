@@ -1,16 +1,16 @@
 import { expect, test } from "@playwright/test";
 import { E2E_PREFIX, LOCALE_PREFIX } from "../../support/env.js";
 
-test("a failed equipment list request shows retry, not an empty list", async ({
+test("a failed equipment & areas list request shows retry, not an empty list", async ({
   page,
 }) => {
-  await page.goto(`${LOCALE_PREFIX}/dashboard/equipment`);
+  await page.goto(`${LOCALE_PREFIX}/dashboard/targets`);
   await expect(page.getByText(`${E2E_PREFIX} Fridge 1`).first()).toBeVisible();
 
   // Switching location starts a fresh, uncached query for the new location — the
   // only way from a real user flow to force isError without stale data masking it.
   let requestsSeen = 0;
-  await page.route("**/locations/*/equipment", async (route) => {
+  await page.route("**/locations/*/targets", async (route) => {
     if (route.request().method() !== "GET") {
       await route.continue();
       return;
@@ -35,7 +35,7 @@ test("a failed equipment list request shows retry, not an empty list", async ({
   await expect(page.getByText(`${E2E_PREFIX} Fridge 1`)).toHaveCount(0);
   expect(requestsSeen).toBeGreaterThan(0);
 
-  await page.unroute("**/locations/*/equipment");
+  await page.unroute("**/locations/*/targets");
   await page.getByTestId("data-table-retry").click();
 
   await expect(page.getByTestId("data-table-error")).toBeHidden();

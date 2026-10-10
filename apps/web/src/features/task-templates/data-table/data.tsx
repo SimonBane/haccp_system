@@ -1,6 +1,10 @@
 "use client";
 
-import type { TaskTemplateResponse, TaskTemplateType } from "@haccp/shared";
+import {
+  FORM_CATEGORY_VALUES,
+  type FormCategory,
+  type TaskTemplateResponse,
+} from "@haccp/shared";
 import type { OnChangeFn, RowSelectionState } from "@tanstack/react-table";
 import { Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -41,12 +45,19 @@ export function TaskTemplatesData({
     [rowSelection],
   );
 
-  const typeLabels = useMemo<Record<TaskTemplateType, string>>(
-    () => ({
-      temperature: t("types.temperature"),
-      cleaning: t("types.cleaning"),
-      other: t("types.other"),
-    }),
+  const tForms = useTranslations("Forms");
+  const categoryLabels = useMemo(
+    () =>
+      Object.fromEntries(
+        FORM_CATEGORY_VALUES.map((category) => [
+          category,
+          tForms(`categories.${category}`),
+        ]),
+      ) as Record<FormCategory, string>,
+    [tForms],
+  );
+  const moreTargets = useCallback(
+    (count: number) => t("moreTargets", { count }),
     [t],
   );
 
@@ -87,24 +98,24 @@ export function TaskTemplatesData({
     () =>
       getColumns({
         t,
-        typeLabels,
+        categoryLabels,
         scheduleLabels,
         windowSummaryLabels,
         getRowActions,
       }),
-    [t, typeLabels, scheduleLabels, windowSummaryLabels, getRowActions],
+    [t, categoryLabels, scheduleLabels, windowSummaryLabels, getRowActions],
   );
 
   const renderMobileRow = useCallback(
     (row: Parameters<typeof TaskTemplatesMobileCard>[0]["row"]) => (
       <TaskTemplatesMobileCard
         row={row}
-        typeLabels={typeLabels}
+        moreTargets={moreTargets}
         scheduleLabels={scheduleLabels}
         windowSummaryLabels={windowSummaryLabels}
       />
     ),
-    [typeLabels, scheduleLabels, windowSummaryLabels],
+    [moreTargets, scheduleLabels, windowSummaryLabels],
   );
 
   return (

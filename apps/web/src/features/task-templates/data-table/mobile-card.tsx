@@ -1,10 +1,10 @@
 "use client";
 
-import type { TaskTemplateResponse, TaskTemplateType } from "@haccp/shared";
-import { TASK_TEMPLATE_TYPE } from "@haccp/shared";
+import type { TaskTemplateResponse } from "@haccp/shared";
 import type { Row } from "@tanstack/react-table";
-import { ClipboardCheckIcon, ThermometerIcon } from "lucide-react";
 import { MobileListRow } from "@/components/ui/data-table/data-table-mobile-list";
+import { FORM_CATEGORY_ICONS } from "@/features/forms/lib/category-icon";
+import { summarizeTargetNames } from "@/features/task-templates/lib/format-targets";
 import { formatWeekdaysLabel } from "@/features/task-templates/lib/format-schedule";
 import {
   formatCompactWindowSummary,
@@ -13,7 +13,7 @@ import {
 
 type TaskTemplatesMobileRowProps = {
   row: Row<TaskTemplateResponse>;
-  typeLabels: Record<TaskTemplateType, string>;
+  moreTargets: (count: number) => string;
   scheduleLabels: {
     everyDay: string;
     weekdays: string;
@@ -26,7 +26,7 @@ type TaskTemplatesMobileRowProps = {
 
 export function TaskTemplatesMobileCard({
   row,
-  typeLabels,
+  moreTargets,
   scheduleLabels,
   windowSummaryLabels,
 }: TaskTemplatesMobileRowProps) {
@@ -40,28 +40,22 @@ export function TaskTemplatesMobileCard({
   });
 
   const detail = [
-    typeLabels[task.type],
+    task.formName,
     weekdays,
-    task.type === TASK_TEMPLATE_TYPE.TEMPERATURE ? task.equipmentName : null,
+    summarizeTargetNames(
+      task.targets.map((target) => target.targetName),
+      moreTargets,
+    ),
   ]
     .filter(Boolean)
     .join(" · ");
+  const CategoryIcon = FORM_CATEGORY_ICONS[task.formCategory];
 
   return (
     <MobileListRow
       variant="card"
       leading={
-        task.type === TASK_TEMPLATE_TYPE.TEMPERATURE ? (
-          <ThermometerIcon
-            className="size-5 text-muted-foreground"
-            aria-hidden
-          />
-        ) : (
-          <ClipboardCheckIcon
-            className="size-5 text-muted-foreground"
-            aria-hidden
-          />
-        )
+        <CategoryIcon className="size-5 text-muted-foreground" aria-hidden />
       }
       title={task.title}
       subtitle={detail}

@@ -1,7 +1,13 @@
-import type { TodayTaskItem, TodayTaskStatus } from "@haccp/shared";
+import type {
+  FormVersionSummary,
+  FormVersionSummaryMap,
+  RecordValues,
+  TodayTaskItem,
+  TodayTaskStatus,
+} from "@haccp/shared";
 import {
   deriveTodayTaskStatusFromOccurrence,
-  TEMPERATURE_RESULT,
+  RECORD_RESULT,
   wallClockToInstant,
   zonedDateString,
   zonedMinutesOfDay,
@@ -10,17 +16,19 @@ import { occurrenceKey, parseScheduledTimeToMinutes } from "./today-grouping";
 
 export type TimeGroupState = "done" | "overdue" | "now" | "upcoming";
 
-export type TodayPriorReading = {
+export type TodayPriorRecord = {
   scheduledTime: string;
   completedAt: string | null;
-  recordedC: number;
+  values: RecordValues;
 };
 
 export type TodayTimelineItem = {
   task: TodayTaskItem;
+  /** The version this occurrence is recorded against; null only if the response omitted it. */
+  form: FormVersionSummary | null;
   isCompleted: boolean;
   isDeviation: boolean;
-  priorReading: TodayPriorReading | null;
+  priorRecord: TodayPriorRecord | null;
   liveStatus: TodayTaskStatus;
 };
 
@@ -114,32 +122,29 @@ export function findTimelineGroup(
 }
 
 function isDeviation(task: TodayTaskItem): boolean {
-  return (
-    task.completedAt !== null &&
-    task.temperatureReading?.result === TEMPERATURE_RESULT.OUT_OF_RANGE
-  );
+  return task.completedAt !== null && task.result === RECORD_RESULT.FAIL;
 }
 
-/** Last same-equipment reading earlier in the day, so a pending 15:00 can show what 07:00 measured. */
-function buildPriorReadings(
+/** Last record for the same target earlier in the day, so a pending 15:00 can show what 07:00 measured. */
+function buildPriorRecords(
   tasksInTimeOrder: TodayTaskItem[],
-): Map<string, TodayPriorReading> {
-  const priorByTaskKey = new Map<string, TodayPriorReading>();
-  const lastByEquipment = new Map<string, TodayPriorReading>();
+): Map<string, TodayPriorRecord> {
+  const priorByTaskKey = new Map<string, TodayPriorRecord>();
+  const lastByTarget = new Map<string, TodayPriorRecord>();
 
   for (const task of tasksInTimeOrder) {
-    if (!task.equipmentId) continue;
+    if (!task.targetId) continue;
 
-    const previous = lastByEquipment.get(task.equipmentId);
+    const previous = lastByTarget.get(task.targetId);
     if (previous) {
       priorByTaskKey.set(task.occurrenceId, previous);
     }
 
-    if (task.temperatureReading) {
-      lastByEquipment.set(task.equipmentId, {
+    if (task.values) {
+      lastByTarget.set(task.targetId, {
         scheduledTime: task.scheduledTime,
         completedAt: task.completedAt,
-        recordedC: task.temperatureReading.recordedC,
+        values: task.values,
       });
     }
   }
@@ -181,23 +186,26 @@ function deriveGroupState(
 }
 
 /** Grouping and counts from the response alone so item identity survives clock ticks. */
-export function buildTodayTaskGroups(tasks: TodayTaskItem[]): TodayTaskGroups {
+export function buildTodayTaskGroups(
+  tasks: TodayTaskItem[],
+  formVersions: FormVersionSummaryMap = {},
+): TodayTaskGroups {
   const inTimeOrder = [...tasks].sort(
     (a, b) =>
       parseScheduledTimeToMinutes(a.scheduledTime) -
       parseScheduledTimeToMinutes(b.scheduledTime),
   );
-  const priorReadings = buildPriorReadings(inTimeOrder);
+  const priorRecords = buildPriorRecords(inTimeOrder);
 
   const byTime = new Map<string, TodayTimelineItem[]>();
   for (const task of inTimeOrder) {
     const items = byTime.get(task.scheduledTime) ?? [];
     items.push({
       task,
+      form: formVersions[task.formVersionId] ?? null,
       isCompleted: task.completedAt !== null,
       isDeviation: isDeviation(task),
-      priorReading:
-        priorReadings.get(task.occurrenceId) ?? null,
+      priorRecord: priorRecords.get(task.occurrenceId) ?? null,
       liveStatus: task.status,
     });
     byTime.set(task.scheduledTime, items);
@@ -307,6 +315,12 @@ export function buildTodayTimeline(
   now: Date,
   selectedDate: string,
   timeZone: string,
+  formVersions: FormVersionSummaryMap = {},
 ): TodayTimeline {
-  return applyClock(buildTodayTaskGroups(tasks), now, selectedDate, timeZone);
+  return applyClock(
+    buildTodayTaskGroups(tasks, formVersions),
+    now,
+    selectedDate,
+    timeZone,
+  );
 }

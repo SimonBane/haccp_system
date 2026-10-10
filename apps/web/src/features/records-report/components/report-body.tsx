@@ -16,8 +16,8 @@ export function ReportBody({ rows }: { rows: ReportRow[] }) {
           <th scope="col" className="py-1 pr-2 font-semibold">
             {t("columns.task")}
           </th>
-          <th scope="col" className="w-16 py-1 pr-2 font-semibold">
-            {t("columns.reading")}
+          <th scope="col" className="w-40 py-1 pr-2 font-semibold">
+            {t("columns.answers")}
           </th>
           <th scope="col" className="w-32 py-1 pr-2 font-semibold">
             {t("columns.status")}
@@ -52,12 +52,12 @@ export function ReportBody({ rows }: { rows: ReportRow[] }) {
                 {row.scheduledTime}
               </td>
               <td className="py-0.5 pr-2 [overflow-wrap:anywhere]">
-                {row.equipmentName === undefined
+                {row.targetName === undefined
                   ? row.title
-                  : `${row.title} · ${row.equipmentName}`}
+                  : `${row.title} · ${row.targetName}`}
               </td>
-              <td className="py-0.5 pr-2 whitespace-nowrap tabular-nums">
-                {row.reading ?? ""}
+              <td className="py-0.5 pr-2 tabular-nums [overflow-wrap:anywhere]">
+                {row.answers ?? ""}
               </td>
               <td
                 className={

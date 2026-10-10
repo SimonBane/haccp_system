@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { apiContext, json } from "../../support/api.js";
+import { ensureE2eForms } from "../../support/forms.js";
 import { E2E_PREFIX, LOCALE_PREFIX } from "../../support/env.js";
 import {
   ensureSubmittedRecord,
@@ -174,9 +175,11 @@ test("an opened no-deadline occurrence prints as Open with no deadline content",
   const title = `E2E Report open no deadline ${Date.now()}`;
 
   const api = await apiContext(page);
+
+  const forms = await ensureE2eForms(api);
   await json(api, "post", `/locations/${locationId}/task-templates`, {
     title,
-    type: "cleaning",
+    formId: forms.cleaning,
     weekdays: [
       "monday",
       "tuesday",
@@ -212,9 +215,11 @@ test("a submitted record with no deadline prints as Done, never late", async ({
   const title = `E2E Report submitted no deadline ${Date.now()}`;
 
   const api = await apiContext(page);
+
+  const forms = await ensureE2eForms(api);
   await json(api, "post", `/locations/${locationId}/task-templates`, {
     title,
-    type: "cleaning",
+    formId: forms.cleaning,
     weekdays: [
       "monday",
       "tuesday",

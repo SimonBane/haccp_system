@@ -1,7 +1,8 @@
 import { type Locale } from "@/i18n/routing";
 import {
   getTenantContext,
-  listEquipment,
+  listForms,
+  listTargets,
   listTaskTemplates,
   resolveActiveLocationId,
 } from "@/lib/api-client";
@@ -19,16 +20,18 @@ export default async function TaskTemplatesPage({
 
   const tenant = await getTenantContext();
   const locationId = await resolveActiveLocationId(tenant);
-  const [taskTemplates, equipment] = await Promise.all([
+  const [taskTemplates, forms, targets] = await Promise.all([
     listTaskTemplates(locationId),
-    listEquipment(locationId),
+    listForms(),
+    listTargets(locationId),
   ]);
 
   return (
     <PageContainer width="content">
       <TaskTemplatesManager
         initialItems={taskTemplates.items}
-        initialEquipment={equipment.items}
+        initialForms={forms.items}
+        initialTargets={targets.items}
         initialLocationId={locationId}
       />
     </PageContainer>

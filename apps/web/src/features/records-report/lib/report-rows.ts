@@ -2,14 +2,15 @@ import {
   RECORD_DISPLAY_STATE,
   RECORD_RESULT,
   RECORD_TIMING,
+  type FormVersionSummaryMap,
   type RecordItem,
 } from "@haccp/shared";
 import {
-  actorName,
-  formatOccurrenceDate,
-  formatTemperatureValue,
-  hasTemperatureOutcome,
-} from "@/features/records/lib/format";
+  describeAnswers,
+  summarizeAnswers,
+  type AnswerFormatters,
+} from "@/features/forms/lib/answer-summary";
+import { actorName, formatOccurrenceDate } from "@/features/records/lib/format";
 import { resolvedTiming, showsTiming } from "@/features/records/lib/labels";
 
 export type ReportStatus = "done" | "fail" | "missed" | "open" | "voided";
@@ -22,8 +23,8 @@ export type ReportRow = {
   title: string;
   status: ReportStatus;
   late: boolean;
-  equipmentName?: string;
-  reading?: string;
+  targetName?: string;
+  answers?: string;
   recordedBy?: string | null;
   correctiveAction?: string;
 };
@@ -42,18 +43,20 @@ function reportStatus(item: RecordItem): ReportStatus {
     case RECORD_DISPLAY_STATE.VOIDED:
       return "voided";
     default:
-      return hasTemperatureOutcome(item) && item.result === RECORD_RESULT.FAIL
-        ? "fail"
-        : "done";
+      return item.result === RECORD_RESULT.FAIL ? "fail" : "done";
   }
 }
 
+export type ReportRowContext = {
+  formVersions: FormVersionSummaryMap;
+  format: AnswerFormatters;
+};
+
 export function toReportRow(
   item: RecordItem,
-  context: { locale: string },
+  context: ReportRowContext,
 ): ReportRow {
   const record = item.record;
-  const temperature = record?.temperature ?? null;
 
   const row: ReportRow = {
     occurrenceId: item.occurrenceId,
@@ -66,18 +69,20 @@ export function toReportRow(
       resolvedTiming(item) === RECORD_TIMING.LATE,
   };
 
-  if (item.equipmentName !== null) {
-    row.equipmentName = item.equipmentName;
-  }
-
-  if (temperature) {
-    row.reading = formatTemperatureValue(temperature.recordedC, context.locale);
-    if (temperature.correctiveAction !== null) {
-      row.correctiveAction = temperature.correctiveAction;
-    }
+  if (item.targetName !== null) {
+    row.targetName = item.targetName;
   }
 
   if (record) {
+    const lines = describeAnswers(
+      context.formVersions[item.formVersionId]?.definition ?? null,
+      record.values,
+      context.format,
+    );
+    if (lines.length > 0) row.answers = summarizeAnswers(lines);
+    if (record.correctiveAction !== null) {
+      row.correctiveAction = record.correctiveAction;
+    }
     row.recordedBy = actorName(record.recordedBy);
   }
 
@@ -86,7 +91,7 @@ export function toReportRow(
 
 export function toReportRows(
   items: readonly RecordItem[],
-  context: { locale: string },
+  context: ReportRowContext,
 ): ReportRow[] {
   return items.map((item) => toReportRow(item, context));
 }

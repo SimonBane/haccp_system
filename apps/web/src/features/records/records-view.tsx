@@ -1,6 +1,13 @@
 "use client";
 
-import type { AppLocale, RecordItem, RecordsListResponse } from "@haccp/shared";
+import {
+  FORM_CATEGORY_VALUES,
+  type AppLocale,
+  type FormCategory,
+  type FormVersionSummary,
+  type RecordItem,
+  type RecordsListResponse,
+} from "@haccp/shared";
 import { PrinterIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useMemo, useState } from "react";
@@ -12,7 +19,10 @@ import { DataTableSkeleton } from "@/components/ui/data-table/data-table-skeleto
 import { useIsMobile } from "@/hooks/use-mobile";
 import { RecordDetailDialog } from "@/features/records/components/record-detail-dialog";
 import { RecordsDateRangeControl } from "@/features/records/components/records-date-range";
-import type { RecordsColumnCopy } from "@/features/records/data-table/columns";
+import type {
+  RecordsColumnCopy,
+  SummarizeRecord,
+} from "@/features/records/data-table/columns";
 import { RecordsData } from "@/features/records/data-table/data";
 import { useRecordsGrid } from "@/features/records/hooks/use-records-grid";
 import type { RecordsLabels } from "@/features/records/lib/labels";
@@ -20,6 +30,11 @@ import { buildRecordsFilterDefinitions } from "@/features/records/lib/records-fi
 import type { RecordsDateRange } from "@/features/records/lib/records-grid-config";
 import { buildRecordsReportUrl } from "@/features/records/lib/report-url";
 import { useTenant } from "@/features/tenant/tenant-provider";
+import { useAnswerFormat } from "@/features/forms/hooks/use-answer-format";
+import {
+  describeAnswers,
+  summarizeAnswers,
+} from "@/features/forms/lib/answer-summary";
 
 type RecordsViewProps = {
   initialPage: RecordsListResponse;
@@ -75,7 +90,9 @@ export function RecordsView({
   today,
 }: RecordsViewProps) {
   const t = useTranslations("RecordsPage");
+  const tForms = useTranslations("Forms");
   const locale = useLocale();
+  const format = useAnswerFormat();
   const { organization, selectedLocation, locationId } = useTenant();
 
   const grid = useRecordsGrid({
@@ -87,6 +104,7 @@ export function RecordsView({
 
   const [detail, setDetail] = useState<{
     item: RecordItem;
+    formVersion: FormVersionSummary | null;
     datasetKey: string;
     open: boolean;
   } | null>(null);
@@ -98,8 +116,13 @@ export function RecordsView({
 
   const openDetail = useCallback(
     (item: RecordItem) =>
-      setDetail({ item, datasetKey: grid.datasetKey, open: true }),
-    [grid.datasetKey],
+      setDetail({
+        item,
+        formVersion: grid.formVersions[item.formVersionId] ?? null,
+        datasetKey: grid.datasetKey,
+        open: true,
+      }),
+    [grid.datasetKey, grid.formVersions],
   );
 
   // Only `open` is cleared — dropping the item would cut the exit transition short.
@@ -133,13 +156,28 @@ export function RecordsView({
         fail: t("result.fail"),
         not_evaluated: t("result.notEvaluated"),
       },
-      type: {
-        temperature: t("types.temperature"),
-        cleaning: t("types.cleaning"),
-        other: t("types.other"),
-      },
+      category: Object.fromEntries(
+        FORM_CATEGORY_VALUES.map((category) => [
+          category,
+          tForms(`categories.${category}`),
+        ]),
+      ) as Record<FormCategory, string>,
     }),
-    [t],
+    [t, tForms],
+  );
+
+  const summarize = useCallback<SummarizeRecord>(
+    (item) =>
+      item.record
+        ? summarizeAnswers(
+            describeAnswers(
+              grid.formVersions[item.formVersionId]?.definition ?? null,
+              item.record.values,
+              format.answers,
+            ),
+          )
+        : null,
+    [format, grid.formVersions],
   );
 
   const columnCopy = useMemo<RecordsColumnCopy>(
@@ -148,8 +186,8 @@ export function RecordsView({
       task: t("columns.task"),
       status: t("columns.status"),
       timing: t("columns.timing"),
-      reading: t("columns.reading"),
-      outcome: t("columns.outcome"),
+      answers: t("columns.answers"),
+      result: t("columns.result"),
       viewDetails: t("viewDetails"),
     }),
     [t],
@@ -158,12 +196,11 @@ export function RecordsView({
   const filterDefinitions = useMemo(
     () =>
       buildRecordsFilterDefinitions({
-        showResult: grid.showResultFilter,
         labels: {
-          type: t("filters.type"),
+          category: t("filters.category"),
           state: t("filters.state"),
           result: t("filters.result"),
-          typeOptions: labels.type,
+          categoryOptions: labels.category,
           stateOptions: {
             submitted: labels.displayState.submitted,
             missed: labels.displayState.missed,
@@ -173,7 +210,7 @@ export function RecordsView({
           resultOptions: labels.result,
         },
       }),
-    [grid.showResultFilter, labels, t],
+    [labels, t],
   );
 
   const reportUrl = buildRecordsReportUrl({
@@ -206,7 +243,7 @@ export function RecordsView({
           filters={filterDefinitions}
           labels={labels}
           copy={columnCopy}
-          locale={locale}
+          summarize={summarize}
           emptyMessage={t("emptyRange")}
           noResultsMessage={t("emptyFiltered")}
           onViewDetails={openDetail}
@@ -229,6 +266,7 @@ export function RecordsView({
           if (!open) closeDetail();
         }}
         item={detail?.item ?? null}
+        formVersion={detail?.formVersion ?? null}
         labels={labels}
         locale={locale}
         timeZone={organization.timezone}

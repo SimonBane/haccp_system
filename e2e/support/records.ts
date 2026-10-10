@@ -1,6 +1,7 @@
 import type { Page, Request } from "@playwright/test";
 import { expect } from "@playwright/test";
 import { apiContext, json } from "./api.js";
+import { CLEANING_ANSWERS } from "./forms.js";
 import { fetchTodayItems } from "./today.js";
 import { LOCALE_PREFIX } from "./env.js";
 
@@ -10,6 +11,7 @@ export const RECORDS_PATH = `${LOCALE_PREFIX}/dashboard/records`;
  * A submitted record is Records-eligible immediately, even before its due time, so
  * one API write gives the grid a deterministic row without waiting for a due slot.
  */
+/** Only for tasks on the cleaning form: the record is a single required tick. */
 export async function ensureSubmittedRecord(
   page: Page,
   title: string,
@@ -37,7 +39,7 @@ export async function ensureSubmittedRecord(
       api,
       item!.recordState === "voided" ? "put" : "post",
       `/locations/${location.id}/today/occurrences/${item!.occurrenceId}/record`,
-      { kind: "ordinary" },
+      { values: CLEANING_ANSWERS },
     );
   } finally {
     await api.dispose();

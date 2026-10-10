@@ -1,7 +1,8 @@
 "use client";
 
 import type {
-  EquipmentResponse,
+  FormResponse,
+  TargetResponse,
   TaskTemplateFieldsInput,
   TaskTemplateResponse,
 } from "@haccp/shared";
@@ -17,7 +18,8 @@ import {
   MobileHeaderAddAction,
   PageHeader,
 } from "@/components/layout/page-header";
-import { useEquipmentOptions } from "@/features/equipment/hooks/use-equipment-query";
+import { useFormsQuery } from "@/features/forms/hooks/use-forms-query";
+import { useTargetsQuery } from "@/features/targets/hooks/use-targets-query";
 import { TaskTemplatesData } from "@/features/task-templates/data-table/data";
 import { useTaskTemplatesMutations } from "@/features/task-templates/hooks/use-task-templates-mutations";
 import { useTaskTemplatesQuery } from "@/features/task-templates/hooks/use-task-templates-query";
@@ -26,14 +28,16 @@ import { useApiErrorToast } from "@/lib/api/use-api-error-toast";
 
 type TaskTemplatesManagerProps = {
   initialItems: TaskTemplateResponse[];
-  /** Seeds the form's equipment select, so opening the dialog needs no request. */
-  initialEquipment: EquipmentResponse[];
+  /** Seed the dialog's pickers, so opening it needs no request. */
+  initialForms: FormResponse[];
+  initialTargets: TargetResponse[];
   initialLocationId: string;
 };
 
 export function TaskTemplatesManager({
   initialItems,
-  initialEquipment,
+  initialForms,
+  initialTargets,
   initialLocationId,
 }: TaskTemplatesManagerProps) {
   const t = useTranslations("TasksPage");
@@ -48,8 +52,9 @@ export function TaskTemplatesManager({
     initialData: initialItems,
     initialLocationId,
   });
-  const equipment = useEquipmentOptions({
-    initialData: initialEquipment,
+  const { data: forms = [] } = useFormsQuery({ initialData: initialForms });
+  const { data: targets = [] } = useTargetsQuery({
+    initialData: initialTargets,
     initialLocationId,
   });
   const { create, update, remove } = useTaskTemplatesMutations();
@@ -228,7 +233,8 @@ export function TaskTemplatesManager({
             ? t("duplicateSuggestedTitle", { title: duplicateSource.title })
             : undefined
         }
-        equipment={equipment}
+        forms={forms}
+        targets={targets}
         onSubmit={handleSubmit}
       />
     </div>

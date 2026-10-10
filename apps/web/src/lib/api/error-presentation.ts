@@ -10,7 +10,11 @@ type ApiErrorMessageKey =
   | "conflict"
   | "unavailable"
   | "reference"
-  | "codes.equipmentNameExists"
+  | "codes.targetNameExists"
+  | "codes.targetTypeNameExists"
+  | "codes.targetTypeInUse"
+  | "codes.formNameExists"
+  | "codes.formInUse"
   | "codes.employeeEmailExists"
   | "codes.locationNameExists"
   | "codes.multipleLocationsDisabled"
@@ -30,7 +34,11 @@ export type ApiErrorPresentation = {
 };
 
 const actionableCodeKeys: Record<string, ApiErrorMessageKey> = {
-  [API_ERROR_CODE.EQUIPMENT_NAME_EXISTS]: "codes.equipmentNameExists",
+  [API_ERROR_CODE.TARGET_NAME_EXISTS]: "codes.targetNameExists",
+  [API_ERROR_CODE.TARGET_TYPE_NAME_EXISTS]: "codes.targetTypeNameExists",
+  [API_ERROR_CODE.TARGET_TYPE_IN_USE]: "codes.targetTypeInUse",
+  [API_ERROR_CODE.FORM_NAME_EXISTS]: "codes.formNameExists",
+  [API_ERROR_CODE.FORM_IN_USE]: "codes.formInUse",
   [API_ERROR_CODE.EMPLOYEE_EMAIL_EXISTS]: "codes.employeeEmailExists",
   [API_ERROR_CODE.LOCATION_NAME_EXISTS]: "codes.locationNameExists",
   [API_ERROR_CODE.MULTIPLE_LOCATIONS_DISABLED]:
