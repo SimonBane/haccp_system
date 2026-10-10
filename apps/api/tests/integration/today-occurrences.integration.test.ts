@@ -8,8 +8,16 @@ import {
 } from "@haccp/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../../src/core/db/client.js";
-import { taskOccurrences, taskTemplates } from "../../src/core/db/schema/index.js";
-import { seedOrganization, type SeededOrg } from "./harness/fixtures.js";
+import {
+  taskOccurrences,
+  taskTemplates,
+} from "../../src/core/db/schema/index.js";
+import {
+  CLEANING_FIELD_ID,
+  FRIDGE_FIELD_ID,
+  seedOrganization,
+  type SeededOrg,
+} from "./harness/fixtures.js";
 import { apiRequest, asAdmin, asEmployee } from "./harness/request.js";
 
 /**
@@ -49,9 +57,8 @@ describe("Today occurrences (GET)", () => {
     availableAt?: Date;
     dueAt?: Date | null;
     title?: string;
-    equipmentName?: string | null;
-    minTempC?: string | null;
-    maxTempC?: string | null;
+    targetName?: string;
+    maxTempC?: number;
   }): Promise<string> {
     const locationId = overrides.locationId ?? org.locations.main.id;
     const taskTemplateId =
@@ -75,16 +82,20 @@ describe("Today occurrences (GET)", () => {
             ? new Date(`${occurrenceDate}T${scheduledTime}:00Z`)
             : overrides.dueAt,
         title: overrides.title ?? "Test occurrence",
-        type: overrides.type,
-        equipmentId: overrides.type === "temperature" ? org.equipment.fridge.id : null,
-        equipmentName:
+        formVersionId:
           overrides.type === "temperature"
-            ? (overrides.equipmentName ?? "Fridge 1")
+            ? org.forms.fridgeCheck.versionId
+            : org.forms.cleaning.versionId,
+        targetId:
+          overrides.type === "temperature" ? org.targets.fridge.id : null,
+        targetName:
+          overrides.type === "temperature"
+            ? (overrides.targetName ?? "Fridge 1")
             : null,
-        minTempC:
-          overrides.type === "temperature" ? (overrides.minTempC ?? "0.0") : null,
-        maxTempC:
-          overrides.type === "temperature" ? (overrides.maxTempC ?? "5.0") : null,
+        resolvedLimits:
+          overrides.type === "temperature"
+            ? { [FRIDGE_FIELD_ID]: { min: 0, max: overrides.maxTempC ?? 5 } }
+            : {},
       })
       .returning({ id: taskOccurrences.id });
 
@@ -102,9 +113,18 @@ describe("Today occurrences (GET)", () => {
   }
 
   it("maps none/active/voided occurrences and scopes strictly by location", async () => {
-    const noneId = await insertOccurrence({ type: "cleaning", scheduledTime: "07:00" });
-    const activeId = await insertOccurrence({ type: "cleaning", scheduledTime: "08:00" });
-    const voidedId = await insertOccurrence({ type: "cleaning", scheduledTime: "09:00" });
+    const noneId = await insertOccurrence({
+      type: "cleaning",
+      scheduledTime: "07:00",
+    });
+    const activeId = await insertOccurrence({
+      type: "cleaning",
+      scheduledTime: "08:00",
+    });
+    const voidedId = await insertOccurrence({
+      type: "cleaning",
+      scheduledTime: "09:00",
+    });
 
     // The FK ties an occurrence's (templateId, locationId) to a real template row there.
     const [annexTemplate] = await db
@@ -112,8 +132,16 @@ describe("Today occurrences (GET)", () => {
       .values({
         locationId: org.locations.annex.id,
         title: "Annex cleaning",
-        type: "cleaning",
-        weekdays: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
+        formId: org.forms.cleaning.id,
+        weekdays: [
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday",
+          "saturday",
+          "sunday",
+        ],
         scheduledTimes: ["10:00"],
       })
       .returning({ id: taskTemplates.id });
@@ -125,26 +153,35 @@ describe("Today occurrences (GET)", () => {
       availableAt: new Date(`${today()}T00:00:00Z`),
       dueAt: new Date(`${today()}T10:00:00Z`),
       title: "Annex occurrence",
-      type: "cleaning",
+      formVersionId: org.forms.cleaning.versionId,
     });
 
-    const activeCreate = await apiRequest(recordPath(org.locations.main.id, activeId), {
-      method: "POST",
-      actor: asEmployee(org),
-      body: JSON.stringify({ kind: "ordinary" }),
-    });
+    const activeCreate = await apiRequest(
+      recordPath(org.locations.main.id, activeId),
+      {
+        method: "POST",
+        actor: asEmployee(org),
+        body: JSON.stringify({ values: { [CLEANING_FIELD_ID]: true } }),
+      },
+    );
     expect(activeCreate.status).toBe(201);
 
-    const voidedCreate = await apiRequest(recordPath(org.locations.main.id, voidedId), {
-      method: "POST",
-      actor: asEmployee(org),
-      body: JSON.stringify({ kind: "ordinary" }),
-    });
+    const voidedCreate = await apiRequest(
+      recordPath(org.locations.main.id, voidedId),
+      {
+        method: "POST",
+        actor: asEmployee(org),
+        body: JSON.stringify({ values: { [CLEANING_FIELD_ID]: true } }),
+      },
+    );
     expect(voidedCreate.status).toBe(201);
-    const voidedUndo = await apiRequest(recordPath(org.locations.main.id, voidedId), {
-      method: "DELETE",
-      actor: asEmployee(org),
-    });
+    const voidedUndo = await apiRequest(
+      recordPath(org.locations.main.id, voidedId),
+      {
+        method: "DELETE",
+        actor: asEmployee(org),
+      },
+    );
     expect(voidedUndo.status).toBe(200);
 
     const response = await todayGet(org.locations.main.id, today());
@@ -171,14 +208,13 @@ describe("Today occurrences (GET)", () => {
     expect(voidedItem.completedBy).toBeNull();
   });
 
-  it("reports the occurrence's own stored title/equipment/range, not the live template/equipment", async () => {
-    // Deliberately stale relative to the seeded template/equipment — proves GET never joins them.
+  it("reports the occurrence's own stored title, target and limits, with its form version", async () => {
+    // Deliberately stale relative to the seeded template/target — proves GET never joins them.
     const occurrenceId = await insertOccurrence({
       type: "temperature",
       title: "Historical fridge check (old wording)",
-      equipmentName: "Old fridge label",
-      minTempC: "-2.0",
-      maxTempC: "3.0",
+      targetName: "Old fridge label",
+      maxTempC: 3,
     });
 
     const response = await todayGet(org.locations.main.id, today());
@@ -187,24 +223,74 @@ describe("Today occurrences (GET)", () => {
     const item = items.find((entry) => entry.occurrenceId === occurrenceId)!;
 
     expect(item.title).toBe("Historical fridge check (old wording)");
-    expect(item.equipmentName).toBe("Old fridge label");
-    expect(item.minTempC).toBe(-2);
-    expect(item.maxTempC).toBe(3);
+    expect(item.targetName).toBe("Old fridge label");
+    expect(item.resolvedLimits).toEqual({
+      [FRIDGE_FIELD_ID]: { min: 0, max: 3 },
+    });
+    expect(body.formVersions[item.formVersionId]).toMatchObject({
+      formId: org.forms.fridgeCheck.id,
+      formName: "Fridge check",
+      category: "temperature",
+      version: 1,
+    });
+  });
+
+  it("returns an active record's answers and result, and hides a voided one's", async () => {
+    const passedId = await insertOccurrence({
+      type: "temperature",
+      scheduledTime: "07:00",
+    });
+    const voidedId = await insertOccurrence({
+      type: "cleaning",
+      scheduledTime: "09:00",
+    });
+
+    await apiRequest(recordPath(org.locations.main.id, passedId), {
+      method: "POST",
+      actor: asEmployee(org),
+      body: JSON.stringify({ values: { [FRIDGE_FIELD_ID]: 3.5 } }),
+    });
+    await apiRequest(recordPath(org.locations.main.id, voidedId), {
+      method: "POST",
+      actor: asEmployee(org),
+      body: JSON.stringify({ values: { [CLEANING_FIELD_ID]: true } }),
+    });
+    await apiRequest(recordPath(org.locations.main.id, voidedId), {
+      method: "DELETE",
+      actor: asEmployee(org),
+    });
+
+    const items = flatten(
+      todayResponseSchema.parse(
+        await (await todayGet(org.locations.main.id, today())).json(),
+      ),
+    );
+
+    const passed = items.find((item) => item.occurrenceId === passedId)!;
+    expect(passed.result).toBe("pass");
+    expect(passed.values?.[FRIDGE_FIELD_ID]).toMatchObject({ value: 3.5 });
+
+    const voided = items.find((item) => item.occurrenceId === voidedId)!;
+    expect(voided.result).toBeNull();
+    expect(voided.values).toBeNull();
   });
 
   it("shows a template creation's reconciled occurrence on an immediate refetch", async () => {
     const weekday = getWeekdayFromDate(today());
 
-    const response = await apiRequest(`/locations/${org.locations.main.id}/task-templates`, {
-      method: "POST",
-      actor: asAdmin(org),
-      body: JSON.stringify({
-        title: "Evening close-down",
-        type: "cleaning",
-        weekdays: [weekday],
-        scheduledTimes: ["23:59"],
-      }),
-    });
+    const response = await apiRequest(
+      `/locations/${org.locations.main.id}/task-templates`,
+      {
+        method: "POST",
+        actor: asAdmin(org),
+        body: JSON.stringify({
+          title: "Evening close-down",
+          formId: org.forms.cleaning.id,
+          weekdays: [weekday],
+          scheduledTimes: ["23:59"],
+        }),
+      },
+    );
     expect(response.status).toBe(201);
     const created = (await response.json()) as { id: string };
 
@@ -226,7 +312,7 @@ describe("Today occurrences (GET)", () => {
         actor: asAdmin(org),
         body: JSON.stringify({
           title,
-          type: "cleaning",
+          formId: org.forms.cleaning.id,
           weekdays: [weekday],
           scheduledTimes: [pastTimeToday()],
         }),
@@ -256,9 +342,9 @@ describe("Today occurrences (GET)", () => {
     expect(response.status).toBe(200);
     const body = todayResponseSchema.parse(await response.json());
     expect(body.date).toBe(tomorrow);
-    expect(flatten(body).some((item) => item.occurrenceId === occurrenceId)).toBe(
-      true,
-    );
+    expect(
+      flatten(body).some((item) => item.occurrenceId === occurrenceId),
+    ).toBe(true);
   });
 
   it("returns never-opened past work as overdue", async () => {

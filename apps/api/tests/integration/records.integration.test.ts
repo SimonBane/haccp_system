@@ -16,13 +16,14 @@ import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "../../src/core/db/client.js";
 import {
-  equipment,
+  targets,
   taskOccurrences,
   taskRecords,
-  taskRecordTemperatures,
   taskTemplates,
 } from "../../src/core/db/schema/index.js";
 import {
+  CLEANING_FIELD_ID,
+  FRIDGE_FIELD_ID,
   seedOrganization,
   seedTwoTenants,
   type SeededOrg,
@@ -112,11 +113,14 @@ describe("Records list (GET)", () => {
           (isTemperature
             ? org.templates.temperature.title
             : org.templates.cleaning.title),
-        type: overrides.type,
-        equipmentId: isTemperature ? org.equipment.fridge.id : null,
-        equipmentName: isTemperature ? org.equipment.fridge.name : null,
-        minTempC: isTemperature ? "0.0" : null,
-        maxTempC: isTemperature ? "5.0" : null,
+        formVersionId: isTemperature
+          ? org.forms.fridgeCheck.versionId
+          : org.forms.cleaning.versionId,
+        targetId: isTemperature ? org.targets.fridge.id : null,
+        targetName: isTemperature ? org.targets.fridge.name : null,
+        resolvedLimits: isTemperature
+          ? { [FRIDGE_FIELD_ID]: { min: 0, max: 5 } }
+          : {},
       })
       .returning({ id: taskOccurrences.id });
 
@@ -139,10 +143,35 @@ describe("Records list (GET)", () => {
       };
     },
   ): Promise<string> {
+    const [occurrence] = await db
+      .select({ formVersionId: taskOccurrences.formVersionId })
+      .from(taskOccurrences)
+      .where(eq(taskOccurrences.id, occurrenceId));
+    const reading = overrides.temperature;
+
     const [record] = await db
       .insert(taskRecords)
       .values({
         occurrenceId,
+        formVersionId: occurrence!.formVersionId,
+        values: reading
+          ? {
+              [FRIDGE_FIELD_ID]: {
+                type: "measurement",
+                value: Number(reading.recordedC),
+                unit: "celsius",
+                min: 0,
+                max: 5,
+                fails: reading.result === "out_of_range",
+              },
+            }
+          : { [CLEANING_FIELD_ID]: { type: "checkbox", value: true } },
+        result: reading
+          ? reading.result === "ok"
+            ? "pass"
+            : "fail"
+          : "not_evaluated",
+        correctiveAction: reading?.correctiveAction ?? null,
         createdAt: overrides.createdAt ?? overrides.recordedAt,
         createdByUserId: overrides.createdByUserId ?? org.admin.userId,
         recordedAt: overrides.recordedAt,
@@ -151,17 +180,6 @@ describe("Records list (GET)", () => {
         voidedByUserId: overrides.voidedByUserId ?? null,
       })
       .returning({ id: taskRecords.id });
-
-    if (overrides.temperature) {
-      await db.insert(taskRecordTemperatures).values({
-        taskRecordId: record!.id,
-        recordedC: overrides.temperature.recordedC,
-        minTempC: "0.0",
-        maxTempC: "5.0",
-        result: overrides.temperature.result,
-        correctiveAction: overrides.temperature.correctiveAction ?? null,
-      });
-    }
 
     return record!.id;
   }
@@ -403,21 +421,27 @@ describe("Records list (GET)", () => {
       const page = await listRecords();
 
       expect(find(page, passId).result).toBe("pass");
-      expect(find(page, passId).record?.temperature).toMatchObject({
-        recordedC: 3.5,
-        minTempC: 0,
-        maxTempC: 5,
-        result: "ok",
+      expect(find(page, passId).record?.values[FRIDGE_FIELD_ID]).toMatchObject({
+        value: 3.5,
+        min: 0,
+        max: 5,
+        fails: false,
       });
       expect(find(page, failId).result).toBe("fail");
-      expect(find(page, failId).record?.temperature?.correctiveAction).toBe(
+      expect(find(page, failId).record?.correctiveAction).toBe(
         "Moved stock to the walk-in",
       );
       expect(find(page, missedId).result).toBe("not_evaluated");
       expect(find(page, missedId).record).toBeNull();
+      expect(page.formVersions[find(page, passId).formVersionId]).toMatchObject(
+        {
+          formName: "Fridge check",
+          category: "temperature",
+        },
+      );
     });
 
-    it("keeps the retained temperature payload on a voided record", async () => {
+    it("keeps the answers and result on a voided record", async () => {
       const voidedId = await insertOccurrence({ type: "temperature" });
       await insertRecord(voidedId, {
         recordedAt: wallClockToInstant(daysAgo(1), "07:50", org.timeZone),
@@ -431,6 +455,11 @@ describe("Records list (GET)", () => {
       expect(find(page, voidedId)).toMatchObject({
         displayState: "voided",
         result: "fail",
+      });
+      expect(
+        find(page, voidedId).record?.values[FRIDGE_FIELD_ID],
+      ).toMatchObject({
+        value: 9.1,
       });
     });
 
@@ -454,7 +483,7 @@ describe("Records list (GET)", () => {
       expect(detail.recordedBy?.firstName).toBe("Ada");
     });
 
-    it("returns the stored occurrence values, not the current template or equipment", async () => {
+    it("returns the stored occurrence values, not the current template or target", async () => {
       const occurrenceId = await insertOccurrence({
         type: "temperature",
         title: "Morning fridge check",
@@ -465,17 +494,19 @@ describe("Records list (GET)", () => {
         .set({ title: "Renamed template" })
         .where(eq(taskTemplates.id, org.templates.temperature.id));
       await db
-        .update(equipment)
+        .update(targets)
         .set({ name: "Renamed fridge" })
-        .where(eq(equipment.id, org.equipment.fridge.id));
+        .where(eq(targets.id, org.targets.fridge.id));
 
       const item = find(await listRecords(), occurrenceId);
 
       expect(item.title).toBe("Morning fridge check");
-      expect(item.equipmentName).toBe("Fridge 1");
-      expect(item.equipmentId).toBe(org.equipment.fridge.id);
-      expect(item.minTempC).toBe(0);
-      expect(item.maxTempC).toBe(5);
+      expect(item.targetName).toBe("Fridge 1");
+      expect(item.targetId).toBe(org.targets.fridge.id);
+      expect(item.resolvedLimits).toEqual({
+        [FRIDGE_FIELD_ID]: { min: 0, max: 5 },
+      });
+      expect(item.category).toBe("temperature");
       expect(item.taskTemplateId).toBe(org.templates.temperature.id);
     });
   });
@@ -556,7 +587,7 @@ describe("Records list (GET)", () => {
           Array.from({ length: 12 }, (_, index) => ({
             locationId: org.locations.main.id,
             title: `Tied template ${index}`,
-            type: "cleaning",
+            formId: org.forms.cleaning.id,
             weekdays: [
               "monday",
               "tuesday",
@@ -677,8 +708,8 @@ describe("Records list (GET)", () => {
       });
     });
 
-    it("filters by type", async () => {
-      const page = await listRecords({ type: "cleaning" });
+    it("filters by form category", async () => {
+      const page = await listRecords({ category: "cleaning" });
 
       expect(page.items.map((item) => item.occurrenceId)).toEqual([
         cleaningVoidedId,
@@ -686,7 +717,7 @@ describe("Records list (GET)", () => {
       expect(page.total).toBe(1);
     });
 
-    it("ORs multiple values inside the type filter", async () => {
+    it("ORs multiple values inside the category filter", async () => {
       const otherId = await insertOccurrence({
         type: "cleaning",
         scheduledTime: "11:00",
@@ -694,7 +725,7 @@ describe("Records list (GET)", () => {
         title: "Other work",
       });
 
-      const page = await listRecords({ type: "cleaning,temperature" });
+      const page = await listRecords({ category: "cleaning,temperature" });
       const ids = page.items.map((item) => item.occurrenceId);
 
       expect(ids).toContain(otherId);
@@ -713,7 +744,7 @@ describe("Records list (GET)", () => {
       expect(page.total).toBe(2);
     });
 
-    it("filters by temperature result, including not_evaluated", async () => {
+    it("filters by result, including not_evaluated", async () => {
       expect(
         (await listRecords({ result: "pass" })).items.map(
           (item) => item.occurrenceId,
@@ -739,18 +770,18 @@ describe("Records list (GET)", () => {
     it("ANDs different filters together", async () => {
       expect(
         (
-          await listRecords({ type: "temperature", state: "submitted" })
+          await listRecords({ category: "temperature", state: "submitted" })
         ).items.map((item) => item.occurrenceId),
       ).toEqual([temperaturePassId, temperatureFailId]);
 
       expect(
-        (await listRecords({ type: "temperature", result: "fail" })).items.map(
-          (item) => item.occurrenceId,
-        ),
+        (
+          await listRecords({ category: "temperature", result: "fail" })
+        ).items.map((item) => item.occurrenceId),
       ).toEqual([temperatureFailId]);
 
       expect(
-        (await listRecords({ type: "cleaning", state: "submitted" })).total,
+        (await listRecords({ category: "cleaning", state: "submitted" })).total,
       ).toBe(0);
     });
 
@@ -792,7 +823,7 @@ describe("Records list (GET)", () => {
       const unfiltered = await listRecords();
       expect(unfiltered.total).toBe(3);
 
-      const filtered = await listRecords({ type: "temperature" });
+      const filtered = await listRecords({ category: "temperature" });
       expect(filtered.total).toBe(1);
     });
 
@@ -802,7 +833,7 @@ describe("Records list (GET)", () => {
         dateTo: "2019-01-31",
       });
 
-      expect(page).toEqual({ items: [], total: 0 });
+      expect(page).toEqual({ items: [], total: 0, formVersions: {} });
     });
 
     it("returns every eligible row on one page when it fits", async () => {
@@ -918,7 +949,8 @@ describe("Records list (GET)", () => {
 
       expect(manyRows.items.length).toBe(11);
       expect(selectSpy.mock.calls.length).toBe(oneRowSelects);
-      expect(oneRowSelects).toBeLessThanOrEqual(2);
+      // Page, count and one batched form-version lookup — none of them per row.
+      expect(oneRowSelects).toBeLessThanOrEqual(3);
       for (const item of manyRows.items) {
         expect(item.record?.recordedBy).not.toBeNull();
       }
@@ -995,7 +1027,7 @@ describe("Records list (GET)", () => {
       ["an unknown parameter", () => ({ limit: "10" })],
       ["an unlisted sort field", () => ({ sortBy: "status" })],
       ["an invalid sort direction", () => ({ sortOrder: "sideways" })],
-      ["an unknown type value", () => ({ type: "delivery" })],
+      ["an unknown category value", () => ({ category: "delivery" })],
       ["a pending status value", () => ({ state: "pending" })],
       ["an unknown result value", () => ({ result: "unknown" })],
       ["page without pageSize", () => ({ page: "2" })],
@@ -1217,7 +1249,7 @@ describe("Records list (GET)", () => {
       const filterSets: Record<string, string>[] = [
         {},
         { state: "missed" },
-        { type: "temperature" },
+        { category: "temperature" },
         { state: "missed,submitted" },
       ];
 
@@ -1319,7 +1351,8 @@ describe("Records list (GET)", () => {
         isolationLevel: "repeatable read",
         accessMode: "read only",
       });
-      expect(selects).toHaveLength(2);
+      // Count, rows and their form versions, all from the same snapshot.
+      expect(selects).toHaveLength(3);
     });
 
     it("stays consistent when a record lands between the count and the read", async () => {

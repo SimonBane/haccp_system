@@ -1,6 +1,8 @@
-import { API_ERROR_CODE } from "@haccp/shared";
+import { API_ERROR_CODE, type FormDefinition } from "@haccp/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ZodError } from "zod";
 import {
+  ConflictError,
   NotFoundError,
   ValidationError,
 } from "../../core/errors/app-errors.js";
@@ -9,9 +11,8 @@ const taskRecordRepository = vi.hoisted(() => ({
   findOccurrenceForRecording: vi.fn(),
   findRecordChain: vi.fn(),
   insertRecord: vi.fn(),
-  insertTemperatureDetail: vi.fn(),
-  updateRecordForReactivation: vi.fn(),
-  replaceTemperatureDetail: vi.fn(),
+  updateRecordAnswers: vi.fn(),
+  replaceReadings: vi.fn(),
   voidActiveRecord: vi.fn(),
 }));
 
@@ -19,10 +20,13 @@ vi.mock("./task-record.repository.js", () => ({ taskRecordRepository }));
 
 const { taskRecordService } = await import("./task-record.service.js");
 
-const LOCATION_ID = "00000000-0000-4000-8000-0000000000l1";
-const OCCURRENCE_ID = "00000000-0000-4000-8000-0000000000x1";
-const RECORD_ID = "00000000-0000-4000-8000-0000000000r1";
-const USER_ID = "00000000-0000-4000-8000-0000000000u1";
+const LOCATION_ID = "00000000-0000-4000-8000-0000000000a1";
+const OCCURRENCE_ID = "00000000-0000-4000-8000-0000000000b1";
+const RECORD_ID = "00000000-0000-4000-8000-0000000000c1";
+const USER_ID = "00000000-0000-4000-8000-0000000000d1";
+const VERSION_ID = "00000000-0000-4000-8000-0000000000e1";
+const TARGET_ID = "00000000-0000-4000-8000-0000000000f1";
+const NOW = new Date("2026-08-19T12:00:00Z");
 
 const SCOPE = {
   locationId: LOCATION_ID,
@@ -30,40 +34,36 @@ const SCOPE = {
   actorUserId: USER_ID,
 };
 
+const FRIDGE: FormDefinition = {
+  fields: [
+    {
+      id: "temperature",
+      type: "measurement",
+      label: "Temperature",
+      required: true,
+      unit: "celsius",
+      limits: { min: 0, max: 5 },
+    },
+  ],
+  correctiveAction: "required_on_fail",
+};
+
+const CLEANING: FormDefinition = {
+  fields: [
+    { id: "cleaned", type: "checkbox", label: "Cleaned", required: true },
+  ],
+  correctiveAction: "required_on_fail",
+};
+
 function makeOccurrence(overrides: Record<string, unknown> = {}) {
   return {
     id: OCCURRENCE_ID,
-    type: "temperature",
-    occurrenceDate: "2026-08-19",
+    locationId: LOCATION_ID,
+    targetId: TARGET_ID,
     availableAt: new Date("2026-08-19T00:00:00Z"),
-    dueAt: new Date("2026-08-19T08:00:00Z"),
-    minTempC: "0.0",
-    maxTempC: "5.0",
-    ...overrides,
-  };
-}
-
-function makeChain(overrides: Record<string, unknown> = {}) {
-  return {
-    recordId: RECORD_ID,
-    occurrenceId: OCCURRENCE_ID,
-    createdAt: new Date("2026-08-19T08:00:00Z"),
-    createdByUserId: USER_ID,
-    recordedAt: new Date("2026-08-19T08:00:00Z"),
-    recordedByUserId: USER_ID,
-    voidedAt: null,
-    voidedByUserId: null,
-    occurrenceType: "temperature",
-    occurrenceDate: "2026-08-19",
-    availableAt: new Date("2026-08-19T00:00:00Z"),
-    dueAt: new Date("2026-08-19T08:00:00Z"),
-    minTempC: "0.0",
-    maxTempC: "5.0",
-    detailRecordedC: "3.0",
-    detailMinTempC: "0.0",
-    detailMaxTempC: "5.0",
-    detailResult: "ok",
-    detailCorrectiveAction: null,
+    formVersionId: VERSION_ID,
+    definition: FRIDGE,
+    resolvedLimits: { temperature: { min: 0, max: 5 } },
     ...overrides,
   };
 }
@@ -72,14 +72,28 @@ function makeRecordRow(overrides: Record<string, unknown> = {}) {
   return {
     id: RECORD_ID,
     occurrenceId: OCCURRENCE_ID,
-    createdAt: new Date("2026-08-19T08:00:00Z"),
+    formVersionId: VERSION_ID,
+    values: {},
+    result: "pass",
+    correctiveAction: null,
+    createdAt: NOW,
     createdByUserId: USER_ID,
-    recordedAt: new Date("2026-08-19T08:00:00Z"),
+    recordedAt: NOW,
     recordedByUserId: USER_ID,
     voidedAt: null,
     voidedByUserId: null,
     ...overrides,
   };
+}
+
+/** The insert/update echo what the service wrote, as the database would. */
+function echoWrites() {
+  taskRecordRepository.insertRecord.mockImplementation(async (_tx, values) =>
+    makeRecordRow(values),
+  );
+  taskRecordRepository.updateRecordAnswers.mockImplementation(
+    async (_tx, _id, values) => makeRecordRow(values),
+  );
 }
 
 function fakeDb() {
@@ -91,7 +105,8 @@ function fakeDb() {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
-  vi.setSystemTime(new Date("2026-08-19T12:00:00Z"));
+  vi.setSystemTime(NOW);
+  echoWrites();
 });
 
 afterEach(() => {
@@ -99,314 +114,278 @@ afterEach(() => {
 });
 
 describe("create", () => {
-  it("404s when the occurrence is not found within the location/organization scope", async () => {
+  it("404s when the occurrence is not found within the location scope", async () => {
     taskRecordRepository.findOccurrenceForRecording.mockResolvedValue(null);
 
     await expect(
-      taskRecordService.create(fakeDb(), SCOPE, { kind: "ordinary" }),
+      taskRecordService.create(fakeDb(), SCOPE, { values: { temperature: 3 } }),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it("rejects a write before the occurrence's availableAt", async () => {
     taskRecordRepository.findOccurrenceForRecording.mockResolvedValue(
-      makeOccurrence({
-        type: "cleaning",
-        availableAt: new Date("2026-08-19T12:00:00.001Z"), // one ms after the fixed now
-      }),
+      makeOccurrence({ availableAt: new Date("2026-08-19T12:00:00.001Z") }),
     );
 
     await expect(
-      taskRecordService.create(fakeDb(), SCOPE, { kind: "ordinary" }),
+      taskRecordService.create(fakeDb(), SCOPE, { values: { temperature: 3 } }),
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
   it("accepts a write at exactly availableAt", async () => {
     taskRecordRepository.findOccurrenceForRecording.mockResolvedValue(
-      makeOccurrence({
-        type: "cleaning",
-        availableAt: new Date("2026-08-19T12:00:00.000Z"), // exactly the fixed now
-      }),
+      makeOccurrence({ availableAt: NOW }),
     );
-    taskRecordRepository.insertRecord.mockResolvedValue(makeRecordRow());
 
     await expect(
-      taskRecordService.create(fakeDb(), SCOPE, { kind: "ordinary" }),
+      taskRecordService.create(fakeDb(), SCOPE, { values: { temperature: 3 } }),
     ).resolves.toMatchObject({ id: RECORD_ID });
   });
 
-  it("accepts a late, no-deadline write long after availableAt", async () => {
-    taskRecordRepository.findOccurrenceForRecording.mockResolvedValue(
-      makeOccurrence({
-        type: "cleaning",
-        availableAt: new Date("2020-01-01T00:00:00Z"),
-        dueAt: null,
-      }),
-    );
-    taskRecordRepository.insertRecord.mockResolvedValue(makeRecordRow());
-
-    await expect(
-      taskRecordService.create(fakeDb(), SCOPE, { kind: "ordinary" }),
-    ).resolves.toMatchObject({ id: RECORD_ID });
-  });
-
-  it("rejects an ordinary payload against a temperature occurrence", async () => {
-    taskRecordRepository.findOccurrenceForRecording.mockResolvedValue(
-      makeOccurrence({ type: "temperature" }),
-    );
-
-    await expect(
-      taskRecordService.create(fakeDb(), SCOPE, { kind: "ordinary" }),
-    ).rejects.toBeInstanceOf(ValidationError);
-  });
-
-  it("rejects a temperature payload against a cleaning occurrence", async () => {
-    taskRecordRepository.findOccurrenceForRecording.mockResolvedValue(
-      makeOccurrence({ type: "cleaning" }),
-    );
-
-    await expect(
-      taskRecordService.create(fakeDb(), SCOPE, {
-        kind: "temperature",
-        recordedC: 3,
-      }),
-    ).rejects.toBeInstanceOf(ValidationError);
-  });
-
-  it("rejects an out-of-range reading with no corrective action", async () => {
+  it("stores a passing reading against the occurrence's own form version", async () => {
     taskRecordRepository.findOccurrenceForRecording.mockResolvedValue(
       makeOccurrence(),
     );
 
-    await expect(
-      taskRecordService.create(fakeDb(), SCOPE, {
-        kind: "temperature",
-        recordedC: 12,
-      }),
-    ).rejects.toBeInstanceOf(ValidationError);
-  });
-
-  it("normalizes an in-range reading's corrective action to null even if supplied", async () => {
-    taskRecordRepository.findOccurrenceForRecording.mockResolvedValue(
-      makeOccurrence(),
-    );
-    taskRecordRepository.insertRecord.mockResolvedValue(makeRecordRow());
-    taskRecordRepository.insertTemperatureDetail.mockResolvedValue({
-      taskRecordId: RECORD_ID,
-      recordedC: "3.0",
-      minTempC: "0.0",
-      maxTempC: "5.0",
-      result: "ok",
-      correctiveAction: null,
+    const result = await taskRecordService.create(fakeDb(), SCOPE, {
+      values: { temperature: 3 },
+      correctiveAction: "ignored on a pass",
     });
 
-    await taskRecordService.create(fakeDb(), SCOPE, {
-      kind: "temperature",
-      recordedC: 3,
-      correctiveAction: "not needed",
-    });
-
-    expect(taskRecordRepository.insertTemperatureDetail).toHaveBeenCalledWith(
-      "tx",
-      expect.objectContaining({ result: "ok", correctiveAction: null }),
-    );
-  });
-
-  it("stores a trimmed corrective action for an out-of-range reading", async () => {
-    taskRecordRepository.findOccurrenceForRecording.mockResolvedValue(
-      makeOccurrence(),
-    );
-    taskRecordRepository.insertRecord.mockResolvedValue(makeRecordRow());
-    taskRecordRepository.insertTemperatureDetail.mockResolvedValue({
-      taskRecordId: RECORD_ID,
-      recordedC: "12.0",
-      minTempC: "0.0",
-      maxTempC: "5.0",
-      result: "out_of_range",
-      correctiveAction: "Moved stock",
-    });
-
-    await taskRecordService.create(fakeDb(), SCOPE, {
-      kind: "temperature",
-      recordedC: 12,
-      correctiveAction: "  Moved stock  ",
-    });
-
-    expect(taskRecordRepository.insertTemperatureDetail).toHaveBeenCalledWith(
+    expect(taskRecordRepository.insertRecord).toHaveBeenCalledWith(
       "tx",
       expect.objectContaining({
-        result: "out_of_range",
-        correctiveAction: "Moved stock",
+        occurrenceId: OCCURRENCE_ID,
+        formVersionId: VERSION_ID,
+        result: "pass",
+        correctiveAction: null,
+        createdByUserId: USER_ID,
+        recordedByUserId: USER_ID,
+        recordedAt: NOW,
       }),
     );
-  });
-
-  it("maps a unique violation on insert to 409 without overwriting", async () => {
-    taskRecordRepository.findOccurrenceForRecording.mockResolvedValue(
-      makeOccurrence({ type: "cleaning" }),
-    );
-    taskRecordRepository.insertRecord.mockRejectedValue(
-      Object.assign(new Error("duplicate"), { code: "23505" }),
-    );
-
-    await expect(
-      taskRecordService.create(fakeDb(), SCOPE, { kind: "ordinary" }),
-    ).rejects.toMatchObject({
-      code: API_ERROR_CODE.TASK_RECORD_ALREADY_EXISTS,
+    expect(result.values.temperature).toEqual({
+      type: "measurement",
+      value: 3,
+      unit: "celsius",
+      min: 0,
+      max: 5,
+      fails: false,
     });
   });
 
-  it("rolls the transaction's error up when the temperature detail insert fails", async () => {
+  it("writes the reading row for the occurrence's target and location", async () => {
     taskRecordRepository.findOccurrenceForRecording.mockResolvedValue(
       makeOccurrence(),
     );
-    taskRecordRepository.insertRecord.mockResolvedValue(makeRecordRow());
-    taskRecordRepository.insertTemperatureDetail.mockRejectedValue(
-      new Error("detail insert failed"),
+
+    await taskRecordService.create(fakeDb(), SCOPE, {
+      values: { temperature: 3 },
+    });
+
+    expect(taskRecordRepository.replaceReadings).toHaveBeenCalledWith(
+      "tx",
+      RECORD_ID,
+      [
+        expect.objectContaining({
+          taskRecordId: RECORD_ID,
+          fieldId: "temperature",
+          locationId: LOCATION_ID,
+          targetId: TARGET_ID,
+          value: "3",
+          fails: false,
+        }),
+      ],
+    );
+  });
+
+  it("judges against the occurrence's resolved limits, not the form's defaults", async () => {
+    taskRecordRepository.findOccurrenceForRecording.mockResolvedValue(
+      makeOccurrence({ resolvedLimits: { temperature: { min: 0, max: 2 } } }),
+    );
+
+    const result = await taskRecordService.create(fakeDb(), SCOPE, {
+      values: { temperature: 3 },
+      correctiveAction: "Moved fish to the walk-in",
+    });
+
+    expect(result.result).toBe("fail");
+    expect(result.correctiveAction).toBe("Moved fish to the walk-in");
+  });
+
+  it("requires a corrective action for a failing check", async () => {
+    taskRecordRepository.findOccurrenceForRecording.mockResolvedValue(
+      makeOccurrence(),
     );
 
     await expect(
       taskRecordService.create(fakeDb(), SCOPE, {
-        kind: "temperature",
-        recordedC: 3,
+        values: { temperature: 12 },
       }),
-    ).rejects.toThrow("detail insert failed");
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(taskRecordRepository.insertRecord).not.toHaveBeenCalled();
+  });
 
-    expect(taskRecordRepository.insertRecord).toHaveBeenCalledTimes(1);
+  it("does not require one when the form makes it optional", async () => {
+    taskRecordRepository.findOccurrenceForRecording.mockResolvedValue(
+      makeOccurrence({
+        definition: { ...FRIDGE, correctiveAction: "optional" },
+      }),
+    );
+
+    await expect(
+      taskRecordService.create(fakeDb(), SCOPE, {
+        values: { temperature: 12 },
+      }),
+    ).resolves.toMatchObject({ result: "fail", correctiveAction: null });
+  });
+
+  it("rejects answers that do not fit the form version, before writing", async () => {
+    taskRecordRepository.findOccurrenceForRecording.mockResolvedValue(
+      makeOccurrence({
+        definition: CLEANING,
+        resolvedLimits: {},
+        targetId: null,
+      }),
+    );
+
+    await expect(
+      taskRecordService.create(fakeDb(), SCOPE, { values: { temperature: 3 } }),
+    ).rejects.toBeInstanceOf(ZodError);
+    expect(taskRecordRepository.insertRecord).not.toHaveBeenCalled();
+  });
+
+  it("writes no readings for a form without measurements", async () => {
+    taskRecordRepository.findOccurrenceForRecording.mockResolvedValue(
+      makeOccurrence({
+        definition: CLEANING,
+        resolvedLimits: {},
+        targetId: null,
+      }),
+    );
+
+    const result = await taskRecordService.create(fakeDb(), SCOPE, {
+      values: { cleaned: true },
+    });
+
+    expect(result.result).toBe("not_evaluated");
+    expect(taskRecordRepository.replaceReadings).toHaveBeenCalledWith(
+      "tx",
+      RECORD_ID,
+      [],
+    );
+  });
+
+  it("maps a duplicate record to TASK_RECORD_ALREADY_EXISTS", async () => {
+    taskRecordRepository.findOccurrenceForRecording.mockResolvedValue(
+      makeOccurrence(),
+    );
+    taskRecordRepository.insertRecord.mockRejectedValue({ code: "23505" });
+
+    const error = await taskRecordService
+      .create(fakeDb(), SCOPE, { values: { temperature: 3 } })
+      .catch((e) => e);
+
+    expect(error).toBeInstanceOf(ConflictError);
+    expect(error.code).toBe(API_ERROR_CODE.TASK_RECORD_ALREADY_EXISTS);
   });
 });
 
 describe("update", () => {
-  it("404s when there is no existing record for the occurrence", async () => {
+  function chain(overrides: Record<string, unknown> = {}) {
+    return { record: makeRecordRow(overrides), occurrence: makeOccurrence() };
+  }
+
+  it("404s when there is no record yet", async () => {
     taskRecordRepository.findRecordChain.mockResolvedValue(null);
 
     await expect(
-      taskRecordService.update(fakeDb(), SCOPE, { kind: "ordinary" }),
+      taskRecordService.update(fakeDb(), SCOPE, { values: { temperature: 3 } }),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it("rejects a reactivation before the occurrence's availableAt", async () => {
-    taskRecordRepository.findRecordChain.mockResolvedValue(
-      makeChain({ availableAt: new Date("2026-08-19T12:00:00.001Z") }),
-    );
+  it("replaces the answers and readings, re-judged against the same occurrence", async () => {
+    taskRecordRepository.findRecordChain.mockResolvedValue(chain());
 
-    await expect(
-      taskRecordService.update(fakeDb(), SCOPE, { kind: "ordinary" }),
-    ).rejects.toBeInstanceOf(ValidationError);
-  });
-
-  it("revalidates the payload kind against the immutable occurrence type, not any prior detail", async () => {
-    taskRecordRepository.findRecordChain.mockResolvedValue(
-      makeChain({ occurrenceType: "cleaning" }),
-    );
-
-    await expect(
-      taskRecordService.update(fakeDb(), SCOPE, {
-        kind: "temperature",
-        recordedC: 3,
-      }),
-    ).rejects.toBeInstanceOf(ValidationError);
-  });
-
-  it("replaces the current temperature detail and attribution on the joined occurrence range", async () => {
-    taskRecordRepository.findRecordChain.mockResolvedValue(makeChain());
-    taskRecordRepository.updateRecordForReactivation.mockResolvedValue(
-      makeRecordRow({ recordedByUserId: USER_ID }),
-    );
-    taskRecordRepository.replaceTemperatureDetail.mockResolvedValue({
-      taskRecordId: RECORD_ID,
-      recordedC: "1.0",
-      minTempC: "0.0",
-      maxTempC: "5.0",
-      result: "ok",
-      correctiveAction: null,
+    const result = await taskRecordService.update(fakeDb(), SCOPE, {
+      values: { temperature: 9 },
+      correctiveAction: "Called the engineer",
     });
 
-    const response = await taskRecordService.update(fakeDb(), SCOPE, {
-      kind: "temperature",
-      recordedC: 1,
-    });
-
-    expect(taskRecordRepository.replaceTemperatureDetail).toHaveBeenCalledWith(
+    expect(taskRecordRepository.updateRecordAnswers).toHaveBeenCalledWith(
       "tx",
       RECORD_ID,
-      expect.objectContaining({ minTempC: "0", maxTempC: "5" }),
+      expect.objectContaining({
+        result: "fail",
+        correctiveAction: "Called the engineer",
+        recordedAt: NOW,
+        recordedByUserId: USER_ID,
+      }),
     );
-    expect(response.temperature?.recordedC).toBe(1);
+    expect(result.result).toBe("fail");
+    expect(taskRecordRepository.replaceReadings).toHaveBeenCalledWith(
+      "tx",
+      RECORD_ID,
+      [expect.objectContaining({ value: "9", fails: true })],
+    );
   });
 
-  it("clears void attribution when reactivating a voided record", async () => {
+  it("reactivates a voided record", async () => {
     taskRecordRepository.findRecordChain.mockResolvedValue(
-      makeChain({
-        occurrenceType: "cleaning",
+      chain({
         voidedAt: new Date("2026-08-19T09:00:00Z"),
         voidedByUserId: USER_ID,
-        detailRecordedC: null,
-        detailMinTempC: null,
-        detailMaxTempC: null,
-        detailResult: null,
-        detailCorrectiveAction: null,
       }),
     );
-    taskRecordRepository.updateRecordForReactivation.mockResolvedValue(
-      makeRecordRow({ voidedAt: null, voidedByUserId: null }),
-    );
 
-    const response = await taskRecordService.update(fakeDb(), SCOPE, {
-      kind: "ordinary",
+    const result = await taskRecordService.update(fakeDb(), SCOPE, {
+      values: { temperature: 3 },
     });
 
-    expect(
-      taskRecordRepository.updateRecordForReactivation,
-    ).toHaveBeenCalledWith(
-      "tx",
-      RECORD_ID,
-      expect.objectContaining({ recordedByUserId: USER_ID }),
-    );
-    expect(response.active).toBe(true);
-    expect(response.voidedAt).toBeNull();
-    expect(response.voidedByUserId).toBeNull();
+    expect(result.active).toBe(true);
+    expect(result.voidedAt).toBeNull();
   });
 });
 
 describe("remove", () => {
-  it("404s when there is no record for the occurrence", async () => {
-    taskRecordRepository.findRecordChain.mockResolvedValue(null);
+  it("404s an already-voided record", async () => {
+    taskRecordRepository.findRecordChain.mockResolvedValue({
+      record: makeRecordRow({ voidedAt: NOW, voidedByUserId: USER_ID }),
+      occurrence: makeOccurrence(),
+    });
 
     await expect(
       taskRecordService.remove(fakeDb(), SCOPE),
     ).rejects.toBeInstanceOf(NotFoundError);
+    expect(taskRecordRepository.voidActiveRecord).not.toHaveBeenCalled();
   });
 
-  it("404s a repeated void of an already-voided record", async () => {
-    taskRecordRepository.findRecordChain.mockResolvedValue(
-      makeChain({ voidedAt: new Date("2026-08-19T09:00:00Z") }),
-    );
-
-    await expect(
-      taskRecordService.remove(fakeDb(), SCOPE),
-    ).rejects.toBeInstanceOf(NotFoundError);
-  });
-
-  it("voids an active record and keeps its temperature detail untouched in the response", async () => {
-    taskRecordRepository.findRecordChain.mockResolvedValue(makeChain());
+  it("voids the active record, keeping its answers", async () => {
+    taskRecordRepository.findRecordChain.mockResolvedValue({
+      record: makeRecordRow(),
+      occurrence: makeOccurrence(),
+    });
     taskRecordRepository.voidActiveRecord.mockResolvedValue(
       makeRecordRow({
-        voidedAt: new Date("2026-08-19T12:00:00Z"),
+        values: {
+          temperature: {
+            type: "measurement",
+            value: 3,
+            unit: "celsius",
+            min: 0,
+            max: 5,
+            fails: false,
+          },
+        },
+        voidedAt: NOW,
         voidedByUserId: USER_ID,
       }),
     );
 
-    const response = await taskRecordService.remove(fakeDb(), SCOPE);
+    const result = await taskRecordService.remove(fakeDb(), SCOPE);
 
-    expect(response.active).toBe(false);
-    expect(response.voidedByUserId).toBe(USER_ID);
-    expect(response.temperature).toEqual({
-      recordedC: 3,
-      minTempC: 0,
-      maxTempC: 5,
-      result: "ok",
-      correctiveAction: null,
-    });
-    expect(taskRecordRepository.insertTemperatureDetail).not.toHaveBeenCalled();
+    expect(result.active).toBe(false);
+    expect(result.values.temperature).toMatchObject({ value: 3 });
+    expect(taskRecordRepository.replaceReadings).not.toHaveBeenCalled();
   });
 });

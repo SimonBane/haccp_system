@@ -13,7 +13,7 @@ describe("location scoping across tenants", () => {
 
   it("lets an admin reach a location in their own organization", async () => {
     const response = await apiRequest(
-      `/locations/${world.alpha.locations.main.id}/equipment`,
+      `/locations/${world.alpha.locations.main.id}/targets`,
       { actor: asAdmin(world.alpha) },
     );
 
@@ -22,7 +22,7 @@ describe("location scoping across tenants", () => {
 
   it("refuses an admin reaching another organization's location", async () => {
     const response = await apiRequest(
-      `/locations/${world.beta.locations.main.id}/equipment`,
+      `/locations/${world.beta.locations.main.id}/targets`,
       { actor: asAdmin(world.alpha) },
     );
 
@@ -49,7 +49,7 @@ describe("location scoping across tenants", () => {
       {
         method: "POST",
         actor: asEmployee(world.alpha),
-        body: JSON.stringify({ kind: "ordinary" }),
+        body: JSON.stringify({ values: { cleaned: true } }),
       },
     );
 
