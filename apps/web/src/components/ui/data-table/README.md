@@ -3,8 +3,8 @@
 One `DataTable`, two execution modes.
 
 - **Client mode** — the component receives the complete array and TanStack filters,
-  sorts and paginates it. This is what every current grid (equipment, task
-  templates, employees, locations) uses today, unchanged.
+  sorts and paginates it. This is what every current grid (equipment & areas,
+  forms, task templates, employees, locations) uses today, unchanged.
 - **Server mode** — the component receives one page plus the server `total`, and
   TanStack is told not to process it again (`manualPagination`, `manualSorting`,
   `manualFiltering`, `rowCount`). Records (`features/records`) is the first
@@ -217,9 +217,12 @@ the canonical option values:
 ```ts
 const filters: DataTableFilterDefinition[] = [
   {
-    key: "type",
-    label: t("columns.type"),
-    options: EQUIPMENT_TYPE_ORDER.map((value) => ({ value, label: typeLabels[value] })),
+    key: "category",
+    label: t("filters.category"),
+    options: RECORDS_CATEGORY_FILTER_VALUES.map((value) => ({
+      value,
+      label: categoryLabels[value],
+    })),
   },
 ];
 ```
