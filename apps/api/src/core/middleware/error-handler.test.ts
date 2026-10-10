@@ -153,4 +153,18 @@ describe("errorHandler", () => {
     const body = await errorBody(await app.request("/validation"));
     expect(body).not.toHaveProperty("details");
   });
+
+  it("serializes details a conflict supplies, for the client to act on", async () => {
+    const app = testApp();
+    app.get("/conflict", () => {
+      throw new ConflictError("Saving would drop overrides", {
+        code: API_ERROR_CODE.FORM_VERSION_DROPS_OVERRIDES,
+        details: { droppedOverrides: [] },
+      });
+    });
+
+    const body = await errorBody(await app.request("/conflict"));
+    expect(body.error).toBe(API_ERROR_CODE.FORM_VERSION_DROPS_OVERRIDES);
+    expect(body.details).toEqual({ droppedOverrides: [] });
+  });
 });

@@ -1,18 +1,17 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { env } from "../env.js";
-import {
-  requireAuth,
-  requireOrgAdmin,
-} from "../core/middleware/auth.js";
+import { requireAuth, requireOrgAdmin } from "../core/middleware/auth.js";
 import { locationParamMiddleware } from "../core/middleware/location-context.js";
 import { requestContextMiddleware } from "../core/middleware/request-context.js";
 import { dbMiddleware } from "../core/middleware/db.js";
 import { employeeRoutes } from "../modules/employees/employee.routes.js";
-import { equipmentRoutes } from "../modules/equipment/equipment.routes.js";
+import { formRoutes } from "../modules/forms/form.routes.js";
 import { healthRoutes } from "../modules/health/health.routes.js";
 import { locationRoutes } from "../modules/locations/location.routes.js";
 import { organizationRoutes } from "../modules/organizations/organization.routes.js";
 import { recordsRoutes } from "../modules/records/records.routes.js";
+import { targetTypeRoutes } from "../modules/target-types/target-type.routes.js";
+import { targetRoutes } from "../modules/targets/target.routes.js";
 import { taskOccurrenceRoutes } from "../modules/task-occurrences/task-occurrence.routes.js";
 import { taskRecordRoutes } from "../modules/task-records/task-record.routes.js";
 import { taskTemplateRoutes } from "../modules/task-templates/task-template.routes.js";
@@ -35,10 +34,7 @@ routes.route("/webhooks", clerkWebhookRoutes);
 // Non-Clerk: guarded by its own CRON_SECRET bearer check, not requireAuth.
 routes.route("/internal/task-occurrences", taskOccurrenceRoutes);
 
-function mountProtected(
-  path: string,
-  moduleRoutes: OpenAPIHono<AppEnv>,
-): void {
+function mountProtected(path: string, moduleRoutes: OpenAPIHono<AppEnv>): void {
   const protectedRouter = new OpenAPIHono<AppEnv>();
   protectedRouter.use("*", requireAuth);
   protectedRouter.use("*", requestContextMiddleware);
@@ -77,8 +73,10 @@ function mountLocationScoped(
 mountProtected("/tenant", tenantRoutes);
 mountAdminProtected("/organizations", organizationRoutes);
 mountAdminProtected("/employees", employeeRoutes);
+mountAdminProtected("/target-types", targetTypeRoutes);
+mountAdminProtected("/forms", formRoutes);
 // Location-scoped routers before admin `/locations`, or Hono runs admin middleware on every `/locations/*` path.
-mountLocationScoped("/locations/:locationId/equipment", equipmentRoutes, true);
+mountLocationScoped("/locations/:locationId/targets", targetRoutes, true);
 mountLocationScoped(
   "/locations/:locationId/task-templates",
   taskTemplateRoutes,
