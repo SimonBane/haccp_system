@@ -90,13 +90,13 @@ describe("reportApiQuery", () => {
 
   it("serializes multi-select filters the same way the grid does", () => {
     const result = parse(
-      valid({ state: "open,missed", type: "temperature", result: "fail" }),
+      valid({ state: "open,missed", category: "temperature", result: "fail" }),
     );
     expect(result.ok).toBe(true);
 
     const query = reportApiQuery(result.ok ? result.params : never());
 
-    expect(query).toContain("type=temperature");
+    expect(query).toContain("category=temperature");
     expect(query).toContain("state=missed%2Copen");
     expect(query).toContain("result=fail");
   });

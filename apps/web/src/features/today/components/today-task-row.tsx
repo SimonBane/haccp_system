@@ -1,14 +1,11 @@
 "use client";
 
-import { TASK_TEMPLATE_TYPE } from "@haccp/shared";
+import { FORM_CATEGORY } from "@haccp/shared";
 import {
   CheckIcon,
   ChevronRightIcon,
   CircleAlertIcon,
-  Clock3Icon,
-  SparklesIcon,
-  ThermometerIcon,
-  ThermometerSnowflakeIcon,
+  ShapesIcon,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { memo } from "react";
@@ -16,9 +13,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import { useAnswerFormat } from "@/features/forms/hooks/use-answer-format";
+import { primaryMeasurement } from "@/features/forms/lib/answer-summary";
+import { FORM_CATEGORY_ICONS } from "@/features/forms/lib/category-icon";
 import { cn } from "@/lib/utils";
-import { formatTemperature, formatTimeOfDay } from "../lib/format";
+import { formatTimeOfDay } from "../lib/format";
 import { occurrenceKey } from "../lib/today-grouping";
+import { needsRecordFlow } from "../lib/today-round";
 import type { TodayTimelineItem } from "../lib/today-timeline";
 
 type Props = {
@@ -29,17 +30,6 @@ type Props = {
   currentUserId: string | null;
   onActivate: (item: TodayTimelineItem) => void;
 };
-
-function typeIcon(type: TodayTimelineItem["task"]["type"]) {
-  switch (type) {
-    case TASK_TEMPLATE_TYPE.TEMPERATURE:
-      return ThermometerIcon;
-    case TASK_TEMPLATE_TYPE.CLEANING:
-      return SparklesIcon;
-    case TASK_TEMPLATE_TYPE.OTHER:
-      return Clock3Icon;
-  }
-}
 
 function formatUserName(
   user: NonNullable<TodayTimelineItem["task"]["completedBy"]>,
@@ -59,13 +49,19 @@ export const TodayTaskRow = memo(function TodayTaskRow({
   onActivate,
 }: Props) {
   const t = useTranslations("TodayPage");
+  const tForms = useTranslations("Forms");
   const locale = useLocale();
-  const { task, isCompleted, isDeviation, priorReading, liveStatus } = item;
+  const format = useAnswerFormat();
+  const { task, form, isCompleted, isDeviation, priorRecord, liveStatus } =
+    item;
 
-  const isTemperature = task.type === TASK_TEMPLATE_TYPE.TEMPERATURE;
-  const isCleaning = task.type === TASK_TEMPLATE_TYPE.CLEANING;
-  const reading = task.temperatureReading;
-  const TypeIcon = typeIcon(task.type);
+  const category = form?.category ?? FORM_CATEGORY.OTHER;
+  const TypeIcon = FORM_CATEGORY_ICONS[category];
+  const needsEntry = needsRecordFlow(item);
+  const reading = isCompleted ? primaryMeasurement(task.values) : null;
+  const priorReading = priorRecord
+    ? primaryMeasurement(priorRecord.values)
+    : null;
 
   const isAvailable = liveStatus !== "upcoming";
   const availableAtLabel = t("row.availableAt", {
@@ -76,19 +72,19 @@ export const TodayTaskRow = memo(function TodayTaskRow({
     ? t("actions.viewRecord")
     : !isAvailable
       ? availableAtLabel
-      : isTemperature
+      : needsEntry
         ? t("actions.record")
         : t("actions.complete");
 
   const recordedLabel =
-    isCompleted && reading
-      ? formatTemperature(reading.recordedC, locale)
+    reading && reading.value !== null
+      ? format.measurement(reading.value, reading.unit)
       : null;
-  const readingLabel =
-    recordedLabel ??
-    (!isCompleted && isAvailable && priorReading
-      ? formatTemperature(priorReading.recordedC, locale)
-      : null);
+  const priorLabel =
+    !isCompleted && isAvailable && priorReading?.value != null
+      ? format.measurement(priorReading.value, priorReading.unit)
+      : null;
+  const readingLabel = recordedLabel ?? priorLabel;
   const completedTime =
     isCompleted && task.completedAt
       ? formatTimeOfDay(task.completedAt, locale, timeZone)
@@ -98,15 +94,15 @@ export const TodayTaskRow = memo(function TodayTaskRow({
       ? formatUserName(task.completedBy, t("audit.you"), currentUserId)
       : null;
 
-  const hasChipRow = Boolean(task.equipmentName);
+  const hasChipRow = Boolean(task.targetName);
   const hasAuditLine = Boolean(completedTime) || Boolean(completedByLabel);
   const hasDataColumn = Boolean(readingLabel) || hasAuditLine;
 
   const ariaLabel = [
     task.title,
-    task.equipmentName,
+    task.targetName,
     task.scheduledTime,
-    recordedLabel ? `${recordedLabel} °C` : null,
+    recordedLabel,
     actionLabel,
   ]
     .filter(Boolean)
@@ -167,38 +163,27 @@ export const TodayTaskRow = memo(function TodayTaskRow({
               !hasChipRow && "hidden sm:flex",
             )}
           >
-            {!isTemperature ? (
-              <Badge
-                variant="outline"
-                className="hidden font-normal text-muted-foreground sm:inline-flex"
-              >
-                {t(`taskTypes.${task.type}`)}
-              </Badge>
-            ) : null}
-
-            {task.equipmentName ? (
+            {task.targetName ? (
               <Badge
                 variant="secondary"
                 className="max-w-[11rem] sm:max-w-[16rem]"
               >
-                <ThermometerSnowflakeIcon />
-                <span className="truncate">{task.equipmentName}</span>
+                <ShapesIcon />
+                <span className="truncate">{task.targetName}</span>
               </Badge>
             ) : null}
 
-            {isTemperature ? (
-              <Badge
-                variant="outline"
-                className="hidden font-normal text-muted-foreground sm:inline-flex"
-              >
-                {t(`taskTypes.${task.type}`)}
-              </Badge>
-            ) : null}
+            <Badge
+              variant="outline"
+              className="hidden font-normal text-muted-foreground sm:inline-flex"
+            >
+              {tForms(`categories.${category}`)}
+            </Badge>
 
             {isDeviation ? (
               <Badge variant="destructive" className="hidden sm:inline-flex">
                 <CircleAlertIcon />
-                {t("temperatureDialog.outOfRange")}
+                {t("row.needsAttention")}
               </Badge>
             ) : null}
           </div>
@@ -220,13 +205,10 @@ export const TodayTaskRow = memo(function TodayTaskRow({
                 )}
               >
                 {readingLabel}
-                <span className="ml-0.5 text-xs font-normal text-muted-foreground">
-                  °C
-                </span>
               </div>
             ) : null}
             {hasAuditLine ? (
-              isCleaning ? (
+              !readingLabel ? (
                 <div
                   className={cn(
                     "flex flex-col items-end gap-0.5 text-[13px] leading-tight text-muted-foreground",
@@ -252,12 +234,7 @@ export const TodayTaskRow = memo(function TodayTaskRow({
                   )}
                 >
                   {completedTime ? (
-                    <span
-                      className={cn(
-                        "whitespace-nowrap tabular-nums",
-                        !isTemperature && "hidden sm:inline",
-                      )}
-                    >
+                    <span className="whitespace-nowrap tabular-nums">
                       {completedTime}
                     </span>
                   ) : null}
@@ -277,9 +254,9 @@ export const TodayTaskRow = memo(function TodayTaskRow({
                 </div>
               )
             ) : null}
-            {!isCompleted && isAvailable && priorReading ? (
+            {priorLabel && priorRecord ? (
               <div className="whitespace-nowrap text-[13px] leading-tight text-muted-foreground/80">
-                {t("row.lastReadingAt", { time: priorReading.scheduledTime })}
+                {t("row.lastReadingAt", { time: priorRecord.scheduledTime })}
               </div>
             ) : null}
           </div>
@@ -314,12 +291,10 @@ export const TodayTaskRow = memo(function TodayTaskRow({
         )}
       </div>
 
-      {isDeviation && reading?.correctiveAction ? (
+      {isDeviation && task.correctiveAction ? (
         <div className="mx-3 mb-2.5 rounded-lg bg-destructive/[0.06] px-2.5 py-1.5 text-[13px] leading-snug sm:mx-4 sm:mb-3">
           <span className="font-medium">{t("audit.correctiveAction")}: </span>
-          <span className="text-muted-foreground">
-            {reading.correctiveAction}
-          </span>
+          <span className="text-muted-foreground">{task.correctiveAction}</span>
         </div>
       ) : null}
 

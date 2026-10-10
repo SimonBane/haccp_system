@@ -39,13 +39,17 @@
     "queryDescription": "Check your connection and try again.",
     "retry": "Try again",
     "codes": {
-      "equipmentNameExists": "Equipment with this name already exists at this site.",
+      "targetNameExists": "Equipment or an area with this name already exists at this site.",
+      "targetTypeNameExists": "A type with this name already exists.",
+      "targetTypeInUse": "This type is still used by equipment or an area.",
+      "formNameExists": "A form with this name already exists.",
+      "formInUse": "This form is still used by a task.",
       "employeeEmailExists": "An employee with this email already exists.",
       "locationNameExists": "A location with this name already exists.",
       "multipleLocationsDisabled": "Multiple locations are not enabled for this organization.",
       "defaultLocationDeleteForbidden": "Choose another default location before deleting this one.",
       "lastLocationDeleteForbidden": "The last location cannot be deleted.",
-      "locationHasDependencies": "This location cannot be deleted while it has equipment or task data.",
+      "locationHasDependencies": "This location cannot be deleted while it has equipment, areas or task data.",
       "taskRecordAlreadyExists": "This task was already recorded. The latest saved value is shown."
     }
   },
@@ -82,37 +86,35 @@
       "edit": "Edit",
       "viewRecord": "View record"
     },
-    "taskTypes": {
-      "cleaning": "Cleaning",
-      "temperature": "Temperature",
-      "other": "Other"
-    },
     "timeline": {
       "now": "Now",
       "overdue": "Overdue",
       "remaining": "{count, plural, one {# left} other {# left}}",
       "doneCount": "{count, plural, one {# done} other {# done}}",
-      "deviations": "{count, plural, one {# out of range} other {# out of range}}",
+      "deviations": "{count, plural, one {# needs attention} other {# need attention}}",
       "jumpToOverdue": "Go to overdue tasks ({count})",
-      "jumpToDeviation": "Go to out-of-range readings ({count})",
+      "jumpToDeviation": "Go to checks that need attention ({count})",
       "nowLine": "Now, {time}",
       "jumpToNow": "Jump to now",
-      "recordRound": "Record the {time} readings ({count})"
+      "recordRound": "Record the {time} checks ({count})"
     },
     "row": {
       "lastReadingAt": "Last {time}",
-      "availableAt": "Available at {time}"
+      "availableAt": "Available at {time}",
+      "needsAttention": "Needs attention"
     },
     "record": {
       "close": "Close",
       "completedAt": "Completed at",
       "completedBy": "Completed by",
-      "taskType": "Type"
+      "category": "Category",
+      "pass": "Passed",
+      "fail": "Needs attention"
     },
     "allDone": {
       "title": "All done",
       "description": "{count, plural, one {# task today} other {# tasks today}}",
-      "withDeviations": "{count, plural, one {# reading needs attention} other {# readings need attention}}"
+      "withDeviations": "{count, plural, one {# check needs attention} other {# checks need attention}}"
     },
     "progress": {
       "summary": "{completed} of {total} completed"
@@ -135,50 +137,47 @@
       "you": "You",
       "correctiveAction": "Corrective action"
     },
-    "temperatureDialog": {
-      "allowedRange": "Allowed range",
-      "recordedCLabel": "Measured temperature",
-      "ok": "OK",
-      "outOfRange": "Out of range",
-      "correctiveActionPlaceholder": "For example, moved the products and notified the manager…",
+    "recordDialog": {
+      "allowed": "Allowed {limits}",
+      "withinLimits": "Within limits",
+      "outsideLimits": "Outside limits",
+      "srWithinLimits": "{value}, within the allowed limits",
+      "srOutsideLimits": "{value}, outside the allowed limits",
+      "noPriorReading": "First reading today",
+      "lastReading": "Last: {value} at {time}",
       "presets": {
         "movedProduct": "Moved product",
         "adjustedThermostat": "Adjusted thermostat",
-        "notifiedManager": "Notified manager",
-        "calledService": "Called service"
+        "calledService": "Called service",
+        "rejectedDelivery": "Rejected the delivery",
+        "discardedProduct": "Discarded product",
+        "recleaned": "Cleaned again",
+        "rechecked": "Repeated the check",
+        "notifiedManager": "Notified manager"
       },
-      "confirm": "Save",
       "validation": {
-        "required": "Enter a temperature reading",
-        "invalid": "Enter a valid number",
-        "correctiveActionRequired": "Select or describe the corrective action taken",
-        "outOfBounds": "Enter a temperature between -99.9 and 99.9 °C",
-        "correctiveActionMax": "Notes can be up to 900 characters"
+        "readingRequired": "Enter a reading",
+        "readingInvalid": "Enter a valid number for this unit",
+        "correctiveRequired": "Select or describe the corrective action taken",
+        "notesMax": "Notes can be up to 900 characters"
       },
       "close": "Close",
       "back": "Back",
-      "continueLabel": "Continue",
+      "continue": "Continue",
+      "save": "Save",
       "saveDeviation": "Save deviation",
       "skip": "Skip",
       "skipLabel": "Skip {title}",
       "roundProgress": "{position} / {total}",
-      "roundProgressLabel": "Reading {position} of {total}",
-      "roundSummary": "{count, plural, one {# reading saved} other {# readings saved}}",
-      "roundSummaryDeviations": "{saved} saved · {deviations} out of range",
-      "keyboardHint": "⏎ save · ↑↓ ±0.1",
-      "rangeIdle": "Allowed range {min} – {max} °C",
-      "rangeInline": "{min} – {max} °C",
-      "implausibleHint": "Unusual for this equipment — check the thermometer",
-      "lastReading": "Last: {value} °C at {time}",
-      "noPriorReading": "First reading today",
-      "signToggleLabel": "Negative temperature",
+      "roundProgressLabel": "Check {position} of {total}",
+      "roundSummary": "{count, plural, one {# check saved} other {# checks saved}}",
+      "roundSummaryDeviations": "{saved} saved · {deviations} need attention",
+      "failedTitle": "This check failed",
       "correctiveTitle": "What did you do?",
+      "correctiveTitleOptional": "What did you do? (optional)",
       "notesLabel": "Notes",
-      "notesCharacterCount": "{current} / {max}",
-      "charactersLeft": "{count, plural, one {# character left} other {# characters left}}",
-      "srVerdictOk": "{value} °C, within the allowed range",
-      "srVerdictOutOfRange": "{value} °C, outside the allowed range",
-      "readingLabel": "Temperature reading in degrees Celsius"
+      "notesPlaceholder": "For example, moved the products and notified the manager…",
+      "notesCharacterCount": "{current} / {max}"
     },
     "a11y": {
       "completed": "{title} completed",
@@ -197,10 +196,10 @@
     "toasts": {
       "completed": "Completed · {title}",
       "recorded": "Recorded · {title}",
-      "missingEquipment": "Unable to find the equipment temperature range",
       "undoError": "Could not undo task",
       "doneError": "Could not complete task",
-      "alreadyRecorded": "Already recorded — showing the latest saved value"
+      "alreadyRecorded": "Already recorded — showing the latest saved value",
+      "missingForm": "This task's form could not be loaded. Refresh and try again."
     }
   },
   "DataTable": {
@@ -246,72 +245,307 @@
       "clearAll": "Clear filters"
     }
   },
-  "EquipmentPage": {
-    "title": "Cold storage",
-    "description": "Register fridges, freezers, and display cases with allowed temperature ranges.",
-    "emptyTitle": "No cold storage yet",
-    "emptyDescription": "Add your first fridge or freezer to start temperature monitoring.",
-    "searchPlaceholder": "Search cold storage",
+  "TargetsPage": {
+    "title": "Equipment & areas",
+    "description": "Register the equipment, rooms, surfaces and vehicles your checks are carried out on.",
+    "emptyTitle": "No equipment or areas yet",
+    "emptyDescription": "Add a fridge, a room or a work surface to link it to tasks.",
+    "searchPlaceholder": "Search equipment & areas",
     "add": "Add",
-    "addTitle": "Add cold storage",
-    "addDescription": "Enter a name, type, and allowed temperature range.",
-    "editTitle": "Edit cold storage",
-    "editDescription": "Update the cold storage details.",
+    "addTitle": "Add equipment or area",
+    "addDescription": "Enter a name and choose its type.",
+    "editTitle": "Edit equipment or area",
+    "editDescription": "Update the name or type.",
+    "duplicateTitle": "Duplicate equipment or area",
+    "duplicateDescription": "Create a copy with a new name.",
+    "duplicateSuggestedName": "{name} (Copy)",
     "nameLabel": "Name",
     "namePlaceholder": "Walk-in freezer",
     "typeLabel": "Type",
     "typePlaceholder": "Select a type",
-    "allowedTempLabel": "Allowed temperature",
-    "tempTo": "to",
+    "noTypesHint": "There are no types yet. Add one first.",
+    "manageTypes": "Manage types",
+    "nameTaken": "Equipment or an area with this name already exists at this site.",
     "save": "Save",
     "cancel": "Cancel",
-    "saving": "Saving…",
     "edit": "Edit",
     "duplicate": "Duplicate",
-    "duplicateTitle": "Duplicate cold storage",
-    "duplicateDescription": "Create a copy with a new name.",
-    "duplicateSuggestedName": "{name} (Copy)",
     "delete": "Delete",
     "openMenu": "Open menu",
-    "deleteConfirm": "Delete \"{name}\"? This cannot be undone.",
-    "bulkDeleteConfirm": "Delete {count, plural, one {# item} other {# items}}? This cannot be undone.",
+    "deleteConfirm": "Delete \"{name}\"? Tasks stop being scheduled for it. Saved records are kept.",
+    "bulkDeleteConfirm": "Delete {count, plural, one {# item} other {# items}}? Tasks stop being scheduled for them. Saved records are kept.",
     "deleteDialog": {
-      "title": "Delete cold storage",
-      "bulkTitle": "Delete cold storage",
-      "fallback": "This will permanently delete the cold storage.",
+      "title": "Delete equipment or area",
+      "bulkTitle": "Delete equipment & areas",
+      "fallback": "This removes the item from future tasks.",
       "cancel": "Cancel",
       "confirm": "Delete"
     },
-    "submitError": "Something went wrong. Please try again.",
     "toast": {
-      "createSuccess": "Cold storage was added.",
-      "updateSuccess": "Cold storage was updated.",
-      "duplicateSuccess": "Cold storage was copied.",
-      "deleteSuccess": "Cold storage was deleted.",
-      "deleteError": "Could not delete cold storage. Please try again.",
-      "bulkDeleteSuccess": "{count, plural, one {# item was} other {# items were}} deleted.",
-      "bulkDeleteError": "Could not delete cold storage. Please try again."
+      "createSuccess": "Added.",
+      "updateSuccess": "Updated.",
+      "duplicateSuccess": "Copied.",
+      "deleteSuccess": "Deleted.",
+      "bulkDeleteSuccess": "{count, plural, one {# item was} other {# items were}} deleted."
     },
-    "nameTaken": "Cold storage with this name already exists.",
     "validation": {
       "nameRequired": "Name is required.",
       "nameMaxLength": "Name must be at most 100 characters.",
-      "typeRequired": "Type is required.",
-      "tempRequired": "Temperature is required.",
-      "minTemp": "Temperature must be at least -40°C.",
-      "maxTemp": "Temperature must be at most 15°C.",
-      "tempRange": "Minimum temperature must be less than maximum temperature."
+      "typeRequired": "Type is required."
     },
     "columns": {
       "name": "Name",
       "type": "Type",
-      "range": "Allowed range",
-      "actions": "Actions"
+      "kind": "Kind"
+    },
+    "kinds": {
+      "equipment": "Equipment",
+      "area": "Area",
+      "surface": "Surface",
+      "vehicle": "Vehicle"
+    },
+    "noTypes": {
+      "title": "Start with the types you check",
+      "description": "Types group your equipment and areas, such as Fridge or Work surface. Add suggested ones in one click."
     },
     "types": {
-      "fridge": "Fridge",
-      "freezer": "Freezer",
-      "displayCase": "Display case"
+      "title": "Types",
+      "description": "Types are shared by all locations of the organization.",
+      "close": "Close",
+      "empty": "No types yet.",
+      "suggestions": "Suggested",
+      "addTitle": "Add a type",
+      "editTitle": "Edit type",
+      "nameLabel": "Name",
+      "namePlaceholder": "Blast chiller",
+      "kindLabel": "Kind",
+      "add": "Add type",
+      "save": "Save",
+      "cancelEdit": "Cancel",
+      "edit": "Edit {name}",
+      "delete": "Delete {name}",
+      "nameRequired": "Name is required.",
+      "nameTaken": "A type with this name already exists.",
+      "created": "Type added.",
+      "updated": "Type updated.",
+      "deleted": "Type deleted.",
+      "deleteTitle": "Delete type",
+      "deleteConfirm": "Delete the type \"{name}\"? Only types no equipment or area uses can be deleted.",
+      "cancelDelete": "Cancel",
+      "confirmDelete": "Delete"
+    }
+  },
+  "FormsPage": {
+    "title": "Forms",
+    "description": "Design the checks staff fill in: measurements, ticks, choices and notes.",
+    "emptyTitle": "No forms yet",
+    "emptyDescription": "Start from a ready-made form or build your own.",
+    "searchPlaceholder": "Search forms",
+    "add": "Add",
+    "edit": "Edit",
+    "duplicate": "Duplicate",
+    "delete": "Delete",
+    "openMenu": "Open menu",
+    "duplicateSuggestedName": "{name} (Copy)",
+    "deleteConfirm": "Delete \"{name}\"? Only forms no task uses can be deleted. Saved records keep their answers.",
+    "deleteDialog": {
+      "title": "Delete form",
+      "cancel": "Cancel",
+      "confirm": "Delete"
+    },
+    "toast": {
+      "deleteSuccess": "Form deleted."
+    },
+    "columns": {
+      "name": "Name",
+      "category": "Category",
+      "fields": "Fields",
+      "version": "Version"
+    },
+    "versionBadge": "v{version}",
+    "fieldCount": "{count, plural, one {# field} other {# fields}}",
+    "library": {
+      "title": "New form",
+      "description": "Start from a ready-made form and adjust it, or build one from scratch.",
+      "close": "Close",
+      "blank": "Blank form",
+      "blankDescription": "Add your own fields one by one.",
+      "starters": "Ready-made forms",
+      "fieldCount": "{count, plural, one {# field} other {# fields}}"
+    },
+    "builder": {
+      "addTitle": "New form",
+      "addDescription": "Add the fields staff fill in. The preview shows what they will see.",
+      "editTitle": "Edit form",
+      "editDescription": "Version {version}. Saving changes to the fields publishes a new version; saved records keep the version they were recorded with.",
+      "cancel": "Cancel",
+      "saveCreate": "Create form",
+      "saveEdit": "Save",
+      "nameLabel": "Name",
+      "namePlaceholder": "Fridge check",
+      "categoryLabel": "Category",
+      "categoryPlaceholder": "Select a category",
+      "correctiveLabel": "Require a corrective action when a check fails",
+      "correctiveDescription": "Staff must describe what they did before saving a failed record.",
+      "fieldsLabel": "Fields",
+      "addField": "Add field",
+      "fieldTypeHints": {
+        "checkbox": "A tick to confirm something was done",
+        "measurement": "A number with a unit and limits",
+        "choice": "Pick from options; some can fail the check",
+        "text": "A short or long note",
+        "date": "A date, such as a use-by date"
+      },
+      "viewLabel": "Show",
+      "viewBuild": "Fields",
+      "viewPreview": "Preview",
+      "untitled": "Untitled field",
+      "required": "Required",
+      "needsAttention": "Needs attention",
+      "moveUp": "Move {label} up",
+      "moveDown": "Move {label} down",
+      "removeField": "Remove {label}",
+      "labelLabel": "Question",
+      "labelPlaceholder": {
+        "checkbox": "Door seals intact",
+        "measurement": "Core temperature",
+        "choice": "Packaging intact",
+        "text": "Supplier",
+        "date": "Use-by date"
+      },
+      "helpLabel": "Help text",
+      "helpPlaceholder": "Optional hint shown under the question",
+      "requiredLabel": "Answer required",
+      "requiredCheckbox": "Must be ticked to save",
+      "multiline": "Allow several lines",
+      "unitLabel": "Unit",
+      "limitsLabel": "Limits",
+      "limitMin": "Minimum",
+      "limitMax": "Maximum",
+      "limitsTo": "to",
+      "noLimit": "No limit",
+      "limitsHint": "A reading outside the limits fails the check. Leave one side empty for a floor or a ceiling. Tasks can set their own limits per equipment or area.",
+      "multiple": "Allow several answers",
+      "optionsLabel": "Options",
+      "optionsHint": "Mark the options that mean the check failed.",
+      "optionLabel": "Option {index}",
+      "optionFails": "Fails",
+      "removeOption": "Remove option {index}",
+      "addOption": "Add option",
+      "errors": {
+        "name": "Name is required.",
+        "nameTaken": "A form with this name already exists.",
+        "category": "Select a category.",
+        "noFields": "Add at least one field.",
+        "label": "Enter the question.",
+        "optionLabel": "Every option needs a label.",
+        "limits": {
+          "min": "The minimum is outside this unit's range or precision.",
+          "max": "The maximum is outside this unit's range or precision.",
+          "order": "The minimum must be below the maximum."
+        }
+      },
+      "toast": {
+        "created": "Form created.",
+        "updated": "Form updated.",
+        "published": "Version {version} published."
+      }
+    },
+    "preview": {
+      "hint": "Try it out — nothing is saved.",
+      "emptyTitle": "Nothing to preview yet",
+      "emptyDescription": "Add a field to see the form as staff will.",
+      "result": {
+        "pass": "Pass",
+        "fail": "Fail",
+        "not_evaluated": "Not evaluated"
+      },
+      "correctiveActionRequired": "Saving this would ask for a corrective action."
+    },
+    "publish": {
+      "title": "Publish version {version}?",
+      "description": "Upcoming tasks switch to the new version. Records already saved keep the version they were recorded with.",
+      "dropsTitle": "Some custom limits will be removed",
+      "dropsDescription": "These tasks set their own limits for a measurement that this version removes or changes to another unit. Publishing removes those limits.",
+      "dropLine": "{field} at {location}: {limits}",
+      "noLimits": "no limits",
+      "cancel": "Cancel",
+      "confirm": "Publish",
+      "confirmDrops": "Publish and remove"
+    }
+  },
+  "Forms": {
+    "units": {
+      "celsius": {
+        "name": "Degrees Celsius (°C)",
+        "symbol": "°C"
+      },
+      "ph": {
+        "name": "pH",
+        "symbol": "pH"
+      },
+      "percent": {
+        "name": "Percent (%)",
+        "symbol": "%"
+      },
+      "ppm": {
+        "name": "Parts per million (ppm)",
+        "symbol": "ppm"
+      },
+      "water_activity": {
+        "name": "Water activity (aw)",
+        "symbol": "aw"
+      },
+      "grams": {
+        "name": "Grams (g)",
+        "symbol": "g"
+      },
+      "kilograms": {
+        "name": "Kilograms (kg)",
+        "symbol": "kg"
+      },
+      "minutes": {
+        "name": "Minutes (min)",
+        "symbol": "min"
+      }
+    },
+    "categories": {
+      "temperature": "Temperature",
+      "cleaning": "Cleaning",
+      "goods_in": "Goods in",
+      "cooking": "Cooking",
+      "cooling": "Cooling",
+      "hygiene": "Hygiene",
+      "pest_control": "Pest control",
+      "other": "Other"
+    },
+    "fieldTypes": {
+      "checkbox": "Checkbox",
+      "measurement": "Measurement",
+      "choice": "Choice",
+      "text": "Text",
+      "date": "Date"
+    },
+    "answers": {
+      "yes": "Yes",
+      "no": "No"
+    },
+    "choicePlaceholder": "Select an option",
+    "measurement": {
+      "signToggle": "Negative value",
+      "withinLimits": "Within limits",
+      "outsideLimits": "Outside limits",
+      "allowed": "Allowed {limits}"
+    },
+    "answerValidation": {
+      "required": "This answer is required.",
+      "invalid": {
+        "checkbox": "Tick this box.",
+        "measurement": "Enter a valid number for this unit.",
+        "choice": "Select a valid option.",
+        "text": "The answer is too long.",
+        "date": "Enter a valid date."
+      }
     }
   },
   "RecordsPage": {
@@ -327,18 +561,13 @@
       "task": "Task/monitoring point",
       "status": "Status",
       "timing": "Timing",
-      "reading": "Reading",
-      "outcome": "Outcome"
+      "answers": "Answers",
+      "result": "Result"
     },
     "filters": {
-      "type": "Type",
+      "category": "Category",
       "state": "Status",
-      "result": "Temperature result"
-    },
-    "types": {
-      "temperature": "Temperature",
-      "cleaning": "Cleaning",
-      "other": "Other"
+      "result": "Result"
     },
     "displayState": {
       "submitted": "Submitted",
@@ -358,9 +587,9 @@
       "noDeadline": "No deadline"
     },
     "result": {
-      "pass": "Within range",
-      "fail": "Out of range",
-      "notEvaluated": "No temperature reading"
+      "pass": "Passed",
+      "fail": "Failed",
+      "notEvaluated": "Not evaluated"
     },
     "dateRange": {
       "label": "Date range",
@@ -385,21 +614,22 @@
       "close": "Close",
       "scheduled": "Scheduled",
       "due": "Due",
-      "type": "Type",
-      "monitoringPoint": "Monitoring point",
       "displayState": "Status",
       "recordState": "Record",
       "timing": "Timing",
-      "result": "Temperature result",
-      "reading": "Reading",
-      "permittedRange": "Permitted range",
+      "result": "Result",
       "correctiveAction": "Corrective action",
       "createdBy": "First created",
       "recordedBy": "Current record",
       "voidedBy": "Voided",
       "recordedTime": "Recorded time",
       "available": "Available from",
-      "noDeadline": "No deadline"
+      "noDeadline": "No deadline",
+      "category": "Category",
+      "form": "Form",
+      "formVersion": "{name} · version {version}",
+      "target": "Equipment or area",
+      "answers": "Answers"
     }
   },
   "RecordsReportPage": {
@@ -416,13 +646,13 @@
     "columns": {
       "time": "Time",
       "task": "Task/monitoring point",
-      "reading": "Reading",
       "status": "Status",
-      "by": "Recorded by"
+      "by": "Recorded by",
+      "answers": "Answers"
     },
     "status": {
       "done": "Done",
-      "fail": "Out of range",
+      "fail": "Failed",
       "missed": "Missed",
       "open": "Open",
       "voided": "Voided"
@@ -481,9 +711,28 @@
     },
     "titleLabel": "Title",
     "titlePlaceholder": "Check walk-in chiller",
-    "typeLabel": "Type",
-    "equipmentLabel": "Cold storage",
-    "equipmentPlaceholder": "Select cold storage",
+    "formLabel": "Form",
+    "formPlaceholder": "Select a form",
+    "noForms": "There are no forms yet.",
+    "manageForms": "Create a form",
+    "targets": {
+      "legend": "Equipment & areas",
+      "description": "Each one selected gets its own task at every scheduled time. Leave empty for a task that is not tied to equipment or an area.",
+      "none": "There is no equipment or area at this location yet.",
+      "manage": "Add equipment & areas",
+      "customLimits": "Own limits for {field}",
+      "formDefault": "Form default: {limits}",
+      "noLimits": "no limits",
+      "to": "to",
+      "noLimit": "No limit",
+      "min": "Minimum {field} for {target}",
+      "max": "Maximum {field} for {target}",
+      "issues": {
+        "min_out_of_range": "The minimum is outside this unit's range or precision.",
+        "max_out_of_range": "The maximum is outside this unit's range or precision.",
+        "order": "The minimum must be below the maximum."
+      }
+    },
     "weekdaysLabel": "Repeats on",
     "moreSelected": "+ {count} more",
     "overflowRemoveLabel": "Remove {count} more days",
@@ -496,6 +745,7 @@
     "duplicate": "Duplicate",
     "delete": "Delete",
     "openMenu": "Open menu",
+    "moreTargets": "+{count}",
     "deleteConfirm": "Delete \"{title}\"? This cannot be undone.",
     "bulkDeleteConfirm": "Delete {count, plural, one {# task} other {# tasks}}? This cannot be undone.",
     "deleteDialog": {
@@ -540,31 +790,25 @@
     "validation": {
       "titleRequired": "Title is required.",
       "titleMaxLength": "Title must be at most 200 characters.",
-      "typeRequired": "Type is required.",
       "weekdaysRequired": "Select at least one weekday.",
       "timesRequired": "Add at least one scheduled time.",
       "timesMax": "At most 4 times per task.",
       "timesUnique": "Scheduled times must be unique.",
       "timeRequired": "Scheduled time is required.",
       "timeInvalid": "Enter a valid time in HH:MM format.",
-      "equipmentRequired": "Cold storage is required for temperature tasks.",
       "completionMinutesRange": "Enter a value between 0 and 1440 minutes.",
       "completionAvailableRequired": "Select when the task becomes available.",
       "completionDeadlineRequired": "Select a deadline.",
-      "completionMinutesInteger": "Enter a whole number of minutes."
+      "completionMinutesInteger": "Enter a whole number of minutes.",
+      "formRequired": "Select a form."
     },
     "columns": {
       "title": "Title",
-      "type": "Type",
       "schedule": "Schedule",
-      "equipment": "Cold storage",
       "actions": "Actions",
-      "window": "Completion window"
-    },
-    "types": {
-      "temperature": "Temperature",
-      "cleaning": "Cleaning",
-      "other": "Other"
+      "window": "Completion window",
+      "form": "Form",
+      "targets": "Equipment & areas"
     },
     "completionWindow": {
       "legend": "Completion window",
@@ -619,7 +863,8 @@
       "today": "Today",
       "organization": "Organization",
       "tasks": "Tasks",
-      "equipment": "Cold storage",
+      "forms": "Forms",
+      "targets": "Equipment & areas",
       "locations": "Locations",
       "employees": "Employees",
       "records": "Records"

@@ -1,15 +1,7 @@
 "use client";
 
-import type { TodayResponse, TodayTaskItem } from "@haccp/shared";
-import {
-  API_ERROR_CODE,
-  classifyTemperatureResult,
-  RECORD_KIND,
-  RECORD_STATE,
-  TASK_TEMPLATE_TYPE,
-  TEMPERATURE_RESULT,
-  zonedDateString,
-} from "@haccp/shared";
+import type { AnswersInput, TodayResponse, TodayTaskItem } from "@haccp/shared";
+import { API_ERROR_CODE, RECORD_STATE, zonedDateString } from "@haccp/shared";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -23,24 +15,20 @@ import { ApiRequestError } from "@/lib/api-utils";
 import { useApiErrorToast } from "@/lib/api/use-api-error-toast";
 import { formatLocalDate, shiftLocalDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
-import {
-  TemperatureRoundFlow,
-  type TemperatureCheck,
-} from "./components/temperature-round-flow";
+import { quickCompleteAnswers } from "@/features/forms/lib/answer-draft";
+import { RecordFlow, type RecordCheck } from "./components/record-flow";
 import { TodayAllDone } from "./components/today-all-done";
 import { TodayEmptyState } from "./components/today-empty-state";
 import { TodayJumpToNow } from "./components/today-jump-to-now";
 import { TodayRecordSheet } from "./components/today-record-sheet";
 import { TodayStickyHeader } from "./components/today-sticky-header";
 import { TodayTimeline } from "./components/today-timeline";
-import {
-  useTemperatureRound,
-  type RoundTally,
-} from "./hooks/use-temperature-round";
+import { useRecordRound, type RoundTally } from "./hooks/use-record-round";
 import { useTodayMutations } from "./hooks/use-today-mutations";
 import { useTodayQuery } from "./hooks/use-today-query";
 import { tapFeedback } from "./lib/haptics";
 import { flatTodayTasks, occurrenceKey } from "./lib/today-grouping";
+import { needsRecordFlow } from "./lib/today-round";
 import {
   applyClock,
   buildTodayTaskGroups,
@@ -105,7 +93,10 @@ export function TodayView({
 
   // Group on the response; applyClock layers live state so TodayTaskRow can bail out between ticks.
   const taskGroups = useMemo(
-    () => buildTodayTaskGroups(response ? flatTodayTasks(response) : []),
+    () =>
+      response
+        ? buildTodayTaskGroups(flatTodayTasks(response), response.formVersions)
+        : buildTodayTaskGroups([]),
     [response],
   );
 
@@ -125,7 +116,7 @@ export function TodayView({
     [timeline, editKey],
   );
 
-  const round = useTemperatureRound(timeline);
+  const round = useRecordRound(timeline);
   const {
     open: openRound,
     recordSaved,
@@ -144,22 +135,21 @@ export function TodayView({
   const isRoundOpen =
     round.item !== null &&
     round.currentKey !== null &&
-    round.item.task.minTempC !== null &&
-    round.item.task.maxTempC !== null;
+    round.item.form !== null;
 
   // Latch during render, not an effect — an effect would mount the popup already open.
-  const [lastCheck, setLastCheck] = useState<TemperatureCheck | null>(null);
+  const [lastCheck, setLastCheck] = useState<RecordCheck | null>(null);
 
-  const liveCheck: TemperatureCheck | null = isRoundOpen
-    ? {
-        item: round.item as TodayTimelineItem,
-        occurrenceKey: round.currentKey as string,
-        minTempC: round.item?.task.minTempC as number,
-        maxTempC: round.item?.task.maxTempC as number,
-        position: round.position,
-        size: round.size,
-      }
-    : null;
+  const liveCheck: RecordCheck | null =
+    isRoundOpen && round.item && round.currentKey
+      ? {
+          item: round.item,
+          occurrenceKey: round.currentKey,
+          position: round.position,
+          size: round.size,
+          initialValues: null,
+        }
+      : null;
 
   if (liveCheck && lastCheck?.occurrenceKey !== liveCheck.occurrenceKey) {
     setLastCheck(liveCheck);
@@ -176,25 +166,20 @@ export function TodayView({
   const shownCheck = liveCheck ?? lastCheck;
   const shownRecordItem = recordItem ?? lastRecordItem;
 
-  const isEditOpen =
-    editItem !== null &&
-    editItem.task.minTempC !== null &&
-    editItem.task.maxTempC !== null;
+  const isEditOpen = editItem !== null && editItem.form !== null;
 
-  const [lastEditCheck, setLastEditCheck] = useState<TemperatureCheck | null>(
-    null,
-  );
+  const [lastEditCheck, setLastEditCheck] = useState<RecordCheck | null>(null);
 
-  const liveEditCheck: TemperatureCheck | null = isEditOpen
-    ? {
-        item: editItem as TodayTimelineItem,
-        occurrenceKey: editKey as string,
-        minTempC: editItem?.task.minTempC as number,
-        maxTempC: editItem?.task.maxTempC as number,
-        position: 1,
-        size: 1,
-      }
-    : null;
+  const liveEditCheck: RecordCheck | null =
+    isEditOpen && editItem && editKey
+      ? {
+          item: editItem,
+          occurrenceKey: editKey,
+          position: 1,
+          size: 1,
+          initialValues: editItem.task.values,
+        }
+      : null;
 
   if (
     liveEditCheck &&
@@ -237,7 +222,9 @@ export function TodayView({
   );
 
   const handleComplete = useCallback(
-    async function complete(task: TodayTaskItem): Promise<void> {
+    async function complete(item: TodayTimelineItem): Promise<void> {
+      const { task, form } = item;
+      if (!form) return;
       const key = occurrenceKey(task);
       // A voided occurrence reactivates its existing record; only an unrecorded one is created.
       const run =
@@ -248,7 +235,7 @@ export function TodayView({
         await run({
           occurrenceId: task.occurrenceId,
           date: task.date,
-          kind: RECORD_KIND.ORDINARY,
+          values: quickCompleteAnswers(form.definition),
         });
         setAnnouncement(t("a11y.completed", { title: task.title }));
         toast.success(t("toasts.completed", { title: task.title }), {
@@ -269,7 +256,7 @@ export function TodayView({
         showApiError(error, {
           action: {
             label: t("error.retry"),
-            onClick: () => void complete(task),
+            onClick: () => void complete(item),
           },
         });
       } finally {
@@ -285,18 +272,21 @@ export function TodayView({
       if (roundSize <= 1 || tally.saved === 0) return;
       toast.success(
         tally.deviations > 0
-          ? t("temperatureDialog.roundSummaryDeviations", {
+          ? t("recordDialog.roundSummaryDeviations", {
               saved: tally.saved,
               deviations: tally.deviations,
             })
-          : t("temperatureDialog.roundSummary", { count: tally.saved }),
+          : t("recordDialog.roundSummary", { count: tally.saved }),
       );
     },
     [t],
   );
 
-  const handleTemperatureConfirm = useCallback(
-    async (recordedC: number, correctiveAction?: string): Promise<boolean> => {
+  const handleRecordConfirm = useCallback(
+    async (
+      values: AnswersInput,
+      correctiveAction?: string,
+    ): Promise<boolean> => {
       const task = round.item?.task;
       if (!task) return false;
 
@@ -308,11 +298,10 @@ export function TodayView({
       markSyncing(key, true);
       tapFeedback();
       try {
-        await run({
+        const record = await run({
           occurrenceId: task.occurrenceId,
           date: task.date,
-          kind: RECORD_KIND.TEMPERATURE,
-          recordedC,
+          values,
           correctiveAction,
         });
         setAnnouncement(t("a11y.recorded", { title: task.title }));
@@ -324,15 +313,7 @@ export function TodayView({
           },
         });
 
-        recordSaved(
-          task.minTempC !== null && task.maxTempC !== null
-            ? classifyTemperatureResult({
-                recordedC,
-                minTempC: task.minTempC,
-                maxTempC: task.maxTempC,
-              })
-            : TEMPERATURE_RESULT.OK,
-        );
+        recordSaved(record.result);
 
         const result = advanceRound();
         if (result.done) summariseRound(result, roundSize);
@@ -345,7 +326,7 @@ export function TodayView({
           showApiError(error);
           return false;
         }
-        // Stay on the same reading so it is not lost.
+        // Stay on the same check so the answers are not lost.
         showApiError(error);
         return false;
       } finally {
@@ -368,7 +349,10 @@ export function TodayView({
   );
 
   const handleEditConfirm = useCallback(
-    async (recordedC: number, correctiveAction?: string): Promise<boolean> => {
+    async (
+      values: AnswersInput,
+      correctiveAction?: string,
+    ): Promise<boolean> => {
       const task = editItem?.task;
       if (!task) return false;
 
@@ -379,8 +363,7 @@ export function TodayView({
         await runUpdate({
           occurrenceId: task.occurrenceId,
           date: task.date,
-          kind: RECORD_KIND.TEMPERATURE,
-          recordedC,
+          values,
           correctiveAction,
         });
         setAnnouncement(t("a11y.recorded", { title: task.title }));
@@ -399,13 +382,13 @@ export function TodayView({
 
   const handleEditClose = useCallback(() => setEditKey(null), []);
 
-  const handleTemperatureSkip = useCallback(() => {
+  const handleRoundSkip = useCallback(() => {
     const roundSize = round.size;
     const result = skipRound();
     if (result.done) summariseRound(result, roundSize);
   }, [round.size, skipRound, summariseRound]);
 
-  const handleTemperatureClose = useCallback(() => {
+  const handleRoundClose = useCallback(() => {
     const roundSize = round.size;
     summariseRound(closeRound(), roundSize);
   }, [closeRound, round.size, summariseRound]);
@@ -420,21 +403,18 @@ export function TodayView({
         return;
       }
 
-      if (item.task.type === TASK_TEMPLATE_TYPE.TEMPERATURE) {
-        if (
-          item.task.minTempC === null ||
-          item.task.maxTempC === null ||
-          !item.task.equipmentId
-        ) {
-          toast.error(t("toasts.missingEquipment"));
-          return;
-        }
+      if (!item.form) {
+        toast.error(t("toasts.missingForm"));
+        return;
+      }
+
+      if (needsRecordFlow(item)) {
         // Same gate as the time group's Record button.
         openRound(item);
         return;
       }
 
-      void handleComplete(item.task);
+      void handleComplete(item);
     },
     [handleComplete, isStale, openRound, t],
   );
@@ -529,16 +509,16 @@ export function TodayView({
       </span>
 
       {/* Mounted from first paint and toggled by `open` so Base UI can run enter/exit. */}
-      <TemperatureRoundFlow
+      <RecordFlow
         open={isRoundOpen}
         check={shownCheck}
-        onSubmit={handleTemperatureConfirm}
-        onSkip={handleTemperatureSkip}
-        onClose={handleTemperatureClose}
+        onSubmit={handleRecordConfirm}
+        onSkip={handleRoundSkip}
+        onClose={handleRoundClose}
       />
 
-      {/* Edit reuses the same round-flow UI in single-record mode (no skip, size 1). */}
-      <TemperatureRoundFlow
+      {/* Edit reuses the same flow in single-record mode (no skip, size 1). */}
+      <RecordFlow
         open={isEditOpen}
         check={shownEditCheck}
         onSubmit={handleEditConfirm}

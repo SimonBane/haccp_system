@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { E2E_PREFIX, LOCALE_PREFIX } from "../../support/env.js";
 
-test("an admin can reach past the first page of equipment on a phone", async ({
+test("an admin can reach past the first page of equipment & areas on a phone", async ({
   page,
 }) => {
-  await page.goto(`${LOCALE_PREFIX}/dashboard/equipment`);
+  await page.goto(`${LOCALE_PREFIX}/dashboard/targets`);
 
   const cards = page.getByTestId("data-table-card");
   await expect(cards.first()).toBeVisible();

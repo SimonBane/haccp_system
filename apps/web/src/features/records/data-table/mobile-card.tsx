@@ -4,11 +4,10 @@ import type { RecordItem } from "@haccp/shared";
 import type { Row } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
 import { MobileListRow } from "@/components/ui/data-table/data-table-mobile-list";
+import type { SummarizeRecord } from "@/features/records/data-table/columns";
 import {
   formatOccurrenceDate,
-  formatTemperatureValue,
-  hasTemperatureOutcome,
-  recordReading,
+  hasJudgedResult,
 } from "@/features/records/lib/format";
 import {
   RECORD_DISPLAY_STATE_VARIANT,
@@ -21,27 +20,27 @@ import {
 type RecordsMobileCardProps = {
   row: Row<RecordItem>;
   labels: RecordsLabels;
-  locale: string;
+  summarize: SummarizeRecord;
 };
 
 export function RecordsMobileCard({
   row,
   labels,
-  locale,
+  summarize,
 }: RecordsMobileCardProps) {
   const item = row.original;
-  const reading = recordReading(item);
+  const summary = summarize(item);
   const timing = timingBadgeValue(item);
 
   return (
     <MobileListRow
       variant="card"
       title={item.title}
-      subtitle={item.equipmentName ?? labels.type[item.type]}
+      subtitle={item.targetName ?? labels.category[item.category]}
       trailing={
-        reading === null ? null : (
-          <span className="tabular-nums">
-            {formatTemperatureValue(reading, locale)}
+        summary === null ? null : (
+          <span className="line-clamp-2 max-w-40 text-right tabular-nums">
+            {summary}
           </span>
         )
       }
@@ -59,7 +58,7 @@ export function RecordsMobileCard({
               {labels.timing[timing]}
             </Badge>
           ) : null}
-          {hasTemperatureOutcome(item) ? (
+          {hasJudgedResult(item) ? (
             <Badge variant={RECORD_RESULT_VARIANT[item.result]}>
               {labels.result[item.result]}
             </Badge>

@@ -1,6 +1,7 @@
 import { zonedMinutesOfDay } from "@haccp/shared";
 import { expect, test } from "@playwright/test";
 import { apiContext, json } from "../../support/api.js";
+import { ensureE2eForms } from "../../support/forms.js";
 import { LOCALE_PREFIX } from "../../support/env.js";
 import { expandGroup, fetchTodayItems, occurrenceRow } from "../../support/today.js";
 
@@ -31,6 +32,7 @@ test.describe("Today — per-occurrence completion windows", () => {
   test("an unopened row cannot be activated, and shows when it opens", async ({ page }) => {
     await page.goto(`${LOCALE_PREFIX}/dashboard`);
     const api = await apiContext(page);
+    const forms = await ensureE2eForms(api);
 
     const tenant = await json<Tenant>(api, "get", "/tenant/current");
     const location =
@@ -40,7 +42,7 @@ test.describe("Today — per-occurrence completion windows", () => {
 
     await json(api, "post", `/locations/${location.id}/task-templates`, {
       title,
-      type: "cleaning",
+      formId: forms.cleaning,
       weekdays: [
         "monday",
         "tuesday",
@@ -76,6 +78,7 @@ test.describe("Today — per-occurrence completion windows", () => {
   }) => {
     await page.goto(`${LOCALE_PREFIX}/dashboard`);
     const api = await apiContext(page);
+    const forms = await ensureE2eForms(api);
 
     const tenant = await json<Tenant>(api, "get", "/tenant/current");
     const location =
@@ -97,7 +100,7 @@ test.describe("Today — per-occurrence completion windows", () => {
     // Opens from the start of the day — already available despite the future scheduled time.
     await json(api, "post", `/locations/${location.id}/task-templates`, {
       title: openTitle,
-      type: "cleaning",
+      formId: forms.cleaning,
       weekdays,
       scheduledTimes: [scheduledTime],
       completionOpensBeforeMinutes: 1440,
@@ -107,7 +110,7 @@ test.describe("Today — per-occurrence completion windows", () => {
     // Opens exactly at the scheduled time — still closed right now.
     await json(api, "post", `/locations/${location.id}/task-templates`, {
       title: closedTitle,
-      type: "cleaning",
+      formId: forms.cleaning,
       weekdays,
       scheduledTimes: [scheduledTime],
       completionOpensBeforeMinutes: 0,

@@ -1,4 +1,5 @@
 import {
+  type FormCategory,
   RECORD_DISPLAY_STATE,
   RECORD_RESULT,
   RECORD_TIMING,
@@ -41,7 +42,7 @@ export type RecordsLabels = {
   recordState: Record<"none" | "submitted" | "voided", string>;
   timing: Record<RecordTiming, string>;
   result: Record<RecordResult, string>;
-  type: Record<"temperature" | "cleaning" | "other", string>;
+  category: Record<FormCategory, string>;
 };
 
 /** Timing only qualifies an active submission — an Open row's own badge already reads "Open". */

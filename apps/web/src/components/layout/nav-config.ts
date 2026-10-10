@@ -2,8 +2,9 @@ import {
   Building2Icon,
   CalendarDaysIcon,
   ClipboardListIcon,
+  FileTextIcon,
   ListChecksIcon,
-  ThermometerSnowflakeIcon,
+  ShapesIcon,
   type LucideIcon,
 } from "lucide-react";
 
@@ -26,7 +27,8 @@ type NavLabels = {
   today: string;
   organization: string;
   tasks: string;
-  equipment: string;
+  targets: string;
+  forms: string;
   locations: string;
   employees: string;
   records: string;
@@ -97,10 +99,16 @@ export function getAdminNavItems(
       isActive: pathname.startsWith("/dashboard/task-templates"),
     },
     {
-      title: labels.equipment,
-      url: "/dashboard/equipment",
-      icon: ThermometerSnowflakeIcon,
-      isActive: pathname.startsWith("/dashboard/equipment"),
+      title: labels.forms,
+      url: "/dashboard/forms",
+      icon: FileTextIcon,
+      isActive: pathname.startsWith("/dashboard/forms"),
+    },
+    {
+      title: labels.targets,
+      url: "/dashboard/targets",
+      icon: ShapesIcon,
+      isActive: pathname.startsWith("/dashboard/targets"),
     },
   ];
 }

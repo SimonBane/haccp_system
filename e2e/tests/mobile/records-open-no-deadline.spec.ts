@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { apiContext, json } from "../../support/api.js";
+import { ensureE2eForms } from "../../support/forms.js";
 import { LOCALE_PREFIX } from "../../support/env.js";
 import { RECORDS_PATH } from "../../support/records.js";
 
@@ -16,6 +17,7 @@ test("an opened, unrecorded Never-overdue occurrence shows as Open with No deadl
 }) => {
   await page.goto(`${LOCALE_PREFIX}/dashboard`);
   const api = await apiContext(page);
+  const forms = await ensureE2eForms(api);
 
   const tenant = await json<Tenant>(api, "get", "/tenant/current");
   const location =
@@ -24,7 +26,7 @@ test("an opened, unrecorded Never-overdue occurrence shows as Open with No deadl
 
   await json(api, "post", `/locations/${location.id}/task-templates`, {
     title,
-    type: "cleaning",
+    formId: forms.cleaning,
     weekdays: [
       "monday",
       "tuesday",
