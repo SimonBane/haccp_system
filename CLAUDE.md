@@ -90,9 +90,8 @@ process won't start.
 - **Plain admin CRUD** should use `registerAdminCrudRoutes` from
   `src/core/openapi/route-factory.ts` — pass schemas + a service with `list/create/update/delete`
   and it generates all four documented routes. `targets` is the smallest end-to-end example.
-- **Multi-tenancy**: Clerk org → `organizations` row (`clerkOrgId`), which owns `locations`,
-  `target_types` and `forms`; locations own `targets` (equipment & areas) and
-  `task_templates`. `assignedLocationIds` is `null` for admins ("all locations"), or an explicit
+- **Multi-tenancy**: Clerk org → `organizations` row (`clerkOrgId`), which owns `locations`
+  and `forms`; locations own `targets` (equipment, areas & fixtures) and `task_templates`. `assignedLocationIds` is `null` for admins ("all locations"), or an explicit
   list for members. Tenant/membership blobs are cached in Redis (2-day TTL, `tenant:clerk:*` /
   `membership:clerk:*`) — **invalidate on every write that changes org, locations, memberships
   or roles**; cache failures log and fall through to Postgres, never throw.
@@ -139,7 +138,7 @@ UI hooks (`use-mobile`, `use-now`).
   pair every input with a label and inline validation.
 - **i18n**: `next-intl`, locales `bg` (default) and `en`, `localePrefix: "as-needed"`, routes
   under `src/app/[locale]/`. **Any user-facing string must be added to both `messages/en.json`
-  and `messages/bg.json`** — currently at exact key parity (802 each). Pages call
+  and `messages/bg.json`** — currently at exact key parity (1098 each). Pages call
   `setRequestLocale(locale)` before rendering; middleware is `src/proxy.ts` (Clerk + intl), not
   `middleware.ts`.
 
@@ -216,6 +215,12 @@ once the work is done.
   `limitOverrides` are keyed by them. Each occurrence pins its `formVersionId` and
   `resolvedLimits`, and records are judged by the shared `evaluateAnswers` — never re-derive a
   result on the web or in SQL. `task_record_readings` holds one typed row per measurement answer.
+- **Targets** have a fixed `kind` (`equipment` | `area` | `fixture`); only areas contain others
+  (`parentId`), and a fixture (walls, floor) must sit in one. Fixture names are unique per area,
+  everything else per location (`isTargetNameTaken`); occurrences snapshot a fixture as
+  "Area › Fixture" (`targetDisplayName`). A form's `appliesTo` is `per_item` (a task picks any mix
+  of kinds) or `location` (no items) — validate with the shared `checkTemplateTargets`, web and API
+  alike. Today folds a time slot's checks that share a room into one card (`today-rooms.ts`).
 - Readings are Postgres `numeric` — mappers convert with `Number(...)`, services write
   `String(...)`.
 - Clerk token verification distinguishes a bad token (401) from an upstream/JWKS failure (503) on
