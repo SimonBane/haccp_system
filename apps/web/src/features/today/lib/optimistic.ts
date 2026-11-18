@@ -1,10 +1,15 @@
-import type { TaskRecordInput, TodayResponse, TodayTaskItem } from "@haccp/shared";
+import type {
+  FormVersionSummaryMap,
+  TaskRecordInput,
+  TodayResponse,
+  TodayTaskItem,
+} from "@haccp/shared";
 import {
-  classifyTemperatureResult,
+  buildAnswerSchema,
   deriveTodayTaskStatusFromOccurrence,
-  RECORD_KIND,
+  evaluateAnswers,
+  RECORD_RESULT,
   RECORD_STATE,
-  TEMPERATURE_RESULT,
 } from "@haccp/shared";
 
 /** Cache patches that return the same reference on a no-op so React Query does not notify. */
@@ -39,19 +44,30 @@ function optimisticUser(currentUserId: string): TodayTaskItem["completedBy"] {
   return { id: currentUserId, firstName: "", lastName: "" };
 }
 
-function activeCompletionPatch(
+type Judged = Pick<TodayTaskItem, "result" | "values" | "correctiveAction">;
+
+const UNJUDGED: Judged = { result: null, values: null, correctiveAction: null };
+
+/** The server's own judgement, run locally; answers it would reject are left for it to report. */
+function judge(
   task: TodayTaskItem,
-  currentUserId: string,
-  now: Date,
-  temperatureReading?: TodayTaskItem["temperatureReading"],
-): TodayTaskItem {
+  input: RecordMutationInput,
+  formVersions: FormVersionSummaryMap,
+): Judged {
+  const definition = formVersions[task.formVersionId]?.definition;
+  if (!definition) return UNJUDGED;
+
+  const parsed = buildAnswerSchema(definition).safeParse(input.values);
+  if (!parsed.success) return UNJUDGED;
+
+  const evaluated = evaluateAnswers(definition, task.resolvedLimits, parsed.data);
+  const correctiveAction = input.correctiveAction?.trim() || null;
+
   return {
-    ...task,
-    recordState: RECORD_STATE.ACTIVE,
-    status: "completed",
-    completedAt: now.toISOString(),
-    completedBy: optimisticUser(currentUserId),
-    temperatureReading: temperatureReading ?? null,
+    result: evaluated.result,
+    values: evaluated.values,
+    correctiveAction:
+      evaluated.result === RECORD_RESULT.FAIL ? correctiveAction : null,
   };
 }
 
@@ -62,34 +78,14 @@ export function applyOptimisticRecord(
   currentUserId: string,
   now: Date = new Date(),
 ): TodayResponse | undefined {
-  return patchOccurrence(response, input.occurrenceId, (task) => {
-    if (input.kind === RECORD_KIND.ORDINARY) {
-      return activeCompletionPatch(task, currentUserId, now);
-    }
-
-    const minTempC = task.minTempC ?? task.temperatureReading?.minTempC ?? null;
-    const maxTempC = task.maxTempC ?? task.temperatureReading?.maxTempC ?? null;
-
-    // Without a range we cannot classify locally; leave the reading for the server.
-    if (minTempC === null || maxTempC === null) {
-      return activeCompletionPatch(task, currentUserId, now);
-    }
-
-    const correctiveAction = input.correctiveAction?.trim() || null;
-    const result = classifyTemperatureResult({
-      recordedC: input.recordedC,
-      minTempC,
-      maxTempC,
-    });
-
-    return activeCompletionPatch(task, currentUserId, now, {
-      recordedC: input.recordedC,
-      result,
-      minTempC,
-      maxTempC,
-      correctiveAction: result === TEMPERATURE_RESULT.OUT_OF_RANGE ? correctiveAction : null,
-    });
-  });
+  return patchOccurrence(response, input.occurrenceId, (task) => ({
+    ...task,
+    ...judge(task, input, response?.formVersions ?? {}),
+    recordState: RECORD_STATE.ACTIVE,
+    status: "completed",
+    completedAt: now.toISOString(),
+    completedBy: optimisticUser(currentUserId),
+  }));
 }
 
 export function applyOptimisticVoid(
@@ -99,6 +95,7 @@ export function applyOptimisticVoid(
 ): TodayResponse | undefined {
   return patchOccurrence(response, occurrenceId, (task) => ({
     ...task,
+    ...UNJUDGED,
     recordState: RECORD_STATE.VOIDED,
     status: deriveTodayTaskStatusFromOccurrence({
       recordState: RECORD_STATE.NONE,
@@ -108,6 +105,5 @@ export function applyOptimisticVoid(
     }),
     completedAt: null,
     completedBy: null,
-    temperatureReading: null,
   }));
 }

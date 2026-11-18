@@ -1,4 +1,8 @@
-import type { TodayTaskItem } from "@haccp/shared";
+import type {
+  FormVersionSummaryMap,
+  RecordValues,
+  TodayTaskItem,
+} from "@haccp/shared";
 import { describe, expect, it } from "vitest";
 import {
   applyClock,
@@ -32,6 +36,9 @@ function instantAt(
 }
 
 let seq = 0;
+
+const CLEANING_VERSION = "00000000-0000-4000-8000-0000000000c1";
+const FRIDGE_VERSION = "00000000-0000-4000-8000-0000000000c2";
 function uuid(): string {
   seq += 1;
   return `00000000-0000-4000-8000-${String(seq).padStart(12, "0")}`;
@@ -50,11 +57,10 @@ function task(overrides: Partial<TodayTaskItem> = {}): TodayTaskItem {
     occurrenceId: uuid(),
     templateId: uuid(),
     title: "Task",
-    type: "cleaning",
-    equipmentId: null,
-    equipmentName: null,
-    minTempC: null,
-    maxTempC: null,
+    formVersionId: CLEANING_VERSION,
+    targetId: null,
+    targetName: null,
+    resolvedLimits: {},
     scheduledTime,
     timeSlot: "morning",
     date,
@@ -64,55 +70,61 @@ function task(overrides: Partial<TodayTaskItem> = {}): TodayTaskItem {
     status: "pending",
     completedAt: null,
     completedBy: null,
-    temperatureReading: null,
+    result: null,
+    values: null,
+    correctiveAction: null,
     ...overrides,
   };
 }
 
 const FRIDGE = uuid();
 
+function reading(value: number, fails: boolean): RecordValues {
+  return {
+    temperature: {
+      type: "measurement",
+      value,
+      unit: "celsius",
+      min: 0,
+      max: 5,
+      fails,
+    },
+  };
+}
+
+function fridgeTask(overrides: Partial<TodayTaskItem>): TodayTaskItem {
+  return task({
+    formVersionId: FRIDGE_VERSION,
+    targetId: FRIDGE,
+    targetName: "Fridge 1",
+    resolvedLimits: { temperature: { min: 0, max: 5 } },
+    ...overrides,
+  });
+}
+
 function buildTasks(): TodayTaskItem[] {
   seq = 100;
   return [
-    task({
+    fridgeTask({
       scheduledTime: "12:00",
       timeSlot: "afternoon",
       title: "Fridge midday",
-      type: "temperature",
-      equipmentId: FRIDGE,
-      equipmentName: "Fridge 1",
-      minTempC: 0,
-      maxTempC: 5,
       recordState: "active",
       status: "completed",
       completedAt: "2026-01-15T10:05:00.000Z",
-      temperatureReading: {
-        recordedC: 9.4,
-        result: "out_of_range",
-        minTempC: 0,
-        maxTempC: 5,
-        correctiveAction: "Moved stock",
-      },
+      result: "fail",
+      values: reading(9.4, true),
+      correctiveAction: "Moved stock",
     }),
     task({ scheduledTime: "18:00", timeSlot: "evening", title: "Evening mop" }),
-    task({
+    fridgeTask({
       scheduledTime: "07:00",
       title: "Fridge open",
-      type: "temperature",
-      equipmentId: FRIDGE,
-      equipmentName: "Fridge 1",
-      minTempC: 0,
-      maxTempC: 5,
       recordState: "active",
       status: "completed",
       completedAt: "2026-01-15T05:04:00.000Z",
-      temperatureReading: {
-        recordedC: 3.1,
-        result: "ok",
-        minTempC: 0,
-        maxTempC: 5,
-        correctiveAction: null,
-      },
+      result: "pass",
+      values: reading(3.1, false),
     }),
     task({ scheduledTime: "18:00", timeSlot: "evening", title: "Evening bins" }),
     task({
@@ -121,16 +133,13 @@ function buildTasks(): TodayTaskItem[] {
       recordState: "active",
       status: "completed",
       completedAt: "2026-01-15T05:20:00.000Z",
+      result: "not_evaluated",
+      values: { cleaned: { type: "checkbox", value: true } },
     }),
-    task({
+    fridgeTask({
       scheduledTime: "18:00",
       timeSlot: "evening",
       title: "Fridge close",
-      type: "temperature",
-      equipmentId: FRIDGE,
-      equipmentName: "Fridge 1",
-      minTempC: 0,
-      maxTempC: 5,
     }),
     task({ scheduledTime: "07:00", title: "Morning floor" }),
     task({
@@ -179,28 +188,58 @@ describe("buildTodayTimeline", () => {
     expect(timeline.isAllDone).toBe(false);
   });
 
-  it("carries the prior reading for the same equipment forward", () => {
+  it("carries the prior record for the same target forward", () => {
     const timeline = buildTodayTimeline(tasks, at("09:00"), DATE, SOFIA);
 
     const [morning, midday, evening] = timeline.groups;
-    const morningFridge = morning.items.find((i) => i.task.equipmentId);
-    const middayFridge = midday.items.find((i) => i.task.equipmentId);
-    const eveningFridge = evening.items.find((i) => i.task.equipmentId);
+    const morningFridge = morning.items.find((i) => i.task.targetId);
+    const middayFridge = midday.items.find((i) => i.task.targetId);
+    const eveningFridge = evening.items.find((i) => i.task.targetId);
 
-    expect(morningFridge?.priorReading).toBeNull();
-    expect(middayFridge?.priorReading).toEqual({
+    expect(morningFridge?.priorRecord).toBeNull();
+    expect(middayFridge?.priorRecord).toEqual({
       scheduledTime: "07:00",
       completedAt: "2026-01-15T05:04:00.000Z",
-      recordedC: 3.1,
+      values: reading(3.1, false),
     });
-    expect(eveningFridge?.priorReading).toEqual({
+    expect(eveningFridge?.priorRecord).toEqual({
       scheduledTime: "12:00",
       completedAt: "2026-01-15T10:05:00.000Z",
-      recordedC: 9.4,
+      values: reading(9.4, true),
     });
   });
 
-  it("flags only completed out-of-range readings as deviations", () => {
+  it("attaches each occurrence's own form version", () => {
+    const formVersions: FormVersionSummaryMap = {
+      [FRIDGE_VERSION]: {
+        id: FRIDGE_VERSION,
+        formId: "00000000-0000-4000-8000-0000000000aa",
+        formName: "Fridge check",
+        category: "temperature",
+        version: 2,
+        definition: {
+          correctiveAction: "required_on_fail",
+          fields: [],
+        },
+      },
+    };
+
+    const timeline = buildTodayTimeline(
+      tasks,
+      at("09:00"),
+      DATE,
+      SOFIA,
+      formVersions,
+    );
+    const items = timeline.groups.flatMap((g) => g.items);
+
+    expect(
+      items.find((i) => i.task.title === "Fridge open")?.form?.version,
+    ).toBe(2);
+    expect(items.find((i) => i.task.title === "Evening mop")?.form).toBeNull();
+  });
+
+  it("flags only completed failing records as deviations", () => {
     const timeline = buildTodayTimeline(tasks, at("09:00"), DATE, SOFIA);
     const flagged = timeline.groups
       .flatMap((g) => g.items)

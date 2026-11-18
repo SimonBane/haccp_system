@@ -4,20 +4,20 @@ import {
   TASK_TEMPLATE_COMPLETION_MINUTES_MAX,
   TASK_TEMPLATE_COMPLETION_MINUTES_MIN,
   TASK_TEMPLATE_MAX_SCHEDULED_TIMES,
-  TASK_TEMPLATE_TYPE,
+  getMeasurementFields,
   scheduledTimeSchema,
-  taskTemplateTypeSchema,
   taskTemplateWeekdaySchema,
-  type EquipmentResponse,
+  type FormResponse,
+  type LimitsIssue,
+  type TargetResponse,
   type TaskTemplateFieldsInput,
   type TaskTemplateResponse,
-  type TaskTemplateType,
   type TaskTemplateWeekday,
 } from "@haccp/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useZodErrorMap } from "@/lib/forms/zod-error-map";
 import { PlusIcon, SaveIcon } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Controller,
@@ -36,6 +36,7 @@ import { DialogFooter } from "@/components/ui/dialog";
 import {
   REQUIRED_LABEL_CLASS,
   Field,
+  FieldDescription,
   FieldError,
   FieldLabel,
   FieldLegend,
@@ -53,14 +54,17 @@ import {
 } from "@/components/ui/select";
 import {
   buildDefaultCompletionWindow,
+  buildDefaultTargets,
   buildDefaultTimeRows,
   buildDefaultWeekdays,
   findDuplicateScheduledTimeIndices,
   getNextDefaultScheduledTime,
   getScheduledTimeRowsErrorMessage,
   hasTaskChanges,
+  toTargetInputs,
   type CompletionWindowValues,
   type ScheduledTimeRowValue,
+  type TargetSelection,
 } from "@/features/task-templates/lib/form-helpers";
 import {
   COMPLETION_DUE_PRESET_MINUTES,
@@ -72,7 +76,10 @@ import {
   type CompletionOpensPreset,
 } from "@/features/task-templates/lib/completion-window";
 import { ScheduledTimeRow } from "@/features/task-templates/components/scheduled-time-row";
-import { TaskTypeToggle } from "@/features/task-templates/components/task-type-toggle";
+import { TargetPicker } from "@/features/task-templates/components/target-picker";
+import { FORM_CATEGORY_ICONS } from "@/features/forms/lib/category-icon";
+import { decimalSeparator } from "@/features/forms/lib/measurement";
+import { Link } from "@/i18n/navigation";
 import { WeekdayToggleStrip } from "@/features/task-templates/components/weekday-toggle-strip";
 import { CompletionWindowFields } from "@/features/task-templates/components/completion-window-fields";
 
@@ -84,7 +91,8 @@ type TaskTemplatesFormProps = {
   task?: TaskTemplateResponse | null;
   duplicateSource?: TaskTemplateResponse | null;
   suggestedDuplicateTitle?: string;
-  equipment: Pick<EquipmentResponse, "id" | "name">[];
+  forms: FormResponse[];
+  targets: TargetResponse[];
   onSubmit: (values: TaskTemplateFieldsInput) => Promise<void>;
 };
 
@@ -94,10 +102,13 @@ export function TaskTemplatesForm({
   task,
   duplicateSource,
   suggestedDuplicateTitle,
-  equipment,
+  forms,
+  targets,
   onSubmit,
 }: TaskTemplatesFormProps) {
   const t = useTranslations("TasksPage");
+  const locale = useLocale();
+  const separator = useMemo(() => decimalSeparator(locale), [locale]);
   const showApiError = useApiErrorToast();
   const isEditing = Boolean(task);
   const isDuplicating = Boolean(duplicateSource) && !isEditing;
@@ -110,11 +121,7 @@ export function TaskTemplatesForm({
           .trim()
           .min(1, t("validation.titleRequired"))
           .max(200, t("validation.titleMaxLength")),
-        type: z
-          .union([taskTemplateTypeSchema, z.literal("")])
-          .refine((value): value is TaskTemplateType => value !== "", {
-            error: t("validation.typeRequired"),
-          }),
+        formId: z.string().min(1, t("validation.formRequired")),
         weekdays: z
           .array(taskTemplateWeekdaySchema)
           .min(1, t("validation.weekdaysRequired")),
@@ -142,20 +149,24 @@ export function TaskTemplatesForm({
           )
           .min(1, t("validation.timesRequired"))
           .max(TASK_TEMPLATE_MAX_SCHEDULED_TIMES, t("validation.timesMax")),
-        equipmentId: z.uuid().nullable(),
+        targets: z.array(
+          z.object({
+            targetId: z.string(),
+            overrides: z.record(
+              z.string(),
+              z.object({
+                enabled: z.boolean(),
+                min: z.string(),
+                max: z.string(),
+              }),
+            ),
+          }),
+        ),
         completionOpensBeforeMinutes: z.string(),
         completionDueAfterMinutes: z.string(),
         neverOverdue: z.boolean(),
       })
       .superRefine((data, ctx) => {
-        if (data.type === TASK_TEMPLATE_TYPE.TEMPERATURE && !data.equipmentId) {
-          ctx.addIssue({
-            code: "custom",
-            message: t("validation.equipmentRequired"),
-            path: ["equipmentId"],
-          });
-        }
-
         validateMinutesField(
           data.completionOpensBeforeMinutes,
           ctx,
@@ -213,10 +224,10 @@ export function TaskTemplatesForm({
 
   type TaskTemplatesFormValues = {
     title: string;
-    type: TaskTemplateType | "";
+    formId: string;
     weekdays: TaskTemplateWeekday[];
     scheduledTimeRows: ScheduledTimeRowValue[];
-    equipmentId: string | null;
+    targets: TargetSelection[];
   } & CompletionWindowValues;
 
   const defaultValues = useMemo((): TaskTemplatesFormValues => {
@@ -228,13 +239,13 @@ export function TaskTemplatesForm({
         (duplicateSource
           ? (suggestedDuplicateTitle ?? duplicateSource.title)
           : ""),
-      type: source?.type ?? "",
+      formId: source?.formId ?? "",
       weekdays: buildDefaultWeekdays(task, duplicateSource),
       scheduledTimeRows: buildDefaultTimeRows(task, duplicateSource),
-      equipmentId: source?.equipmentId ?? null,
+      targets: buildDefaultTargets(task, duplicateSource, separator),
       ...buildDefaultCompletionWindow(task, duplicateSource),
     };
-  }, [task, duplicateSource, suggestedDuplicateTitle]);
+  }, [task, duplicateSource, suggestedDuplicateTitle, separator]);
 
   const zodErrorMap = useZodErrorMap();
 
@@ -256,15 +267,17 @@ export function TaskTemplatesForm({
     autoFocusTimeIndex: number | null;
     opensPreset: CompletionOpensPreset | null;
     duePreset: CompletionDuePreset | null;
+    overrideIssues: Record<string, LimitsIssue>;
   }>(() => ({
     autoFocusTimeIndex: null,
+    overrideIssues: {},
     opensPreset: resolveOpensPreset(defaultValues.completionOpensBeforeMinutes),
     duePreset: resolveDuePreset(
       defaultValues.completionDueAfterMinutes,
       defaultValues.neverOverdue,
     ),
   }));
-  const { autoFocusTimeIndex, opensPreset, duePreset } = formUi;
+  const { autoFocusTimeIndex, opensPreset, duePreset, overrideIssues } = formUi;
 
   const setAutoFocusTimeIndex = (next: number | null) =>
     setFormUi((previous) => ({ ...previous, autoFocusTimeIndex: next }));
@@ -282,6 +295,7 @@ export function TaskTemplatesForm({
     if (openedTarget) {
       setFormUi({
         autoFocusTimeIndex: null,
+        overrideIssues: {},
         opensPreset: resolveOpensPreset(
           openedTarget.completionOpensBeforeMinutes,
         ),
@@ -297,12 +311,6 @@ export function TaskTemplatesForm({
     if (!open) return;
     form.reset(defaultValues);
   }, [open, defaultValues, form]);
-
-  const typeLabels: Record<TaskTemplateType, string> = {
-    temperature: t("types.temperature"),
-    cleaning: t("types.cleaning"),
-    other: t("types.other"),
-  };
 
   const weekdayShortLabels: Record<TaskTemplateWeekday, string> = {
     monday: t("weekdaysShort.monday"),
@@ -324,7 +332,12 @@ export function TaskTemplatesForm({
     sunday: t("weekdaysFull.sunday"),
   };
 
-  const selectedType = useWatch({ control: form.control, name: "type" });
+  const selectedFormId = useWatch({ control: form.control, name: "formId" });
+  const selectedForm = forms.find((item) => item.id === selectedFormId) ?? null;
+  const selectedDefinition = selectedForm?.latestVersion.definition ?? null;
+  const measurementFields = selectedDefinition
+    ? getMeasurementFields(selectedDefinition)
+    : [];
   const watchedScheduledTimes = useWatch({
     control: form.control,
     name: "scheduledTimeRows",
@@ -390,22 +403,31 @@ export function TaskTemplatesForm({
       return;
     }
 
-    if (isEditing && task && !hasTaskChanges(values, task)) {
+    const definition =
+      forms.find((item) => item.id === values.formId)?.latestVersion
+        .definition ?? null;
+    const { targets: targetInputs, issues } = toTargetInputs(
+      values.targets,
+      definition,
+    );
+    setFormUi((previous) => ({ ...previous, overrideIssues: issues }));
+    if (Object.keys(issues).length > 0) return;
+
+    if (
+      isEditing &&
+      task &&
+      !hasTaskChanges({ ...values, targets: targetInputs }, task)
+    ) {
       onOpenChange(false);
       return;
     }
 
-    if (!values.type) return;
-
     const payload: TaskTemplateFieldsInput = {
       title: values.title,
-      type: values.type,
+      formId: values.formId,
       weekdays: values.weekdays,
       scheduledTimes: values.scheduledTimeRows.map((row) => row.time),
-      equipmentId:
-        values.type === TASK_TEMPLATE_TYPE.TEMPERATURE
-          ? values.equipmentId
-          : null,
+      targets: targetInputs,
       completionOpensBeforeMinutes: Number(values.completionOpensBeforeMinutes),
       completionDueAfterMinutes: values.neverOverdue
         ? null
@@ -515,88 +537,94 @@ export function TaskTemplatesForm({
           />
 
           <Controller
-            name="type"
+            name="formId"
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
                 <FieldLabel
-                  htmlFor={`${TASK_TEMPLATES_FORM_ID}-type`}
+                  htmlFor={`${TASK_TEMPLATES_FORM_ID}-form`}
                   className={REQUIRED_LABEL_CLASS}
                 >
-                  {t("typeLabel")}
+                  {t("formLabel")}
                 </FieldLabel>
-                <TaskTypeToggle
-                  id={`${TASK_TEMPLATES_FORM_ID}-type`}
-                  value={field.value}
-                  labels={typeLabels}
-                  invalid={fieldState.invalid}
-                  onValueChange={(nextType) => {
-                    field.onChange(nextType);
-                    if (nextType !== TASK_TEMPLATE_TYPE.TEMPERATURE) {
-                      form.setValue("equipmentId", null);
-                    }
+                <Select
+                  name={field.name}
+                  items={forms.map((item) => ({
+                    label: item.name,
+                    value: item.id,
+                  }))}
+                  value={field.value || null}
+                  onValueChange={(value: unknown) =>
+                    field.onChange(typeof value === "string" ? value : "")
+                  }
+                  onOpenChange={(nextOpen) => {
+                    if (!nextOpen) field.onBlur();
                   }}
-                  onBlur={field.onBlur}
-                />
+                >
+                  <SelectTrigger
+                    id={`${TASK_TEMPLATES_FORM_ID}-form`}
+                    aria-invalid={fieldState.invalid}
+                    className="w-full"
+                  >
+                    <SelectValue placeholder={t("formPlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent alignItemWithTrigger={false}>
+                    <SelectGroup>
+                      {forms.map((item) => {
+                        const Icon = FORM_CATEGORY_ICONS[item.category];
+                        return (
+                          <SelectItem key={item.id} value={item.id}>
+                            <Icon className="text-muted-foreground" />
+                            {item.name}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                {forms.length === 0 ? (
+                  <FieldDescription>
+                    {t("noForms")}{" "}
+                    <Link href="/dashboard/forms" className="underline">
+                      {t("manageForms")}
+                    </Link>
+                  </FieldDescription>
+                ) : null}
                 {fieldState.invalid && (
                   <FieldError errors={[fieldState.error]} />
                 )}
               </Field>
             )}
           />
+        </FieldSet>
 
-          {selectedType === TASK_TEMPLATE_TYPE.TEMPERATURE ? (
-            <Controller
-              name="equipmentId"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel
-                    htmlFor={`${TASK_TEMPLATES_FORM_ID}-equipment`}
-                    className={REQUIRED_LABEL_CLASS}
-                  >
-                    {t("equipmentLabel")}
-                  </FieldLabel>
-                  <Select
-                    name={field.name}
-                    items={equipment.map((item) => ({
-                      label: item.name,
-                      value: item.id,
-                    }))}
-                    value={field.value ?? null}
-                    onValueChange={(value: unknown) => {
-                      field.onChange(typeof value === "string" ? value : null);
-                    }}
-                    onOpenChange={(nextOpen) => {
-                      if (!nextOpen) {
-                        field.onBlur();
-                      }
-                    }}
-                  >
-                    <SelectTrigger
-                      id={`${TASK_TEMPLATES_FORM_ID}-equipment`}
-                      aria-invalid={fieldState.invalid}
-                      className="w-full"
-                    >
-                      <SelectValue placeholder={t("equipmentPlaceholder")} />
-                    </SelectTrigger>
-                    <SelectContent alignItemWithTrigger={false}>
-                      <SelectGroup>
-                        {equipment.map((item) => (
-                          <SelectItem key={item.id} value={item.id}>
-                            {item.name}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  {fieldState.invalid && (
-                    <FieldError errors={[fieldState.error]} />
-                  )}
-                </Field>
-              )}
-            />
-          ) : null}
+        <FieldSeparator />
+
+        <FieldSet className="gap-3">
+          <FieldLegend variant="label" className="mb-0">
+            {t("targets.legend")}
+          </FieldLegend>
+          <FieldDescription>{t("targets.description")}</FieldDescription>
+          <Controller
+            name="targets"
+            control={form.control}
+            render={({ field }) => (
+              <TargetPicker
+                id={`${TASK_TEMPLATES_FORM_ID}-targets`}
+                targets={targets}
+                measurementFields={measurementFields}
+                value={field.value}
+                onChange={(next) => {
+                  field.onChange(next);
+                  setFormUi((previous) => ({
+                    ...previous,
+                    overrideIssues: {},
+                  }));
+                }}
+                issues={overrideIssues}
+              />
+            )}
+          />
         </FieldSet>
 
         <FieldSeparator />

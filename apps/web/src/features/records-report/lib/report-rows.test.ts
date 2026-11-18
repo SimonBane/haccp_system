@@ -1,12 +1,60 @@
-import type { RecordItem } from "@haccp/shared";
+import type { FormVersionSummaryMap, RecordItem, RecordValues } from "@haccp/shared";
 import { describe, expect, it } from "vitest";
+import { buildAnswerFormatters } from "@/features/forms/lib/answer-format";
 import {
   groupReportRowsByDate,
   toReportRow,
   toReportRows,
+  type ReportRowContext,
 } from "./report-rows";
 
-const CONTEXT = { locale: "bg" };
+const FRIDGE_VERSION = "55555555-5555-4555-8555-555555555555";
+
+const FORM_VERSIONS: FormVersionSummaryMap = {
+  [FRIDGE_VERSION]: {
+    id: FRIDGE_VERSION,
+    formId: "66666666-6666-4666-8666-666666666666",
+    formName: "Хладилник",
+    category: "temperature",
+    version: 1,
+    definition: {
+      correctiveAction: "required_on_fail",
+      fields: [
+        {
+          id: "temperature",
+          type: "measurement",
+          label: "Температура",
+          required: true,
+          unit: "celsius",
+          limits: { min: 0, max: 5 },
+        },
+      ],
+    },
+  },
+};
+
+const CONTEXT: ReportRowContext = {
+  formVersions: FORM_VERSIONS,
+  format: buildAnswerFormatters({
+    locale: "bg",
+    symbol: (unit) => (unit === "celsius" ? "°C" : unit),
+    yes: "Да",
+    no: "Не",
+  }),
+};
+
+function reading(value: number, fails: boolean): RecordValues {
+  return {
+    temperature: {
+      type: "measurement",
+      value,
+      unit: "celsius",
+      min: 0,
+      max: 5,
+      fails,
+    },
+  };
+}
 
 const OCCURRENCE_ID = "11111111-1111-4111-8111-111111111111";
 const ADA = {
@@ -29,11 +77,11 @@ function item(overrides: Partial<RecordItem> = {}): RecordItem {
     availableAt: "2026-08-23T00:00:00.000Z",
     dueAt: "2026-08-23T05:00:00.000Z",
     title: "Сутрешна проверка на хладилника",
-    type: "temperature",
-    equipmentId: "33333333-3333-4333-8333-333333333333",
-    equipmentName: "Хладилник 1",
-    minTempC: 0,
-    maxTempC: 5,
+    formVersionId: FRIDGE_VERSION,
+    category: "temperature",
+    targetId: "33333333-3333-4333-8333-333333333333",
+    targetName: "Хладилник 1",
+    resolvedLimits: { temperature: { min: 0, max: 5 } },
     displayState: "submitted",
     recordState: "submitted",
     timing: "on_time",
@@ -52,7 +100,8 @@ function record(overrides: Record<string, unknown> = {}) {
     recordedBy: BORIS,
     voidedAt: null,
     voidedBy: null,
-    temperature: null,
+    values: {},
+    correctiveAction: null,
     ...overrides,
   } as RecordItem["record"];
 }
@@ -65,13 +114,13 @@ describe("toReportRow status", () => {
     expect(row.late).toBe(false);
   });
 
-  it("prints a failed temperature submission as out of range", () => {
+  it("prints a failed submission as failed", () => {
     const row = toReportRow(item({ result: "fail", record: record() }), CONTEXT);
 
     expect(row.status).toBe("fail");
   });
 
-  it("keeps lateness alongside an out-of-range result", () => {
+  it("keeps lateness alongside a failed result", () => {
     const row = toReportRow(
       item({ result: "fail", timing: "late", record: record() }),
       CONTEXT,
@@ -121,7 +170,7 @@ describe("toReportRow status", () => {
     expect(row.late).toBe(false);
   });
 
-  it("prints a voided row as voided even when its reading failed", () => {
+  it("prints a voided row as voided even when its answers failed", () => {
     const row = toReportRow(
       item({
         displayState: "voided",
@@ -131,20 +180,15 @@ describe("toReportRow status", () => {
         record: record({
           voidedAt: "2026-08-23T06:10:00.000Z",
           voidedBy: ADA,
-          temperature: {
-            recordedC: 8.4,
-            minTempC: 0,
-            maxTempC: 5,
-            result: "out_of_range",
-            correctiveAction: "Преместени продукти",
-          },
+          values: reading(8.4, true),
+          correctiveAction: "Преместени продукти",
         }),
       }),
       CONTEXT,
     );
 
     expect(row.status).toBe("voided");
-    expect(row.reading).toBe("8,4 °C");
+    expect(row.answers).toBe("8,4 °C");
     expect(row.correctiveAction).toBe("Преместени продукти");
   });
 });
@@ -170,7 +214,7 @@ describe("toReportRow minimal facts", () => {
 
     expect(Object.keys(row).sort()).toEqual(
       [
-        "equipmentName",
+        "targetName",
         "late",
         "occurrenceId",
         "recordedBy",
@@ -182,14 +226,13 @@ describe("toReportRow minimal facts", () => {
     );
   });
 
-  it("omits reading and equipment on a cleaning row", () => {
+  it("omits the target on a row that has none", () => {
     const row = toReportRow(
       item({
-        type: "cleaning",
-        equipmentId: null,
-        equipmentName: null,
-        minTempC: null,
-        maxTempC: null,
+        category: "cleaning",
+        targetId: null,
+        targetName: null,
+        resolvedLimits: {},
         result: "not_evaluated",
         record: record(),
       }),
@@ -197,27 +240,37 @@ describe("toReportRow minimal facts", () => {
     );
 
     expect(row.status).toBe("done");
-    expect("reading" in row).toBe(false);
-    expect("equipmentName" in row).toBe(false);
+    expect("answers" in row).toBe(false);
+    expect("targetName" in row).toBe(false);
   });
 
-  it("keeps a corrective action off a row that has none", () => {
+  it("labels each answer when the form asks several questions", () => {
     const row = toReportRow(
       item({
+        formVersionId: "77777777-7777-4777-8777-777777777777",
         record: record({
-          temperature: {
-            recordedC: 3.5,
-            minTempC: 0,
-            maxTempC: 5,
-            result: "ok",
-            correctiveAction: null,
+          values: {
+            ...reading(3, false),
+            door: { type: "checkbox", value: true },
           },
         }),
       }),
       CONTEXT,
     );
 
-    expect(row.reading).toBe("3,5 °C");
+    // Without the version in the map, ids stand in for the labels.
+    expect(row.answers).toBe("temperature: 3 °C · door: Да");
+  });
+
+  it("keeps a corrective action off a row that has none", () => {
+    const row = toReportRow(
+      item({
+        record: record({ values: reading(3.5, false) }),
+      }),
+      CONTEXT,
+    );
+
+    expect(row.answers).toBe("3,5 °C");
     expect("correctiveAction" in row).toBe(false);
   });
 });

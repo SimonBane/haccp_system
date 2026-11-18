@@ -1,15 +1,18 @@
+import type { ResolvedLimits } from "@haccp/shared";
 import {
   date,
   foreignKey,
   index,
-  numeric,
+  jsonb,
   pgTable,
   text,
   timestamp,
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
+import { formVersions } from "./form-versions.js";
 import { locations } from "./locations.js";
+import { targets } from "./targets.js";
 import { taskTemplates } from "./task-templates.js";
 
 export const taskOccurrences = pgTable(
@@ -25,22 +28,29 @@ export const taskOccurrences = pgTable(
     availableAt: timestamp("available_at", { withTimezone: true }).notNull(),
     dueAt: timestamp("due_at", { withTimezone: true }),
     title: text("title").notNull(),
-    type: text("type").notNull(),
-    equipmentId: uuid("equipment_id"),
-    equipmentName: text("equipment_name"),
-    minTempC: numeric("min_temp_c", { precision: 4, scale: 1 }),
-    maxTempC: numeric("max_temp_c", { precision: 4, scale: 1 }),
+    formVersionId: uuid("form_version_id")
+      .notNull()
+      .references(() => formVersions.id, { onDelete: "restrict" }),
+    targetId: uuid("target_id"),
+    targetName: text("target_name"),
+    resolvedLimits: jsonb("resolved_limits")
+      .$type<ResolvedLimits>()
+      .notNull()
+      .default({}),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
   },
   (table) => [
-    // Also covers taskTemplateId-only lookups as its left prefix.
-    unique("task_occurrences_template_date_time_unique").on(
-      table.taskTemplateId,
-      table.occurrenceDate,
-      table.scheduledTime,
-    ),
+    // NULLS NOT DISTINCT keeps one untargeted occurrence per slot; also covers taskTemplateId-only lookups.
+    unique("task_occurrences_template_target_date_time_unique")
+      .on(
+        table.taskTemplateId,
+        table.targetId,
+        table.occurrenceDate,
+        table.scheduledTime,
+      )
+      .nullsNotDistinct(),
     index("task_occurrences_location_date_time_id_idx").on(
       table.locationId,
       table.occurrenceDate,
@@ -50,6 +60,11 @@ export const taskOccurrences = pgTable(
     foreignKey({
       columns: [table.taskTemplateId, table.locationId],
       foreignColumns: [taskTemplates.id, taskTemplates.locationId],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "task_occurrences_target_location_fk",
+      columns: [table.targetId, table.locationId],
+      foreignColumns: [targets.id, targets.locationId],
     }).onDelete("restrict"),
   ],
 );

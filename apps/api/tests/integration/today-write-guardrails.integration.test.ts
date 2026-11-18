@@ -2,6 +2,8 @@ import { zonedDateString } from "@haccp/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../../src/core/db/client.js";
 import {
+  CLEANING_FIELD_ID,
+  FRIDGE_FIELD_ID,
   seedOccurrence,
   seedOrganization,
   type SeededOrg,
@@ -69,14 +71,14 @@ describe("Today write guardrails", () => {
       {
         method: "POST",
         actor: asEmployee(org),
-        body: JSON.stringify({ kind: "ordinary" }),
+        body: JSON.stringify({ values: { [CLEANING_FIELD_ID]: true } }),
       },
     );
 
     expect(response.status).toBe(400);
   });
 
-  it("rejects a temperature write for a future occurrence date", async () => {
+  it("rejects a reading for a future occurrence date", async () => {
     const occurrenceId = await seedOccurrence(db, org, {
       type: "temperature",
       occurrenceDate: tomorrow(),
@@ -88,7 +90,7 @@ describe("Today write guardrails", () => {
       {
         method: "POST",
         actor: asEmployee(org),
-        body: JSON.stringify({ kind: "temperature", recordedC: 3 }),
+        body: JSON.stringify({ values: { [FRIDGE_FIELD_ID]: 3 } }),
       },
     );
 
@@ -107,7 +109,7 @@ describe("Today write guardrails", () => {
       {
         method: "POST",
         actor: asEmployee(org),
-        body: JSON.stringify({ kind: "ordinary" }),
+        body: JSON.stringify({ values: { [CLEANING_FIELD_ID]: true } }),
       },
     );
 

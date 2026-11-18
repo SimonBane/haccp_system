@@ -4,15 +4,15 @@ import {
   computeDueAt,
   getWeekdayFromDate,
   isValidTimeZone,
+  resolveLimits,
   sortScheduledTimes,
   startOfLocalDay,
-  TASK_TEMPLATE_TYPE,
   wallClockToInstant,
   zonedDateString,
-  type TaskTemplateType,
+  type ResolvedLimits,
 } from "@haccp/shared";
 import type { Db, DbClient } from "../../core/db/client.js";
-import { InternalError, ValidationError } from "../../core/errors/app-errors.js";
+import { InternalError } from "../../core/errors/app-errors.js";
 import { logger } from "../../lib/logger.js";
 import { locationRepository } from "../locations/location.repository.js";
 import { organizationRepository } from "../organizations/organization.repository.js";
@@ -43,34 +43,62 @@ type DesiredOccurrence = {
   availableAt: Date;
   dueAt: Date | null;
   title: string;
-  type: TaskTemplateType;
-  equipmentId: string | null;
-  equipmentName: string | null;
-  minTempC: string | null;
-  maxTempC: string | null;
+  formVersionId: string;
+  targetId: string | null;
+  targetName: string | null;
+  resolvedLimits: ResolvedLimits;
 };
 
-function desiredKey(templateId: string, date: string, time: string): string {
-  return `${templateId}|${date}|${time}`;
+function desiredKey(
+  templateId: string,
+  targetId: string | null,
+  date: string,
+  time: string,
+): string {
+  return `${templateId}|${targetId ?? ""}|${date}|${time}`;
 }
 
 function existingKey(row: TaskOccurrenceRow): string {
-  return desiredKey(row.taskTemplateId, row.occurrenceDate, row.scheduledTime);
+  return desiredKey(
+    row.taskTemplateId,
+    row.targetId,
+    row.occurrenceDate,
+    row.scheduledTime,
+  );
 }
 
-function assertResolvedTemperatureSource(source: TaskTemplateSourceRow): void {
-  if (source.type !== TASK_TEMPLATE_TYPE.TEMPERATURE) return;
+/** jsonb returns keys in its own order, so limits are compared on a key-sorted encoding. */
+function limitsKey(limits: ResolvedLimits): string {
+  return JSON.stringify(
+    Object.keys(limits)
+      .sort()
+      .map((fieldId) => [fieldId, limits[fieldId]!.min, limits[fieldId]!.max]),
+  );
+}
 
-  if (
-    !source.equipmentId ||
-    source.equipmentName === null ||
-    source.minTempC === null ||
-    source.maxTempC === null
-  ) {
-    throw new ValidationError(
-      `Task template "${source.title}" has no valid same-location equipment for temperature occurrences`,
-    );
+/** A template with no targets still gets one occurrence per slot, about nothing in particular. */
+function slotsFor(
+  source: TaskTemplateSourceRow,
+): {
+  targetId: string | null;
+  targetName: string | null;
+  resolvedLimits: ResolvedLimits;
+}[] {
+  if (source.targets.length === 0) {
+    return [
+      {
+        targetId: null,
+        targetName: null,
+        resolvedLimits: resolveLimits(source.definition, null),
+      },
+    ];
   }
+
+  return source.targets.map((target) => ({
+    targetId: target.targetId,
+    targetName: target.targetName,
+    resolvedLimits: resolveLimits(source.definition, target.limitOverrides),
+  }));
 }
 
 function buildDesiredOccurrences(
@@ -81,9 +109,8 @@ function buildDesiredOccurrences(
   const desired = new Map<string, DesiredOccurrence>();
 
   for (const source of sources) {
-    assertResolvedTemperatureSource(source);
-
     const times = sortScheduledTimes(source.scheduledTimes);
+    const slots = slotsFor(source);
 
     for (const date of dates) {
       const weekday = getWeekdayFromDate(date);
@@ -106,32 +133,21 @@ function buildDesiredOccurrences(
           completionDueAfterMinutes: source.completionDueAfterMinutes,
         });
 
-        desired.set(desiredKey(source.id, date, time), {
-          taskTemplateId: source.id,
-          locationId: source.locationId,
-          occurrenceDate: date,
-          scheduledTime: time,
-          availableAt,
-          dueAt,
-          title: source.title,
-          type: source.type,
-          equipmentId:
-            source.type === TASK_TEMPLATE_TYPE.TEMPERATURE
-              ? source.equipmentId
-              : null,
-          equipmentName:
-            source.type === TASK_TEMPLATE_TYPE.TEMPERATURE
-              ? source.equipmentName
-              : null,
-          minTempC:
-            source.type === TASK_TEMPLATE_TYPE.TEMPERATURE
-              ? source.minTempC
-              : null,
-          maxTempC:
-            source.type === TASK_TEMPLATE_TYPE.TEMPERATURE
-              ? source.maxTempC
-              : null,
-        });
+        for (const slot of slots) {
+          desired.set(desiredKey(source.id, slot.targetId, date, time), {
+            taskTemplateId: source.id,
+            locationId: source.locationId,
+            occurrenceDate: date,
+            scheduledTime: time,
+            availableAt,
+            dueAt,
+            title: source.title,
+            formVersionId: source.formVersionId,
+            targetId: slot.targetId,
+            targetName: slot.targetName,
+            resolvedLimits: slot.resolvedLimits,
+          });
+        }
       }
     }
   }
@@ -145,11 +161,10 @@ function matchesDesired(
 ): boolean {
   return (
     existingRow.title === desiredRow.title &&
-    existingRow.type === desiredRow.type &&
-    existingRow.equipmentId === desiredRow.equipmentId &&
-    existingRow.equipmentName === desiredRow.equipmentName &&
-    existingRow.minTempC === desiredRow.minTempC &&
-    existingRow.maxTempC === desiredRow.maxTempC &&
+    existingRow.formVersionId === desiredRow.formVersionId &&
+    existingRow.targetName === desiredRow.targetName &&
+    limitsKey(existingRow.resolvedLimits) ===
+      limitsKey(desiredRow.resolvedLimits) &&
     existingRow.availableAt.getTime() === desiredRow.availableAt.getTime() &&
     (existingRow.dueAt?.getTime() ?? null) ===
       (desiredRow.dueAt?.getTime() ?? null)
@@ -165,11 +180,10 @@ function toInsertRow(row: DesiredOccurrence): NewTaskOccurrenceRow {
     availableAt: row.availableAt,
     dueAt: row.dueAt,
     title: row.title,
-    type: row.type,
-    equipmentId: row.equipmentId,
-    equipmentName: row.equipmentName,
-    minTempC: row.minTempC,
-    maxTempC: row.maxTempC,
+    formVersionId: row.formVersionId,
+    targetId: row.targetId,
+    targetName: row.targetName,
+    resolvedLimits: row.resolvedLimits,
   };
 }
 
@@ -197,19 +211,23 @@ async function reconcileTemplateIds(
 
   const now = new Date();
   const currentLocalDate = zonedDateString(now, timeZone);
-  const dates = calendarDateRange(currentLocalDate, MATERIALIZATION_WINDOW_DAYS);
+  const dates = calendarDateRange(
+    currentLocalDate,
+    MATERIALIZATION_WINDOW_DAYS,
+  );
 
   const [sources, existing] = await Promise.all([
-    taskTemplateRepository.findActiveWithEquipmentByIds(db, templateIds),
+    taskTemplateRepository.findActiveSourcesByIds(db, templateIds),
     taskOccurrenceRepository.findByTemplateIds(db, templateIds),
   ]);
 
   const desired = buildDesiredOccurrences(sources, dates, timeZone);
 
-  const recordedOccurrenceIds = await taskOccurrenceRepository.findRecordedOccurrenceIds(
-    db,
-    existing.map((row) => row.id),
-  );
+  const recordedOccurrenceIds =
+    await taskOccurrenceRepository.findRecordedOccurrenceIds(
+      db,
+      existing.map((row) => row.id),
+    );
 
   const toDeleteIds: string[] = [];
   const newInserts: DesiredOccurrence[] = [];
@@ -292,11 +310,16 @@ export const taskOccurrenceService = {
     });
   },
 
-  async reconcileEquipment(
+  /** For a change outside a template (a renamed or archived target) that alters what its occurrences copy. */
+  async reconcileTemplatesAtLocation(
     db: DbClient,
     locationId: string,
-    equipmentId: string,
+    templateIds: string[],
   ): Promise<ReconcileSummary> {
+    if (templateIds.length === 0) {
+      return { processed: 0, created: 0, replaced: 0, deleted: 0 };
+    }
+
     const org = await locationRepository.findOrganizationContextByLocationId(
       db,
       locationId,
@@ -308,12 +331,6 @@ export const taskOccurrenceService = {
       );
     }
 
-    const templateIds = await taskTemplateRepository.findActiveIdsByLocationAndEquipment(
-      db,
-      locationId,
-      equipmentId,
-    );
-
     return reconcileTemplateIds(db, { templateIds, timeZone: org.timeZone });
   },
 
@@ -322,10 +339,11 @@ export const taskOccurrenceService = {
     organizationId: string,
     timeZone: string,
   ): Promise<ReconcileSummary> {
-    const templateIds = await taskTemplateRepository.findActiveIdsByOrganization(
-      db,
-      organizationId,
-    );
+    const templateIds =
+      await taskTemplateRepository.findActiveIdsByOrganization(
+        db,
+        organizationId,
+      );
 
     return reconcileTemplateIds(db, { templateIds, timeZone });
   },

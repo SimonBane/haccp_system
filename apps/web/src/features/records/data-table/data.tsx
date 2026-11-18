@@ -8,6 +8,7 @@ import type { DataTableServerConfig } from "@/components/ui/data-table/server-gr
 import {
   getRecordsColumns,
   type RecordsColumnCopy,
+  type SummarizeRecord,
 } from "@/features/records/data-table/columns";
 import { RecordsMobileCard } from "@/features/records/data-table/mobile-card";
 import type { RecordsLabels } from "@/features/records/lib/labels";
@@ -18,7 +19,7 @@ type RecordsDataProps = {
   filters: DataTableFilterDefinition[];
   labels: RecordsLabels;
   copy: RecordsColumnCopy;
-  locale: string;
+  summarize: SummarizeRecord;
   /** Shown when the location has no scheduled work at all in range. */
   emptyMessage: string;
   /** Shown when active filters hide every row of an otherwise non-empty page. */
@@ -34,7 +35,7 @@ export function RecordsData({
   filters,
   labels,
   copy,
-  locale,
+  summarize,
   emptyMessage,
   noResultsMessage,
   onViewDetails,
@@ -42,15 +43,15 @@ export function RecordsData({
   toolbar,
 }: RecordsDataProps) {
   const columns = useMemo(
-    () => getRecordsColumns({ copy, labels, locale, onViewDetails }),
-    [copy, labels, locale, onViewDetails],
+    () => getRecordsColumns({ copy, labels, summarize, onViewDetails }),
+    [copy, labels, summarize, onViewDetails],
   );
 
   const renderMobileRow = useCallback(
     (row: Parameters<typeof RecordsMobileCard>[0]["row"]) => (
-      <RecordsMobileCard row={row} labels={labels} locale={locale} />
+      <RecordsMobileCard row={row} labels={labels} summarize={summarize} />
     ),
-    [labels, locale],
+    [labels, summarize],
   );
 
   return (

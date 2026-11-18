@@ -5,7 +5,12 @@ const todayRepository = vi.hoisted(() => ({
   findOccurrencesWithRecords: vi.fn(),
 }));
 
+const formRepository = vi.hoisted(() => ({
+  findVersionSummariesByIds: vi.fn().mockResolvedValue([]),
+}));
+
 vi.mock("./today.repository.js", () => ({ todayRepository }));
+vi.mock("../forms/form.repository.js", () => ({ formRepository }));
 
 const { todayService } = await import("./today.service.js");
 
@@ -17,11 +22,10 @@ function occurrenceRow(overrides: Record<string, unknown> = {}) {
     occurrenceId: "00000000-0000-4000-8000-00000000000a",
     taskTemplateId: "00000000-0000-4000-8000-00000000000t",
     title: "Wipe counters",
-    type: "cleaning",
-    equipmentId: null,
-    equipmentName: null,
-    minTempC: null,
-    maxTempC: null,
+    formVersionId: "00000000-0000-4000-8000-0000000000f1",
+    targetId: null,
+    targetName: null,
+    resolvedLimits: {},
     scheduledTime: "07:00",
     occurrenceDate: "2026-01-15",
     availableAt: new Date("2026-01-15T00:00:00Z"),
@@ -31,11 +35,9 @@ function occurrenceRow(overrides: Record<string, unknown> = {}) {
     recordedByFirstName: null,
     recordedByLastName: null,
     voidedAt: null,
-    detailRecordedC: null,
-    detailMinTempC: null,
-    detailMaxTempC: null,
-    detailResult: null,
-    detailCorrectiveAction: null,
+    result: null,
+    values: null,
+    correctiveAction: null,
     ...overrides,
   };
 }
@@ -43,7 +45,13 @@ function occurrenceRow(overrides: Record<string, unknown> = {}) {
 describe("todayService.getToday — timezone guard", () => {
   it("rejects a read for an invalid organization timezone", async () => {
     await expect(
-      todayService.getToday({} as never, LOCATION, "2026-01-15", USER, "Not/AZone"),
+      todayService.getToday(
+        {} as never,
+        LOCATION,
+        "2026-01-15",
+        USER,
+        "Not/AZone",
+      ),
     ).rejects.toBeInstanceOf(InternalError);
 
     expect(todayRepository.findOccurrencesWithRecords).not.toHaveBeenCalled();
@@ -53,9 +61,18 @@ describe("todayService.getToday — timezone guard", () => {
 describe("todayService.getToday — grouping", () => {
   it("groups occurrences into morning/afternoon/evening by scheduled time", async () => {
     todayRepository.findOccurrencesWithRecords.mockResolvedValueOnce([
-      occurrenceRow({ occurrenceId: "00000000-0000-4000-8000-00000000000a", scheduledTime: "07:00" }),
-      occurrenceRow({ occurrenceId: "00000000-0000-4000-8000-00000000000b", scheduledTime: "14:00" }),
-      occurrenceRow({ occurrenceId: "00000000-0000-4000-8000-00000000000c", scheduledTime: "19:00" }),
+      occurrenceRow({
+        occurrenceId: "00000000-0000-4000-8000-00000000000a",
+        scheduledTime: "07:00",
+      }),
+      occurrenceRow({
+        occurrenceId: "00000000-0000-4000-8000-00000000000b",
+        scheduledTime: "14:00",
+      }),
+      occurrenceRow({
+        occurrenceId: "00000000-0000-4000-8000-00000000000c",
+        scheduledTime: "19:00",
+      }),
     ]);
 
     const result = await todayService.getToday(
@@ -74,10 +91,35 @@ describe("todayService.getToday — grouping", () => {
     expect(result.currentUserId).toBe(USER);
   });
 
-  it("does not query task templates or equipment", async () => {
+  it("looks up each form version once, however many occurrences use it", async () => {
+    todayRepository.findOccurrencesWithRecords.mockResolvedValueOnce([
+      occurrenceRow({ occurrenceId: "00000000-0000-4000-8000-00000000000a" }),
+      occurrenceRow({ occurrenceId: "00000000-0000-4000-8000-00000000000b" }),
+    ]);
+
+    await todayService.getToday(
+      {} as never,
+      LOCATION,
+      "2026-01-15",
+      USER,
+      "Europe/Sofia",
+    );
+
+    expect(formRepository.findVersionSummariesByIds).toHaveBeenCalledWith({}, [
+      "00000000-0000-4000-8000-0000000000f1",
+    ]);
+  });
+
+  it("does not query task templates or targets", async () => {
     todayRepository.findOccurrencesWithRecords.mockResolvedValueOnce([]);
 
-    await todayService.getToday({} as never, LOCATION, "2026-01-15", USER, "Europe/Sofia");
+    await todayService.getToday(
+      {} as never,
+      LOCATION,
+      "2026-01-15",
+      USER,
+      "Europe/Sofia",
+    );
 
     expect(todayRepository.findOccurrencesWithRecords).toHaveBeenCalledWith(
       {},

@@ -182,16 +182,16 @@ describe("query string", () => {
 });
 
 describe("scope comparison", () => {
-  const key = ["equipment", "loc-1", "list", { page: 1 }] as const;
+  const key = ["targets", "loc-1", "list", { page: 1 }] as const;
 
   it("accepts a different request within the same scope", () => {
-    expect(sameGridScope(["equipment", "loc-1", "list", { page: 2 }], key)).toBe(
+    expect(sameGridScope(["targets", "loc-1", "list", { page: 2 }], key)).toBe(
       true,
     );
   });
 
   it("rejects another location", () => {
-    expect(sameGridScope(["equipment", "loc-2", "list", { page: 1 }], key)).toBe(
+    expect(sameGridScope(["targets", "loc-2", "list", { page: 1 }], key)).toBe(
       false,
     );
   });
@@ -201,7 +201,7 @@ describe("scope comparison", () => {
       sameGridScope(["employees", "loc-1", "list", { page: 1 }], key),
     ).toBe(false);
     expect(sameGridScope(undefined, key)).toBe(false);
-    expect(sameGridScope(["equipment", "loc-1"], key)).toBe(false);
+    expect(sameGridScope(["targets", "loc-1"], key)).toBe(false);
   });
 });
 

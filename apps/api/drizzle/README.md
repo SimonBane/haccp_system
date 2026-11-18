@@ -37,6 +37,12 @@ beyond `plpgsql`. Existing databases still have `pgcrypto` installed (nothing
 drops it) — this only stops the extension from being (re-)created going
 forward.
 
+On 2026-10-10 the chain was reset to a fresh `0000_baseline.sql` for the
+configurable forms rework (equipment and temperature-only records replaced by
+targets, versioned forms and readings). No existing data was kept, so this
+reset was not re-ledgered: every database is recreated empty and migrated from
+the new baseline.
+
 CI enforces the rule: `validate-migrations` runs `db:check` and fails if it
 produces a migration, which catches both a schema change with no migration and a
 migration the snapshots never saw.

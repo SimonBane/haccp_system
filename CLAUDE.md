@@ -2,7 +2,7 @@
 
 Guidance for Claude Code when working in this repository. Keep this file under ~200 lines: tighten existing prose before adding new content, rather than letting it grow unbounded.
 
-HACCP (Hazard Analysis and Critical Control Points) management platform for food-service sites: an admin configures locations, equipment and recurring task templates; staff work a daily "Today" checklist and log fridge/freezer temperatures.
+HACCP (Hazard Analysis and Critical Control Points) management platform for food-service sites: an admin configures locations, equipment & areas, versioned forms and recurring task templates; staff fill those forms in from a daily "Today" checklist.
 
 ## Stack & layout
 
@@ -89,13 +89,13 @@ process won't start.
   `src/lib/db-errors.ts`; use `isContention` for a lost insert race.
 - **Plain admin CRUD** should use `registerAdminCrudRoutes` from
   `src/core/openapi/route-factory.ts` — pass schemas + a service with `list/create/update/delete`
-  and it generates all four documented routes. `equipment` is the smallest end-to-end example.
+  and it generates all four documented routes. `targets` is the smallest end-to-end example.
 - **Multi-tenancy**: Clerk org → `organizations` row (`clerkOrgId`), which owns `locations`,
-  which own `equipment` / `task_templates`. `assignedLocationIds` is `null` for admins ("all
-  locations"), or an explicit list for members. Tenant/membership blobs are cached in Redis
-  (2-day TTL, `tenant:clerk:*` / `membership:clerk:*`) — **invalidate on every write that
-  changes org, locations, memberships or roles**; cache failures log and fall through to
-  Postgres, never throw.
+  `target_types` and `forms`; locations own `targets` (equipment & areas) and
+  `task_templates`. `assignedLocationIds` is `null` for admins ("all locations"), or an explicit
+  list for members. Tenant/membership blobs are cached in Redis (2-day TTL, `tenant:clerk:*` /
+  `membership:clerk:*`) — **invalidate on every write that changes org, locations, memberships
+  or roles**; cache failures log and fall through to Postgres, never throw.
 - **Imports use explicit `.js` extensions** (`tsconfig` is `NodeNext`):
   `import { env } from "../env.js"`.
 
@@ -115,7 +115,7 @@ UI hooks (`use-mobile`, `use-now`).
   `src/lib/api/client.ts`, always parsing responses with the shared Zod schema. Every query key
   lives in `src/lib/api/query-keys.ts` and is scoped by `locationId` or `organizationId` so a
   location/org switch can't serve another tenant's cached rows; mutations invalidate related
-  keys (e.g. an equipment edit also invalidates `todayByLocation`). API failures are presented
+  keys (e.g. a target edit also invalidates `todayByLocation`). API failures are presented
   through `src/lib/api/error-presentation.ts`: action failures toast globally, initial query
   failures render `ApiQueryError`, and background failures retain cached data and toast once.
 - **Active location** comes from `TenantProvider` (`src/features/tenant/tenant-provider.tsx`) —
@@ -139,7 +139,7 @@ UI hooks (`use-mobile`, `use-now`).
   pair every input with a label and inline validation.
 - **i18n**: `next-intl`, locales `bg` (default) and `en`, `localePrefix: "as-needed"`, routes
   under `src/app/[locale]/`. **Any user-facing string must be added to both `messages/en.json`
-  and `messages/bg.json`** — currently at exact key parity (619 each). Pages call
+  and `messages/bg.json`** — currently at exact key parity (802 each). Pages call
   `setRequestLocale(locale)` before rendering; middleware is `src/proxy.ts` (Clerk + intl), not
   `middleware.ts`.
 
@@ -210,7 +210,13 @@ once the work is done.
 - Timezone-sensitive logic (task status, "today") must take the organisation's `timeZone`
   explicitly; helpers in `packages/shared/src/lib/timezone.ts` enforce this. Server renders run
   in UTC on Vercel, so never default a date to the local zone.
-- Temperatures are Postgres `numeric` — mappers convert with `Number(...)`, services write
+- **Forms**: field types are code (`packages/shared/src/schemas/form.ts`), forms are data. A
+  published `form_versions` row is never edited; saving new fields publishes the next version,
+  and field/option ids stay stable across versions because answers and per-target
+  `limitOverrides` are keyed by them. Each occurrence pins its `formVersionId` and
+  `resolvedLimits`, and records are judged by the shared `evaluateAnswers` — never re-derive a
+  result on the web or in SQL. `task_record_readings` holds one typed row per measurement answer.
+- Readings are Postgres `numeric` — mappers convert with `Number(...)`, services write
   `String(...)`.
 - Clerk token verification distinguishes a bad token (401) from an upstream/JWKS failure (503) on
   purpose: the web app reads 401 as "signed out", so a Clerk blip must not sign out every tablet.

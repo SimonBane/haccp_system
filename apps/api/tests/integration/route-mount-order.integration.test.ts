@@ -51,7 +51,7 @@ describe("route mount order", () => {
   it("keeps location-scoped admin routes admin-only", async () => {
     // Location-scoped and admin-only, so both middlewares run in mount order.
     const response = await apiRequest(
-      `/locations/${org.locations.main.id}/equipment`,
+      `/locations/${org.locations.main.id}/targets`,
       { actor: asEmployee(org) },
     );
 

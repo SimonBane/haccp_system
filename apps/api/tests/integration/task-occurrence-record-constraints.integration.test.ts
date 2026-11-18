@@ -5,8 +5,8 @@ import {
   locations,
   organizations,
   taskOccurrences,
+  taskRecordReadings,
   taskRecords,
-  taskRecordTemperatures,
   users,
 } from "../../src/core/db/schema/index.js";
 import { PG_ERROR, postgresErrorCode } from "./harness/db.js";
@@ -46,11 +46,23 @@ describe("task occurrence and record constraints", () => {
       availableAt: new Date("2026-08-19T00:00:00Z"),
       dueAt: new Date("2026-08-19T08:00:00Z"),
       title: "Morning fridge check",
-      type: "temperature",
+      formVersionId: world.alpha.forms.fridgeCheck.versionId,
     };
   }
 
-  it("allows one occurrence per template/date/time", async () => {
+  function recordValues(occurrenceId: string) {
+    return {
+      occurrenceId,
+      formVersionId: world.alpha.forms.fridgeCheck.versionId,
+      values: {},
+      result: "pass",
+      createdByUserId: world.alpha.admin.userId,
+      recordedAt: new Date(),
+      recordedByUserId: world.alpha.admin.userId,
+    };
+  }
+
+  it("allows one untargeted occurrence per template/date/time", async () => {
     const code = await codeFor(
       db.insert(taskOccurrences).values(
         occurrenceValues({
@@ -63,7 +75,7 @@ describe("task occurrence and record constraints", () => {
     expect(code).toBeNull();
   });
 
-  it("refuses a second occurrence for the same template/date/time", async () => {
+  it("refuses a second untargeted occurrence for the same template/date/time", async () => {
     await db.insert(taskOccurrences).values(
       occurrenceValues({
         locationId: world.alpha.locations.main.id,
@@ -126,15 +138,9 @@ describe("task occurrence and record constraints", () => {
 
   it("allows one record per occurrence", async () => {
     const occurrenceId = await insertOccurrence();
-    const now = new Date();
 
     const code = await codeFor(
-      db.insert(taskRecords).values({
-        occurrenceId,
-        createdByUserId: world.alpha.admin.userId,
-        recordedAt: now,
-        recordedByUserId: world.alpha.admin.userId,
-      }),
+      db.insert(taskRecords).values(recordValues(occurrenceId)),
     );
 
     expect(code).toBeNull();
@@ -142,13 +148,7 @@ describe("task occurrence and record constraints", () => {
 
   it("refuses a second record for the same occurrence", async () => {
     const occurrenceId = await insertOccurrence();
-    const now = new Date();
-    const values = {
-      occurrenceId,
-      createdByUserId: world.alpha.admin.userId,
-      recordedAt: now,
-      recordedByUserId: world.alpha.admin.userId,
-    };
+    const values = recordValues(occurrenceId);
 
     await db.insert(taskRecords).values(values);
 
@@ -158,15 +158,10 @@ describe("task occurrence and record constraints", () => {
   });
 
   it("refuses a record that references a missing occurrence", async () => {
-    const now = new Date();
-
     const code = await codeFor(
-      db.insert(taskRecords).values({
-        occurrenceId: "00000000-0000-4000-8000-000000000000",
-        createdByUserId: world.alpha.admin.userId,
-        recordedAt: now,
-        recordedByUserId: world.alpha.admin.userId,
-      }),
+      db
+        .insert(taskRecords)
+        .values(recordValues("00000000-0000-4000-8000-000000000000")),
     );
 
     expect(code).toBe(PG_ERROR.FOREIGN_KEY_VIOLATION);
@@ -174,15 +169,9 @@ describe("task occurrence and record constraints", () => {
 
   it("resolves a record's location and organization through its occurrence", async () => {
     const occurrenceId = await insertOccurrence();
-    const now = new Date();
     const [record] = await db
       .insert(taskRecords)
-      .values({
-        occurrenceId,
-        createdByUserId: world.alpha.admin.userId,
-        recordedAt: now,
-        recordedByUserId: world.alpha.admin.userId,
-      })
+      .values(recordValues(occurrenceId))
       .returning({ id: taskRecords.id });
 
     const [row] = await db
@@ -191,7 +180,10 @@ describe("task occurrence and record constraints", () => {
         organizationId: organizations.id,
       })
       .from(taskRecords)
-      .innerJoin(taskOccurrences, eq(taskRecords.occurrenceId, taskOccurrences.id))
+      .innerJoin(
+        taskOccurrences,
+        eq(taskRecords.occurrenceId, taskOccurrences.id),
+      )
       .innerJoin(locations, eq(taskOccurrences.locationId, locations.id))
       .innerJoin(organizations, eq(locations.organizationId, organizations.id))
       .where(eq(taskRecords.id, record!.id));
@@ -200,46 +192,89 @@ describe("task occurrence and record constraints", () => {
     expect(row?.organizationId).toBe(world.alpha.organizationId);
   });
 
-  it("keeps temperature detail one-to-one with its task record", async () => {
+  async function insertRecord(): Promise<string> {
     const occurrenceId = await insertOccurrence();
-    const now = new Date();
     const [record] = await db
       .insert(taskRecords)
-      .values({
-        occurrenceId,
-        createdByUserId: world.alpha.admin.userId,
-        recordedAt: now,
-        recordedByUserId: world.alpha.admin.userId,
-      })
+      .values(recordValues(occurrenceId))
       .returning({ id: taskRecords.id });
+    return record!.id;
+  }
 
-    const detailValues = {
-      taskRecordId: record!.id,
-      recordedC: "3.0",
-      minTempC: "0.0",
-      maxTempC: "5.0",
-      result: "ok",
+  function readingValues(
+    taskRecordId: string,
+    overrides: Record<string, unknown> = {},
+  ) {
+    return {
+      taskRecordId,
+      fieldId: "temperature",
+      locationId: world.alpha.locations.main.id,
+      targetId: world.alpha.targets.fridge.id,
+      unit: "celsius",
+      value: "3.0",
+      minValue: "0.0",
+      maxValue: "5.0",
+      fails: false,
+      recordedAt: new Date(),
+      ...overrides,
     };
+  }
 
-    const first = await codeFor(
-      db.insert(taskRecordTemperatures).values(detailValues),
-    );
-    expect(first).toBeNull();
+  it("keeps one reading per record and field", async () => {
+    const recordId = await insertRecord();
 
-    const second = await codeFor(
-      db.insert(taskRecordTemperatures).values(detailValues),
-    );
-    expect(second).toBe(PG_ERROR.UNIQUE_VIOLATION);
+    expect(
+      await codeFor(
+        db.insert(taskRecordReadings).values(readingValues(recordId)),
+      ),
+    ).toBeNull();
+    expect(
+      await codeFor(
+        db.insert(taskRecordReadings).values(readingValues(recordId)),
+      ),
+    ).toBe(PG_ERROR.UNIQUE_VIOLATION);
+    expect(
+      await codeFor(
+        db
+          .insert(taskRecordReadings)
+          .values(readingValues(recordId, { fieldId: "core_temperature" })),
+      ),
+    ).toBeNull();
   });
 
-  it("refuses a temperature detail for a missing task record", async () => {
+  it("refuses a reading for a missing task record", async () => {
     const code = await codeFor(
-      db.insert(taskRecordTemperatures).values({
-        taskRecordId: "00000000-0000-4000-8000-000000000000",
-        recordedC: "3.0",
-        minTempC: "0.0",
-        maxTempC: "5.0",
-        result: "ok",
+      db
+        .insert(taskRecordReadings)
+        .values(readingValues("00000000-0000-4000-8000-000000000000")),
+    );
+
+    expect(code).toBe(PG_ERROR.FOREIGN_KEY_VIOLATION);
+  });
+
+  it("refuses a reading whose target belongs to another location", async () => {
+    const recordId = await insertRecord();
+
+    const code = await codeFor(
+      db
+        .insert(taskRecordReadings)
+        .values(
+          readingValues(recordId, {
+            locationId: world.alpha.locations.annex.id,
+          }),
+        ),
+    );
+
+    expect(code).toBe(PG_ERROR.FOREIGN_KEY_VIOLATION);
+  });
+
+  it("refuses a record whose form version does not exist", async () => {
+    const occurrenceId = await insertOccurrence();
+
+    const code = await codeFor(
+      db.insert(taskRecords).values({
+        ...recordValues(occurrenceId),
+        formVersionId: "00000000-0000-4000-8000-000000000000",
       }),
     );
 
@@ -248,13 +283,7 @@ describe("task occurrence and record constraints", () => {
 
   it("keeps user relationships on task_records restrictive", async () => {
     const occurrenceId = await insertOccurrence();
-    const now = new Date();
-    await db.insert(taskRecords).values({
-      occurrenceId,
-      createdByUserId: world.alpha.admin.userId,
-      recordedAt: now,
-      recordedByUserId: world.alpha.admin.userId,
-    });
+    await db.insert(taskRecords).values(recordValues(occurrenceId));
 
     const code = await codeFor(
       db.delete(users).where(eq(users.id, world.alpha.admin.userId)),

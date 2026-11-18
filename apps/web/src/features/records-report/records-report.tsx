@@ -4,6 +4,7 @@ import {
   type RecordsReportSearchParams,
 } from "@haccp/shared";
 import { useTranslations } from "next-intl";
+import { buildAnswerFormatters } from "@/features/forms/lib/answer-format";
 import {
   formatOccurrenceDate,
   formatRecordInstant,
@@ -26,6 +27,7 @@ export function RecordsReport(props: {
   backHref: string;
 }) {
   const t = useTranslations("RecordsReportPage");
+  const tForms = useTranslations("Forms");
 
   if (props.report.status === RECORDS_REPORT_STATUS.TOO_LARGE) {
     return (
@@ -41,7 +43,15 @@ export function RecordsReport(props: {
     );
   }
 
-  const rows = toReportRows(props.report.items, { locale: props.locale });
+  const rows = toReportRows(props.report.items, {
+    formVersions: props.report.formVersions,
+    format: buildAnswerFormatters({
+      locale: props.locale,
+      symbol: (unit) => tForms(`units.${unit}.symbol`),
+      yes: tForms("answers.yes"),
+      no: tForms("answers.no"),
+    }),
+  });
 
   return (
     <div className="flex flex-col gap-4">

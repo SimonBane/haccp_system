@@ -2,6 +2,8 @@ import type { TodayResponse } from "@haccp/shared";
 import { isValidTimeZone } from "@haccp/shared";
 import type { Db } from "../../core/db/client.js";
 import { InternalError } from "../../core/errors/app-errors.js";
+import { toFormVersionSummaryMap } from "../forms/form.mapper.js";
+import { formRepository } from "../forms/form.repository.js";
 import { sortItemsByScheduledTime, toTodayTaskItem } from "./today.mapper.js";
 import { todayRepository } from "./today.repository.js";
 
@@ -31,6 +33,10 @@ export const todayService = {
       evening: [],
     };
 
+    const versionRows = await formRepository.findVersionSummariesByIds(db, [
+      ...new Set(rows.map((row) => row.formVersionId)),
+    ]);
+
     for (const row of rows) {
       const item = toTodayTaskItem(row, now);
       sections[item.timeSlot].push(item);
@@ -40,6 +46,7 @@ export const todayService = {
       date,
       locationId,
       currentUserId,
+      formVersions: toFormVersionSummaryMap(versionRows),
       sections: {
         morning: sortItemsByScheduledTime(sections.morning),
         afternoon: sortItemsByScheduledTime(sections.afternoon),

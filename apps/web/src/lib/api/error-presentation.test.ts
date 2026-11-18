@@ -14,14 +14,14 @@ const t = (key: string, values?: { requestId: string }) =>
 describe("getApiErrorPresentation", () => {
   it("translates actionable business codes instead of API messages", () => {
     const error = new ApiRequestError("raw English API message", {
-      code: API_ERROR_CODE.EQUIPMENT_NAME_EXISTS,
+      code: API_ERROR_CODE.TARGET_NAME_EXISTS,
       kind: "api",
       status: 409,
       requestId: "request-1",
     });
 
     expect(getApiErrorPresentation(error, t)).toEqual({
-      message: "codes.equipmentNameExists",
+      message: "codes.targetNameExists",
     });
   });
 

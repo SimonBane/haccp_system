@@ -4,6 +4,7 @@ import {
   GRID_DEFAULT_PAGE_SIZE,
   RECORDS_DEFAULT_SORT,
   recordsListResponseSchema,
+  type FormVersionSummaryMap,
   type RecordItem,
   type RecordsListResponse,
 } from "@haccp/shared";
@@ -19,17 +20,14 @@ import {
   recordsRangeError,
 } from "@/features/records/lib/date-range";
 import {
-  isTemperatureResultFilterVisible,
-  RECORDS_FILTER_KEY,
-  shouldClearResultFilter,
-} from "@/features/records/lib/records-filters";
-import {
   RECORDS_GRID_CAPABILITIES,
   recordsDatasetKey,
   recordsQueryString,
   shouldSeedRecordsPage,
   type RecordsDateRange,
 } from "@/features/records/lib/records-grid-config";
+
+const EMPTY_FORM_VERSIONS: FormVersionSummaryMap = {};
 
 export type UseRecordsGridOptions = {
   initialPage: RecordsListResponse;
@@ -45,7 +43,8 @@ export type RecordsGrid = {
   range: RecordsDateRange;
   setRange: (range: RecordsDateRange) => void;
   server: DataTableServerConfig;
-  showResultFilter: boolean;
+  /** The form versions the visible rows were recorded against. */
+  formVersions: FormVersionSummaryMap;
   isLoading: boolean;
   isError: boolean;
   error: unknown;
@@ -94,30 +93,7 @@ export function useRecordsGrid(options: UseRecordsGridOptions): RecordsGrid {
     fetcher,
   });
 
-  const { onFilterChange, onPaginationChange, filters, pagination } =
-    grid.server;
-
-  const showResultFilter = isTemperatureResultFilterVisible(
-    filters[RECORDS_FILTER_KEY.TYPE],
-  );
-
-  const handleFilterChange = useCallback(
-    (key: string, values: string[]) => {
-      onFilterChange(key, values);
-
-      // Both dispatches land in one commit, so only the final state reaches a request.
-      if (
-        shouldClearResultFilter({
-          key,
-          values,
-          currentResult: filters[RECORDS_FILTER_KEY.RESULT],
-        })
-      ) {
-        onFilterChange(RECORDS_FILTER_KEY.RESULT, []);
-      }
-    },
-    [filters, onFilterChange],
-  );
+  const { onPaginationChange, pagination } = grid.server;
 
   const setRange = useCallback(
     (next: RecordsDateRange) => {
@@ -134,11 +110,6 @@ export function useRecordsGrid(options: UseRecordsGridOptions): RecordsGrid {
     [onPaginationChange, options.today, pagination.pageSize],
   );
 
-  const server = useMemo<DataTableServerConfig>(
-    () => ({ ...grid.server, onFilterChange: handleFilterChange }),
-    [grid.server, handleFilterChange],
-  );
-
   const datasetKey = useMemo(
     () => recordsDatasetKey({ locationId, range, request: grid.request }),
     [locationId, range, grid.request],
@@ -149,8 +120,8 @@ export function useRecordsGrid(options: UseRecordsGridOptions): RecordsGrid {
     total: grid.total,
     range,
     setRange,
-    server,
-    showResultFilter,
+    server: grid.server,
+    formVersions: grid.page?.formVersions ?? EMPTY_FORM_VERSIONS,
     isLoading: grid.isLoading,
     isError: grid.isError,
     error: grid.error,

@@ -5,8 +5,10 @@ export {
   getTenantContext,
   getToday,
   listEmployees,
-  listEquipment,
+  listForms,
   listLocations,
+  listTargets,
+  listTargetTypes,
   listTaskTemplates,
   resolveActiveLocationId,
 } from "./api/server";

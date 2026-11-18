@@ -42,11 +42,11 @@ test.describe("Today completions", () => {
 
     await target.getByTestId("today-task-activate").click();
 
-    const reading = page.getByTestId("temperature-reading");
+    const reading = page.getByTestId("measurement-reading");
     await expect(reading).toBeVisible();
     const posted = waitForOccurrenceRecord(page, task.occurrenceId, "POST");
     await reading.fill("2");
-    await page.getByTestId("temperature-save").click();
+    await page.getByTestId("record-save").click();
     expect((await posted).status()).toBe(201);
 
     await expect(target).toHaveAttribute("data-completed", "true");

@@ -5,7 +5,8 @@ import type { RecordRow } from "./records.repository.js";
 
 const OCCURRENCE_ID = "11111111-1111-4111-8111-111111111111";
 const TEMPLATE_ID = "22222222-2222-4222-8222-222222222222";
-const EQUIPMENT_ID = "33333333-3333-4333-8333-333333333333";
+const TARGET_ID = "33333333-3333-4333-8333-333333333333";
+const VERSION_ID = "88888888-8888-4888-8888-888888888888";
 const RECORD_ID = "44444444-4444-4444-8444-444444444444";
 const CREATOR_ID = "55555555-5555-4555-8555-555555555555";
 const RECORDER_ID = "66666666-6666-4666-8666-666666666666";
@@ -22,11 +23,11 @@ function row(overrides: Partial<RecordRow> = {}): RecordRow {
     availableAt: new Date("2026-08-23T00:00:00.000Z"),
     dueAt: DUE_AT,
     title: "Morning fridge check",
-    type: "temperature",
-    equipmentId: EQUIPMENT_ID,
-    equipmentName: "Fridge 1",
-    minTempC: "0.0",
-    maxTempC: "5.0",
+    formVersionId: VERSION_ID,
+    category: "temperature",
+    targetId: TARGET_ID,
+    targetName: "Fridge 1",
+    resolvedLimits: { temperature: { min: 0, max: 5 } },
     recordId: null,
     recordCreatedAt: null,
     recordedAt: null,
@@ -40,10 +41,8 @@ function row(overrides: Partial<RecordRow> = {}): RecordRow {
     voidedById: null,
     voidedByFirstName: null,
     voidedByLastName: null,
-    temperatureRecordedC: null,
-    temperatureMinTempC: null,
-    temperatureMaxTempC: null,
-    temperatureResult: null,
+    recordResult: null,
+    values: null,
     correctiveAction: null,
     ...overrides,
   };
@@ -59,18 +58,27 @@ const submittedRecord: Partial<RecordRow> = {
   recordedById: RECORDER_ID,
   recordedByFirstName: "Emil",
   recordedByLastName: "Employee",
+  recordResult: "not_evaluated",
+  values: { cleaned: { type: "checkbox", value: true } },
 };
 
-const temperatureDetail: Partial<RecordRow> = {
-  temperatureRecordedC: "3.5",
-  temperatureMinTempC: "0.0",
-  temperatureMaxTempC: "5.0",
-  temperatureResult: "ok",
+const reading = (value: number, fails: boolean): Partial<RecordRow> => ({
+  recordResult: fails ? "fail" : "pass",
+  values: {
+    temperature: {
+      type: "measurement",
+      value,
+      unit: "celsius",
+      min: 0,
+      max: 5,
+      fails,
+    },
+  },
   correctiveAction: null,
-};
+});
 
 describe("toRecordItem stored occurrence values", () => {
-  it("returns the stored occurrence fields with numerics as numbers", () => {
+  it("returns the stored occurrence fields", () => {
     const item = toRecordItem(row());
 
     expect(item).toMatchObject({
@@ -80,34 +88,32 @@ describe("toRecordItem stored occurrence values", () => {
       scheduledTime: "08:00",
       dueAt: DUE_AT.toISOString(),
       title: "Morning fridge check",
-      type: "temperature",
-      equipmentId: EQUIPMENT_ID,
-      equipmentName: "Fridge 1",
-      minTempC: 0,
-      maxTempC: 5,
+      formVersionId: VERSION_ID,
+      category: "temperature",
+      targetId: TARGET_ID,
+      targetName: "Fridge 1",
+      resolvedLimits: { temperature: { min: 0, max: 5 } },
     });
   });
 
-  it("keeps a non-temperature occurrence's empty equipment and range null", () => {
+  it("keeps an untargeted occurrence's target null", () => {
     const item = toRecordItem(
       row({
-        type: "cleaning",
-        equipmentId: null,
-        equipmentName: null,
-        minTempC: null,
-        maxTempC: null,
+        category: "cleaning",
+        targetId: null,
+        targetName: null,
+        resolvedLimits: {},
       }),
     );
 
-    expect(item.equipmentName).toBeNull();
-    expect(item.minTempC).toBeNull();
-    expect(item.maxTempC).toBeNull();
+    expect(item.targetName).toBeNull();
+    expect(item.resolvedLimits).toEqual({});
   });
 
   it("produces a row the shared contract accepts", () => {
     expect(
       recordItemSchema.safeParse(
-        toRecordItem(row({ ...submittedRecord, ...temperatureDetail })),
+        toRecordItem(row({ ...submittedRecord, ...reading(3.5, false) })),
       ).success,
     ).toBe(true);
   });
@@ -183,41 +189,35 @@ describe("toRecordItem state derivation", () => {
     });
   });
 
-  it("reports the retained temperature result even on a voided record", () => {
+  it("reports the retained result even on a voided record", () => {
     expect(
       toRecordItem(
         row({
           ...submittedRecord,
-          ...temperatureDetail,
-          temperatureResult: "out_of_range",
+          ...reading(9.1, true),
           voidedAt: new Date("2026-08-23T06:00:00.000Z"),
         }),
       ),
     ).toMatchObject({ displayState: "voided", result: "fail" });
   });
 
-  it("maps ok and out_of_range onto pass and fail", () => {
+  it("carries the stored result through", () => {
     expect(
-      toRecordItem(row({ ...submittedRecord, ...temperatureDetail })).result,
+      toRecordItem(row({ ...submittedRecord, ...reading(3.5, false) })).result,
     ).toBe("pass");
     expect(
-      toRecordItem(
-        row({
-          ...submittedRecord,
-          ...temperatureDetail,
-          temperatureResult: "out_of_range",
-        }),
-      ).result,
+      toRecordItem(row({ ...submittedRecord, ...reading(9.1, true) })).result,
     ).toBe("fail");
+    expect(toRecordItem(row(submittedRecord)).result).toBe("not_evaluated");
   });
 });
 
 describe("toRecordItem record detail", () => {
-  it("maps timestamps to ISO strings and numerics to numbers", () => {
+  it("maps timestamps to ISO strings and carries the answers and corrective action", () => {
     const item = toRecordItem(
       row({
         ...submittedRecord,
-        ...temperatureDetail,
+        ...reading(9.1, true),
         correctiveAction: "Moved stock to the walk-in",
       }),
     );
@@ -227,13 +227,8 @@ describe("toRecordItem record detail", () => {
       createdAt: "2026-08-23T04:40:00.000Z",
       recordedAt: "2026-08-23T04:50:00.000Z",
       voidedAt: null,
-      temperature: {
-        recordedC: 3.5,
-        minTempC: 0,
-        maxTempC: 5,
-        result: "ok",
-        correctiveAction: "Moved stock to the walk-in",
-      },
+      values: { temperature: { value: 9.1, fails: true } },
+      correctiveAction: "Moved stock to the walk-in",
     });
   });
 
@@ -269,23 +264,17 @@ describe("toRecordItem record detail", () => {
     expect(toRecordItem(row(submittedRecord)).record?.voidedBy).toBeNull();
   });
 
-  it("returns a null temperature detail for a non-temperature record", () => {
-    expect(
-      toRecordItem(row({ ...submittedRecord, type: "cleaning" })).record
-        ?.temperature,
-    ).toBeNull();
-  });
-
   it("exposes no field M0 does not store", () => {
     const detail = toRecordItem(row(submittedRecord)).record!;
 
     expect(Object.keys(detail).sort()).toEqual([
+      "correctiveAction",
       "createdAt",
       "createdBy",
       "recordId",
       "recordedAt",
       "recordedBy",
-      "temperature",
+      "values",
       "voidedAt",
       "voidedBy",
     ]);

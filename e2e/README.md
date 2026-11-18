@@ -23,8 +23,9 @@ No passwords are needed. `clerk.signIn` mints a server-side token from `CLERK_SE
 also sidesteps the device-trust step that leaves a password sign-in stuck on
 `needs_client_trust`.
 
-Everything else the journeys need — the tenant row, the annex location, 11 equipment rows and
-two task templates — is created by `tests/setup/seed.setup.ts` through the API on each run.
+Everything else the journeys need — the tenant row, the annex location, two forms, a target
+type, 11 equipment rows and two task templates — is created by `tests/setup/seed.setup.ts`
+through the API on each run.
 The API provisions the organization, user and membership just-in-time from Clerk, so no
 database seeding is required.
 
