@@ -1,181 +1,100 @@
-import { expect, test } from "@playwright/test";
-import { LOCALE_PREFIX } from "../../support/env.js";
+import { expect, test, type Page } from "@playwright/test";
+import { E2E_PREFIX, LOCALE_PREFIX } from "../../support/env.js";
 
 const TASKS_PATH = `${LOCALE_PREFIX}/dashboard/task-templates`;
+const CLEANING_FORM = `${E2E_PREFIX} Cleaning tick`;
+const FRIDGE_FORM = `${E2E_PREFIX} Fridge reading`;
+
+async function openNewTask(page: Page) {
+  await page.goto(TASKS_PATH);
+  await page.locator("main").getByRole("button", { name: "Add task" }).first().click();
+  await expect(page).toHaveURL(/\/task-templates\/new$/);
+}
+
+async function saveAndFindRow(page: Page, title: string) {
+  await page.getByRole("button", { name: "Save task" }).click();
+  await expect(page).toHaveURL(new RegExp(`${TASKS_PATH}$`));
+  // Repeated runs accumulate rows past the default page size — search narrows to ours.
+  await page.getByPlaceholder("Search tasks").fill(title);
+  return page.getByRole("button").filter({ hasText: title });
+}
 
 /**
- * HACCP-70: the admin's Completion window section on the task-template form — preset
- * Available/Deadline dropdowns (including the No deadline preset), that both are required with
- * no prefilled default, and that the chosen window persists through create/edit/duplicate.
+ * The full-page task builder: the time window is optional (off means available all day), times
+ * can be listed or repeated beyond four a day, and equipment can be added without leaving.
  */
-test.describe("Task template completion window", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto(TASKS_PATH);
+test.describe("Task builder", () => {
+  test("a task with no window is available any time that day", async ({ page }) => {
+    const title = `E2E Anytime ${Date.now()}`;
+    await openNewTask(page);
+
+    await page.getByRole("combobox", { name: "Form" }).click();
+    await page.getByRole("option", { name: new RegExp(CLEANING_FORM) }).click();
+    await page.getByLabel("Task name").fill(title);
+    await page.getByLabel("Time to add").fill("08:00");
+    await page.getByRole("button", { name: "Add time" }).click();
+    await expect(page.getByRole("button", { name: "Remove 08:00" })).toBeVisible();
+    await expect(
+      page.getByRole("switch", { name: "Limit when each check can be done" }),
+    ).not.toBeChecked();
+
+    const row = await saveAndFindRow(page, title);
+    await expect(row).toContainText("Any time that day");
   });
 
-  test("admin configures a window from presets and it persists through edit", async ({
-    page,
-  }) => {
-    const title = `E2E Window ${Date.now()}`;
+  test("required parts are listed instead of saving an incomplete task", async ({ page }) => {
+    await openNewTask(page);
+    await page.getByRole("button", { name: "Save task" }).click();
 
-    await page.locator("main").getByRole("button", { name: "Add" }).click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
+    await expect(page).toHaveURL(/\/task-templates\/new$/);
+    await expect(page.getByText("Choose a form.")).toBeVisible();
+    await expect(page.getByText("Add at least one time.")).toBeVisible();
+  });
 
-    await dialog.getByPlaceholder("Check walk-in chiller").fill(title);
-    await dialog.getByRole("button", { name: "Cleaning" }).click();
-    await dialog.getByRole("button", { name: "Every day" }).click();
+  test("repeating every 2 hours with a window survives an edit", async ({ page }) => {
+    const title = `E2E Repeat ${Date.now()}`;
+    const equipment = `E2E Inline ${Date.now()}`;
+    await openNewTask(page);
 
-    await dialog.getByRole("button", { name: "Add time" }).click();
-    await dialog.locator('input[type="time"]').fill("08:00");
+    await page.getByRole("combobox", { name: "Form" }).click();
+    await page.getByRole("option", { name: new RegExp(FRIDGE_FORM) }).click();
+    await page.getByLabel("Task name").fill(title);
 
-    const available = dialog.getByRole("combobox", { name: "Available" });
-    const deadline = dialog.getByRole("combobox", { name: "Deadline" });
+    await page.getByRole("button", { name: "Add equipment" }).click();
+    await page.getByRole("button", { name: "New equipment" }).click();
+    await page.getByLabel("Name", { exact: true }).fill(equipment);
+    await page.getByRole("button", { name: "Add and select" }).click();
+    await expect(page.getByRole("option", { name: equipment })).toHaveAttribute("aria-selected", "true");
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("button", { name: `Remove ${equipment}` })).toBeVisible();
 
-    await available.click();
-    await page.getByRole("option", { name: "30 minutes before" }).click();
-    await expect(available).toContainText("30 minutes before");
+    await page.getByRole("tab", { name: "Repeat every…" }).click();
+    await page.getByRole("button", { name: "2 h", exact: true }).click();
+    await page.getByLabel("From").fill("08:00");
+    await page.getByLabel("Until").fill("22:00");
+    await expect(page.getByText("8 checks a day, every 2 h from 08:00 to 22:00")).toBeVisible();
 
-    await deadline.click();
-    await page.getByRole("option", { name: "No deadline" }).click();
-    await expect(deadline).toContainText("No deadline");
+    await page.getByRole("switch", { name: "Limit when each check can be done" }).click();
+    await page
+      .getByRole("group", { name: "Opens" })
+      .getByRole("button", { name: "30 min" })
+      .click();
+    await page
+      .getByRole("group", { name: "Overdue" })
+      .getByRole("button", { name: "1 h" })
+      .click();
 
-    await dialog.locator('button[type="submit"]').click();
-    await expect(dialog).toBeHidden();
+    const row = await saveAndFindRow(page, title);
+    await expect(row).toContainText("8× · every 2 h, 08:00–22:00");
+    await expect(row).toContainText("From 30 min before to 1 h after");
 
-    // Repeated runs accumulate rows past the default page size — search narrows to ours.
-    await page.getByPlaceholder("Search tasks").fill(title);
-    const row = page.getByRole("button").filter({ hasText: title });
-    await expect(row).toContainText("30 min before");
-    await expect(row).toContainText("No deadline");
-
-    // Edit: the persisted window loads back as the matching presets.
     await row.click();
-    const editDialog = page.getByRole("dialog");
-    await expect(
-      editDialog.getByRole("combobox", { name: "Available" }),
-    ).toContainText("30 minutes before");
-    await expect(
-      editDialog.getByRole("combobox", { name: "Deadline" }),
-    ).toContainText("No deadline");
-    await editDialog.getByRole("button", { name: "Close" }).click();
-    await expect(editDialog).toBeHidden();
-  });
-
-  test("Available and Deadline are required with no default preset", async ({
-    page,
-  }) => {
-    const title = `E2E Required ${Date.now()}`;
-
-    await page.locator("main").getByRole("button", { name: "Add" }).click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
-
-    const available = dialog.getByRole("combobox", { name: "Available" });
-    const deadline = dialog.getByRole("combobox", { name: "Deadline" });
-
-    // Neither dropdown carries a preselected value until the admin chooses one.
-    await expect(available).toContainText("Select when it opens");
-    await expect(deadline).toContainText("Select a deadline");
-
-    await dialog.getByPlaceholder("Check walk-in chiller").fill(title);
-    await dialog.getByRole("button", { name: "Cleaning" }).click();
-    await dialog.getByRole("button", { name: "Every day" }).click();
-    await dialog.getByRole("button", { name: "Add time" }).click();
-    await dialog.locator('input[type="time"]').fill("08:00");
-
-    await dialog.locator('button[type="submit"]').click();
-    await expect(
-      dialog.getByText("Select when the task becomes available."),
-    ).toBeVisible();
-    await expect(
-      dialog.getByText("Select a deadline."),
-    ).toBeVisible();
-    await expect(dialog).toBeVisible();
-
-    await available.click();
-    await page.getByRole("option", { name: "1 hour before" }).click();
-    await deadline.click();
-    await page.getByRole("option", { name: "At the scheduled time" }).click();
-
-    await dialog.locator('button[type="submit"]').click();
-    await expect(dialog).toBeHidden();
-  });
-
-  test("a custom deadline value validates against the 0–1440 range", async ({
-    page,
-  }) => {
-    const title = `E2E Custom ${Date.now()}`;
-
-    await page.locator("main").getByRole("button", { name: "Add" }).click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
-
-    await dialog.getByPlaceholder("Check walk-in chiller").fill(title);
-    await dialog.getByRole("button", { name: "Cleaning" }).click();
-    await dialog.getByRole("button", { name: "Every day" }).click();
-    await dialog.getByRole("button", { name: "Add time" }).click();
-    await dialog.locator('input[type="time"]').fill("08:00");
-
-    await dialog.getByRole("combobox", { name: "Available" }).click();
-    await page.getByRole("option", { name: "30 minutes before" }).click();
-
-    await dialog.getByRole("combobox", { name: "Deadline" }).click();
-    await page.getByRole("option", { name: "Custom…" }).click();
-
-    const customDeadline = dialog.getByRole("textbox", {
-      name: "Custom minutes after the scheduled time",
-    });
-    await customDeadline.fill("1441");
-    await dialog.locator('button[type="submit"]').click();
-    await expect(
-      dialog.getByText("Enter a value between 0 and 1440 minutes."),
-    ).toBeVisible();
-    await expect(dialog).toBeVisible();
-
-    await customDeadline.fill("90");
-    await dialog.locator('button[type="submit"]').click();
-    await expect(dialog).toBeHidden();
-  });
-
-  test("duplicate scheduled times show a single group error and block submit", async ({
-    page,
-  }) => {
-    const title = `E2E Duplicate ${Date.now()}`;
-
-    await page.locator("main").getByRole("button", { name: "Add" }).click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
-
-    await dialog.getByPlaceholder("Check walk-in chiller").fill(title);
-    await dialog.getByRole("button", { name: "Cleaning" }).click();
-    await dialog.getByRole("button", { name: "Every day" }).click();
-
-    const addTimeButton = dialog.getByRole("button", { name: "Add time" });
-    await addTimeButton.click();
-    await addTimeButton.click();
-
-    const timeInputs = dialog.locator('input[type="time"]');
-    await timeInputs.nth(0).fill("08:00");
-    await timeInputs.nth(1).fill("08:00");
-
-    const duplicateError = dialog.getByText(
-      "Scheduled times must be unique.",
+    await expect(page.getByRole("tab", { name: "Repeat every…" })).toHaveAttribute(
+      "aria-selected",
+      "true",
     );
-    await expect(duplicateError).toBeVisible();
-
-    await dialog.locator('button[type="submit"]').click();
-    await expect(dialog).toBeVisible();
-
-    await timeInputs.nth(1).fill("09:00");
-    await expect(duplicateError).toBeHidden();
-
-    await dialog.getByRole("combobox", { name: "Available" }).click();
-    await page.getByRole("option", { name: "30 minutes before" }).click();
-    await dialog.getByRole("combobox", { name: "Deadline" }).click();
-    await page.getByRole("option", { name: "No deadline" }).click();
-
-    await dialog.locator('button[type="submit"]').click();
-    await expect(dialog).toBeHidden();
+    await expect(
+      page.getByRole("switch", { name: "Limit when each check can be done" }),
+    ).toBeChecked();
   });
 });
