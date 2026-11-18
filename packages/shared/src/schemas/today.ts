@@ -12,6 +12,7 @@ import {
   taskTemplateWeekdaySchema,
   TASK_TEMPLATE_ALL_WEEKDAYS,
 } from "./task-template.js";
+import { targetKindSchema, type TargetKind } from "./target.js";
 import { userSummarySchema } from "./user.js";
 
 export const todayTaskStatusSchema = z.enum([
@@ -47,6 +48,13 @@ export const todayDateQuerySchema = z.object({
 
 export type TodayDateQuery = z.infer<typeof todayDateQuerySchema>;
 
+export const todayAreaSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+});
+
+export type TodayArea = z.infer<typeof todayAreaSchema>;
+
 export const todayTaskItemSchema = z.object({
   occurrenceId: z.uuid(),
   templateId: z.uuid(),
@@ -54,6 +62,9 @@ export const todayTaskItemSchema = z.object({
   formVersionId: z.uuid(),
   targetId: z.uuid().nullable(),
   targetName: z.string().nullable(),
+  targetKind: targetKindSchema.nullable(),
+  /** The room the check belongs to: the area itself, or the one holding the fixture or equipment; null when standalone. */
+  area: todayAreaSchema.nullable(),
   resolvedLimits: resolvedLimitsSchema,
   scheduledTime: scheduledTimeSchema,
   timeSlot: taskTemplateTimeSlotSchema,
@@ -160,6 +171,8 @@ export function buildTodayTaskItemFromOccurrence(params: {
   formVersionId: string;
   targetId: string | null;
   targetName: string | null;
+  targetKind?: TargetKind | null;
+  area?: TodayArea | null;
   resolvedLimits: TodayTaskItem["resolvedLimits"];
   scheduledTime: TodayTaskItem["scheduledTime"];
   date: TodayTaskItem["date"];
@@ -182,6 +195,8 @@ export function buildTodayTaskItemFromOccurrence(params: {
     formVersionId: params.formVersionId,
     targetId: params.targetId,
     targetName: params.targetName,
+    targetKind: params.targetKind ?? null,
+    area: params.area ?? null,
     resolvedLimits: params.resolvedLimits,
     scheduledTime: params.scheduledTime,
     timeSlot,

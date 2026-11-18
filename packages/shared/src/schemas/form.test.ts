@@ -1,11 +1,56 @@
 import { describe, expect, it } from "vitest";
 import {
+  CHOICE_OPTION_LABEL_MAX_LENGTH,
+  FORM_FIELD_HELP_MAX_LENGTH,
+  FORM_FIELD_LABEL_MAX_LENGTH,
+  FORM_NAME_MAX_LENGTH,
   checkMeasurementLimits,
+  createFormSchema,
+  checkTemplateTargets,
   createFormVersionSchema,
+  formCategorySchema,
   formDefinitionSchema,
+  formListItemSchema,
   isValidMeasurementValue,
   type FormField,
 } from "./form.js";
+
+describe("formCategorySchema", () => {
+  it.each(["temperature", "cleaning", "hygiene", "pest_control", "goods_in"])(
+    "accepts %s",
+    (category) => {
+      expect(formCategorySchema.safeParse(category).success).toBe(true);
+    },
+  );
+
+  it.each(["cooking", "cooling", "other"])("rejects retired %s", (category) => {
+    expect(formCategorySchema.safeParse(category).success).toBe(false);
+  });
+});
+
+describe("formListItemSchema", () => {
+  const item = {
+    id: "7b0d7f1e-3b9a-4a51-9a64-2f1b0f6d8a11",
+    name: "Fridge",
+    category: "temperature",
+    appliesTo: "per_item",
+    latestVersion: {
+      id: "0c6a1f2e-5d4b-4b3a-8f2e-1a9b8c7d6e5f",
+      formId: "7b0d7f1e-3b9a-4a51-9a64-2f1b0f6d8a11",
+      version: 1,
+      definition: { fields: [], correctiveAction: "optional" },
+      createdAt: "2026-10-01T09:00:00.000Z",
+    },
+    createdAt: "2026-10-01T09:00:00.000Z",
+    updatedAt: "2026-10-01T09:00:00.000Z",
+  };
+
+  it("requires a non-negative template count", () => {
+    expect(formListItemSchema.safeParse({ ...item, templateCount: 3 }).success).toBe(true);
+    expect(formListItemSchema.safeParse(item).success).toBe(false);
+    expect(formListItemSchema.safeParse({ ...item, templateCount: -1 }).success).toBe(false);
+  });
+});
 
 function definition(fields: FormField[]) {
   return { fields, correctiveAction: "required_on_fail" as const };
@@ -192,5 +237,61 @@ describe("createFormVersionSchema", () => {
     });
 
     expect(parsed.confirmDroppedOverrides).toBe(false);
+  });
+});
+
+describe("checkTemplateTargets", () => {
+  it("needs at least one item for a per-item form", () => {
+    expect(checkTemplateTargets("per_item", 3)).toBeNull();
+    expect(checkTemplateTargets("per_item", 0)).toBe("targets_required");
+  });
+
+  it("refuses items on a whole-location form", () => {
+    expect(checkTemplateTargets("location", 0)).toBeNull();
+    expect(checkTemplateTargets("location", 1)).toBe("targets_not_allowed");
+  });
+});
+
+describe("form text limits", () => {
+  const over = (max: number) => "a".repeat(max + 1);
+  const at = (max: number) => "a".repeat(max);
+  const choice = (label: string, optionLabel: string, help?: string): FormField => ({
+    id: "pick",
+    type: "choice",
+    label,
+    ...(help === undefined ? {} : { help }),
+    required: true,
+    multiple: false,
+    options: [
+      { id: "a", label: optionLabel, fails: false },
+      { id: "b", label: "No", fails: true },
+    ],
+  });
+  const parse = (name: string, field: FormField) =>
+    createFormSchema.safeParse({
+      name,
+      category: "cleaning",
+      appliesTo: "location",
+      definition: definition([field]),
+    }).success;
+
+  it("accepts every text at its limit", () => {
+    expect(
+      parse(
+        at(FORM_NAME_MAX_LENGTH),
+        choice(
+          at(FORM_FIELD_LABEL_MAX_LENGTH),
+          at(CHOICE_OPTION_LABEL_MAX_LENGTH),
+          at(FORM_FIELD_HELP_MAX_LENGTH),
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects any text one character over its limit", () => {
+    expect(parse(over(FORM_NAME_MAX_LENGTH), choice("Clean?", "Yes"))).toBe(false);
+    expect(parse("Form", choice(over(FORM_FIELD_LABEL_MAX_LENGTH), "Yes"))).toBe(false);
+    expect(parse("Form", choice("Clean?", over(CHOICE_OPTION_LABEL_MAX_LENGTH)))).toBe(false);
+    expect(parse("Form", choice("Clean?", "Yes", over(FORM_FIELD_HELP_MAX_LENGTH)))).toBe(false);
   });
 });

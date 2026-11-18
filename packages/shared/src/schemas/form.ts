@@ -30,28 +30,51 @@ export type MeasurementUnit = z.infer<typeof measurementUnitSchema>;
 export const FORM_CATEGORY = {
   TEMPERATURE: "temperature",
   CLEANING: "cleaning",
-  GOODS_IN: "goods_in",
-  COOKING: "cooking",
-  COOLING: "cooling",
   HYGIENE: "hygiene",
   PEST_CONTROL: "pest_control",
-  OTHER: "other",
+  GOODS_IN: "goods_in",
 } as const;
 
 export const FORM_CATEGORY_VALUES = [
   FORM_CATEGORY.TEMPERATURE,
   FORM_CATEGORY.CLEANING,
-  FORM_CATEGORY.GOODS_IN,
-  FORM_CATEGORY.COOKING,
-  FORM_CATEGORY.COOLING,
   FORM_CATEGORY.HYGIENE,
   FORM_CATEGORY.PEST_CONTROL,
-  FORM_CATEGORY.OTHER,
+  FORM_CATEGORY.GOODS_IN,
 ] as const;
 
 export const formCategorySchema = z.enum(FORM_CATEGORY_VALUES);
 
 export type FormCategory = z.infer<typeof formCategorySchema>;
+
+export const FORM_APPLIES_TO = {
+  /** One check per item a task picks: equipment, areas and fixtures in any mix. */
+  PER_ITEM: "per_item",
+  /** One check per time slot, for no item. */
+  LOCATION: "location",
+} as const;
+
+export const FORM_APPLIES_TO_VALUES = [
+  FORM_APPLIES_TO.PER_ITEM,
+  FORM_APPLIES_TO.LOCATION,
+] as const;
+
+export const formAppliesToSchema = z.enum(FORM_APPLIES_TO_VALUES);
+
+export type FormAppliesTo = z.infer<typeof formAppliesToSchema>;
+
+export type TemplateTargetsIssue = "targets_required" | "targets_not_allowed";
+
+/** A per-item form's task needs something to check; a whole-location form's task checks nothing. */
+export function checkTemplateTargets(
+  appliesTo: FormAppliesTo,
+  targetCount: number,
+): TemplateTargetsIssue | null {
+  if (appliesTo === FORM_APPLIES_TO.LOCATION) {
+    return targetCount === 0 ? null : "targets_not_allowed";
+  }
+  return targetCount === 0 ? "targets_required" : null;
+}
 
 export const FIELD_TYPE = {
   CHECKBOX: "checkbox",
@@ -102,13 +125,18 @@ export const CHOICE_MIN_OPTIONS = 2;
 export const CHOICE_MAX_OPTIONS = 30;
 export const TEXT_ANSWER_MAX_LENGTH = 2000;
 export const CORRECTIVE_ACTION_MAX_LENGTH = 1000;
+/** Mirrored by the `forms_name_length` check in the database. */
+export const FORM_NAME_MAX_LENGTH = 200;
+export const FORM_FIELD_LABEL_MAX_LENGTH = 200;
+export const FORM_FIELD_HELP_MAX_LENGTH = 500;
+export const CHOICE_OPTION_LABEL_MAX_LENGTH = 200;
 
 /** Builders mint these once and keep them across versions; answers and overrides are keyed by them. */
 export const formElementIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,40}$/, {
   error: "Ids may contain letters, digits, _ and - (at most 40)",
 });
 
-const fieldLabelSchema = z.string().trim().min(1).max(200);
+const fieldLabelSchema = z.string().trim().min(1).max(FORM_FIELD_LABEL_MAX_LENGTH);
 
 export const measurementLimitsSchema = z.object({
   min: z.number().nullable(),
@@ -187,7 +215,7 @@ export function limitsIssueMessage(issue: LimitsIssue): string {
 const fieldBaseShape = {
   id: formElementIdSchema,
   label: fieldLabelSchema,
-  help: z.string().trim().max(500).optional(),
+  help: z.string().trim().max(FORM_FIELD_HELP_MAX_LENGTH).optional(),
   required: z.boolean(),
 };
 
@@ -205,7 +233,7 @@ export const measurementFieldSchema = z.object({
 
 export const choiceOptionSchema = z.object({
   id: formElementIdSchema,
-  label: fieldLabelSchema,
+  label: z.string().trim().min(1).max(CHOICE_OPTION_LABEL_MAX_LENGTH),
   fails: z.boolean(),
 });
 
@@ -303,11 +331,12 @@ export function isCalendarDateString(value: string): boolean {
   return isCalendarDate(value) && addCalendarDays(value, 0) === value;
 }
 
-const formNameSchema = z.string().trim().min(1).max(200);
+const formNameSchema = z.string().trim().min(1).max(FORM_NAME_MAX_LENGTH);
 
 export const createFormSchema = z.object({
   name: formNameSchema,
   category: formCategorySchema,
+  appliesTo: formAppliesToSchema,
   definition: formDefinitionSchema,
 });
 
@@ -316,6 +345,7 @@ export type CreateFormInput = z.infer<typeof createFormSchema>;
 export const updateFormSchema = z.object({
   name: formNameSchema,
   category: formCategorySchema,
+  appliesTo: formAppliesToSchema,
 });
 
 export type UpdateFormInput = z.infer<typeof updateFormSchema>;
@@ -346,6 +376,7 @@ export const formResponseSchema = z.object({
   id: z.uuid(),
   name: z.string(),
   category: formCategorySchema,
+  appliesTo: formAppliesToSchema,
   latestVersion: formVersionResponseSchema,
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
@@ -353,8 +384,15 @@ export const formResponseSchema = z.object({
 
 export type FormResponse = z.infer<typeof formResponseSchema>;
 
+export const formListItemSchema = formResponseSchema.extend({
+  /** Active task templates that use the form; only those block deleting it. */
+  templateCount: z.int().nonnegative(),
+});
+
+export type FormListItem = z.infer<typeof formListItemSchema>;
+
 export const formListResponseSchema = z.object({
-  items: z.array(formResponseSchema),
+  items: z.array(formListItemSchema),
 });
 
 export type FormListResponse = z.infer<typeof formListResponseSchema>;
