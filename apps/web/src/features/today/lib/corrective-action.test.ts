@@ -14,7 +14,7 @@ describe("correctivePresetsFor", () => {
   });
 
   it("falls back to the generic picks without a category", () => {
-    expect(correctivePresetsFor(null)).toEqual(correctivePresetsFor("other"));
+    expect(correctivePresetsFor(null)).toEqual(["rechecked", "notifiedManager"]);
   });
 });
 

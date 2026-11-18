@@ -3,21 +3,21 @@ import "server-only";
 import {
   employeeListResponseSchema,
   formListResponseSchema,
+  formResponseSchema,
   locationListResponseSchema,
   recordsListResponseSchema,
   recordsReportResponseSchema,
   targetListResponseSchema,
-  targetTypeListResponseSchema,
   taskTemplateListResponseSchema,
   tenantContextResponseSchema,
   todayResponseSchema,
   type EmployeeListResponse,
   type FormListResponse,
+  type FormResponse,
   type LocationListResponse,
   type RecordsListResponse,
   type RecordsReportResponse,
   type TargetListResponse,
-  type TargetTypeListResponse,
   type TaskTemplateListResponse,
   type TenantContextResponse,
   type TodayResponse,
@@ -104,12 +104,26 @@ export async function listTargets(
   );
 }
 
-export async function listTargetTypes(): Promise<TargetTypeListResponse> {
-  return fetchJson("/target-types", targetTypeListResponseSchema);
-}
-
 export async function listForms(): Promise<FormListResponse> {
   return fetchJson("/forms", formListResponseSchema);
+}
+
+/** Null for a form that is archived, missing or another organisation's, so the page can 404. */
+export async function getForm(formId: string): Promise<FormResponse | null> {
+  try {
+    return await fetchJson(
+      `/forms/${encodeURIComponent(formId)}`,
+      formResponseSchema,
+    );
+  } catch (error) {
+    if (
+      error instanceof ApiRequestError &&
+      (error.status === 404 || error.status === 400)
+    ) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 export async function listTaskTemplates(

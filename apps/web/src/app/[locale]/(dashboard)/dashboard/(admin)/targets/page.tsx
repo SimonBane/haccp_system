@@ -2,7 +2,6 @@ import { type Locale } from "@/i18n/routing";
 import {
   getTenantContext,
   listTargets,
-  listTargetTypes,
   resolveActiveLocationId,
 } from "@/lib/api-client";
 import { setRequestLocale } from "next-intl/server";
@@ -19,16 +18,12 @@ export default async function TargetsPage({
 
   const tenant = await getTenantContext();
   const locationId = await resolveActiveLocationId(tenant);
-  const [targets, targetTypes] = await Promise.all([
-    listTargets(locationId),
-    listTargetTypes(),
-  ]);
+  const targets = await listTargets(locationId);
 
   return (
     <PageContainer width="content">
       <TargetsManager
         initialItems={targets.items}
-        initialTypes={targetTypes.items}
         initialLocationId={locationId}
       />
     </PageContainer>

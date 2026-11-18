@@ -1,6 +1,6 @@
 "use client";
 
-import type { FormCategory, FormResponse, StarterForm } from "@haccp/shared";
+import type { FormCategory, FormListItem } from "@haccp/shared";
 import { FORM_CATEGORY_VALUES } from "@haccp/shared";
 import { Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -13,23 +13,20 @@ import {
 } from "@/components/layout/page-header";
 import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
 import { Spinner } from "@/components/ui/spinner";
-import {
-  FormBuilderDialog,
-  type FormBuilderMode,
-} from "@/features/forms/components/builder/form-builder-dialog";
-import { NewFormDialog } from "@/features/forms/components/new-form-dialog";
 import { FormsData } from "@/features/forms/data-table/data";
 import { useFormsMutations } from "@/features/forms/hooks/use-forms-mutations";
 import { useFormsQuery } from "@/features/forms/hooks/use-forms-query";
+import { useRouter } from "@/i18n/navigation";
 import { useApiErrorToast } from "@/lib/api/use-api-error-toast";
 
 type FormsManagerProps = {
-  initialItems: FormResponse[];
+  initialItems: FormListItem[];
 };
 
 export function FormsManager({ initialItems }: FormsManagerProps) {
   const t = useTranslations("FormsPage");
   const tForms = useTranslations("Forms");
+  const router = useRouter();
   const showApiError = useApiErrorToast();
   const {
     data: items = [],
@@ -40,13 +37,7 @@ export function FormsManager({ initialItems }: FormsManagerProps) {
   } = useFormsQuery({ initialData: initialItems });
   const { remove } = useFormsMutations();
 
-  const [chooserOpen, setChooserOpen] = useState(false);
-  const [builderOpen, setBuilderOpen] = useState(false);
-  const [builderMode, setBuilderMode] = useState<FormBuilderMode>({
-    kind: "create",
-    source: null,
-  });
-  const [deleteTarget, setDeleteTarget] = useState<FormResponse | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<FormListItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const categoryLabels = useMemo(
@@ -60,41 +51,20 @@ export function FormsManager({ initialItems }: FormsManagerProps) {
     [tForms],
   );
 
-  const openBuilder = useCallback((mode: FormBuilderMode) => {
-    setBuilderMode(mode);
-    setBuilderOpen(true);
-  }, []);
-
-  const openChooser = useCallback(() => setChooserOpen(true), []);
-
-  const handlePick = useCallback(
-    (source: StarterForm | null) => {
-      setChooserOpen(false);
-      openBuilder({ kind: "create", source });
-    },
-    [openBuilder],
-  );
+  const handleAdd = useCallback(() => router.push("/dashboard/forms/new"), [router]);
 
   const handleEdit = useCallback(
-    (form: FormResponse) => openBuilder({ kind: "edit", form }),
-    [openBuilder],
+    (form: FormListItem) => router.push(`/dashboard/forms/${form.id}`),
+    [router],
   );
 
   const handleDuplicate = useCallback(
-    (form: FormResponse) =>
-      openBuilder({
-        kind: "create",
-        source: {
-          key: form.id,
-          name: t("duplicateSuggestedName", { name: form.name }),
-          category: form.category,
-          definition: form.latestVersion.definition,
-        },
-      }),
-    [openBuilder, t],
+    (form: FormListItem) =>
+      router.push({ pathname: "/dashboard/forms/new", query: { from: form.id } }),
+    [router],
   );
 
-  const handleDelete = useCallback((form: FormResponse) => {
+  const handleDelete = useCallback((form: FormListItem) => {
     setIsDeleting(false);
     setDeleteTarget(form);
   }, []);
@@ -115,7 +85,7 @@ export function FormsManager({ initialItems }: FormsManagerProps) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6">
-      <MobileHeaderAddAction label={t("add")} onClick={openChooser} />
+      <MobileHeaderAddAction label={t("add")} onClick={handleAdd} />
 
       <PageHeader title={t("title")} description={t("description")} />
 
@@ -129,7 +99,7 @@ export function FormsManager({ initialItems }: FormsManagerProps) {
         <FormsData
           items={items}
           categoryLabels={categoryLabels}
-          onAdd={openChooser}
+          onAdd={handleAdd}
           onEdit={handleEdit}
           onDuplicate={handleDuplicate}
           onDelete={handleDelete}
@@ -149,18 +119,6 @@ export function FormsManager({ initialItems }: FormsManagerProps) {
         isLoading={isDeleting}
         cancelDisabled={isDeleting}
         onConfirm={confirmDelete}
-      />
-
-      <NewFormDialog
-        open={chooserOpen}
-        onOpenChange={setChooserOpen}
-        onPick={handlePick}
-      />
-
-      <FormBuilderDialog
-        open={builderOpen}
-        onOpenChange={setBuilderOpen}
-        mode={builderMode}
       />
     </div>
   );

@@ -28,13 +28,6 @@ const PRESETS_BY_CATEGORY: Record<
     "notifiedManager",
     "calledService",
   ],
-  [FORM_CATEGORY.COOLING]: [
-    "movedProduct",
-    "discardedProduct",
-    "notifiedManager",
-    "calledService",
-  ],
-  [FORM_CATEGORY.COOKING]: ["rechecked", "discardedProduct", "notifiedManager"],
   [FORM_CATEGORY.GOODS_IN]: [
     "rejectedDelivery",
     "discardedProduct",
@@ -43,14 +36,18 @@ const PRESETS_BY_CATEGORY: Record<
   [FORM_CATEGORY.CLEANING]: ["recleaned", "notifiedManager"],
   [FORM_CATEGORY.HYGIENE]: ["recleaned", "notifiedManager"],
   [FORM_CATEGORY.PEST_CONTROL]: ["calledService", "notifiedManager"],
-  [FORM_CATEGORY.OTHER]: ["rechecked", "notifiedManager"],
 };
+
+const GENERIC_PRESETS: readonly CorrectivePresetKey[] = [
+  "rechecked",
+  "notifiedManager",
+];
 
 /** Quick picks that make sense for the kind of check that failed. */
 export function correctivePresetsFor(
   category: FormCategory | null,
 ): readonly CorrectivePresetKey[] {
-  return category ? PRESETS_BY_CATEGORY[category] : PRESETS_BY_CATEGORY.other;
+  return category ? PRESETS_BY_CATEGORY[category] : GENERIC_PRESETS;
 }
 
 export function composeCorrectiveAction(

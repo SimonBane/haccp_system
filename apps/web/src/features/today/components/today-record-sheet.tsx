@@ -1,6 +1,6 @@
 "use client";
 
-import { FORM_CATEGORY, RECORD_RESULT } from "@haccp/shared";
+import { RECORD_RESULT } from "@haccp/shared";
 import {
   CheckIcon,
   CircleAlertIcon,
@@ -139,7 +139,7 @@ export function TodayRecordSheet({
           <DetailRow label={t("record.completedBy")} value={userLabel} />
           <DetailRow
             label={t("record.category")}
-            value={tForms(`categories.${form?.category ?? FORM_CATEGORY.OTHER}`)}
+            value={form ? tForms(`categories.${form.category}`) : "—"}
           />
         </div>
 

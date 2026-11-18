@@ -7,7 +7,7 @@ import {
   ListChecksIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { memo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,7 +16,8 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
-import { chainableItems } from "../lib/today-round";
+import { chainableItems, type RoundScope } from "../lib/today-round";
+import { buildTimeGroupEntries } from "../lib/today-rooms";
 import { occurrenceKey } from "../lib/today-grouping";
 import type {
   TimeGroupState,
@@ -29,6 +30,7 @@ import {
   RAIL_TAIL_SEGMENT_CLASSNAME,
   UPCOMING_RAIL_CLASSNAME,
 } from "./today-rail";
+import { TodayRoomCard } from "./today-room-card";
 import { TodayTaskRow } from "./today-task-row";
 
 type Props = {
@@ -44,7 +46,7 @@ type Props = {
   isTail: boolean;
   syncingKeys: ReadonlySet<string>;
   currentUserId: string | null;
-  onActivate: (item: TodayTimelineItem) => void;
+  onActivate: (item: TodayTimelineItem, scope?: RoundScope) => void;
 };
 
 function getRailClassName(
@@ -119,6 +121,7 @@ export const TodayTimeGroup = memo(function TodayTimeGroup({
   const headingId = `${group.id}-heading`;
   const railClassName = getRailClassName(state, group.deviationCount);
 
+  const entries = useMemo(() => buildTimeGroupEntries(group.items), [group.items]);
   const roundItems = chainableItems(group);
   const roundStart = roundItems.length >= 2 ? roundItems[0] : null;
 
@@ -235,7 +238,7 @@ export const TodayTimeGroup = memo(function TodayTimeGroup({
                 time: group.scheduledTime,
                 count: roundItems.length,
               })}
-              onClick={() => onActivate(roundStart)}
+              onClick={() => onActivate(roundStart, "slot")}
             >
               <ListChecksIcon className="size-3.5" />
               {t("actions.recordAll")}
@@ -255,17 +258,29 @@ export const TodayTimeGroup = memo(function TodayTimeGroup({
 
         <CollapsibleContent>
           <ul className="space-y-2 pt-0.5 pb-1">
-            {group.items.map((item) => (
-              <li key={occurrenceKey(item.task)}>
-                <TodayTaskRow
-                  item={item}
-                  timeZone={timeZone}
-                  isSyncing={syncingKeys.has(occurrenceKey(item.task))}
-                  currentUserId={currentUserId}
-                  onActivate={onActivate}
-                />
-              </li>
-            ))}
+            {entries.map((entry) =>
+              entry.type === "room" ? (
+                <li key={`room-${entry.id}`}>
+                  <TodayRoomCard
+                    room={entry}
+                    timeZone={timeZone}
+                    syncingKeys={syncingKeys}
+                    currentUserId={currentUserId}
+                    onActivate={onActivate}
+                  />
+                </li>
+              ) : (
+                <li key={occurrenceKey(entry.item.task)}>
+                  <TodayTaskRow
+                    item={entry.item}
+                    timeZone={timeZone}
+                    isSyncing={syncingKeys.has(occurrenceKey(entry.item.task))}
+                    currentUserId={currentUserId}
+                    onActivate={onActivate}
+                  />
+                </li>
+              ),
+            )}
           </ul>
         </CollapsibleContent>
       </section>

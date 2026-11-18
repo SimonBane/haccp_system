@@ -1,155 +1,85 @@
-import {
-  TASK_TEMPLATE_COMPLETION_OPENS_BEFORE_DEFAULT_MINUTES,
-} from "@haccp/shared";
+import { TASK_TEMPLATE_COMPLETION_OPENS_BEFORE_DEFAULT_MINUTES } from "@haccp/shared";
 
-const MINUTES_INPUT_PATTERN = /^\d{0,4}$/;
+/** "Opens" choices; 1440 (start of the day) keeps windows saved before the redesign editable. */
+export const OPENS_OPTIONS = [0, 15, 30, 60, 120, 1440] as const;
+/** "Overdue" choices; null is "Never". */
+export const DUE_OPTIONS = [0, 15, 30, 60, 120, null] as const;
 
-export const CUSTOM_MINUTES_INITIAL_VALUE = "30";
+export const DEFAULT_WINDOW = { opensBefore: 30, dueAfter: 60 } as const;
 
-export function isAllowedMinutesInput(raw: string): boolean {
-  return MINUTES_INPUT_PATTERN.test(raw);
+/** No window is stored as opening at the start of the day with no deadline — the API's own "always available". */
+export const NO_WINDOW = {
+  completionOpensBeforeMinutes: TASK_TEMPLATE_COMPLETION_OPENS_BEFORE_DEFAULT_MINUTES,
+  completionDueAfterMinutes: null,
+} as const;
+
+export function isStartOfDay(opensBefore: number): boolean {
+  return opensBefore >= TASK_TEMPLATE_COMPLETION_OPENS_BEFORE_DEFAULT_MINUTES;
 }
 
-export function parseMinutesValue(raw: string): number | null {
-  if (raw === "") return null;
-  const value = Number(raw);
-  return Number.isNaN(value) ? null : value;
-}
-
-export function isFromStartOfDay(opensBeforeMinutes: number): boolean {
-  return opensBeforeMinutes >= TASK_TEMPLATE_COMPLETION_OPENS_BEFORE_DEFAULT_MINUTES;
-}
-
-type AvailableSummaryLabels = {
-  fromStartOfDay: string;
-  opensBefore: (minutes: number) => string;
-};
-
-type DeadlineSummaryLabels = {
-  neverOverdue: string;
-  overdueAfter: (minutes: number) => string;
-};
-
-export type CompactWindowSummaryLabels = AvailableSummaryLabels &
-  DeadlineSummaryLabels;
-
-function formatAvailableLabel(
-  opensBeforeMinutes: number,
-  labels: AvailableSummaryLabels,
-): string {
-  return isFromStartOfDay(opensBeforeMinutes)
-    ? labels.fromStartOfDay
-    : labels.opensBefore(opensBeforeMinutes);
-}
-
-function formatDeadlineLabel(
-  dueAfterMinutes: number | null,
-  labels: DeadlineSummaryLabels,
-): string {
-  return dueAfterMinutes === null
-    ? labels.neverOverdue
-    : labels.overdueAfter(dueAfterMinutes);
-}
-
-/** Compact "available · deadline" summary for admin grid rows and the mobile card. */
-export function formatCompactWindowSummary(params: {
+export function hasWindow(task: {
   completionOpensBeforeMinutes: number;
   completionDueAfterMinutes: number | null;
-  labels: CompactWindowSummaryLabels;
-}): string {
-  const opensPart = formatAvailableLabel(
-    params.completionOpensBeforeMinutes,
-    params.labels,
+}): boolean {
+  return !(
+    isStartOfDay(task.completionOpensBeforeMinutes) &&
+    task.completionDueAfterMinutes === null
   );
-  const duePart = formatDeadlineLabel(
-    params.completionDueAfterMinutes,
-    params.labels,
-  );
-
-  return `${opensPart} · ${duePart}`;
 }
 
-export const COMPLETION_OPENS_PRESET_ORDER = [
-  "min30",
-  "min60",
-  "min120",
-  "atScheduledTime",
-  "startOfDay",
-  "custom",
-] as const;
-
-export type CompletionOpensPreset = (typeof COMPLETION_OPENS_PRESET_ORDER)[number];
-
-export const COMPLETION_OPENS_PRESET_MINUTES: Record<
-  Exclude<CompletionOpensPreset, "custom">,
-  number
-> = {
-  min30: 30,
-  min60: 60,
-  min120: 120,
-  atScheduledTime: 0,
-  startOfDay: TASK_TEMPLATE_COMPLETION_OPENS_BEFORE_DEFAULT_MINUTES,
+export type DurationLabels = {
+  minutes: (count: number) => string;
+  hours: (count: number) => string;
+  hoursMinutes: (hours: number, minutes: number) => string;
 };
 
-export function getOpensPreset(minutes: number | null): CompletionOpensPreset {
-  if (minutes === null) return "custom";
-
-  const preset = COMPLETION_OPENS_PRESET_ORDER.find(
-    (candidate) =>
-      candidate !== "custom" && COMPLETION_OPENS_PRESET_MINUTES[candidate] === minutes,
-  );
-
-  return preset ?? "custom";
+export function formatDuration(minutes: number, labels: DurationLabels): string {
+  if (minutes < 60) return labels.minutes(minutes);
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 ? labels.hours(hours) : labels.hoursMinutes(hours, rest);
 }
 
-export const COMPLETION_DUE_PRESET_ORDER = [
-  "min30",
-  "min60",
-  "min120",
-  "atScheduledTime",
-  "never",
-  "custom",
-] as const;
-
-export type CompletionDuePreset = (typeof COMPLETION_DUE_PRESET_ORDER)[number];
-
-export const COMPLETION_DUE_PRESET_MINUTES: Record<
-  Exclude<CompletionDuePreset, "custom" | "never">,
-  number
-> = {
-  min30: 30,
-  min60: 60,
-  min120: 120,
-  atScheduledTime: 0,
+export type WindowLabels = {
+  duration: DurationLabels;
+  anyTime: string;
+  startAtTime: string;
+  startAtStartOfDay: string;
+  startBefore: (duration: string) => string;
+  endAtTime: string;
+  endAfter: (duration: string) => string;
+  range: (start: string, end: string) => string;
+  rangeNoDeadline: (start: string) => string;
 };
 
-export function getDuePreset(
-  minutes: number | null,
-  neverOverdue: boolean,
-): CompletionDuePreset {
-  if (neverOverdue) return "never";
-  if (minutes === null) return "custom";
-
-  const preset = COMPLETION_DUE_PRESET_ORDER.find(
-    (candidate) =>
-      candidate !== "custom" &&
-      candidate !== "never" &&
-      COMPLETION_DUE_PRESET_MINUTES[candidate] === minutes,
-  );
-
-  return preset ?? "custom";
+/** "Any time that day" or "From 30 min before to 1 h after" — one line for tables, cards and the preview. */
+export function formatWindowRange(
+  window: { opensBefore: number; dueAfter: number | null } | null,
+  labels: WindowLabels,
+): string {
+  if (!window) return labels.anyTime;
+  const start =
+    window.opensBefore === 0
+      ? labels.startAtTime
+      : isStartOfDay(window.opensBefore)
+        ? labels.startAtStartOfDay
+        : labels.startBefore(formatDuration(window.opensBefore, labels.duration));
+  if (window.dueAfter === null) return labels.rangeNoDeadline(start);
+  const end =
+    window.dueAfter === 0
+      ? labels.endAtTime
+      : labels.endAfter(formatDuration(window.dueAfter, labels.duration));
+  return labels.range(start, end);
 }
 
-export function resolveOpensPreset(raw: string): CompletionOpensPreset | null {
-  const minutes = parseMinutesValue(raw);
-  return minutes === null ? null : getOpensPreset(minutes);
-}
-
-export function resolveDuePreset(
-  raw: string,
-  neverOverdue: boolean,
-): CompletionDuePreset | null {
-  if (neverOverdue) return "never";
-  const minutes = parseMinutesValue(raw);
-  return minutes === null ? null : getDuePreset(minutes, false);
+export function windowOf(task: {
+  completionOpensBeforeMinutes: number;
+  completionDueAfterMinutes: number | null;
+}): { opensBefore: number; dueAfter: number | null } | null {
+  return hasWindow(task)
+    ? {
+        opensBefore: task.completionOpensBeforeMinutes,
+        dueAfter: task.completionDueAfterMinutes,
+      }
+    : null;
 }

@@ -1,4 +1,4 @@
-import type { FormResponse } from "@haccp/shared";
+import type { FormListItem } from "@haccp/shared";
 import { CopyPlusIcon, PencilIcon, Trash2Icon } from "lucide-react";
 import { createElement } from "react";
 import type { useTranslations } from "next-intl";
@@ -8,9 +8,9 @@ type FormsTranslations = ReturnType<typeof useTranslations<"FormsPage">>;
 
 type Params = {
   t: FormsTranslations;
-  onEdit: (form: FormResponse) => void;
-  onDuplicate: (form: FormResponse) => void;
-  onDelete: (form: FormResponse) => void;
+  onEdit: (form: FormListItem) => void;
+  onDuplicate: (form: FormListItem) => void;
+  onDelete: (form: FormListItem) => void;
 };
 
 export function getFormRowActions({
@@ -19,7 +19,7 @@ export function getFormRowActions({
   onDuplicate,
   onDelete,
 }: Params) {
-  return (form: FormResponse): RowAction[] => [
+  return (form: FormListItem): RowAction[] => [
     {
       id: "edit",
       label: t("edit"),

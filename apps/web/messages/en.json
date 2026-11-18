@@ -40,8 +40,6 @@
     "retry": "Try again",
     "codes": {
       "targetNameExists": "Equipment or an area with this name already exists at this site.",
-      "targetTypeNameExists": "A type with this name already exists.",
-      "targetTypeInUse": "This type is still used by equipment or an area.",
       "formNameExists": "A form with this name already exists.",
       "formInUse": "This form is still used by a task.",
       "employeeEmailExists": "An employee with this email already exists.",
@@ -50,7 +48,10 @@
       "defaultLocationDeleteForbidden": "Choose another default location before deleting this one.",
       "lastLocationDeleteForbidden": "The last location cannot be deleted.",
       "locationHasDependencies": "This location cannot be deleted while it has equipment, areas or task data.",
-      "taskRecordAlreadyExists": "This task was already recorded. The latest saved value is shown."
+      "taskRecordAlreadyExists": "This task was already recorded. The latest saved value is shown.",
+      "targetKindInUse": "This cannot change between equipment and area while tasks check it or items sit inside it.",
+      "targetParentNotArea": "Only an area can contain other items.",
+      "formAppliesToInUse": "Tasks using this form check items that would no longer fit. Change those tasks first."
     }
   },
   "ForbiddenPage": {
@@ -200,6 +201,12 @@
       "doneError": "Could not complete task",
       "alreadyRecorded": "Already recorded — showing the latest saved value",
       "missingForm": "This task's form could not be loaded. Refresh and try again."
+    },
+    "room": {
+      "progress": "{done} of {total} done",
+      "recordRoom": "Record room",
+      "recordRoomLabel": "Record the {room} checks ({count})",
+      "wholeRoom": "Whole room"
     }
   },
   "DataTable": {
@@ -247,93 +254,179 @@
   },
   "TargetsPage": {
     "title": "Equipment & areas",
-    "description": "Register the equipment, rooms, surfaces and vehicles your checks are carried out on.",
-    "emptyTitle": "No equipment or areas yet",
-    "emptyDescription": "Add a fridge, a room or a work surface to link it to tasks.",
-    "searchPlaceholder": "Search equipment & areas",
+    "description": "Everything your team checks at this location.",
     "add": "Add",
-    "addTitle": "Add equipment or area",
-    "addDescription": "Enter a name and choose its type.",
-    "editTitle": "Edit equipment or area",
-    "editDescription": "Update the name or type.",
-    "duplicateTitle": "Duplicate equipment or area",
-    "duplicateDescription": "Create a copy with a new name.",
+    "scope": {
+      "label": "Browse",
+      "all": "Everything",
+      "equipment": "Equipment",
+      "equipmentHint": "In an area or standalone",
+      "areas": "Areas"
+    },
+    "columns": {
+      "name": "Name",
+      "area": "Area",
+      "tasks": "Tasks"
+    },
+    "standalone": "Standalone",
+    "noTasks": "No tasks",
+    "itemsInside": "{count, plural, =0 {Empty} one {# item inside} other {# items inside}}",
+    "emptyEquipment": "No equipment yet.",
+    "inlineAdd": {
+      "label": "New equipment in {name}",
+      "placeholder": "Equipment name",
+      "submit": "Add",
+      "labelFixture": "New fixture in {name}",
+      "placeholderFixture": "Fixture name, e.g. Walls"
+    },
+    "selection": {
+      "toolbar": "Selected items",
+      "count": "{count, plural, one {# selected} other {# selected}}",
+      "selectAll": "Select all",
+      "select": "Select {name}",
+      "clear": "Clear selection",
+      "moveTo": "Move to area",
+      "moveToLabel": "{count, plural, one {Move # item to} other {Move # items to}}",
+      "makeStandalone": "Make standalone",
+      "delete": "Delete",
+      "deleteCount": "{count, plural, one {Delete # item} other {Delete # items}}",
+      "deleteTitle": "{count, plural, one {Delete # item} other {Delete # items}}",
+      "deleteDescription": "Tasks stop being scheduled for them. Saved records are kept.",
+      "deleteKept": "{count, plural, one {{names} still holds other items and will be kept.} other {{names} still hold other items and will be kept.}}",
+      "moved": "{count, plural, one {# item moved.} other {# items moved.}}",
+      "madeStandalone": "{count, plural, one {# item is now standalone.} other {# items are now standalone.}}",
+      "deleted": "{count, plural, one {# item deleted.} other {# items deleted.}}"
+    },
+    "searchPlaceholder": "Search",
+    "expandArea": "Show what is in {name}",
+    "collapseArea": "Hide what is in {name}",
+    "addEquipment": "Add equipment",
+    "addEquipmentTo": "Add equipment to {name}",
+    "summary": {
+      "equipment": "{count, plural, =0 {No equipment} one {# equipment} other {# equipment}}",
+      "areas": "{count, plural, one {# area} other {# areas}}",
+      "fixtures": "{count, plural, one {# fixture} other {# fixtures}}"
+    },
+    "taskCount": "{count, plural, =0 {Not used in any task} one {In # task} other {In # tasks}}",
+    "emptyArea": "Nothing here yet.",
+    "noResults": "Nothing matches your search.",
+    "kinds": {
+      "equipment": "Equipment",
+      "area": "Area",
+      "fixture": "Fixture"
+    },
+    "kindHints": {
+      "equipment": "A thing you check: fridges, tables, slicers, sinks, scales",
+      "area": "A room or zone: kitchen, cold store, changing room",
+      "fixture": "Part of a room: walls, floor, ceiling, door"
+    },
+    "form": {
+      "kindLabel": "What are you adding?",
+      "addTitle": {
+        "equipment": "Add equipment",
+        "area": "Add area",
+        "fixture": "Add fixture"
+      },
+      "addDescription": {
+        "equipment": "It can be picked in any task that checks equipment.",
+        "area": "It can be picked in any task that checks areas.",
+        "fixture": "It can be picked in any task that checks fixtures."
+      },
+      "editTitle": {
+        "equipment": "Edit equipment",
+        "area": "Edit area",
+        "fixture": "Edit fixture"
+      },
+      "editDescription": {
+        "equipment": "Rename it or move it to another room.",
+        "area": "Rename it or place it inside a larger area.",
+        "fixture": "Rename it or move it to another room."
+      },
+      "duplicateTitle": {
+        "equipment": "Duplicate equipment",
+        "area": "Duplicate area",
+        "fixture": "Duplicate fixture"
+      },
+      "duplicateDescription": {
+        "equipment": "Create a copy with a new name.",
+        "area": "Create a copy with a new name. What is inside is not copied.",
+        "fixture": "Create a copy with a new name."
+      },
+      "namePlaceholder": {
+        "equipment": "Mincer",
+        "area": "Cold store",
+        "fixture": "Walls"
+      },
+      "parentLabel": "Located in",
+      "parentNone": "No area",
+      "submit": {
+        "equipment": "Add equipment",
+        "area": "Add area",
+        "fixture": "Add fixture"
+      },
+      "parentRequired": "Choose the room this fixture is part of."
+    },
     "duplicateSuggestedName": "{name} (Copy)",
     "nameLabel": "Name",
-    "namePlaceholder": "Walk-in freezer",
-    "typeLabel": "Type",
-    "typePlaceholder": "Select a type",
-    "noTypesHint": "There are no types yet. Add one first.",
-    "manageTypes": "Manage types",
-    "nameTaken": "Equipment or an area with this name already exists at this site.",
+    "nameTaken": "Equipment or an area with this name already exists at this location.",
     "save": "Save",
     "cancel": "Cancel",
     "edit": "Edit",
     "duplicate": "Duplicate",
     "delete": "Delete",
-    "openMenu": "Open menu",
+    "openMenu": "Actions for {name}",
     "deleteConfirm": "Delete \"{name}\"? Tasks stop being scheduled for it. Saved records are kept.",
-    "bulkDeleteConfirm": "Delete {count, plural, one {# item} other {# items}}? Tasks stop being scheduled for them. Saved records are kept.",
     "deleteDialog": {
-      "title": "Delete equipment or area",
-      "bulkTitle": "Delete equipment & areas",
+      "equipmentTitle": "Delete equipment",
+      "areaTitle": "Delete area",
       "fallback": "This removes the item from future tasks.",
       "cancel": "Cancel",
-      "confirm": "Delete"
+      "confirm": "Delete",
+      "fixtureTitle": "Delete fixture"
     },
     "toast": {
-      "createSuccess": "Added.",
-      "updateSuccess": "Updated.",
+      "createSuccess": "{name} was added.",
+      "updateSuccess": "Saved.",
       "duplicateSuccess": "Copied.",
-      "deleteSuccess": "Deleted.",
-      "bulkDeleteSuccess": "{count, plural, one {# item was} other {# items were}} deleted."
+      "deleteSuccess": "Deleted."
     },
     "validation": {
       "nameRequired": "Name is required.",
-      "nameMaxLength": "Name must be at most 100 characters.",
-      "typeRequired": "Type is required."
+      "nameMaxLength": "Keep the name to {max} characters or fewer."
     },
-    "columns": {
-      "name": "Name",
-      "type": "Type",
-      "kind": "Kind"
+    "onboarding": {
+      "title": "Start with your rooms",
+      "description": "Add the rooms you keep clean, then the equipment inside them. Tasks can then check them on a schedule.",
+      "step": "Step {number}",
+      "steps": {
+        "areas": {
+          "title": "Add areas",
+          "hint": "Kitchen, cold store, changing room"
+        },
+        "equipment": {
+          "title": "Add equipment",
+          "hint": "Fridges, tables, slicers, sinks"
+        },
+        "tasks": {
+          "title": "Check them in tasks",
+          "hint": "A task picks a form and what it checks"
+        }
+      },
+      "quickAdd": "Quick add",
+      "suggestions": {
+        "kitchen": "Kitchen",
+        "coldStorage": "Cold storage",
+        "washingRoom": "Washing room",
+        "changingRoom": "Changing room",
+        "dryStore": "Dry store",
+        "dispatch": "Dispatch"
+      },
+      "added": "{name} was added.",
+      "addArea": "Add area",
+      "addLooseEquipment": "Add equipment without an area"
     },
-    "kinds": {
-      "equipment": "Equipment",
-      "area": "Area",
-      "surface": "Surface",
-      "vehicle": "Vehicle"
-    },
-    "noTypes": {
-      "title": "Start with the types you check",
-      "description": "Types group your equipment and areas, such as Fridge or Work surface. Add suggested ones in one click."
-    },
-    "types": {
-      "title": "Types",
-      "description": "Types are shared by all locations of the organization.",
-      "close": "Close",
-      "empty": "No types yet.",
-      "suggestions": "Suggested",
-      "addTitle": "Add a type",
-      "editTitle": "Edit type",
-      "nameLabel": "Name",
-      "namePlaceholder": "Blast chiller",
-      "kindLabel": "Kind",
-      "add": "Add type",
-      "save": "Save",
-      "cancelEdit": "Cancel",
-      "edit": "Edit {name}",
-      "delete": "Delete {name}",
-      "nameRequired": "Name is required.",
-      "nameTaken": "A type with this name already exists.",
-      "created": "Type added.",
-      "updated": "Type updated.",
-      "deleted": "Type deleted.",
-      "deleteTitle": "Delete type",
-      "deleteConfirm": "Delete the type \"{name}\"? Only types no equipment or area uses can be deleted.",
-      "cancelDelete": "Cancel",
-      "confirmDelete": "Delete"
-    }
+    "nameTakenFixture": "This room already has a fixture with this name.",
+    "addFixture": "Add fixture"
   },
   "FormsPage": {
     "title": "Forms",
@@ -341,7 +434,7 @@
     "emptyTitle": "No forms yet",
     "emptyDescription": "Start from a ready-made form or build your own.",
     "searchPlaceholder": "Search forms",
-    "add": "Add",
+    "add": "New form",
     "edit": "Edit",
     "duplicate": "Duplicate",
     "delete": "Delete",
@@ -360,27 +453,12 @@
       "name": "Name",
       "category": "Category",
       "fields": "Fields",
-      "version": "Version"
+      "version": "Version",
+      "usedBy": "Used by"
     },
     "versionBadge": "v{version}",
     "fieldCount": "{count, plural, one {# field} other {# fields}}",
-    "library": {
-      "title": "New form",
-      "description": "Start from a ready-made form and adjust it, or build one from scratch.",
-      "close": "Close",
-      "blank": "Blank form",
-      "blankDescription": "Add your own fields one by one.",
-      "starters": "Ready-made forms",
-      "fieldCount": "{count, plural, one {# field} other {# fields}}"
-    },
     "builder": {
-      "addTitle": "New form",
-      "addDescription": "Add the fields staff fill in. The preview shows what they will see.",
-      "editTitle": "Edit form",
-      "editDescription": "Version {version}. Saving changes to the fields publishes a new version; saved records keep the version they were recorded with.",
-      "cancel": "Cancel",
-      "saveCreate": "Create form",
-      "saveEdit": "Save",
       "nameLabel": "Name",
       "namePlaceholder": "Fridge check",
       "categoryLabel": "Category",
@@ -396,9 +474,6 @@
         "text": "A short or long note",
         "date": "A date, such as a use-by date"
       },
-      "viewLabel": "Show",
-      "viewBuild": "Fields",
-      "viewPreview": "Preview",
       "untitled": "Untitled field",
       "required": "Required",
       "needsAttention": "Needs attention",
@@ -422,7 +497,6 @@
       "limitsLabel": "Limits",
       "limitMin": "Minimum",
       "limitMax": "Maximum",
-      "limitsTo": "to",
       "noLimit": "No limit",
       "limitsHint": "A reading outside the limits fails the check. Leave one side empty for a floor or a ceiling. Tasks can set their own limits per equipment or area.",
       "multiple": "Allow several answers",
@@ -443,24 +517,92 @@
           "min": "The minimum is outside this unit's range or precision.",
           "max": "The maximum is outside this unit's range or precision.",
           "order": "The minimum must be below the maximum."
-        }
+        },
+        "appliesTo": "Select what this form is filled in for."
       },
       "toast": {
         "created": "Form created.",
         "updated": "Form updated.",
         "published": "Version {version} published."
-      }
+      },
+      "appliesToLabel": "Filled in for",
+      "appliesToPlaceholder": "Select what it checks",
+      "appliesToHint": "Tasks using an each-item form pick any mix of equipment, rooms and fixtures.",
+      "backToForms": "Forms",
+      "untitledForm": "Untitled form",
+      "versionBadge": "v{version}",
+      "fieldCountOf": "{count} of {max} fields",
+      "modeLabel": "Mode",
+      "modeBuild": "Build",
+      "modePreview": "Preview",
+      "issues": "{count, plural, one {# issue} other {# issues}}",
+      "publish": "Publish",
+      "save": "Save",
+      "addFieldTitle": "Add a field",
+      "addFieldHint": "Adds it below the selected field.",
+      "failsWhenTitle": "A record fails when",
+      "failsWhenEmpty": "Nothing yet. Add limits to a measurement or mark a choice option as failing.",
+      "failsWhenCorrective": "Staff then describe the corrective action they took.",
+      "failRuleRange": "{field} is below {min} or above {max}",
+      "failRuleBelow": "{field} is below {min}",
+      "failRuleAbove": "{field} is above {max}",
+      "failRuleOptions": "{field} — {options}",
+      "formSettings": "Form settings",
+      "fieldTab": "Field",
+      "inspectorLabel": "Field settings",
+      "selectFieldTitle": "Select a field to edit it",
+      "selectFieldDescription": "Or add one from the list on the left.",
+      "fieldPosition": "Field {index} of {count}",
+      "fieldActions": "Field actions",
+      "duplicate": "Duplicate",
+      "deleteField": "Delete field",
+      "duplicateField": "Duplicate {label}",
+      "copyLabel": "{label} (copy)",
+      "editField": "Edit field {index}: {label}",
+      "passes": "Passes {limits}",
+      "passesAlways": "Every reading passes",
+      "failsBelow": "Fails below {value}",
+      "failsAbove": "Fails above {value}",
+      "requiredHint": "Staff can't save the record without an answer.",
+      "requiredCheckboxHint": "Staff can't save the record until this is ticked.",
+      "optional": "Optional",
+      "tickToConfirm": "Tick to confirm",
+      "typeNote": "Type a note",
+      "pickDate": "Pick a date",
+      "untitledOption": "Untitled option",
+      "failingOptions": "{failing} of {total} fail",
+      "correctiveBadge": "Corrective action on fail",
+      "emptyCanvas": "No fields yet. Add the first one.",
+      "versionNoteNew": "Not published yet. Publishing creates version 1. Later changes to the fields publish a new version; saved records keep the version they were recorded with.",
+      "versionNote": "Version {version} is live. Changing the fields publishes version {next}; saved records keep the version they were recorded with.",
+      "discardTitle": "Discard your changes?",
+      "discardDescription": "You have changes that aren't published. Leaving now loses them.",
+      "discardCancel": "Keep editing",
+      "discardConfirm": "Discard",
+      "close": "Close",
+      "done": "Done"
     },
     "preview": {
       "hint": "Try it out — nothing is saved.",
       "emptyTitle": "Nothing to preview yet",
       "emptyDescription": "Add a field to see the form as staff will.",
-      "result": {
-        "pass": "Pass",
-        "fail": "Fail",
-        "not_evaluated": "Not evaluated"
+      "correctiveActionRequired": "Saving this would ask for a corrective action.",
+      "tryTitle": "Try it out",
+      "tryDescription": "Fill it in as staff would. Nothing is saved.",
+      "resultTitle": "Result",
+      "resultIfRecorded": "Result if recorded now",
+      "outcome": {
+        "pass": "Passed",
+        "fail": "Needs attention",
+        "incomplete": "Not complete"
       },
-      "correctiveActionRequired": "Saving this would ask for a corrective action."
+      "needsAttentionTitle": "This check needs attention",
+      "reasonFailed": "{field} fails the check",
+      "reasonMissing": "{field} is required",
+      "reasonAllPass": "Every answer is within limits.",
+      "reset": "Reset answers",
+      "record": "Record",
+      "recordToast": "Preview only — nothing was recorded."
     },
     "publish": {
       "title": "Publish version {version}?",
@@ -471,7 +613,46 @@
       "noLimits": "no limits",
       "cancel": "Cancel",
       "confirm": "Publish",
-      "confirmDrops": "Publish and remove"
+      "confirmDrops": "Publish and remove",
+      "createDescription": "Staff can use {name} as soon as a task schedules it.",
+      "summaryFields": "Fields",
+      "summaryAppliesTo": "Filled in for",
+      "summaryOnFail": "On fail",
+      "onFailRequired": "Corrective action required",
+      "onFailOptional": "Corrective action optional",
+      "noIssues": "No issues found",
+      "lockNote": "Published fields don't change. Later edits publish a new version; saved records keep the version they were recorded with.",
+      "doneTitle": "{name} is published",
+      "doneDescription": "Version {version} is live. Schedule it in a task so it shows up on staff's Today list.",
+      "backToForms": "Back to forms",
+      "createTask": "Create a task"
+    },
+    "usedBy": "{count, plural, =0 {Not used yet} one {# task} other {# tasks}}",
+    "create": {
+      "title": "New form",
+      "close": "Close",
+      "progress": "Progress",
+      "stepOf": "Step {current} of {total}",
+      "steps": {
+        "start": "Start",
+        "setup": "Set up",
+        "fields": "Fields"
+      },
+      "startTitle": "How do you want to start?",
+      "startDescription": "Ready-made forms follow common HACCP checks. You can change every field before you publish.",
+      "blank": "Blank form",
+      "blankDescription": "Add your own fields one by one.",
+      "starters": "Ready-made forms",
+      "filterLabel": "Filter by category",
+      "all": "All",
+      "fieldCount": "{count, plural, one {# field} other {# fields}}",
+      "setupTitle": "Set up the form",
+      "setupDescription": "These choices shape how the form is used. You can change them later in Form settings.",
+      "nameHint": "Staff see this name on their Today list.",
+      "startingFrom": "Starting from",
+      "fieldsNext": "You'll add, remove and reorder fields in the next step.",
+      "back": "Back",
+      "continue": "Continue to fields"
     }
   },
   "Forms": {
@@ -512,12 +693,9 @@
     "categories": {
       "temperature": "Temperature",
       "cleaning": "Cleaning",
-      "goods_in": "Goods in",
-      "cooking": "Cooking",
-      "cooling": "Cooling",
       "hygiene": "Hygiene",
       "pest_control": "Pest control",
-      "other": "Other"
+      "goods_in": "Goods in"
     },
     "fieldTypes": {
       "checkbox": "Checkbox",
@@ -546,6 +724,14 @@
         "text": "The answer is too long.",
         "date": "Enter a valid date."
       }
+    },
+    "appliesTo": {
+      "per_item": "Each item it checks",
+      "location": "Whole location"
+    },
+    "appliesToHints": {
+      "per_item": "One check per fridge, room, wall… a task picks — e.g. temperatures, cleaning",
+      "location": "Once per time slot — e.g. opening checklist"
     }
   },
   "RecordsPage": {
@@ -693,54 +879,12 @@
   },
   "TasksPage": {
     "title": "Tasks",
-    "description": "Define recurring HACCP tasks with weekdays and scheduled times from your plan.",
+    "description": "Recurring checks your team completes from the Today list.",
     "emptyTitle": "No tasks yet",
-    "emptyDescription": "Add your first task template to build the daily checklist.",
+    "emptyDescription": "Add your first task to build the daily checklist.",
     "searchPlaceholder": "Search tasks",
-    "add": "Add",
-    "addTitle": "Add task",
-    "addDescription": "Enter the task details, weekdays, and scheduled times.",
-    "editTitle": "Edit task",
-    "editDescription": "Update the task template.",
-    "duplicateTitle": "Duplicate task",
-    "duplicateDescription": "Create a copy with a new title.",
+    "add": "Add task",
     "duplicateSuggestedTitle": "{title} (Copy)",
-    "sections": {
-      "details": "Details",
-      "schedule": "Schedule"
-    },
-    "titleLabel": "Title",
-    "titlePlaceholder": "Check walk-in chiller",
-    "formLabel": "Form",
-    "formPlaceholder": "Select a form",
-    "noForms": "There are no forms yet.",
-    "manageForms": "Create a form",
-    "targets": {
-      "legend": "Equipment & areas",
-      "description": "Each one selected gets its own task at every scheduled time. Leave empty for a task that is not tied to equipment or an area.",
-      "none": "There is no equipment or area at this location yet.",
-      "manage": "Add equipment & areas",
-      "customLimits": "Own limits for {field}",
-      "formDefault": "Form default: {limits}",
-      "noLimits": "no limits",
-      "to": "to",
-      "noLimit": "No limit",
-      "min": "Minimum {field} for {target}",
-      "max": "Maximum {field} for {target}",
-      "issues": {
-        "min_out_of_range": "The minimum is outside this unit's range or precision.",
-        "max_out_of_range": "The maximum is outside this unit's range or precision.",
-        "order": "The minimum must be below the maximum."
-      }
-    },
-    "weekdaysLabel": "Repeats on",
-    "moreSelected": "+ {count} more",
-    "overflowRemoveLabel": "Remove {count} more days",
-    "timesLabel": "Scheduled times",
-    "removeTime": "Remove time",
-    "addTime": "Add time",
-    "save": "Save",
-    "cancel": "Cancel",
     "edit": "Edit",
     "duplicate": "Duplicate",
     "delete": "Delete",
@@ -755,7 +899,6 @@
       "cancel": "Cancel",
       "confirm": "Delete"
     },
-    "submitError": "Something went wrong. Please try again.",
     "toast": {
       "createSuccess": "Task was added.",
       "updateSuccess": "Task was updated.",
@@ -765,9 +908,28 @@
       "bulkDeleteSuccess": "{count, plural, one {# task was} other {# tasks were}} deleted.",
       "bulkDeleteError": "Could not delete tasks. Please try again."
     },
+    "views": {
+      "label": "View",
+      "list": "List",
+      "plan": "Day plan"
+    },
+    "columns": {
+      "title": "Task",
+      "targets": "Checks",
+      "schedule": "Schedule",
+      "window": "Time window"
+    },
+    "wholeLocation": "Whole location",
+    "oncePerTime": "One check per time",
+    "itemCount": "{count, plural, one {# item} other {# items}}",
+    "checksPerDay": "{count, plural, one {# check a day} other {# checks a day}}",
+    "timesEvery": "{count}× · every {interval}, {from}–{until}",
+    "timesMore": "{times} +{count}",
+    "listFooter": "{tasks, plural, one {# task} other {# tasks}} · up to {checks, plural, one {# check} other {# checks}} a day",
     "presets": {
       "everyDay": "Every day",
-      "weekdays": "Weekdays"
+      "weekdays": "Weekdays",
+      "weekends": "Weekends"
     },
     "weekdaysShort": {
       "monday": "Mon",
@@ -778,6 +940,15 @@
       "saturday": "Sat",
       "sunday": "Sun"
     },
+    "weekdaysLetter": {
+      "monday": "M",
+      "tuesday": "T",
+      "wednesday": "W",
+      "thursday": "T",
+      "friday": "F",
+      "saturday": "S",
+      "sunday": "S"
+    },
     "weekdaysFull": {
       "monday": "Monday",
       "tuesday": "Tuesday",
@@ -787,66 +958,255 @@
       "saturday": "Saturday",
       "sunday": "Sunday"
     },
-    "validation": {
-      "titleRequired": "Title is required.",
-      "titleMaxLength": "Title must be at most 200 characters.",
-      "weekdaysRequired": "Select at least one weekday.",
-      "timesRequired": "Add at least one scheduled time.",
-      "timesMax": "At most 4 times per task.",
-      "timesUnique": "Scheduled times must be unique.",
-      "timeRequired": "Scheduled time is required.",
-      "timeInvalid": "Enter a valid time in HH:MM format.",
-      "completionMinutesRange": "Enter a value between 0 and 1440 minutes.",
-      "completionAvailableRequired": "Select when the task becomes available.",
-      "completionDeadlineRequired": "Select a deadline.",
-      "completionMinutesInteger": "Enter a whole number of minutes.",
-      "formRequired": "Select a form."
+    "duration": {
+      "minutes": "{count} min",
+      "hours": "{count} h",
+      "hoursMinutes": "{hours} h {minutes} min"
     },
-    "columns": {
-      "title": "Title",
-      "schedule": "Schedule",
-      "actions": "Actions",
-      "window": "Completion window",
-      "form": "Form",
-      "targets": "Equipment & areas"
+    "window": {
+      "anyTime": "Any time that day",
+      "startAtTime": "From the time",
+      "startAtStartOfDay": "From the start of the day",
+      "startBefore": "From {duration} before",
+      "endAtTime": "the time",
+      "endAfter": "{duration} after",
+      "range": "{start} to {end}",
+      "rangeNoDeadline": "{start}, no deadline"
     },
-    "completionWindow": {
-      "legend": "Completion window",
-      "minutesSuffixBefore": "min before",
-      "minutesSuffixAfter": "min after",
-      "compactFromStartOfDay": "All day",
-      "compactOpensBefore": "{minutes} min before",
-      "compactNeverOverdue": "No deadline",
-      "compactOverdueAfter": "{minutes} min after",
-      "availableLabel": "Available",
-      "availableInfoLabel": "About availability",
-      "availableInfoDescription": "The moment when the task becomes available for staff to complete.",
-      "availablePlaceholder": "Select when it opens",
-      "deadlineLabel": "Deadline",
-      "deadlineInfoLabel": "About the deadline",
-      "deadlineInfoIntro": "After this time, the task is considered late.",
-      "deadlineInfoStillDoable": "It can still be completed after - just marked as late.",
-      "deadlineInfoNoDeadline": "Choose “No deadline” to never mark it as late.",
-      "deadlinePlaceholder": "Select a deadline",
-      "customMinutesBefore": "Custom minutes before the scheduled time",
-      "customMinutesAfter": "Custom minutes after the scheduled time",
-      "presets": {
-        "opens": {
-          "min30": "30 minutes before",
-          "min60": "1 hour before",
-          "min120": "2 hours before",
-          "atScheduledTime": "At the scheduled time",
-          "startOfDay": "From the start of the day",
-          "custom": "Custom…"
+    "plan": {
+      "dayLabel": "Day",
+      "task": "Task",
+      "summary": "{tasks, plural, one {# task} other {# tasks}} · {checks, plural, one {# check} other {# checks}}",
+      "rowSub": "{checks, plural, one {# check} other {# checks}} · {window}",
+      "empty": "Nothing is scheduled on this day.",
+      "legendCheck": "Check",
+      "legendWindow": "Time window",
+      "legendAnyTime": "Any time that day"
+    },
+    "builder": {
+      "newTitle": "New task",
+      "editTitle": "Edit task",
+      "duplicateTitle": "Duplicate task",
+      "breadcrumb": "Tasks · {location}",
+      "back": "Back to tasks",
+      "close": "Close without saving",
+      "cancel": "Cancel",
+      "save": "Save task",
+      "continue": "Continue",
+      "stepDone": "Done",
+      "progress": "{done} of {total} done",
+      "discard": {
+        "title": "Discard changes?",
+        "description": "Your changes to this task have not been saved.",
+        "cancel": "Keep editing",
+        "confirm": "Discard"
+      },
+      "form": {
+        "title": "What do staff fill in?",
+        "mobileTitle": "Form",
+        "description": "Pick the form. It decides what this task can check.",
+        "mobileDescription": "What do staff fill in? It decides what this task can check.",
+        "label": "Form",
+        "questions": "{count, plural, one {# question} other {# questions}}",
+        "noForms": "There are no forms yet.",
+        "createForm": "Create a form",
+        "required": "Choose a form.",
+        "titleLabel": "Task name",
+        "titlePlaceholder": "e.g. Prep fridge temperatures",
+        "titleHint": "Shown to staff on the Today list.",
+        "titleRequired": "Enter a task name.",
+        "titleMaxLength": "Keep the name to {max} characters or fewer.",
+        "choose": "Choose a form",
+        "change": "Change",
+        "search": "Search {count, plural, one {# form} other {# forms}}",
+        "searchLabel": "Search forms",
+        "noMatch": "No form matches your search.",
+        "createNew": "Create a new form",
+        "sheetTitle": "Choose a form",
+        "close": "Close"
+      },
+      "targets": {
+        "title": "What does it check?",
+        "mobileTitle": "What it checks",
+        "descriptionNone": "Choose a form first. It decides what can be checked.",
+        "descriptionPick": "Each one you pick gets its own check at every time.",
+        "chooseFormFirst": "Choose a form above to see what it can check.",
+        "search": "Search equipment, rooms and fixtures",
+        "new": "Add new",
+        "required": "Choose at least one item to check.",
+        "standalone": "Standalone",
+        "groupSelected": "{selected} of {total} selected",
+        "selectAll": "Select all",
+        "clear": "Clear",
+        "selectAllIn": "Select all in {group}",
+        "clearIn": "Clear all in {group}",
+        "noMatch": "Nothing matches “{query}”.",
+        "empty": "Nothing at this location fits this form yet.",
+        "addQuery": "Add “{query}”",
+        "selected": "{items} selected",
+        "nothingSelected": "Nothing selected yet",
+        "remove": "Remove {name}",
+        "done": "Done",
+        "doneCount": "Done · {items}",
+        "add": "Add items",
+        "nothingChosenFor": "Nothing chosen yet. Use “{add}” to pick what this task checks.",
+        "kinds": {
+          "area": "Whole room",
+          "equipment": "Equipment",
+          "fixture": "Fixture"
         },
-        "due": {
-          "min30": "30 minutes after",
-          "min60": "1 hour after",
-          "min120": "2 hours after",
-          "atScheduledTime": "At the scheduled time",
-          "never": "No deadline",
-          "custom": "Custom…"
-        }
+        "filterSelected": "Filter {count} selected",
+        "itemsCount": "{count, plural, one {# item} other {# items}}",
+        "showAll": "Show all {count} ({hidden} more)",
+        "showLess": "Show less"
+      },
+      "create": {
+        "titleEquipment": "New equipment",
+        "titleArea": "New area",
+        "type": "Type",
+        "kinds": {
+          "equipment": "Equipment",
+          "area": "Area",
+          "fixture": "Fixture"
+        },
+        "name": "Name",
+        "placeholderEquipment": "e.g. Blast chiller",
+        "placeholderArea": "e.g. Pastry room",
+        "where": "Where is it?",
+        "standalone": "Standalone",
+        "submit": "Add and select",
+        "cancel": "Cancel",
+        "close": "Close",
+        "alsoIn": "It also appears in Equipment & areas.",
+        "nameRequired": "Enter a name.",
+        "nameTaken": "{name} already exists here. Pick it from the list.",
+        "addedTo": "{name} was added to {area} and selected.",
+        "added": "{name} was added and selected.",
+        "titleFixture": "New fixture",
+        "placeholderFixture": "e.g. Walls",
+        "whereFixture": "Which room is it part of?",
+        "needsArea": "Add a room on the Equipment & areas page first — fixtures belong to one."
+      },
+      "limits": {
+        "noLimits": "no limits",
+        "to": "to",
+        "minFor": "Minimum {field} for {target}",
+        "maxFor": "Maximum {field} for {target}",
+        "issues": {
+          "min_out_of_range": "The minimum is outside this unit's range or precision.",
+          "max_out_of_range": "The maximum is outside this unit's range or precision.",
+          "order": "The minimum must be below the maximum."
+        },
+        "ownChip": "{min} to {max} {unit}",
+        "editorTitle": "Limits for {name}",
+        "useOwn": "Own limits",
+        "done": "Done",
+        "noMin": "No min",
+        "noMax": "No max"
+      },
+      "when": {
+        "title": "When is it done?",
+        "mobileTitle": "Days and times",
+        "description": "Pick the days, then the time of each check.",
+        "days": "Days",
+        "dayPresets": "Day presets",
+        "daysRequired": "Choose at least one day.",
+        "times": "Times",
+        "timesCount": "{count, plural, one {# time a day} other {# times a day}}",
+        "timesUpTo": "Up to {max} a day",
+        "modeLabel": "How the times are set",
+        "modeTimes": "At set times",
+        "modeRepeat": "Repeat every…",
+        "noTimes": "No times yet. Add the first one below.",
+        "noTimesShort": "No times yet.",
+        "timeToAdd": "Time to add",
+        "addTime": "Add time",
+        "add": "Add",
+        "clearAll": "Clear all",
+        "enterHint": "Enter adds the time · up to {max} a day",
+        "removeTime": "Remove {time}",
+        "every": "Every",
+        "from": "From",
+        "until": "Until",
+        "repeatSummary": "{count, plural, one {# check a day} other {# checks a day}}, every {interval} from {from} to {until}",
+        "repeatEmpty": "Set a start time before the end time.",
+        "toList": "Edit these times one by one",
+        "timesRequired": "Add at least one time.",
+        "enterTime": "Enter a time first.",
+        "duplicateTime": "{time} is already on the list.",
+        "maxTimes": "You can add up to {max} times a day.",
+        "glance": "Day at a glance",
+        "daysDescription": "Which days it repeats on",
+        "timesDescription": "When each check is due"
+      },
+      "window": {
+        "title": "Time window",
+        "optional": "Optional",
+        "on": "Each check can only be done in a window around its time.",
+        "off": "Off: each check can be done any time on its day and never shows as overdue.",
+        "mobileOn": "Each check can only be done near its time.",
+        "mobileOff": "Off: any time on its day, never overdue.",
+        "switchLabel": "Limit when each check can be done",
+        "mobileSwitch": "Limit when it can be done",
+        "summaryOff": "Off · any time that day",
+        "opens": "Opens",
+        "overdue": "Overdue",
+        "onTime": "On time",
+        "startOfDay": "Start of day",
+        "never": "Never",
+        "offNote": "All {count} checks open at the start of the day, so they can be done back to back. Turn on a window to keep them apart.",
+        "mobileOffNote": "All {count} checks open at the start of the day. Turn this on to keep them apart.",
+        "example": "The {time} check opens at {opens} and is overdue after {overdue}.",
+        "exampleNoDeadline": "The {time} check opens at {opens} and never shows as overdue.",
+        "exampleEmpty": "Add a time to see an example.",
+        "overlapTitle": "Windows overlap.",
+        "overlap": "Checks are {gap} apart but each window lasts {length}, so staff would see two open at once. Shorten the window or space the times out.",
+        "mobileOverlap": "Checks are {gap} apart but each window lasts {length}. Shorten it or space the times out.",
+        "opensDescription": "How early staff can start, before each time",
+        "opensMobileDescription": "How early, before each time",
+        "overdueDescription": "When it shows as late, after each time",
+        "overdueMobileDescription": "When late, after each time"
+      },
+      "preview": {
+        "label": "Preview",
+        "summary": "Summary",
+        "start": "Choose a form to start. This fills in as you go.",
+        "form": "Form",
+        "checks": "Checks",
+        "days": "Days",
+        "times": "Times",
+        "window": "Window",
+        "perDay": "{count, plural, one {check a day} other {checks a day}}",
+        "perDayDetail": "{times, plural, one {# time} other {# times}} × {items}",
+        "glanceLabel": "{count, plural, one {# check} other {# checks}} between {from} and {until}",
+        "glanceEmptyLabel": "No checks yet",
+        "glanceNoTimes": "Add times to see the day.",
+        "glanceWindow": "Shaded: when each check can be done.",
+        "glanceNoWindow": "Grey band: no window, so every check is open all day.",
+        "today": "On the Today list",
+        "opensAt": "Opens {time}",
+        "todayRows": "Staff get {count, plural, one {# row} other {# rows}} like this on each day it runs.",
+        "todayRowsNone": "Staff get one row per item at each time.",
+        "overdueNote": "Marked overdue once its window closes.",
+        "neverOverdue": "Never marked overdue.",
+        "stillNeeded": "Still needed",
+        "missing": {
+          "form": "Choose a form",
+          "title": "Name the task",
+          "targets": "Choose what it checks",
+          "days": "Choose at least one day",
+          "times": "Add at least one time"
+        },
+        "notChosen": "Not chosen yet",
+        "chooseFormFirst": "Choose a form first",
+        "noDays": "No days chosen",
+        "noTimes": "no times yet",
+        "mobilePerDay": "{count, plural, =0 {No checks yet} one {# check a day} other {# checks a day}}",
+        "mobileStart": "Choose a form to start",
+        "mobilePick": "Pick what it checks and when",
+        "mobilePickWhen": "Pick when it runs",
+        "glanceTitle": "Day at a glance",
+        "more": "+{count} more"
       }
     }
   },

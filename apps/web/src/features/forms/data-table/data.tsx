@@ -1,6 +1,6 @@
 "use client";
 
-import type { FormCategory, FormResponse } from "@haccp/shared";
+import type { FormCategory, FormListItem } from "@haccp/shared";
 import { useTranslations } from "next-intl";
 import { useCallback, useMemo } from "react";
 import { DataTable } from "@/components/ui/data-table/data-table";
@@ -10,12 +10,12 @@ import { FormsMobileCard } from "@/features/forms/data-table/mobile-card";
 import { getFormRowActions } from "@/features/forms/data-table/row-actions";
 
 type FormsDataProps = {
-  items: FormResponse[];
+  items: FormListItem[];
   categoryLabels: Record<FormCategory, string>;
   onAdd: () => void;
-  onEdit: (form: FormResponse) => void;
-  onDuplicate: (form: FormResponse) => void;
-  onDelete: (form: FormResponse) => void;
+  onEdit: (form: FormListItem) => void;
+  onDuplicate: (form: FormListItem) => void;
+  onDelete: (form: FormListItem) => void;
 };
 
 export function FormsData({

@@ -1,6 +1,6 @@
 "use client";
 
-import type { FormCategory, FormResponse } from "@haccp/shared";
+import type { FormCategory, FormListItem } from "@haccp/shared";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
@@ -14,14 +14,14 @@ type FormsTranslations = ReturnType<typeof useTranslations<"FormsPage">>;
 type GetColumnsParams = {
   t: FormsTranslations;
   categoryLabels: Record<FormCategory, string>;
-  getRowActions: GetRowActions<FormResponse>;
+  getRowActions: GetRowActions<FormListItem>;
 };
 
 export function getColumns({
   t,
   categoryLabels,
   getRowActions,
-}: GetColumnsParams): ColumnDef<FormResponse>[] {
+}: GetColumnsParams): ColumnDef<FormListItem>[] {
   return [
     {
       accessorKey: "name",
@@ -62,6 +62,24 @@ export function getColumns({
       cell: ({ row }) => (
         <span className="tabular-nums text-muted-foreground">
           {row.original.latestVersion.definition.fields.length}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "templateCount",
+      meta: { view_label: t("columns.usedBy") },
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t("columns.usedBy")} />
+      ),
+      cell: ({ row }) => (
+        <span
+          className={
+            row.original.templateCount === 0
+              ? "text-muted-foreground"
+              : "tabular-nums"
+          }
+        >
+          {t("usedBy", { count: row.original.templateCount })}
         </span>
       ),
     },

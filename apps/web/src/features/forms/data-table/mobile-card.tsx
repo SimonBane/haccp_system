@@ -1,6 +1,6 @@
 "use client";
 
-import type { FormCategory, FormResponse } from "@haccp/shared";
+import type { FormCategory, FormListItem } from "@haccp/shared";
 import type { Row } from "@tanstack/react-table";
 import type { useTranslations } from "next-intl";
 import { MobileListRow } from "@/components/ui/data-table/data-table-mobile-list";
@@ -9,7 +9,7 @@ import { FORM_CATEGORY_ICONS } from "@/features/forms/lib/category-icon";
 type FormsTranslations = ReturnType<typeof useTranslations<"FormsPage">>;
 
 type FormsMobileCardProps = {
-  row: Row<FormResponse>;
+  row: Row<FormListItem>;
   t: FormsTranslations;
   categoryLabels: Record<FormCategory, string>;
 };
@@ -28,7 +28,7 @@ export function FormsMobileCard({
       title={form.name}
       subtitle={`${categoryLabels[form.category]} · ${t("fieldCount", {
         count: form.latestVersion.definition.fields.length,
-      })}`}
+      })} · ${t("usedBy", { count: form.templateCount })}`}
       trailing={
         <span className="text-xs tabular-nums text-muted-foreground">
           {t("versionBadge", { version: form.latestVersion.version })}

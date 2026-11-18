@@ -1,6 +1,6 @@
 "use client";
 
-import type { FormResponse } from "@haccp/shared";
+import type { FormListItem } from "@haccp/shared";
 import { formListResponseSchema } from "@haccp/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useTenant } from "@/features/tenant/tenant-provider";
@@ -8,7 +8,7 @@ import { useAuthenticatedFetch } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
 
 type UseFormsQueryOptions = {
-  initialData?: FormResponse[];
+  initialData?: FormListItem[];
 };
 
 export function useFormsQuery(options?: UseFormsQueryOptions) {

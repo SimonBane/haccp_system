@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { scrollToTimeGroup } from "../lib/scroll";
+import type { RoundScope } from "../lib/today-round";
 import type { TodayTimeline as Timeline, TodayTimelineItem } from "../lib/today-timeline";
 import { TodayNowLine } from "./today-now-line";
 import {
@@ -17,7 +18,7 @@ type Props = {
   scrollKey: string;
   syncingKeys: ReadonlySet<string>;
   currentUserId: string | null;
-  onActivate: (item: TodayTimelineItem) => void;
+  onActivate: (item: TodayTimelineItem, scope?: RoundScope) => void;
 };
 
 export function TodayTimeline({

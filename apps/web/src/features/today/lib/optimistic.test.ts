@@ -40,7 +40,7 @@ function summary(id: string, definition: FormDefinition) {
     id,
     formId: "00000000-0000-4000-8000-0000000000f0",
     formName: "Form",
-    category: "other" as const,
+    category: "hygiene" as const,
     version: 1,
     definition,
   };
@@ -54,6 +54,8 @@ function task(overrides: Partial<TodayTaskItem> = {}): TodayTaskItem {
     formVersionId: CLEANING_VERSION,
     targetId: null,
     targetName: null,
+    targetKind: null,
+    area: null,
     resolvedLimits: {},
     scheduledTime: "07:00",
     timeSlot: "morning",
