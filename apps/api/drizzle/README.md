@@ -43,6 +43,11 @@ targets, versioned forms and readings). No existing data was kept, so this
 reset was not re-ledgered: every database is recreated empty and migrated from
 the new baseline.
 
+On 2026-11-18 that baseline and its follow-ups `0001`–`0004` (fixed target kinds,
+fixtures, name length limits) were squashed into a regenerated `0000_baseline.sql`,
+verified identical on scratch databases as above. Again no data was kept: every
+database is recreated empty.
+
 CI enforces the rule: `validate-migrations` runs `db:check` and fails if it
 produces a migration, which catches both a schema change with no migration and a
 migration the snapshots never saw.

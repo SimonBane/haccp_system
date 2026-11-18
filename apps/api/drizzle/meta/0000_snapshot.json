@@ -1,5 +1,5 @@
 {
-  "id": "6efd91a0-9a7a-414e-a498-27b04ba7e272",
+  "id": "dba43f2f-b9c6-4bd3-9016-5f238dc3aaa4",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -614,101 +614,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.target_types": {
-      "name": "target_types",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "archived_at": {
-          "name": "archived_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "target_types_organization_id_name_active_unique": {
-          "name": "target_types_organization_id_name_active_unique",
-          "columns": [
-            {
-              "expression": "organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "name",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"target_types\".\"archived_at\" IS NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "target_types_organization_id_organizations_id_fk": {
-          "name": "target_types_organization_id_organizations_id_fk",
-          "tableFrom": "target_types",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.targets": {
       "name": "targets",
       "schema": "",
@@ -726,9 +631,9 @@
           "primaryKey": false,
           "notNull": true
         },
-        "target_type_id": {
-          "name": "target_type_id",
-          "type": "uuid",
+        "kind": {
+          "name": "kind",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -766,8 +671,8 @@
         }
       },
       "indexes": {
-        "targets_location_id_name_active_unique": {
-          "name": "targets_location_id_name_active_unique",
+        "targets_location_id_name_scope_active_unique": {
+          "name": "targets_location_id_name_scope_active_unique",
           "columns": [
             {
               "expression": "location_id",
@@ -780,25 +685,16 @@
               "isExpression": false,
               "asc": true,
               "nulls": "last"
+            },
+            {
+              "expression": "(CASE WHEN \"kind\" = 'fixture' THEN \"parent_id\" ELSE \"location_id\" END)",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
             }
           ],
           "isUnique": true,
           "where": "\"targets\".\"archived_at\" IS NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "targets_target_type_id_idx": {
-          "name": "targets_target_type_id_idx",
-          "columns": [
-            {
-              "expression": "target_type_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -811,19 +707,6 @@
           "tableTo": "locations",
           "columnsFrom": [
             "location_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "targets_target_type_id_target_types_id_fk": {
-          "name": "targets_target_type_id_target_types_id_fk",
-          "tableFrom": "targets",
-          "tableTo": "target_types",
-          "columnsFrom": [
-            "target_type_id"
           ],
           "columnsTo": [
             "id"
@@ -860,6 +743,18 @@
       },
       "policies": {},
       "checkConstraints": {
+        "targets_name_length": {
+          "name": "targets_name_length",
+          "value": "char_length(\"targets\".\"name\") BETWEEN 1 AND 100"
+        },
+        "targets_kind_valid": {
+          "name": "targets_kind_valid",
+          "value": "\"targets\".\"kind\" IN ('equipment', 'area', 'fixture')"
+        },
+        "targets_fixture_has_parent": {
+          "name": "targets_fixture_has_parent",
+          "value": "\"targets\".\"kind\" <> 'fixture' OR \"targets\".\"parent_id\" IS NOT NULL"
+        },
         "targets_parent_not_self": {
           "name": "targets_parent_not_self",
           "value": "\"targets\".\"parent_id\" IS NULL OR \"targets\".\"parent_id\" <> \"targets\".\"id\""
@@ -892,6 +787,12 @@
         },
         "category": {
           "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "applies_to": {
+          "name": "applies_to",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -959,7 +860,16 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "forms_name_length": {
+          "name": "forms_name_length",
+          "value": "char_length(\"forms\".\"name\") BETWEEN 1 AND 200"
+        },
+        "forms_applies_to_valid": {
+          "name": "forms_applies_to_valid",
+          "value": "\"forms\".\"applies_to\" IN ('per_item', 'location')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.form_versions": {
@@ -1184,6 +1094,10 @@
       },
       "policies": {},
       "checkConstraints": {
+        "task_templates_title_length": {
+          "name": "task_templates_title_length",
+          "value": "char_length(\"task_templates\".\"title\") BETWEEN 1 AND 100"
+        },
         "task_templates_completion_opens_before_range": {
           "name": "task_templates_completion_opens_before_range",
           "value": "\"task_templates\".\"completion_opens_before_minutes\" >= 0 AND \"task_templates\".\"completion_opens_before_minutes\" <= 1440"

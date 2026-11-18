@@ -57,26 +57,19 @@ CREATE TABLE "locations" (
 	CONSTRAINT "locations_id_organization_id_unique" UNIQUE("id","organization_id")
 );
 --> statement-breakpoint
-CREATE TABLE "target_types" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"organization_id" uuid NOT NULL,
-	"name" text NOT NULL,
-	"kind" text NOT NULL,
-	"archived_at" timestamp with time zone,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
 CREATE TABLE "targets" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"location_id" uuid NOT NULL,
-	"target_type_id" uuid NOT NULL,
+	"kind" text NOT NULL,
 	"name" text NOT NULL,
 	"parent_id" uuid,
 	"archived_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "targets_id_location_id_unique" UNIQUE("id","location_id"),
+	CONSTRAINT "targets_name_length" CHECK (char_length("targets"."name") BETWEEN 1 AND 100),
+	CONSTRAINT "targets_kind_valid" CHECK ("targets"."kind" IN ('equipment', 'area', 'fixture')),
+	CONSTRAINT "targets_fixture_has_parent" CHECK ("targets"."kind" <> 'fixture' OR "targets"."parent_id" IS NOT NULL),
 	CONSTRAINT "targets_parent_not_self" CHECK ("targets"."parent_id" IS NULL OR "targets"."parent_id" <> "targets"."id")
 );
 --> statement-breakpoint
@@ -85,9 +78,12 @@ CREATE TABLE "forms" (
 	"organization_id" uuid NOT NULL,
 	"name" text NOT NULL,
 	"category" text NOT NULL,
+	"applies_to" text NOT NULL,
 	"archived_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "forms_name_length" CHECK (char_length("forms"."name") BETWEEN 1 AND 200),
+	CONSTRAINT "forms_applies_to_valid" CHECK ("forms"."applies_to" IN ('per_item', 'location'))
 );
 --> statement-breakpoint
 CREATE TABLE "form_versions" (
@@ -113,6 +109,7 @@ CREATE TABLE "task_templates" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "task_templates_id_location_id_unique" UNIQUE("id","location_id"),
+	CONSTRAINT "task_templates_title_length" CHECK (char_length("task_templates"."title") BETWEEN 1 AND 100),
 	CONSTRAINT "task_templates_completion_opens_before_range" CHECK ("task_templates"."completion_opens_before_minutes" >= 0 AND "task_templates"."completion_opens_before_minutes" <= 1440),
 	CONSTRAINT "task_templates_completion_due_after_range" CHECK ("task_templates"."completion_due_after_minutes" IS NULL OR ("task_templates"."completion_due_after_minutes" >= 0 AND "task_templates"."completion_due_after_minutes" <= 1440))
 );
@@ -178,9 +175,7 @@ ALTER TABLE "organization_member_locations" ADD CONSTRAINT "organization_member_
 ALTER TABLE "organization_member_locations" ADD CONSTRAINT "organization_member_locations_membership_id_organization_id_organization_memberships_id_organization_id_fk" FOREIGN KEY ("membership_id","organization_id") REFERENCES "public"."organization_memberships"("id","organization_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "organization_member_locations" ADD CONSTRAINT "organization_member_locations_location_id_organization_id_locations_id_organization_id_fk" FOREIGN KEY ("location_id","organization_id") REFERENCES "public"."locations"("id","organization_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "locations" ADD CONSTRAINT "locations_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "target_types" ADD CONSTRAINT "target_types_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "targets" ADD CONSTRAINT "targets_location_id_locations_id_fk" FOREIGN KEY ("location_id") REFERENCES "public"."locations"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "targets" ADD CONSTRAINT "targets_target_type_id_target_types_id_fk" FOREIGN KEY ("target_type_id") REFERENCES "public"."target_types"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "targets" ADD CONSTRAINT "targets_parent_id_location_id_targets_id_location_id_fk" FOREIGN KEY ("parent_id","location_id") REFERENCES "public"."targets"("id","location_id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "forms" ADD CONSTRAINT "forms_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "form_versions" ADD CONSTRAINT "form_versions_form_id_forms_id_fk" FOREIGN KEY ("form_id") REFERENCES "public"."forms"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
@@ -209,9 +204,7 @@ CREATE INDEX "organization_member_locations_location_id_organization_id_idx" ON 
 CREATE INDEX "organization_member_locations_organization_id_idx" ON "organization_member_locations" USING btree ("organization_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "locations_organization_id_name_unique" ON "locations" USING btree ("organization_id","name");--> statement-breakpoint
 CREATE UNIQUE INDEX "locations_organization_id_is_default_unique" ON "locations" USING btree ("organization_id") WHERE "locations"."is_default" = true;--> statement-breakpoint
-CREATE UNIQUE INDEX "target_types_organization_id_name_active_unique" ON "target_types" USING btree ("organization_id","name") WHERE "target_types"."archived_at" IS NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX "targets_location_id_name_active_unique" ON "targets" USING btree ("location_id","name") WHERE "targets"."archived_at" IS NULL;--> statement-breakpoint
-CREATE INDEX "targets_target_type_id_idx" ON "targets" USING btree ("target_type_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "targets_location_id_name_scope_active_unique" ON "targets" USING btree ("location_id","name",(CASE WHEN "kind" = 'fixture' THEN "parent_id" ELSE "location_id" END)) WHERE "targets"."archived_at" IS NULL;--> statement-breakpoint
 CREATE UNIQUE INDEX "forms_organization_id_name_active_unique" ON "forms" USING btree ("organization_id","name") WHERE "forms"."archived_at" IS NULL;--> statement-breakpoint
 CREATE INDEX "task_templates_location_id_idx" ON "task_templates" USING btree ("location_id");--> statement-breakpoint
 CREATE INDEX "task_templates_form_id_idx" ON "task_templates" USING btree ("form_id");--> statement-breakpoint
