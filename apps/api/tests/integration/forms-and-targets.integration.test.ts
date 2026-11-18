@@ -5,7 +5,6 @@ import {
   formResponseSchema,
   targetListResponseSchema,
   targetResponseSchema,
-  targetTypeListResponseSchema,
   type FormDefinition,
 } from "@haccp/shared";
 import { eq } from "drizzle-orm";
@@ -39,131 +38,133 @@ describe("Equipment & areas and forms (HTTP)", () => {
     };
   }
 
-  describe("target types", () => {
-    it("lists only the caller's organisation's types", async () => {
-      const response = await apiRequest("/target-types", asAlpha("GET"));
-
-      expect(response.status).toBe(200);
-      const body = targetTypeListResponseSchema.parse(await response.json());
-      expect(body.items.map((item) => item.id)).toEqual([
-        world.alpha.targetTypes.fridge.id,
-      ]);
-    });
-
-    it("refuses a duplicate active name with TARGET_TYPE_NAME_EXISTS", async () => {
-      const response = await apiRequest(
-        "/target-types",
-        asAlpha("POST", { name: "Fridge", kind: "equipment" }),
-      );
-
-      expect(response.status).toBe(409);
-      expect(await response.json()).toMatchObject({
-        error: API_ERROR_CODE.TARGET_TYPE_NAME_EXISTS,
-      });
-    });
-
-    it("refuses to archive a type still used by a target", async () => {
-      const response = await apiRequest(
-        `/target-types/${world.alpha.targetTypes.fridge.id}`,
-        asAlpha("DELETE"),
-      );
-
-      expect(response.status).toBe(409);
-      expect(await response.json()).toMatchObject({
-        error: API_ERROR_CODE.TARGET_TYPE_IN_USE,
-      });
-    });
-
-    it("cannot touch another organisation's type", async () => {
-      const response = await apiRequest(
-        `/target-types/${world.beta.targetTypes.fridge.id}`,
-        asAlpha("PATCH", { name: "Hijacked", kind: "area" }),
-      );
-
-      expect(response.status).toBe(404);
-    });
-
-    it("is admin-only", async () => {
-      const response = await apiRequest("/target-types", {
-        actor: asEmployee(world.alpha),
-      });
-
-      expect(response.status).toBe(403);
-    });
-  });
-
   describe("targets", () => {
     const targetsPath = (locationId: string) =>
       `/locations/${locationId}/targets`;
 
-    it("creates a target nested inside another, with its type", async () => {
+    async function createArea(name: string, parentId: string | null = null) {
+      const response = await apiRequest(
+        targetsPath(world.alpha.locations.main.id),
+        asAlpha("POST", { name, kind: "area", parentId }),
+      );
+      expect(response.status).toBe(201);
+      return targetResponseSchema.parse(await response.json());
+    }
+
+    it("lists targets with the number of active tasks checking them", async () => {
+      const response = await apiRequest(
+        targetsPath(world.alpha.locations.main.id),
+        asAlpha("GET"),
+      );
+
+      expect(response.status).toBe(200);
+      const body = targetListResponseSchema.parse(await response.json());
+      expect(body.items).toEqual([
+        expect.objectContaining({
+          id: world.alpha.targets.fridge.id,
+          kind: "equipment",
+          taskCount: 1,
+        }),
+      ]);
+    });
+
+    it("creates equipment inside an area", async () => {
+      const kitchen = await createArea("Kitchen");
+
       const response = await apiRequest(
         targetsPath(world.alpha.locations.main.id),
         asAlpha("POST", {
-          name: "Top shelf",
-          targetTypeId: world.alpha.targetTypes.fridge.id,
-          parentId: world.alpha.targets.fridge.id,
+          name: "Prep table",
+          kind: "equipment",
+          parentId: kitchen.id,
         }),
       );
 
       expect(response.status).toBe(201);
       expect(targetResponseSchema.parse(await response.json())).toMatchObject({
-        name: "Top shelf",
-        parentId: world.alpha.targets.fridge.id,
-        targetTypeName: "Fridge",
+        name: "Prep table",
         kind: "equipment",
+        parentId: kitchen.id,
+        taskCount: 0,
       });
     });
 
-    it("refuses another organisation's type", async () => {
+    it("refuses to place anything inside equipment", async () => {
       const response = await apiRequest(
         targetsPath(world.alpha.locations.main.id),
         asAlpha("POST", {
-          name: "Borrowed",
-          targetTypeId: world.beta.targetTypes.fridge.id,
-        }),
-      );
-
-      expect(response.status).toBe(404);
-    });
-
-    it("refuses a parent from another location", async () => {
-      const response = await apiRequest(
-        targetsPath(world.alpha.locations.annex.id),
-        asAlpha("POST", {
-          name: "Annex shelf",
-          targetTypeId: world.alpha.targetTypes.fridge.id,
+          name: "Top shelf",
+          kind: "equipment",
           parentId: world.alpha.targets.fridge.id,
         }),
       );
 
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({
+        error: API_ERROR_CODE.TARGET_PARENT_NOT_AREA,
+      });
+    });
+
+    it("refuses a kind the database does not know", async () => {
+      const response = await apiRequest(
+        targetsPath(world.alpha.locations.main.id),
+        asAlpha("POST", { name: "Van", kind: "vehicle" }),
+      );
+
+      expect(response.status).toBe(400);
+    });
+
+    it("refuses a parent from another location", async () => {
+      const kitchen = await createArea("Kitchen");
+
+      const response = await apiRequest(
+        targetsPath(world.alpha.locations.annex.id),
+        asAlpha("POST", {
+          name: "Annex shelf",
+          kind: "equipment",
+          parentId: kitchen.id,
+        }),
+      );
+
       expect(response.status).toBe(404);
     });
 
-    it("refuses to nest a target inside its own child", async () => {
-      const child = targetResponseSchema.parse(
-        await (
-          await apiRequest(
-            targetsPath(world.alpha.locations.main.id),
-            asAlpha("POST", {
-              name: "Shelf",
-              targetTypeId: world.alpha.targetTypes.fridge.id,
-              parentId: world.alpha.targets.fridge.id,
-            }),
-          )
-        ).json(),
-      );
+    it("refuses to nest an area inside its own child", async () => {
+      const kitchen = await createArea("Kitchen");
+      const coldRoom = await createArea("Cold room", kitchen.id);
 
       const response = await apiRequest(
-        `${targetsPath(world.alpha.locations.main.id)}/${world.alpha.targets.fridge.id}`,
+        `${targetsPath(world.alpha.locations.main.id)}/${kitchen.id}`,
         asAlpha("PATCH", {
-          name: "Fridge 1",
-          targetTypeId: world.alpha.targetTypes.fridge.id,
-          parentId: child.id,
+          name: "Kitchen",
+          kind: "area",
+          parentId: coldRoom.id,
         }),
       );
 
       expect(response.status).toBe(400);
+    });
+
+    it("changes an item's kind while a task checks it, but not an area that holds items", async () => {
+      const fridgeAsArea = await apiRequest(
+        `${targetsPath(world.alpha.locations.main.id)}/${world.alpha.targets.fridge.id}`,
+        asAlpha("PATCH", {
+          name: world.alpha.targets.fridge.name,
+          kind: "area",
+        }),
+      );
+      expect(fridgeAsArea.status).toBe(200);
+
+      const kitchen = await createArea("Kitchen");
+      await createArea("Cold room", kitchen.id);
+      const kitchenAsEquipment = await apiRequest(
+        `${targetsPath(world.alpha.locations.main.id)}/${kitchen.id}`,
+        asAlpha("PATCH", { name: "Kitchen", kind: "equipment" }),
+      );
+      expect(kitchenAsEquipment.status).toBe(409);
+      expect(await kitchenAsEquipment.json()).toMatchObject({
+        error: API_ERROR_CODE.TARGET_KIND_IN_USE,
+      });
     });
 
     it("archives a target: hidden from the list, unlinked from templates, name reusable", async () => {
@@ -193,7 +194,7 @@ describe("Equipment & areas and forms (HTTP)", () => {
         targetsPath(world.alpha.locations.main.id),
         asAlpha("POST", {
           name: world.alpha.targets.fridge.name,
-          targetTypeId: world.alpha.targetTypes.fridge.id,
+          kind: "equipment",
         }),
       );
       expect(recreated.status).toBe(201);
@@ -204,7 +205,7 @@ describe("Equipment & areas and forms (HTTP)", () => {
         targetsPath(world.alpha.locations.main.id),
         asAlpha("POST", {
           name: world.alpha.targets.fridge.name,
-          targetTypeId: world.alpha.targetTypes.fridge.id,
+          kind: "equipment",
         }),
       );
 
@@ -212,6 +213,60 @@ describe("Equipment & areas and forms (HTTP)", () => {
       expect(await response.json()).toMatchObject({
         error: API_ERROR_CODE.TARGET_NAME_EXISTS,
       });
+    });
+
+    it("creates fixtures inside areas, repeating a name only across areas", async () => {
+      const kitchen = await createArea("Kitchen");
+      const bar = await createArea("Bar");
+      const createFixture = (parentId: string | null) =>
+        apiRequest(
+          targetsPath(world.alpha.locations.main.id),
+          asAlpha("POST", { name: "Walls", kind: "fixture", parentId }),
+        );
+
+      const kitchenWalls = await createFixture(kitchen.id);
+      expect(kitchenWalls.status).toBe(201);
+      expect(targetResponseSchema.parse(await kitchenWalls.json())).toMatchObject({
+        kind: "fixture",
+        parentId: kitchen.id,
+      });
+      expect((await createFixture(bar.id)).status).toBe(201);
+
+      const duplicate = await createFixture(kitchen.id);
+      expect(duplicate.status).toBe(409);
+      expect(await duplicate.json()).toMatchObject({
+        error: API_ERROR_CODE.TARGET_NAME_EXISTS,
+      });
+      expect((await createFixture(null)).status).toBe(400);
+    });
+
+    it("refuses to place a fixture inside equipment", async () => {
+      const response = await apiRequest(
+        targetsPath(world.alpha.locations.main.id),
+        asAlpha("POST", {
+          name: "Door",
+          kind: "fixture",
+          parentId: world.alpha.targets.fridge.id,
+        }),
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({
+        error: API_ERROR_CODE.TARGET_PARENT_NOT_AREA,
+      });
+    });
+
+    it("is admin-only for writes", async () => {
+      const response = await apiRequest(
+        targetsPath(world.alpha.locations.main.id),
+        {
+          method: "POST",
+          actor: asEmployee(world.alpha),
+          body: JSON.stringify({ name: "Kitchen", kind: "area" }),
+        },
+      );
+
+      expect(response.status).toBe(403);
     });
   });
 
@@ -249,20 +304,89 @@ describe("Equipment & areas and forms (HTTP)", () => {
       );
     });
 
+    it("counts only active templates per form", async () => {
+      await db
+        .update(taskTemplates)
+        .set({ archivedAt: new Date() })
+        .where(eq(taskTemplates.id, world.alpha.templates.cleaning.id));
+
+      const response = await apiRequest("/forms", asAlpha("GET"));
+
+      const body = formListResponseSchema.parse(await response.json());
+      const countByName = Object.fromEntries(
+        body.items.map((item) => [item.name, item.templateCount]),
+      );
+      expect(countByName).toEqual({ "Fridge check": 1, Cleaning: 0 });
+    });
+
     it("creates a form with version 1", async () => {
       const response = await apiRequest(
         "/forms",
         asAlpha("POST", {
           name: "Goods-in check",
           category: "goods_in",
+          appliesTo: "location",
           definition: CLEANING_DEFINITION,
         }),
       );
 
       expect(response.status).toBe(201);
-      expect(
-        formResponseSchema.parse(await response.json()).latestVersion.version,
-      ).toBe(1);
+      const body = formResponseSchema.parse(await response.json());
+      expect(body.latestVersion.version).toBe(1);
+      expect(body.appliesTo).toBe("location");
+    });
+
+    it("refuses whole-location while a task checks items, and per-item while one checks none", async () => {
+      const toLocation = await apiRequest(
+        `/forms/${world.alpha.forms.fridgeCheck.id}`,
+        asAlpha("PATCH", {
+          name: "Fridge check",
+          category: "temperature",
+          appliesTo: "location",
+        }),
+      );
+      const toPerItem = await apiRequest(
+        `/forms/${world.alpha.forms.cleaning.id}`,
+        asAlpha("PATCH", {
+          name: "Cleaning",
+          category: "cleaning",
+          appliesTo: "per_item",
+        }),
+      );
+
+      for (const response of [toLocation, toPerItem]) {
+        expect(response.status).toBe(409);
+        expect(await response.json()).toMatchObject({
+          error: API_ERROR_CODE.FORM_APPLIES_TO_IN_USE,
+        });
+      }
+    });
+
+    it("changes applies-to freely while no task uses the form", async () => {
+      const created = await apiRequest(
+        "/forms",
+        asAlpha("POST", {
+          name: "Room inspection",
+          category: "hygiene",
+          appliesTo: "location",
+          definition: CLEANING_DEFINITION,
+        }),
+      );
+      const form = formResponseSchema.parse(await created.json());
+
+      const response = await apiRequest(
+        `/forms/${form.id}`,
+        asAlpha("PATCH", {
+          name: "Room inspection",
+          category: "hygiene",
+          appliesTo: "per_item",
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(formResponseSchema.parse(await response.json()).appliesTo).toBe(
+        "per_item",
+      );
     });
 
     it("rejects a definition with duplicate field ids", async () => {
@@ -270,7 +394,8 @@ describe("Equipment & areas and forms (HTTP)", () => {
         "/forms",
         asAlpha("POST", {
           name: "Broken",
-          category: "other",
+          category: "hygiene",
+          appliesTo: "location",
           definition: {
             ...CLEANING_DEFINITION,
             fields: [

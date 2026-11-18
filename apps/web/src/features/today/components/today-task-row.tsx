@@ -1,6 +1,5 @@
 "use client";
 
-import { FORM_CATEGORY } from "@haccp/shared";
 import {
   CheckIcon,
   ChevronRightIcon,
@@ -15,7 +14,10 @@ import { Card } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { useAnswerFormat } from "@/features/forms/hooks/use-answer-format";
 import { primaryMeasurement } from "@/features/forms/lib/answer-summary";
-import { FORM_CATEGORY_ICONS } from "@/features/forms/lib/category-icon";
+import {
+  FALLBACK_FORM_ICON,
+  FORM_CATEGORY_ICONS,
+} from "@/features/forms/lib/category-icon";
 import { cn } from "@/lib/utils";
 import { formatTimeOfDay } from "../lib/format";
 import { occurrenceKey } from "../lib/today-grouping";
@@ -29,6 +31,8 @@ type Props = {
   isSyncing: boolean;
   currentUserId: string | null;
   onActivate: (item: TodayTimelineItem) => void;
+  /** Replaces the target chip's text, e.g. "Walls" inside the Kitchen 2 card. */
+  targetLabel?: string | null;
 };
 
 function formatUserName(
@@ -47,6 +51,7 @@ export const TodayTaskRow = memo(function TodayTaskRow({
   isSyncing,
   currentUserId,
   onActivate,
+  targetLabel,
 }: Props) {
   const t = useTranslations("TodayPage");
   const tForms = useTranslations("Forms");
@@ -55,8 +60,8 @@ export const TodayTaskRow = memo(function TodayTaskRow({
   const { task, form, isCompleted, isDeviation, priorRecord, liveStatus } =
     item;
 
-  const category = form?.category ?? FORM_CATEGORY.OTHER;
-  const TypeIcon = FORM_CATEGORY_ICONS[category];
+  const category = form?.category ?? null;
+  const TypeIcon = category ? FORM_CATEGORY_ICONS[category] : FALLBACK_FORM_ICON;
   const needsEntry = needsRecordFlow(item);
   const reading = isCompleted ? primaryMeasurement(task.values) : null;
   const priorReading = priorRecord
@@ -94,7 +99,8 @@ export const TodayTaskRow = memo(function TodayTaskRow({
       ? formatUserName(task.completedBy, t("audit.you"), currentUserId)
       : null;
 
-  const hasChipRow = Boolean(task.targetName);
+  const chipLabel = targetLabel === undefined ? task.targetName : targetLabel;
+  const hasChipRow = Boolean(chipLabel);
   const hasAuditLine = Boolean(completedTime) || Boolean(completedByLabel);
   const hasDataColumn = Boolean(readingLabel) || hasAuditLine;
 
@@ -163,22 +169,24 @@ export const TodayTaskRow = memo(function TodayTaskRow({
               !hasChipRow && "hidden sm:flex",
             )}
           >
-            {task.targetName ? (
+            {chipLabel ? (
               <Badge
                 variant="secondary"
                 className="max-w-[11rem] sm:max-w-[16rem]"
               >
                 <ShapesIcon />
-                <span className="truncate">{task.targetName}</span>
+                <span className="truncate">{chipLabel}</span>
               </Badge>
             ) : null}
 
-            <Badge
-              variant="outline"
-              className="hidden font-normal text-muted-foreground sm:inline-flex"
-            >
-              {tForms(`categories.${category}`)}
-            </Badge>
+            {category ? (
+              <Badge
+                variant="outline"
+                className="hidden font-normal text-muted-foreground sm:inline-flex"
+              >
+                {tForms(`categories.${category}`)}
+              </Badge>
+            ) : null}
 
             {isDeviation ? (
               <Badge variant="destructive" className="hidden sm:inline-flex">

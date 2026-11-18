@@ -35,6 +35,16 @@ describe("sanitizeMeasurementDraft", () => {
     expect(sanitizeMeasurementDraft("08", ",", "celsius")).toBe("8");
     expect(sanitizeMeasurementDraft("0,5", ",", "celsius")).toBe("0,5");
   });
+
+  it("drops letters, symbols and extra separators, as limit inputs rely on", () => {
+    expect(sanitizeMeasurementDraft("ab°C 4.55%", ".", "celsius")).toBe("4.5");
+    expect(sanitizeMeasurementDraft("1,2,3", ",", "celsius")).toBe("1,2");
+    expect(sanitizeMeasurementDraft("e5", ".", "celsius")).toBe("5");
+  });
+
+  it("leaves an emptied box empty, which means no limit on that side", () => {
+    expect(sanitizeMeasurementDraft("", ",", "celsius")).toBe("");
+  });
 });
 
 describe("parseMeasurementDraft", () => {

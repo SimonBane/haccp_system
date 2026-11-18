@@ -4,127 +4,12 @@ import {
   type FormDefinition,
   type LimitOverrides,
   type LimitsIssue,
+  type MeasurementField,
+  type TaskTemplateFieldsInput,
   type TaskTemplateResponse,
   type TaskTemplateTargetInput,
-  type TaskTemplateWeekday,
 } from "@haccp/shared";
 import { parseMeasurementDraft } from "@/features/forms/lib/measurement";
-
-export function findDuplicateScheduledTimeIndices(
-  times: string[],
-): Set<number> {
-  const countsByTime = new Map<string, number>();
-  for (const time of times) {
-    if (!time) continue;
-    countsByTime.set(time, (countsByTime.get(time) ?? 0) + 1);
-  }
-
-  const duplicateIndices = new Set<number>();
-  times.forEach((time, index) => {
-    if (time && (countsByTime.get(time) ?? 0) > 1) {
-      duplicateIndices.add(index);
-    }
-  });
-
-  return duplicateIndices;
-}
-
-export function getNextDefaultScheduledTime(existingTimes: string[]): string {
-  const lastTime = existingTimes.at(-1);
-  if (!lastTime) return "08:00";
-
-  const [hourString] = lastTime.split(":");
-  const nextHour = ((Number(hourString) + 1) % 24).toString().padStart(2, "0");
-  return `${nextHour}:00`;
-}
-
-export function getScheduledTimeRowsErrorMessage(
-  error: unknown,
-): string | undefined {
-  if (!error || typeof error !== "object") return undefined;
-
-  if ("message" in error && error.message) {
-    return String(error.message);
-  }
-
-  if (
-    "root" in error &&
-    error.root &&
-    typeof error.root === "object" &&
-    "message" in error.root &&
-    error.root.message
-  ) {
-    return String(error.root.message);
-  }
-
-  if (Array.isArray(error)) {
-    for (const item of error) {
-      const message = (item as { time?: { message?: string } } | undefined)
-        ?.time?.message;
-      if (message) return message;
-    }
-  }
-
-  return undefined;
-}
-
-export type ScheduledTimeRowValue = {
-  time: string;
-};
-
-export function buildDefaultTimeRows(
-  task?: TaskTemplateResponse | null,
-  duplicateSource?: TaskTemplateResponse | null,
-): ScheduledTimeRowValue[] {
-  const source = task ?? duplicateSource;
-  if (source && source.scheduledTimes.length > 0) {
-    return source.scheduledTimes.map((time) => ({ time }));
-  }
-
-  return [];
-}
-
-export function buildDefaultWeekdays(
-  task?: TaskTemplateResponse | null,
-  duplicateSource?: TaskTemplateResponse | null,
-): TaskTemplateWeekday[] {
-  const source = task ?? duplicateSource;
-  if (source) {
-    return source.weekdays;
-  }
-
-  return [];
-}
-
-export type CompletionWindowValues = {
-  completionOpensBeforeMinutes: string;
-  completionDueAfterMinutes: string;
-  neverOverdue: boolean;
-};
-
-export function buildDefaultCompletionWindow(
-  task?: TaskTemplateResponse | null,
-  duplicateSource?: TaskTemplateResponse | null,
-): CompletionWindowValues {
-  const source = task ?? duplicateSource;
-
-  if (source) {
-    return {
-      completionOpensBeforeMinutes: String(source.completionOpensBeforeMinutes),
-      completionDueAfterMinutes:
-        source.completionDueAfterMinutes === null
-          ? ""
-          : String(source.completionDueAfterMinutes),
-      neverOverdue: source.completionDueAfterMinutes === null,
-    };
-  }
-
-  return {
-    completionOpensBeforeMinutes: "",
-    completionDueAfterMinutes: "",
-    neverOverdue: false,
-  };
-}
 
 /** Limits stay as typed text; `enabled` keeps typed values around when the admin toggles back to the form's defaults. */
 export type OverrideDraft = { enabled: boolean; min: string; max: string };
@@ -159,6 +44,28 @@ export function buildDefaultTargets(
       ]),
     ),
   }));
+}
+
+/** Keeps each still-selected target's override drafts, so deselecting another loses nothing. */
+export function applyTargetSelection(
+  selections: readonly TargetSelection[],
+  targetIds: readonly string[],
+): TargetSelection[] {
+  const byId = new Map(
+    selections.map((selection) => [selection.targetId, selection]),
+  );
+  return targetIds.map(
+    (targetId) => byId.get(targetId) ?? { targetId, overrides: {} },
+  );
+}
+
+export function countTargetsWithCustomLimits(
+  selections: readonly TargetSelection[],
+  fieldIds: readonly string[],
+): number {
+  return selections.filter((selection) =>
+    fieldIds.some((fieldId) => selection.overrides[fieldId]?.enabled),
+  ).length;
 }
 
 function parseLimitText(raw: string): number | null | "invalid" {
@@ -231,41 +138,61 @@ function targetsKey(
   );
 }
 
+function sameMembers(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value) => right.includes(value));
+}
+
+/** Whether saving would change anything; editing without changes just goes back to the list. */
 export function hasTaskChanges(
-  values: {
-    title: string;
-    formId: string;
-    weekdays: TaskTemplateWeekday[];
-    scheduledTimeRows: ScheduledTimeRowValue[];
-    targets: readonly TaskTemplateTargetInput[];
-    completionOpensBeforeMinutes: string;
-    completionDueAfterMinutes: string;
-    neverOverdue: boolean;
-  },
+  payload: TaskTemplateFieldsInput,
   task: TaskTemplateResponse,
 ): boolean {
-  const nextTimes = values.scheduledTimeRows.map((row) => row.time);
-
-  const weekdaysChanged =
-    values.weekdays.length !== task.weekdays.length ||
-    values.weekdays.some((weekday) => !task.weekdays.includes(weekday));
-
-  const timesChanged =
-    nextTimes.length !== task.scheduledTimes.length ||
-    nextTimes.some((time) => !task.scheduledTimes.includes(time));
-
-  const nextDueAfter = values.neverOverdue
-    ? null
-    : Number(values.completionDueAfterMinutes);
-
   return (
-    values.title !== task.title ||
-    values.formId !== task.formId ||
-    weekdaysChanged ||
-    timesChanged ||
-    targetsKey(values.targets) !== targetsKey(task.targets) ||
-    Number(values.completionOpensBeforeMinutes) !==
-      task.completionOpensBeforeMinutes ||
-    nextDueAfter !== task.completionDueAfterMinutes
+    payload.title !== task.title ||
+    payload.formId !== task.formId ||
+    !sameMembers(payload.weekdays, task.weekdays) ||
+    !sameMembers(payload.scheduledTimes, task.scheduledTimes) ||
+    targetsKey(payload.targets) !== targetsKey(task.targets) ||
+    payload.completionOpensBeforeMinutes !== task.completionOpensBeforeMinutes ||
+    payload.completionDueAfterMinutes !== task.completionDueAfterMinutes
   );
+}
+
+/** One switch per target: turning it on starts every measured field from the form's own limits. */
+export function setOwnLimits(
+  selections: readonly TargetSelection[],
+  targetId: string,
+  fields: readonly MeasurementField[],
+  enabled: boolean,
+  separator: string,
+): TargetSelection[] {
+  return selections.map((selection) => {
+    if (selection.targetId !== targetId) return selection;
+    const overrides = { ...selection.overrides };
+    for (const field of fields) {
+      const current = overrides[field.id] ?? {
+        enabled: false,
+        min: limitText(field.limits.min, separator),
+        max: limitText(field.limits.max, separator),
+      };
+      overrides[field.id] = { ...current, enabled };
+    }
+    return { ...selection, overrides };
+  });
+}
+
+export function patchOwnLimit(
+  selections: readonly TargetSelection[],
+  targetId: string,
+  fieldId: string,
+  patch: Partial<Pick<OverrideDraft, "min" | "max">>,
+): TargetSelection[] {
+  return selections.map((selection) => {
+    const draft = selection.overrides[fieldId];
+    if (selection.targetId !== targetId || !draft) return selection;
+    return {
+      ...selection,
+      overrides: { ...selection.overrides, [fieldId]: { ...draft, ...patch } },
+    };
+  });
 }

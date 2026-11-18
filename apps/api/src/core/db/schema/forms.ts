@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  check,
   pgTable,
   text,
   timestamp,
@@ -17,6 +18,7 @@ export const forms = pgTable(
       .references(() => organizations.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     category: text("category").notNull(),
+    appliesTo: text("applies_to").notNull(),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -30,6 +32,12 @@ export const forms = pgTable(
     uniqueIndex("forms_organization_id_name_active_unique")
       .on(table.organizationId, table.name)
       .where(sql`${table.archivedAt} IS NULL`),
+    // Same limit as FORM_NAME_MAX_LENGTH in @haccp/shared.
+    check("forms_name_length", sql`char_length(${table.name}) BETWEEN 1 AND 200`),
+    check(
+      "forms_applies_to_valid",
+      sql`${table.appliesTo} IN ('per_item', 'location')`,
+    ),
   ],
 );
 

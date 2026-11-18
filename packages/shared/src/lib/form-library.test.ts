@@ -28,9 +28,23 @@ describe("getStarterForms", () => {
   it("names forms in the requested language", () => {
     expect(
       getStarterForms("bg").find((s) => s.key === "fridge_check")?.name,
-    ).toBe("Проверка на хладилник");
+    ).toBe("Проверка на температурата в хладилник");
     expect(
       getStarterForms("en").find((s) => s.key === "fridge_check")?.name,
-    ).toBe("Fridge check");
+    ).toBe("Fridge temperature check");
+  });
+
+  it("describes every starter", () => {
+    for (const starter of getStarterForms("en")) {
+      expect(starter.description.trim()).not.toBe("");
+    }
+  });
+
+  it("only uses categories the form schema accepts", () => {
+    expect(
+      new Set(getStarterForms("en").map((starter) => starter.category)),
+    ).toEqual(
+      new Set(["temperature", "cleaning", "hygiene", "pest_control", "goods_in"]),
+    );
   });
 });

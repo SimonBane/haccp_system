@@ -28,7 +28,7 @@ import { useTodayMutations } from "./hooks/use-today-mutations";
 import { useTodayQuery } from "./hooks/use-today-query";
 import { tapFeedback } from "./lib/haptics";
 import { flatTodayTasks, occurrenceKey } from "./lib/today-grouping";
-import { needsRecordFlow } from "./lib/today-round";
+import { needsRecordFlow, type RoundScope } from "./lib/today-round";
 import {
   applyClock,
   buildTodayTaskGroups,
@@ -394,7 +394,7 @@ export function TodayView({
   }, [closeRound, round.size, summariseRound]);
 
   const handleActivate = useCallback(
-    (item: TodayTimelineItem) => {
+    (item: TodayTimelineItem, scope?: RoundScope) => {
       if (isStale) return;
       if (!item.isCompleted && item.liveStatus === "upcoming") return;
 
@@ -410,7 +410,7 @@ export function TodayView({
 
       if (needsRecordFlow(item)) {
         // Same gate as the time group's Record button.
-        openRound(item);
+        openRound(item, scope);
         return;
       }
 

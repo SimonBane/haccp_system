@@ -33,12 +33,9 @@ const LABELS = {
   categoryOptions: {
     temperature: "Температура",
     cleaning: "Почистване",
-    goods_in: "Приемане на стоки",
-    cooking: "Термична обработка",
-    cooling: "Охлаждане",
     hygiene: "Хигиена",
     pest_control: "Контрол на вредители",
-    other: "Друго",
+    goods_in: "Приемане на стоки",
   },
   stateOptions: {
     submitted: "Изпълнена",
@@ -277,12 +274,9 @@ describe("filter definitions", () => {
     expect(definitions[0]!.options.map((option) => option.value)).toEqual([
       "temperature",
       "cleaning",
-      "goods_in",
-      "cooking",
-      "cooling",
       "hygiene",
       "pest_control",
-      "other",
+      "goods_in",
     ]);
     expect(definitions[1]!.options.map((option) => option.value)).toEqual([
       "submitted",

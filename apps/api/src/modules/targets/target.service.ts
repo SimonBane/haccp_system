@@ -3,7 +3,7 @@ import type {
   TargetListResponse,
   TargetResponse,
 } from "@haccp/shared";
-import { API_ERROR_CODE } from "@haccp/shared";
+import { API_ERROR_CODE, TARGET_KIND } from "@haccp/shared";
 import type { Db, DbClient } from "../../core/db/client.js";
 import {
   AppError,
@@ -15,53 +15,40 @@ import {
 import { mapDbMutationError } from "../../lib/db-errors.js";
 import { taskOccurrenceService } from "../task-occurrences/task-occurrence.service.js";
 import { toTargetResponse } from "./target.mapper.js";
-import { targetRepository } from "./target.repository.js";
+import {
+  targetRepository,
+  type TargetHierarchyRow,
+} from "./target.repository.js";
 
 function nameExists(): ConflictError {
-  return new ConflictError(
-    "Equipment or an area with this name already exists here",
-    {
-      code: API_ERROR_CODE.TARGET_NAME_EXISTS,
-    },
-  );
+  return new ConflictError("This name is already used here", {
+    code: API_ERROR_CODE.TARGET_NAME_EXISTS,
+  });
 }
 
-async function assertTypeUsable(
-  db: DbClient,
-  locationId: string,
-  targetTypeId: string,
-): Promise<void> {
-  const found = await targetRepository.findActiveTypeForLocation(
-    db,
-    locationId,
-    targetTypeId,
-  );
-
-  if (!found) {
-    throw new NotFoundError("Target type not found");
-  }
-}
-
-/** Parent must be an active target here, and following parents up from it must never reach `selfId`. */
-async function assertParentValid(
-  db: DbClient,
-  locationId: string,
+/** Parent must be an active area here, and following parents up from it must never reach `selfId`. */
+function assertParentValid(
+  hierarchy: TargetHierarchyRow[],
   parentId: string | null,
   selfId: string | null,
-): Promise<void> {
+): void {
   if (parentId === null) return;
 
   if (parentId === selfId) {
     throw new ValidationError("A target cannot be its own parent");
   }
 
-  const rows = await targetRepository.findManyActiveByLocation(db, locationId);
-  const parentOf = new Map(
-    rows.map((row) => [row.target.id, row.target.parentId]),
-  );
+  const byId = new Map(hierarchy.map((row) => [row.id, row]));
+  const parent = byId.get(parentId);
 
-  if (!parentOf.has(parentId)) {
-    throw new NotFoundError("Parent target not found");
+  if (!parent) {
+    throw new NotFoundError("Parent area not found");
+  }
+
+  if (parent.kind !== TARGET_KIND.AREA) {
+    throw new ValidationError("Only an area can contain other items", {
+      code: API_ERROR_CODE.TARGET_PARENT_NOT_AREA,
+    });
   }
 
   const seen = new Set<string>();
@@ -71,7 +58,7 @@ async function assertParentValid(
       throw new ValidationError("A target cannot be nested inside itself");
     }
     seen.add(current);
-    current = parentOf.get(current);
+    current = byId.get(current)?.parentId;
   }
 }
 
@@ -89,6 +76,14 @@ async function loadResponse(
   return toTargetResponse(row);
 }
 
+function mapWriteError(error: unknown): never {
+  if (error instanceof AppError) throw error;
+  mapDbMutationError(error, {
+    unique: nameExists,
+    foreignKey: () => new NotFoundError("Parent area not found"),
+  });
+}
+
 export const targetService = {
   async list(db: Db, locationId: string): Promise<TargetListResponse> {
     const rows = await targetRepository.findManyActiveByLocation(
@@ -103,14 +98,17 @@ export const targetService = {
     locationId: string,
     input: TargetInput,
   ): Promise<TargetResponse> {
-    await assertTypeUsable(db, locationId, input.targetTypeId);
-    await assertParentValid(db, locationId, input.parentId, null);
+    const hierarchy = await targetRepository.findActiveHierarchyByLocation(
+      db,
+      locationId,
+    );
+    assertParentValid(hierarchy, input.parentId, null);
 
     try {
       const created = await targetRepository.insert(db, {
         locationId,
         name: input.name,
-        targetTypeId: input.targetTypeId,
+        kind: input.kind,
         parentId: input.parentId,
       });
 
@@ -120,11 +118,7 @@ export const targetService = {
 
       return await loadResponse(db, locationId, created.id);
     } catch (error) {
-      if (error instanceof AppError) throw error;
-      mapDbMutationError(error, {
-        unique: nameExists,
-        foreignKey: () => new NotFoundError("Target type or parent not found"),
-      });
+      mapWriteError(error);
     }
   },
 
@@ -134,18 +128,37 @@ export const targetService = {
     targetId: string,
     input: TargetInput,
   ): Promise<TargetResponse> {
-    await assertTypeUsable(db, locationId, input.targetTypeId);
-    await assertParentValid(db, locationId, input.parentId, targetId);
-
     try {
       return await db.transaction(async (tx) => {
+        const hierarchy = await targetRepository.findActiveHierarchyByLocation(
+          tx,
+          locationId,
+        );
+        const current = hierarchy.find((row) => row.id === targetId);
+
+        if (!current) {
+          throw new NotFoundError("Target not found");
+        }
+
+        assertParentValid(hierarchy, input.parentId, targetId);
+
+        if (
+          current.kind !== input.kind &&
+          hierarchy.some((row) => row.parentId === targetId)
+        ) {
+          throw new ConflictError(
+            "Move the items inside this area before changing what it is",
+            { code: API_ERROR_CODE.TARGET_KIND_IN_USE },
+          );
+        }
+
         const updated = await targetRepository.updateActive(
           tx,
           locationId,
           targetId,
           {
             name: input.name,
-            targetTypeId: input.targetTypeId,
+            kind: input.kind,
             parentId: input.parentId,
             updatedAt: new Date(),
           },
@@ -155,9 +168,21 @@ export const targetService = {
           throw new NotFoundError("Target not found");
         }
 
-        // Occurrences copy the target's name, so upcoming ones are rebuilt with the new one.
-        const templateIds =
-          await targetRepository.findActiveTemplateIdsByTarget(tx, targetId);
+        // Occurrences copy the target's name, and a fixture's copies its area's too, so upcoming ones are rebuilt.
+        const fixtureIds =
+          current.name === input.name
+            ? []
+            : hierarchy
+                .filter(
+                  (row) =>
+                    row.parentId === targetId &&
+                    row.kind === TARGET_KIND.FIXTURE,
+                )
+                .map((row) => row.id);
+        const templateIds = await targetRepository.findActiveTemplateIdsByTargets(
+          tx,
+          [targetId, ...fixtureIds],
+        );
         await taskOccurrenceService.reconcileTemplatesAtLocation(
           tx,
           locationId,
@@ -167,11 +192,7 @@ export const targetService = {
         return loadResponse(tx, locationId, targetId);
       });
     } catch (error) {
-      if (error instanceof AppError) throw error;
-      mapDbMutationError(error, {
-        unique: nameExists,
-        foreignKey: () => new NotFoundError("Target type or parent not found"),
-      });
+      mapWriteError(error);
     }
   },
 

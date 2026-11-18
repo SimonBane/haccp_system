@@ -1,5 +1,6 @@
 export {
   fetchApi,
+  getForm,
   getRecordsPage,
   getRecordsReport,
   getTenantContext,
@@ -8,7 +9,6 @@ export {
   listForms,
   listLocations,
   listTargets,
-  listTargetTypes,
   listTaskTemplates,
   resolveActiveLocationId,
 } from "./api/server";

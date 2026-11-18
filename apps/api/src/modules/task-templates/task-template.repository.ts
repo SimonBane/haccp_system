@@ -7,6 +7,11 @@ import { locations } from "../../core/db/schema/locations.js";
 import { targets } from "../../core/db/schema/targets.js";
 import { taskTemplateTargets } from "../../core/db/schema/task-template-targets.js";
 import { taskTemplates } from "../../core/db/schema/task-templates.js";
+import {
+  parentTargets,
+  targetLabelColumns,
+  withTargetLabel,
+} from "../targets/target-label.js";
 
 export type TaskTemplateRow = typeof taskTemplates.$inferSelect;
 
@@ -27,6 +32,7 @@ export type FormForTemplateRow = {
   formId: string;
   formName: string;
   formCategory: string;
+  appliesTo: string;
   definition: FormDefinition;
 };
 
@@ -100,17 +106,21 @@ export const taskTemplateRepository = {
   ): Promise<TemplateTargetRow[]> {
     if (templateIds.length === 0) return [];
 
-    return db
+    const rows = await db
       .select({
         taskTemplateId: taskTemplateTargets.taskTemplateId,
         targetId: targets.id,
-        targetName: targets.name,
+        ...targetLabelColumns,
         limitOverrides: taskTemplateTargets.limitOverrides,
       })
       .from(taskTemplateTargets)
       .innerJoin(targets, eq(targets.id, taskTemplateTargets.targetId))
-      .where(inArray(taskTemplateTargets.taskTemplateId, templateIds))
-      .orderBy(asc(targets.name));
+      .leftJoin(parentTargets, eq(parentTargets.id, targets.parentId))
+      .where(inArray(taskTemplateTargets.taskTemplateId, templateIds));
+
+    return rows
+      .map(withTargetLabel)
+      .sort((a, b) => a.targetName.localeCompare(b.targetName));
   },
 
   /** The form a template at this location may use: active, in the location's organisation, with its latest definition. */
@@ -124,6 +134,7 @@ export const taskTemplateRepository = {
         formId: forms.id,
         formName: forms.name,
         formCategory: forms.category,
+        appliesTo: forms.appliesTo,
       })
       .from(forms)
       .innerJoin(locations, eq(locations.organizationId, forms.organizationId))
@@ -273,11 +284,12 @@ export const taskTemplateRepository = {
         .select({
           taskTemplateId: taskTemplateTargets.taskTemplateId,
           targetId: targets.id,
-          targetName: targets.name,
+          ...targetLabelColumns,
           limitOverrides: taskTemplateTargets.limitOverrides,
         })
         .from(taskTemplateTargets)
         .innerJoin(targets, eq(targets.id, taskTemplateTargets.targetId))
+        .leftJoin(parentTargets, eq(parentTargets.id, targets.parentId))
         .where(
           and(
             inArray(
@@ -293,7 +305,7 @@ export const taskTemplateRepository = {
       latestVersions.map((version) => [version.formId, version]),
     );
     const linksByTemplate = new Map<string, TaskTemplateSourceRow["targets"]>();
-    for (const link of links) {
+    for (const link of links.map(withTargetLabel)) {
       const list = linksByTemplate.get(link.taskTemplateId) ?? [];
       list.push({
         targetId: link.targetId,

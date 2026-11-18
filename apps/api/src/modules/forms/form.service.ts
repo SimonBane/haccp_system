@@ -1,9 +1,11 @@
 import {
   API_ERROR_CODE,
+  checkTemplateTargets,
   findUnusableOverrideFieldIds,
   type CreateFormInput,
   type CreateFormVersionInput,
   type DroppedOverride,
+  type FormAppliesTo,
   type FormDefinition,
   type FormListResponse,
   type FormResponse,
@@ -19,7 +21,7 @@ import {
 } from "../../core/errors/app-errors.js";
 import { mapDbMutationError } from "../../lib/db-errors.js";
 import { taskOccurrenceService } from "../task-occurrences/task-occurrence.service.js";
-import { toFormResponse } from "./form.mapper.js";
+import { toFormListItem, toFormResponse } from "./form.mapper.js";
 import {
   formRepository,
   type FormWithLatestVersion,
@@ -97,6 +99,24 @@ function planOverrideChanges(
   return { changes, dropped };
 }
 
+/** Templates already using the form must still fit after what it applies to changes. */
+async function assertTemplatesFitAppliesTo(
+  db: DbClient,
+  formId: string,
+  appliesTo: FormAppliesTo,
+): Promise<void> {
+  const rows = await formRepository.findTemplateTargetCountsByForm(db, formId);
+
+  for (const { targetCount } of rows) {
+    if (checkTemplateTargets(appliesTo, targetCount) !== null) {
+      throw new ConflictError(
+        "Tasks using this form check items that would no longer fit; change those tasks first",
+        { code: API_ERROR_CODE.FORM_APPLIES_TO_IN_USE },
+      );
+    }
+  }
+}
+
 async function loadResponse(
   db: DbClient,
   organizationId: string,
@@ -121,7 +141,15 @@ export const formService = {
       db,
       organizationId,
     );
-    return { items: rows.map(toFormResponse) };
+    const counts = await formRepository.countActiveTemplatesByForm(
+      db,
+      rows.map((row) => row.form.id),
+    );
+    return {
+      items: rows.map((row) =>
+        toFormListItem(row, counts.get(row.form.id) ?? 0),
+      ),
+    };
   },
 
   async get(
@@ -153,6 +181,7 @@ export const formService = {
           organizationId,
           name: input.name,
           category: input.category,
+          appliesTo: input.appliesTo,
         });
         if (!form) throw new InternalError("Failed to create form");
 
@@ -177,22 +206,36 @@ export const formService = {
     formId: string,
     input: UpdateFormInput,
   ): Promise<FormResponse> {
-    let updated;
     try {
-      updated = await formRepository.updateActive(db, organizationId, formId, {
-        name: input.name,
-        category: input.category,
-        updatedAt: new Date(),
+      return await db.transaction(async (tx) => {
+        const current = await formRepository.findActiveWithLatestVersion(
+          tx,
+          organizationId,
+          formId,
+          { lock: true },
+        );
+
+        if (!current) {
+          throw new NotFoundError("Form not found");
+        }
+
+        if (current.form.appliesTo !== input.appliesTo) {
+          await assertTemplatesFitAppliesTo(tx, formId, input.appliesTo);
+        }
+
+        await formRepository.updateActive(tx, organizationId, formId, {
+          name: input.name,
+          category: input.category,
+          appliesTo: input.appliesTo,
+          updatedAt: new Date(),
+        });
+
+        return loadResponse(tx, organizationId, formId);
       });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       mapDbMutationError(error, { unique: nameExists });
     }
-
-    if (!updated) {
-      throw new NotFoundError("Form not found");
-    }
-
-    return loadResponse(db, organizationId, formId);
   },
 
   /**

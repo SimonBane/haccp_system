@@ -46,6 +46,11 @@ export const taskTemplates = pgTable(
       table.id,
       table.locationId,
     ),
+    // Same limit as TASK_TEMPLATE_TITLE_MAX_LENGTH in @haccp/shared.
+    check(
+      "task_templates_title_length",
+      sql`char_length(${table.title}) BETWEEN 1 AND 100`,
+    ),
     check(
       "task_templates_completion_opens_before_range",
       sql`${table.completionOpensBeforeMinutes} >= 0 AND ${table.completionOpensBeforeMinutes} <= 1440`,

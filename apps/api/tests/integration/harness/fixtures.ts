@@ -9,7 +9,6 @@ import {
   organizationMemberships,
   organizations,
   targets,
-  targetTypes,
   taskOccurrences,
   taskTemplates,
   taskTemplateTargets,
@@ -44,7 +43,6 @@ export type SeededOrg = {
   admin: SeededActor;
   /** Assigned to `main` only, so "assigned" and "same tenant" can be told apart. */
   employee: SeededActor;
-  targetTypes: { fridge: { id: string } };
   targets: { fridge: { id: string; name: string } };
   forms: {
     fridgeCheck: { id: string; versionId: string };
@@ -208,16 +206,11 @@ export async function seedOrganization(
       organizationId,
     });
 
-    const [fridgeType] = await tx
-      .insert(targetTypes)
-      .values({ organizationId, name: "Fridge", kind: "equipment" })
-      .returning();
-
     const [fridge] = await tx
       .insert(targets)
       .values({
         locationId: main.id,
-        targetTypeId: fridgeType!.id,
+        kind: "equipment",
         name: "Fridge 1",
       })
       .returning();
@@ -225,8 +218,18 @@ export async function seedOrganization(
     const insertedForms = await tx
       .insert(forms)
       .values([
-        { organizationId, name: "Fridge check", category: "temperature" },
-        { organizationId, name: "Cleaning", category: "cleaning" },
+        {
+          organizationId,
+          name: "Fridge check",
+          category: "temperature",
+          appliesTo: "per_item",
+        },
+        {
+          organizationId,
+          name: "Cleaning",
+          category: "cleaning",
+          appliesTo: "location",
+        },
       ])
       .returning();
     const fridgeForm = insertedForms.find(
@@ -335,7 +338,6 @@ export async function seedOrganization(
         role: ORG_ROLE.EMPLOYEE,
         locationIds: [main.id],
       },
-      targetTypes: { fridge: { id: fridgeType!.id } },
       targets: { fridge: { id: fridge!.id, name: fridge!.name } },
       forms: {
         fridgeCheck: { id: fridgeForm.id, versionId: fridgeVersion.id },

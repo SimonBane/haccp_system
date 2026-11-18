@@ -3,7 +3,6 @@ export * from "./users.js";
 export * from "./organization-memberships.js";
 export * from "./organization-member-locations.js";
 export * from "./locations.js";
-export * from "./target-types.js";
 export * from "./targets.js";
 export * from "./forms.js";
 export * from "./form-versions.js";

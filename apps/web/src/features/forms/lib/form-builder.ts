@@ -7,6 +7,7 @@ import {
   isValidMeasurementValue,
   type CorrectiveActionMode,
   type FieldType,
+  type FormAppliesTo,
   type FormCategory,
   type FormDefinition,
   type FormField,
@@ -28,6 +29,7 @@ export type BuilderField =
 export type BuilderState = {
   name: string;
   category: FormCategory | "";
+  appliesTo: FormAppliesTo | "";
   correctiveAction: CorrectiveActionMode;
   fields: BuilderField[];
 };
@@ -43,6 +45,7 @@ export type FieldIssues = {
 export type BuilderIssues = {
   name?: true;
   category?: true;
+  appliesTo?: true;
   fields?: "empty";
   byField: Record<string, FieldIssues>;
 };
@@ -79,18 +82,25 @@ export function emptyBuilderState(): BuilderState {
   return {
     name: "",
     category: "",
+    appliesTo: "",
     correctiveAction: CORRECTIVE_ACTION_MODE.REQUIRED_ON_FAIL,
     fields: [],
   };
 }
 
 export function toBuilderState(
-  source: { name: string; category: FormCategory; definition: FormDefinition },
+  source: {
+    name: string;
+    category: FormCategory;
+    appliesTo: FormAppliesTo;
+    definition: FormDefinition;
+  },
   separator: string,
 ): BuilderState {
   return {
     name: source.name,
     category: source.category,
+    appliesTo: source.appliesTo,
     correctiveAction: source.definition.correctiveAction,
     fields: source.definition.fields.map((field) =>
       field.type === FIELD_TYPE.MEASUREMENT
@@ -154,6 +164,83 @@ export function moveField(
   return next;
 }
 
+/** Inserts after `afterId`, or at the end when it is null or no longer present. */
+export function insertField(
+  fields: readonly BuilderField[],
+  afterId: string | null,
+  field: BuilderField,
+): BuilderField[] {
+  const index = afterId === null ? -1 : fields.findIndex((f) => f.id === afterId);
+  const next = [...fields];
+  next.splice(index === -1 ? next.length : index + 1, 0, field);
+  return next;
+}
+
+/** A copy gets fresh field and option ids: reusing them would merge its answers with the original's. */
+export function duplicateField(
+  field: BuilderField,
+  taken: ReadonlySet<string>,
+  label: string,
+): BuilderField {
+  const copy = { ...field, id: mintElementId("f", taken), label };
+  if (copy.type !== FIELD_TYPE.CHOICE) return copy;
+
+  const optionIds = new Set<string>();
+  return {
+    ...copy,
+    options: copy.options.map((option) => {
+      const id = mintElementId("o", optionIds);
+      optionIds.add(id);
+      return { ...option, id };
+    }),
+  };
+}
+
+export type FailRule =
+  | {
+      kind: "limits";
+      fieldId: string;
+      label: string;
+      unit: MeasurementUnit;
+      limits: { min: number | null; max: number | null };
+    }
+  | { kind: "options"; fieldId: string; label: string; options: string[] };
+
+/** What makes a record fail, in field order; fields still being fixed are left out. */
+export function failRules(fields: readonly BuilderField[]): FailRule[] {
+  return fields.flatMap((field): FailRule[] => {
+    const label = field.label.trim();
+    if (!label) return [];
+
+    if (field.type === FIELD_TYPE.MEASUREMENT) {
+      if (limitsIssue(field.limits, field.unit)) return [];
+      const min = parseLimit(field.limits.min);
+      const max = parseLimit(field.limits.max);
+      if (min === "invalid" || max === "invalid") return [];
+      if (min === null && max === null) return [];
+      return [
+        { kind: "limits", fieldId: field.id, label, unit: field.unit, limits: { min, max } },
+      ];
+    }
+
+    if (field.type === FIELD_TYPE.CHOICE) {
+      const options = field.options
+        .filter((option) => option.fails && option.label.trim())
+        .map((option) => option.label.trim());
+      return options.length > 0
+        ? [{ kind: "options", fieldId: field.id, label, options }]
+        : [];
+    }
+
+    return [];
+  });
+}
+
+/** Unsaved-changes check: any edit, including retyping a value back, counts once it differs. */
+export function sameBuilderState(a: BuilderState, b: BuilderState): boolean {
+  return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
+}
+
 function parseLimit(raw: string): number | null | "invalid" {
   if (raw.trim() === "") return null;
   return parseMeasurementDraft(raw) ?? "invalid";
@@ -209,6 +296,7 @@ export function validateBuilder(state: BuilderState): BuilderIssues {
 
   if (state.name.trim() === "") issues.name = true;
   if (state.category === "") issues.category = true;
+  if (state.appliesTo === "") issues.appliesTo = true;
   if (state.fields.length === 0) issues.fields = "empty";
 
   for (const field of state.fields) {
@@ -221,8 +309,9 @@ export function validateBuilder(state: BuilderState): BuilderIssues {
 
 export function hasBuilderIssues(issues: BuilderIssues): boolean {
   return (
-    Boolean(issues.name || issues.category || issues.fields) ||
-    Object.keys(issues.byField).length > 0
+    Boolean(
+      issues.name || issues.category || issues.appliesTo || issues.fields,
+    ) || Object.keys(issues.byField).length > 0
   );
 }
 

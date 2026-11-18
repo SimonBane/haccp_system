@@ -410,7 +410,7 @@ function ChoiceAnswer({
           <ToggleGroupItem
             key={option.id}
             value={option.id}
-            className="h-(--control-h) min-w-20 flex-1 cursor-pointer aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary/90"
+            className="h-auto min-h-(--control-h) min-w-20 flex-[1_1_auto] cursor-pointer py-1.5 whitespace-normal aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary/90"
           >
             {option.label}
           </ToggleGroupItem>

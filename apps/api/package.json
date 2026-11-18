@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch --env-file=.env --env-file=.env.local src/index.ts",
+    "dev:supabase": "tsx watch --env-file=.env --env-file=.env.supabase src/index.ts",
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "start": "node --env-file=.env --env-file=.env.local dist/index.js",
     "start:ci": "node dist/index.js",

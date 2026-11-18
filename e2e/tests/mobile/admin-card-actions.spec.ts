@@ -1,16 +1,15 @@
 import { expect, test } from "@playwright/test";
-import { LOCALE_PREFIX } from "../../support/env.js";
+import { E2E_PREFIX, LOCALE_PREFIX } from "../../support/env.js";
 
-test("a supported card action is visible and usable without a long press", async ({
+test("a row's actions are visible and usable on a phone without a long press", async ({
   page,
 }) => {
   await page.goto(`${LOCALE_PREFIX}/dashboard/targets`);
 
-  const firstCard = page.getByTestId("data-table-card").first();
-  await expect(firstCard).toBeVisible();
-
-  const actionsButton = firstCard.getByTestId("data-table-card-actions");
-  // Visible on render, not only after a long-press or keyboard focus.
+  // Long-press starts selecting, so the actions button must be reachable on its own.
+  const actionsButton = page.getByRole("button", {
+    name: `Actions for ${E2E_PREFIX} Fridge 01`,
+  });
   await expect(actionsButton).toBeVisible();
 
   await actionsButton.click();

@@ -7,10 +7,7 @@ import {
   LOCALE_PREFIX,
   storageStatePath,
 } from "../../support/env.js";
-import {
-  fetchTodayItems,
-  upcomingSameDayTimes,
-} from "../../support/today.js";
+import { fetchTodayItems, upcomingSameDayTimes } from "../../support/today.js";
 
 setup.use({ storageState: storageStatePath("admin") });
 
@@ -89,13 +86,6 @@ setup("seed locations, forms, equipment and templates", async ({ page }) => {
   const templatePath = `/locations/${main.id}/task-templates`;
 
   const forms = await ensureE2eForms(api);
-  const fridgeType = await upsertByLabel(
-    api,
-    "/target-types",
-    (row) => row.name ?? "",
-    `${E2E_PREFIX} Fridge`,
-    { name: `${E2E_PREFIX} Fridge`, kind: "equipment" },
-  );
 
   const fridges: Named[] = [];
   for (let index = 1; index <= TARGET_COUNT; index += 1) {
@@ -104,7 +94,7 @@ setup("seed locations, forms, equipment and templates", async ({ page }) => {
     fridges.push(
       await upsertByLabel(api, targetsPath, (row) => row.name ?? "", name, {
         name,
-        targetTypeId: fridgeType.id,
+        kind: "equipment",
       }),
     );
   }

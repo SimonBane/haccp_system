@@ -1,46 +1,48 @@
 "use client";
 
-import type {
-  FormResponse,
-  TargetResponse,
-  TaskTemplateFieldsInput,
-  TaskTemplateResponse,
-} from "@haccp/shared";
+import type { FormListItem, TaskTemplateResponse } from "@haccp/shared";
 import type { RowSelectionState } from "@tanstack/react-table";
-import { Trash2Icon } from "lucide-react";
+import { ChartGanttIcon, ListIcon, Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ApiQueryError } from "@/components/api-query-error";
-import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
-import { Spinner } from "@/components/ui/spinner";
 import {
   MobileHeaderAddAction,
   PageHeader,
 } from "@/components/layout/page-header";
+import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
+import { Spinner } from "@/components/ui/spinner";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFormsQuery } from "@/features/forms/hooks/use-forms-query";
-import { useTargetsQuery } from "@/features/targets/hooks/use-targets-query";
+import { DayPlan } from "@/features/task-templates/components/day-plan";
 import { TaskTemplatesData } from "@/features/task-templates/data-table/data";
 import { useTaskTemplatesMutations } from "@/features/task-templates/hooks/use-task-templates-mutations";
 import { useTaskTemplatesQuery } from "@/features/task-templates/hooks/use-task-templates-query";
-import { TaskTemplatesForm } from "@/features/task-templates/task-templates-form";
+import { useRouter } from "@/i18n/navigation";
 import { useApiErrorToast } from "@/lib/api/use-api-error-toast";
+
+const TASKS_PATH = "/dashboard/task-templates";
+const HIGHLIGHT_MS = 5000;
+
+type View = "list" | "plan";
 
 type TaskTemplatesManagerProps = {
   initialItems: TaskTemplateResponse[];
-  /** Seed the dialog's pickers, so opening it needs no request. */
-  initialForms: FormResponse[];
-  initialTargets: TargetResponse[];
+  initialForms: FormListItem[];
   initialLocationId: string;
+  /** The task just saved by the builder, highlighted for a moment. */
+  savedId: string | null;
 };
 
 export function TaskTemplatesManager({
   initialItems,
   initialForms,
-  initialTargets,
   initialLocationId,
+  savedId,
 }: TaskTemplatesManagerProps) {
   const t = useTranslations("TasksPage");
+  const router = useRouter();
   const showApiError = useApiErrorToast();
   const {
     data: items = [],
@@ -48,26 +50,13 @@ export function TaskTemplatesManager({
     isError,
     error,
     refetch,
-  } = useTaskTemplatesQuery({
-    initialData: initialItems,
-    initialLocationId,
-  });
+  } = useTaskTemplatesQuery({ initialData: initialItems, initialLocationId });
   const { data: forms = [] } = useFormsQuery({ initialData: initialForms });
-  const { data: targets = [] } = useTargetsQuery({
-    initialData: initialTargets,
-    initialLocationId,
-  });
-  const { create, update, remove } = useTaskTemplatesMutations();
+  const { remove } = useTaskTemplatesMutations();
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<TaskTemplateResponse | null>(
-    null,
-  );
-  const [duplicateSource, setDuplicateSource] =
-    useState<TaskTemplateResponse | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<TaskTemplateResponse | null>(
-    null,
-  );
+  const [view, setView] = useState<View>("list");
+  const [highlightId, setHighlightId] = useState(savedId);
+  const [deleteTarget, setDeleteTarget] = useState<TaskTemplateResponse | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
@@ -77,26 +66,31 @@ export function TaskTemplatesManager({
     [rowSelection],
   );
 
-  const openCreateForm = useCallback(() => {
-    setEditingTask(null);
-    setDuplicateSource(null);
-    setFormOpen(true);
-    setDeleteTarget(null);
-  }, []);
+  useEffect(() => {
+    if (!savedId) return;
+    router.replace(TASKS_PATH, { scroll: false });
+    const timer = setTimeout(() => setHighlightId(null), HIGHLIGHT_MS);
+    return () => clearTimeout(timer);
+  }, [savedId, router]);
 
-  const openEditForm = useCallback((task: TaskTemplateResponse) => {
-    setEditingTask(task);
-    setDuplicateSource(null);
-    setFormOpen(true);
-    setDeleteTarget(null);
-  }, []);
+  const appliesToById = useMemo(
+    () => new Map(forms.map((form) => [form.id, form.appliesTo])),
+    [forms],
+  );
+  const appliesToOf = useCallback(
+    (task: TaskTemplateResponse) => appliesToById.get(task.formId) ?? null,
+    [appliesToById],
+  );
 
-  const openDuplicateForm = useCallback((task: TaskTemplateResponse) => {
-    setEditingTask(null);
-    setDuplicateSource(task);
-    setFormOpen(true);
-    setDeleteTarget(null);
-  }, []);
+  const openNew = useCallback(() => router.push(`${TASKS_PATH}/new`), [router]);
+  const openEdit = useCallback(
+    (task: TaskTemplateResponse) => router.push(`${TASKS_PATH}/${task.id}`),
+    [router],
+  );
+  const openDuplicate = useCallback(
+    (task: TaskTemplateResponse) => router.push(`${TASKS_PATH}/new?from=${task.id}`),
+    [router],
+  );
 
   const handleDelete = useCallback((task: TaskTemplateResponse) => {
     setIsDeleting(false);
@@ -105,10 +99,9 @@ export function TaskTemplatesManager({
 
   const confirmDelete = useCallback(async () => {
     if (!deleteTarget || isDeleting) return;
-    const target = deleteTarget;
     setIsDeleting(true);
     try {
-      await remove.mutateAsync(target.id);
+      await remove.mutateAsync(deleteTarget.id);
       await refetch();
       toast.success(t("toast.deleteSuccess"));
       setDeleteTarget(null);
@@ -118,20 +111,13 @@ export function TaskTemplatesManager({
     }
   }, [deleteTarget, isDeleting, refetch, remove, showApiError, t]);
 
-  const handleBulkDelete = useCallback(() => {
-    setDeleteTarget(null);
-    setBulkDeleteOpen(true);
-  }, []);
-
   const confirmBulkDelete = useCallback(async () => {
     if (isBulkDeleting || selectedIds.length === 0) return;
     setIsBulkDeleting(true);
     try {
       await Promise.all(selectedIds.map((id) => remove.mutateAsync(id)));
       await refetch();
-      toast.success(
-        t("toast.bulkDeleteSuccess", { count: selectedIds.length }),
-      );
+      toast.success(t("toast.bulkDeleteSuccess", { count: selectedIds.length }));
       setRowSelection({});
       setBulkDeleteOpen(false);
     } catch (error) {
@@ -141,34 +127,24 @@ export function TaskTemplatesManager({
     }
   }, [isBulkDeleting, refetch, remove, selectedIds, showApiError, t]);
 
-  // Only clear `open` — clearing the record remounts the form via `key` and kills the slide-out.
-  const handleFormOpenChange = useCallback((open: boolean) => {
-    if (!open) setFormOpen(false);
-  }, []);
-
-  const handleSubmit = useCallback(
-    async (values: TaskTemplateFieldsInput) => {
-      if (editingTask) {
-        await update.mutateAsync({ id: editingTask.id, input: values });
-        toast.success(t("toast.updateSuccess"));
-        return;
-      }
-
-      await create.mutateAsync(values);
-      toast.success(
-        duplicateSource
-          ? t("toast.duplicateSuccess")
-          : t("toast.createSuccess"),
-      );
-    },
-    [create, duplicateSource, editingTask, t, update],
-  );
-
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6">
-      <MobileHeaderAddAction label={t("add")} onClick={openCreateForm} />
+      <MobileHeaderAddAction label={t("add")} onClick={openNew} />
 
       <PageHeader title={t("title")} description={t("description")} />
+
+      <Tabs value={view} onValueChange={(next) => setView(next as View)}>
+        <TabsList variant="line" aria-label={t("views.label")}>
+          <TabsTrigger value="list">
+            <ListIcon aria-hidden />
+            {t("views.list")}
+          </TabsTrigger>
+          <TabsTrigger value="plan">
+            <ChartGanttIcon aria-hidden />
+            {t("views.plan")}
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-24">
@@ -176,14 +152,21 @@ export function TaskTemplatesManager({
         </div>
       ) : isError ? (
         <ApiQueryError error={error} onRetry={() => void refetch()} />
+      ) : view === "plan" ? (
+        <DayPlan items={items} appliesToOf={appliesToOf} onEdit={openEdit} />
       ) : (
         <TaskTemplatesData
           items={items}
-          onAdd={openCreateForm}
-          onEdit={openEditForm}
-          onDuplicate={openDuplicateForm}
+          appliesToOf={appliesToOf}
+          highlightId={highlightId}
+          onAdd={openNew}
+          onEdit={openEdit}
+          onDuplicate={openDuplicate}
           onDelete={handleDelete}
-          onBulkDelete={handleBulkDelete}
+          onBulkDelete={() => {
+            setDeleteTarget(null);
+            setBulkDeleteOpen(true);
+          }}
           rowSelection={rowSelection}
           onRowSelectionChange={setRowSelection}
         />
@@ -221,21 +204,6 @@ export function TaskTemplatesManager({
         isLoading={isBulkDeleting}
         cancelDisabled={isBulkDeleting}
         onConfirm={confirmBulkDelete}
-      />
-
-      <TaskTemplatesForm
-        open={formOpen}
-        onOpenChange={handleFormOpenChange}
-        task={editingTask}
-        duplicateSource={duplicateSource}
-        suggestedDuplicateTitle={
-          duplicateSource
-            ? t("duplicateSuggestedTitle", { title: duplicateSource.title })
-            : undefined
-        }
-        forms={forms}
-        targets={targets}
-        onSubmit={handleSubmit}
       />
     </div>
   );

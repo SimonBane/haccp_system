@@ -11,10 +11,11 @@ type ApiErrorMessageKey =
   | "unavailable"
   | "reference"
   | "codes.targetNameExists"
-  | "codes.targetTypeNameExists"
-  | "codes.targetTypeInUse"
+  | "codes.targetKindInUse"
+  | "codes.targetParentNotArea"
   | "codes.formNameExists"
   | "codes.formInUse"
+  | "codes.formAppliesToInUse"
   | "codes.employeeEmailExists"
   | "codes.locationNameExists"
   | "codes.multipleLocationsDisabled"
@@ -35,10 +36,11 @@ export type ApiErrorPresentation = {
 
 const actionableCodeKeys: Record<string, ApiErrorMessageKey> = {
   [API_ERROR_CODE.TARGET_NAME_EXISTS]: "codes.targetNameExists",
-  [API_ERROR_CODE.TARGET_TYPE_NAME_EXISTS]: "codes.targetTypeNameExists",
-  [API_ERROR_CODE.TARGET_TYPE_IN_USE]: "codes.targetTypeInUse",
+  [API_ERROR_CODE.TARGET_KIND_IN_USE]: "codes.targetKindInUse",
+  [API_ERROR_CODE.TARGET_PARENT_NOT_AREA]: "codes.targetParentNotArea",
   [API_ERROR_CODE.FORM_NAME_EXISTS]: "codes.formNameExists",
   [API_ERROR_CODE.FORM_IN_USE]: "codes.formInUse",
+  [API_ERROR_CODE.FORM_APPLIES_TO_IN_USE]: "codes.formAppliesToInUse",
   [API_ERROR_CODE.EMPLOYEE_EMAIL_EXISTS]: "codes.employeeEmailExists",
   [API_ERROR_CODE.LOCATION_NAME_EXISTS]: "codes.locationNameExists",
   [API_ERROR_CODE.MULTIPLE_LOCATIONS_DISABLED]:

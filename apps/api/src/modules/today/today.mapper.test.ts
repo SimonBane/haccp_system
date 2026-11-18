@@ -10,7 +10,10 @@ describe("sortItemsByScheduledTime", () => {
   const item = (
     scheduledTime: string,
     occurrenceId = OCCURRENCE_A,
-  ): TodayTaskItem => ({ scheduledTime, occurrenceId }) as TodayTaskItem;
+    targetName: string | null = null,
+    title = "Check",
+  ): TodayTaskItem =>
+    ({ scheduledTime, occurrenceId, targetName, title }) as TodayTaskItem;
 
   it("orders by clock time, not string order", () => {
     // Lexical "09:00" > "12:00"; clock order must put 9am first.
@@ -39,6 +42,22 @@ describe("sortItemsByScheduledTime", () => {
     ]);
   });
 
+  it("keeps a room's fixtures together across tasks at the same time", () => {
+    const sorted = sortItemsByScheduledTime([
+      item("22:00", OCCURRENCE_A, "Kitchen 2 › Walls", "Weekly walls"),
+      item("22:00", OCCURRENCE_A, "Bar › Floor", "Daily floors"),
+      item("22:00", OCCURRENCE_B, "Kitchen 2 › Floor", "Daily floors"),
+      item("22:00", OCCURRENCE_B, null, "Closing checklist"),
+    ]);
+
+    expect(sorted.map((i) => i.targetName)).toEqual([
+      null,
+      "Bar › Floor",
+      "Kitchen 2 › Floor",
+      "Kitchen 2 › Walls",
+    ]);
+  });
+
   it("does not mutate the input", () => {
     const input = [item("12:00"), item("07:00")];
     sortItemsByScheduledTime(input);
@@ -60,6 +79,10 @@ describe("toTodayTaskItem", () => {
       formVersionId: "00000000-0000-4000-8000-0000000000f1",
       targetId: "00000000-0000-4000-8000-00000000000e",
       targetName: "Walk-in fridge",
+      targetKind: "equipment",
+      targetLiveName: "Walk-in fridge",
+      targetParentId: null,
+      targetParentName: null,
       resolvedLimits: { temperature: { min: 0, max: 5 } },
       scheduledTime: "07:00",
       occurrenceDate: "2026-01-15",
@@ -76,6 +99,49 @@ describe("toTodayTaskItem", () => {
       ...overrides,
     };
   }
+
+  it("puts a check in its room: the area itself, or the area holding the item", () => {
+    const KITCHEN = "00000000-0000-4000-8000-0000000000a2";
+
+    expect(toTodayTaskItem(occurrenceRow(), NOW).area).toBeNull();
+    expect(
+      toTodayTaskItem(
+        occurrenceRow({
+          targetId: KITCHEN,
+          targetKind: "area",
+          targetName: "Kitchen",
+          targetLiveName: "Main kitchen",
+        }),
+        NOW,
+      ).area,
+    ).toEqual({ id: KITCHEN, name: "Main kitchen" });
+    expect(
+      toTodayTaskItem(
+        occurrenceRow({
+          targetKind: "fixture",
+          targetName: "Kitchen › Walls",
+          targetLiveName: "Walls",
+          targetParentId: KITCHEN,
+          targetParentName: "Kitchen",
+        }),
+        NOW,
+      ),
+    ).toMatchObject({
+      targetKind: "fixture",
+      area: { id: KITCHEN, name: "Kitchen" },
+    });
+    expect(
+      toTodayTaskItem(
+        occurrenceRow({
+          targetId: null,
+          targetName: null,
+          targetKind: null,
+          targetLiveName: null,
+        }),
+        NOW,
+      ).area,
+    ).toBeNull();
+  });
 
   it("maps an unrecorded occurrence to recordState none and status overdue past dueAt", () => {
     const item = toTodayTaskItem(occurrenceRow(), NOW);

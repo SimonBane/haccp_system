@@ -49,6 +49,8 @@ interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   onRowClick?: (row: Row<TData>) => void;
+  /** Extra classes for one desktop row, e.g. to highlight the row just saved. */
+  getRowClassName?: (row: Row<TData>) => string | undefined;
   renderMobileRow?: (row: Row<TData>) => React.ReactNode;
   getRowActions?: (row: Row<TData>) => RowAction[];
   getRowLabel?: (row: Row<TData>) => string;
@@ -107,6 +109,7 @@ export function DataTable<TData, TValue>({
   data,
   onRowClick,
   renderMobileRow,
+  getRowClassName,
   getRowActions,
   getRowLabel,
   mobileVariant,
@@ -433,6 +436,7 @@ export function DataTable<TData, TValue>({
                       className={cn(
                         "group h-8 md:h-auto",
                         isRowClickable && "cursor-pointer",
+                        getRowClassName?.(row),
                       )}
                       tabIndex={isRowClickable ? 0 : undefined}
                       role={isRowClickable ? "button" : undefined}

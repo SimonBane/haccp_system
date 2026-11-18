@@ -70,7 +70,7 @@ export function SheetAppBar({
   );
 }
 
-type ResponsiveFormDialogProps = {
+export type ResponsiveFormSurfaceProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: React.ReactNode;
@@ -82,6 +82,40 @@ type ResponsiveFormDialogProps = {
   initialFocus?: boolean;
 };
 
+/** The phone layout shared by every responsive form surface: a near-full-height bottom sheet. */
+export function MobileFormSheet({
+  open,
+  onOpenChange,
+  title,
+  children,
+  footer,
+  closeLabel,
+  className,
+}: Omit<ResponsiveFormSurfaceProps, "description" | "initialFocus">) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="bottom"
+        showCloseButton={false}
+        className={cn("gap-0 p-0", SHEET_SURFACE, className)}
+      >
+        <SheetAppBar
+          icon={<XIcon className="size-5" />}
+          label={closeLabel}
+          onPress={() => onOpenChange(false)}
+          title={title}
+        />
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+          {children}
+        </div>
+
+        {footer ? <div className={SHEET_FOOTER}>{footer}</div> : null}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 export function ResponsiveFormDialog({
   open,
   onOpenChange,
@@ -92,31 +126,21 @@ export function ResponsiveFormDialog({
   closeLabel,
   className,
   initialFocus,
-}: ResponsiveFormDialogProps) {
+}: ResponsiveFormSurfaceProps) {
   const isMobile = useIsMobile();
 
   if (isMobile) {
     return (
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent
-          side="bottom"
-          showCloseButton={false}
-          className={cn("gap-0 p-0", SHEET_SURFACE, className)}
-        >
-          <SheetAppBar
-            icon={<XIcon className="size-5" />}
-            label={closeLabel}
-            onPress={() => onOpenChange(false)}
-            title={title}
-          />
-
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-            {children}
-          </div>
-
-          {footer ? <div className={SHEET_FOOTER}>{footer}</div> : null}
-        </SheetContent>
-      </Sheet>
+      <MobileFormSheet
+        open={open}
+        onOpenChange={onOpenChange}
+        title={title}
+        footer={footer}
+        closeLabel={closeLabel}
+        className={className}
+      >
+        {children}
+      </MobileFormSheet>
     );
   }
 

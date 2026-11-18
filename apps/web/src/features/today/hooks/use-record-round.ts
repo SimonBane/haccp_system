@@ -2,7 +2,7 @@
 
 import { RECORD_RESULT, type RecordResult } from "@haccp/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { buildRoundKeys } from "../lib/today-round";
+import { buildRoundKeys, type RoundScope } from "../lib/today-round";
 import { findTimelineItem } from "../lib/today-timeline";
 import type { TodayTimeline, TodayTimelineItem } from "../lib/today-timeline";
 
@@ -39,10 +39,10 @@ export function useRecordRound(timeline: TodayTimeline) {
   }, []);
 
   const open = useCallback(
-    (item: TodayTimelineItem) => {
+    (item: TodayTimelineItem, scope?: RoundScope) => {
       tallyRef.current = emptyTally();
       commit({
-        keys: buildRoundKeys(timelineRef.current, item),
+        keys: buildRoundKeys(timelineRef.current, item, scope),
         index: 0,
       });
     },

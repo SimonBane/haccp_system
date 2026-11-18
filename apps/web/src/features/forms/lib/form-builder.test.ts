@@ -2,10 +2,14 @@ import { formDefinitionSchema, getStarterForms } from "@haccp/shared";
 import { describe, expect, it } from "vitest";
 import {
   createBuilderField,
+  duplicateField,
+  failRules,
+  insertField,
   emptyBuilderState,
   hasBuilderIssues,
   mintElementId,
   moveField,
+  sameBuilderState,
   sameDefinition,
   toBuilderState,
   toDefinition,
@@ -49,7 +53,7 @@ describe("toBuilderState and toDefinition", () => {
     const state: BuilderState = {
       ...emptyBuilderState(),
       name: "Hot holding",
-      category: "cooking",
+      category: "temperature",
       fields: [
         {
           ...field,
@@ -99,6 +103,7 @@ describe("validateBuilder", () => {
     expect(validateBuilder(state)).toEqual({
       name: true,
       category: true,
+      appliesTo: true,
       byField: {
         [measurement.id]: { limits: "order" },
         [choice.id]: { label: true, optionLabels: [0] },
@@ -111,7 +116,7 @@ describe("validateBuilder", () => {
     const state: BuilderState = {
       ...emptyBuilderState(),
       name: "pH",
-      category: "other",
+      category: "hygiene",
       fields: [
         { ...field, label: "pH", unit: "ph", limits: { min: "", max: "15" } },
       ],
@@ -120,9 +125,28 @@ describe("validateBuilder", () => {
     expect(validateBuilder(state).byField[field.id]).toEqual({ limits: "max" });
   });
 
+  it("requires what the form is filled in for", () => {
+    expect(
+      validateBuilder({
+        ...emptyBuilderState(),
+        name: "x",
+        category: "hygiene",
+        appliesTo: "",
+      }).appliesTo,
+    ).toBe(true);
+    expect(
+      validateBuilder({
+        ...emptyBuilderState(),
+        name: "x",
+        category: "hygiene",
+        appliesTo: "location",
+      }).appliesTo,
+    ).toBeUndefined();
+  });
+
   it("requires at least one field", () => {
     expect(
-      validateBuilder({ ...emptyBuilderState(), name: "x", category: "other" })
+      validateBuilder({ ...emptyBuilderState(), name: "x", category: "hygiene" })
         .fields,
     ).toBe("empty");
   });
@@ -167,5 +191,125 @@ describe("sameDefinition", () => {
 
     expect(sameDefinition(definition, rekeyed)).toBe(true);
     expect(sameDefinition(definition, reordered)).toBe(false);
+  });
+});
+
+function checkboxField(label: string) {
+  return {
+    ...createBuilderField("checkbox", new Set(), { optionLabels: OPTION_LABELS }),
+    label,
+  };
+}
+
+function choiceField() {
+  const field = createBuilderField("choice", new Set(), {
+    optionLabels: OPTION_LABELS,
+  });
+  if (field.type !== "choice") throw new Error("expected a choice");
+  return field;
+}
+
+describe("insertField", () => {
+  const first = checkboxField("First");
+  const second = checkboxField("Second");
+  const added = checkboxField("Added");
+
+  it("places the new field right after the selected one", () => {
+    expect(
+      insertField([first, second], first.id, added).map((f) => f.label),
+    ).toEqual(["First", "Added", "Second"]);
+  });
+
+  it("appends when nothing is selected or the selection is gone", () => {
+    expect(insertField([first], null, added).map((f) => f.label)).toEqual([
+      "First",
+      "Added",
+    ]);
+    expect(insertField([first], "f_gone", added).map((f) => f.label)).toEqual([
+      "First",
+      "Added",
+    ]);
+  });
+});
+
+describe("duplicateField", () => {
+  it("mints a new field id and new option ids, keeping everything else", () => {
+    const original = { ...choiceField(), label: "Packaging intact" };
+
+    const copy = duplicateField(
+      original,
+      new Set([original.id]),
+      "Packaging intact (copy)",
+    );
+
+    if (copy.type !== "choice") throw new Error("expected a choice");
+    expect(copy.id).not.toBe(original.id);
+    expect(copy.label).toBe("Packaging intact (copy)");
+    expect(copy.options.map((o) => o.label)).toEqual(["Yes", "No"]);
+    expect(copy.options.map((o) => o.fails)).toEqual([false, true]);
+    expect(
+      copy.options.some((o) => original.options.some((p) => p.id === o.id)),
+    ).toBe(false);
+    expect(new Set(copy.options.map((o) => o.id)).size).toBe(2);
+  });
+});
+
+describe("failRules", () => {
+  it("lists measurement limits and failing options, in field order", () => {
+    const temperature = {
+      ...measurementField(),
+      label: "Air temperature",
+      limits: { min: "0", max: "4,5" },
+    };
+    const storage = { ...choiceField(), label: "Packaging intact" };
+
+    expect(failRules([temperature, storage])).toEqual([
+      {
+        kind: "limits",
+        fieldId: temperature.id,
+        label: "Air temperature",
+        unit: "celsius",
+        limits: { min: 0, max: 4.5 },
+      },
+      {
+        kind: "options",
+        fieldId: storage.id,
+        label: "Packaging intact",
+        options: ["No"],
+      },
+    ]);
+  });
+
+  it("leaves out unlabelled fields, open measurements and invalid limits", () => {
+    const open = { ...measurementField(), label: "Probe" };
+    const unlabelled = { ...measurementField(), limits: { min: "0", max: "5" } };
+    const inverted = {
+      ...measurementField(),
+      label: "Inverted",
+      limits: { min: "5", max: "0" },
+    };
+    const neverFails = {
+      ...choiceField(),
+      label: "Chemical",
+      options: choiceField().options.map((o) => ({ ...o, fails: false })),
+    };
+
+    expect(failRules([open, unlabelled, inverted, neverFails])).toEqual([]);
+  });
+});
+
+describe("sameBuilderState", () => {
+  it("ignores key order but not values", () => {
+    const state: BuilderState = {
+      ...emptyBuilderState(),
+      name: "Fridge",
+      category: "temperature",
+    };
+    const reordered = Object.fromEntries(
+      Object.entries(state).reverse(),
+    ) as BuilderState;
+
+    expect(sameBuilderState(state, reordered)).toBe(true);
+    expect(sameBuilderState(state, { ...state, name: "Freezer" })).toBe(false);
   });
 });

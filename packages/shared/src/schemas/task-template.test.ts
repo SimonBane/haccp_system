@@ -5,6 +5,8 @@ import {
   TASK_TEMPLATE_COMPLETION_MINUTES_MAX,
   TASK_TEMPLATE_COMPLETION_MINUTES_MIN,
   TASK_TEMPLATE_COMPLETION_OPENS_BEFORE_DEFAULT_MINUTES,
+  TASK_TEMPLATE_MAX_SCHEDULED_TIMES,
+  TASK_TEMPLATE_TITLE_MAX_LENGTH,
 } from "./task-template.js";
 
 const FORM_ID = "11111111-1111-4111-8111-111111111111";
@@ -170,6 +172,38 @@ describe("targets", () => {
     expect(
       createTaskTemplateSchema.safeParse(baseInput({ formId: undefined }))
         .success,
+    ).toBe(false);
+  });
+});
+
+describe("scheduled times", () => {
+  const every30 = Array.from({ length: 48 }, (_, i) =>
+    `${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`,
+  );
+
+  it("accepts a check every 30 minutes around the clock", () => {
+    expect(TASK_TEMPLATE_MAX_SCHEDULED_TIMES).toBe(48);
+    expect(
+      createTaskTemplateSchema.safeParse(baseInput({ scheduledTimes: every30 })).success,
+    ).toBe(true);
+  });
+
+  it("rejects more than the maximum", () => {
+    const tooMany = [...every30, "23:59"];
+    expect(
+      createTaskTemplateSchema.safeParse(baseInput({ scheduledTimes: tooMany })).success,
+    ).toBe(false);
+  });
+});
+
+describe("title", () => {
+  it("accepts a title at the limit once trimmed and rejects one over it", () => {
+    const atLimit = "a".repeat(TASK_TEMPLATE_TITLE_MAX_LENGTH);
+    expect(
+      createTaskTemplateSchema.safeParse(baseInput({ title: `  ${atLimit}  ` })).success,
+    ).toBe(true);
+    expect(
+      createTaskTemplateSchema.safeParse(baseInput({ title: `${atLimit}a` })).success,
     ).toBe(false);
   });
 });

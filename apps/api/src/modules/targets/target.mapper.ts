@@ -1,16 +1,18 @@
 import type { TargetResponse } from "@haccp/shared";
-import type { TargetWithTypeRow } from "./target.repository.js";
+import type { TargetWithTaskCountRow } from "./target.repository.js";
 
-export function toTargetResponse(row: TargetWithTypeRow): TargetResponse {
+export function toTargetResponse({
+  target,
+  taskCount,
+}: TargetWithTaskCountRow): TargetResponse {
   return {
-    id: row.target.id,
-    locationId: row.target.locationId,
-    name: row.target.name,
-    targetTypeId: row.target.targetTypeId,
-    targetTypeName: row.targetTypeName,
-    kind: row.kind as TargetResponse["kind"],
-    parentId: row.target.parentId,
-    createdAt: row.target.createdAt.toISOString(),
-    updatedAt: row.target.updatedAt.toISOString(),
+    id: target.id,
+    locationId: target.locationId,
+    name: target.name,
+    kind: target.kind as TargetResponse["kind"],
+    parentId: target.parentId,
+    taskCount,
+    createdAt: target.createdAt.toISOString(),
+    updatedAt: target.updatedAt.toISOString(),
   };
 }

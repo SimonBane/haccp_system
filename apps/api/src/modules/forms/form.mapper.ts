@@ -1,4 +1,5 @@
 import type {
+  FormListItem,
   FormResponse,
   FormVersionResponse,
   FormVersionSummaryMap,
@@ -29,10 +30,18 @@ export function toFormResponse({
     id: form.id,
     name: form.name,
     category: form.category as FormResponse["category"],
+    appliesTo: form.appliesTo as FormResponse["appliesTo"],
     latestVersion: toFormVersionResponse(latestVersion),
     createdAt: form.createdAt.toISOString(),
     updatedAt: form.updatedAt.toISOString(),
   };
+}
+
+export function toFormListItem(
+  row: FormWithLatestVersion,
+  templateCount: number,
+): FormListItem {
+  return { ...toFormResponse(row), templateCount };
 }
 
 export function toFormVersionSummaryMap(

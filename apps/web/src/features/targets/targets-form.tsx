@@ -1,26 +1,31 @@
 "use client";
 
 import {
+  TARGET_NAME_MAX_LENGTH,
   API_ERROR_CODE,
+  TARGET_KIND,
+  TARGET_KIND_VALUES,
+  isTargetNameTaken,
   type TargetInput,
+  type TargetKind,
   type TargetResponse,
-  type TargetTypeResponse,
 } from "@haccp/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { PlusIcon, SaveIcon, Settings2Icon } from "lucide-react";
+import { PlusIcon, SaveIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useEffect, useMemo } from "react";
-import { Controller, useForm, useFormState } from "react-hook-form";
+import { useEffect, useId, useMemo } from "react";
+import { Controller, useForm, useFormState, useWatch } from "react-hook-form";
 import { z } from "zod";
+import { CharacterCount } from "@/components/character-count";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import {
   REQUIRED_LABEL_CLASS,
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
+  FieldTitle,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
@@ -32,13 +37,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { KindPicker } from "@/features/targets/components/kind-picker";
+import {
+  areaWithDescendants,
+  buildTargetTree,
+  flattenAreas,
+} from "@/features/targets/lib/target-tree";
 import { ApiRequestError } from "@/lib/api-utils";
 import { useApiErrorToast } from "@/lib/api/use-api-error-toast";
 import { useZodErrorMap } from "@/lib/forms/zod-error-map";
 
 const TARGETS_FORM_ID = "targets-form";
+const NO_AREA = "none";
+const DEPTH_INDENT = ["", "pl-6", "pl-9", "pl-12"];
 
-type TargetsFormValues = { name: string; targetTypeId: string };
+type TargetsFormValues = { name: string; kind: TargetKind; parentId: string };
+
+export type TargetsFormDefaults = {
+  kind: TargetKind;
+  parentId: string | null;
+};
 
 type TargetsFormProps = {
   open: boolean;
@@ -46,9 +64,9 @@ type TargetsFormProps = {
   target?: TargetResponse | null;
   duplicateSource?: TargetResponse | null;
   suggestedDuplicateName?: string;
-  targetTypes: TargetTypeResponse[];
-  existingItems: Pick<TargetResponse, "id" | "name">[];
-  onManageTypes: () => void;
+  /** Kind and area a new item starts with, e.g. from an area's "Add equipment". */
+  defaults: TargetsFormDefaults;
+  items: TargetResponse[];
   onSubmit: (values: TargetInput) => Promise<void>;
 };
 
@@ -58,13 +76,13 @@ export function TargetsForm({
   target,
   duplicateSource,
   suggestedDuplicateName,
-  targetTypes,
-  existingItems,
-  onManageTypes,
+  defaults,
+  items,
   onSubmit,
 }: TargetsFormProps) {
   const t = useTranslations("TargetsPage");
   const showApiError = useApiErrorToast();
+  const kindLabelId = useId();
   const isEditing = Boolean(target);
   const isDuplicating = Boolean(duplicateSource) && !isEditing;
 
@@ -75,24 +93,36 @@ export function TargetsForm({
           .string()
           .trim()
           .min(1, t("validation.nameRequired"))
-          .max(100, t("validation.nameMaxLength")),
-        targetTypeId: z.string().min(1, t("validation.typeRequired")),
-      }),
+          .max(
+            TARGET_NAME_MAX_LENGTH,
+            t("validation.nameMaxLength", { max: TARGET_NAME_MAX_LENGTH }),
+          ),
+        kind: z.enum(TARGET_KIND_VALUES),
+        parentId: z.string(),
+      })
+      .refine(
+        (values) =>
+          values.kind !== TARGET_KIND.FIXTURE || values.parentId !== NO_AREA,
+        { message: t("form.parentRequired"), path: ["parentId"] },
+      ),
     [t],
   );
 
   const defaultValues = useMemo<TargetsFormValues>(() => {
-    if (target) {
-      return { name: target.name, targetTypeId: target.targetTypeId };
-    }
-    if (duplicateSource) {
+    const source = target ?? duplicateSource;
+    if (source) {
       return {
-        name: suggestedDuplicateName ?? duplicateSource.name,
-        targetTypeId: duplicateSource.targetTypeId,
+        name: target ? target.name : (suggestedDuplicateName ?? source.name),
+        kind: source.kind,
+        parentId: source.parentId ?? NO_AREA,
       };
     }
-    return { name: "", targetTypeId: "" };
-  }, [target, duplicateSource, suggestedDuplicateName]);
+    return {
+      name: "",
+      kind: defaults.kind,
+      parentId: defaults.parentId ?? NO_AREA,
+    };
+  }, [target, duplicateSource, suggestedDuplicateName, defaults]);
 
   const zodErrorMap = useZodErrorMap();
 
@@ -107,7 +137,30 @@ export function TargetsForm({
     form.reset(defaultValues);
   }, [open, defaultValues, form]);
 
+  const kind = useWatch({ control: form.control, name: "kind" });
   const { isSubmitting, isDirty } = useFormState({ control: form.control });
+
+  const areaItems = useMemo(() => {
+    // An area cannot move into itself or anything nested inside it.
+    const blocked =
+      target?.kind === TARGET_KIND.AREA
+        ? areaWithDescendants(items, target.id)
+        : new Set<string>();
+    const areas = flattenAreas(buildTargetTree(items)).filter(
+      ({ area }) => !blocked.has(area.id),
+    );
+    return [
+      // A fixture is part of a room, so it cannot stand alone.
+      ...(kind === TARGET_KIND.FIXTURE
+        ? []
+        : [{ value: NO_AREA, label: t("form.parentNone"), depth: 0 }]),
+      ...areas.map(({ area, depth }) => ({
+        value: area.id,
+        label: area.name,
+        depth,
+      })),
+    ];
+  }, [items, target, kind, t]);
 
   async function handleValidSubmit(values: TargetsFormValues) {
     if (isEditing && !isDirty) {
@@ -115,28 +168,28 @@ export function TargetsForm({
       return;
     }
 
-    const isNameTaken = existingItems.some(
-      (item) => item.name === values.name.trim() && item.id !== target?.id,
+    const input: TargetInput = {
+      name: values.name.trim(),
+      kind: values.kind,
+      parentId: values.parentId === NO_AREA ? null : values.parentId,
+    };
+    const takenMessage = t(
+      input.kind === TARGET_KIND.FIXTURE ? "nameTakenFixture" : "nameTaken",
     );
-    if (isNameTaken) {
-      form.setError("name", { message: t("nameTaken") });
+    if (isTargetNameTaken(items, { ...input, id: target?.id })) {
+      form.setError("name", { message: takenMessage });
       return;
     }
 
     try {
-      await onSubmit({
-        name: values.name.trim(),
-        targetTypeId: values.targetTypeId,
-        // Nesting has no UI yet; keep whatever parent the target already has.
-        parentId: target?.parentId ?? duplicateSource?.parentId ?? null,
-      });
+      await onSubmit(input);
       onOpenChange(false);
     } catch (error) {
       if (
         error instanceof ApiRequestError &&
         error.code === API_ERROR_CODE.TARGET_NAME_EXISTS
       ) {
-        form.setError("name", { message: t("nameTaken") });
+        form.setError("name", { message: takenMessage });
         return;
       }
       showApiError(error);
@@ -144,25 +197,14 @@ export function TargetsForm({
   }
 
   const SubmitIcon = isEditing ? SaveIcon : PlusIcon;
+  const mode = isEditing ? "edit" : isDuplicating ? "duplicate" : "add";
 
   return (
     <ResponsiveFormDialog
       open={open}
       onOpenChange={onOpenChange}
-      title={
-        isEditing
-          ? t("editTitle")
-          : isDuplicating
-            ? t("duplicateTitle")
-            : t("addTitle")
-      }
-      description={
-        isEditing
-          ? t("editDescription")
-          : isDuplicating
-            ? t("duplicateDescription")
-            : t("addDescription")
-      }
+      title={t(`form.${mode}Title.${kind}`)}
+      description={t(`form.${mode}Description.${kind}`)}
       closeLabel={t("cancel")}
       initialFocus={isEditing || isDuplicating ? undefined : false}
       footer={
@@ -174,7 +216,7 @@ export function TargetsForm({
             disabled={isEditing && !isDirty}
           >
             <SubmitIcon data-icon="inline-start" />
-            {isEditing ? t("save") : t("add")}
+            {isEditing ? t("save") : t(`form.submit.${kind}`)}
           </Button>
         </DialogFooter>
       }
@@ -184,6 +226,21 @@ export function TargetsForm({
         onSubmit={form.handleSubmit(handleValidSubmit)}
       >
         <FieldGroup>
+          <Controller
+            name="kind"
+            control={form.control}
+            render={({ field }) => (
+              <Field>
+                <FieldTitle id={kindLabelId}>{t("form.kindLabel")}</FieldTitle>
+                <KindPicker
+                  labelledBy={kindLabelId}
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              </Field>
+            )}
+          />
+
           <Controller
             name="name"
             control={form.control}
@@ -198,73 +255,70 @@ export function TargetsForm({
                 <Input
                   {...field}
                   id={`${TARGETS_FORM_ID}-name`}
+                  maxLength={TARGET_NAME_MAX_LENGTH}
                   aria-invalid={fieldState.invalid}
-                  placeholder={t("namePlaceholder")}
+                  placeholder={t(`form.namePlaceholder.${kind}`)}
                 />
-                {fieldState.invalid && (
-                  <FieldError errors={[fieldState.error]} />
-                )}
+                <div className="flex items-start justify-between gap-3">
+                  {fieldState.invalid ? (
+                    <FieldError errors={[fieldState.error]} />
+                  ) : (
+                    <span />
+                  )}
+                  <CharacterCount value={field.value} max={TARGET_NAME_MAX_LENGTH} />
+                </div>
               </Field>
             )}
           />
 
           <Controller
-            name="targetTypeId"
+            name="parentId"
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
                 <FieldLabel
-                  htmlFor={`${TARGETS_FORM_ID}-type`}
-                  className={REQUIRED_LABEL_CLASS}
+                  htmlFor={`${TARGETS_FORM_ID}-parent`}
+                  className={
+                    kind === TARGET_KIND.FIXTURE ? REQUIRED_LABEL_CLASS : undefined
+                  }
                 >
-                  {t("typeLabel")}
+                  {t("form.parentLabel")}
                 </FieldLabel>
                 <Select
-                  name={field.name}
-                  items={targetTypes.map((type) => ({
-                    label: type.name,
-                    value: type.id,
-                  }))}
-                  value={field.value || null}
-                  onValueChange={(value: unknown) =>
-                    field.onChange(typeof value === "string" ? value : "")
+                  items={areaItems}
+                  value={
+                    kind === TARGET_KIND.FIXTURE && field.value === NO_AREA
+                      ? null
+                      : field.value
                   }
-                  onOpenChange={(nextOpen) => {
-                    if (!nextOpen) field.onBlur();
-                  }}
+                  onValueChange={(value: unknown) =>
+                    field.onChange(value as string)
+                  }
                 >
                   <SelectTrigger
-                    id={`${TARGETS_FORM_ID}-type`}
-                    aria-invalid={fieldState.invalid}
+                    id={`${TARGETS_FORM_ID}-parent`}
                     className="w-full"
+                    aria-invalid={fieldState.invalid}
                   >
-                    <SelectValue placeholder={t("typePlaceholder")} />
+                    <SelectValue placeholder={t("form.parentRequired")} />
                   </SelectTrigger>
                   <SelectContent alignItemWithTrigger={false}>
                     <SelectGroup>
-                      {targetTypes.map((type) => (
-                        <SelectItem key={type.id} value={type.id}>
-                          {type.name}
+                      {areaItems.map((item) => (
+                        <SelectItem
+                          key={item.value}
+                          value={item.value}
+                          className={DEPTH_INDENT[Math.min(item.depth, 3)]}
+                        >
+                          {item.label}
                         </SelectItem>
                       ))}
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-                {targetTypes.length === 0 ? (
-                  <FieldDescription>{t("noTypesHint")}</FieldDescription>
-                ) : null}
-                {fieldState.invalid && (
+                {fieldState.invalid ? (
                   <FieldError errors={[fieldState.error]} />
-                )}
-                <Button
-                  type="button"
-                  variant="link"
-                  className="h-auto w-fit p-0"
-                  onClick={onManageTypes}
-                >
-                  <Settings2Icon data-icon="inline-start" />
-                  {t("manageTypes")}
-                </Button>
+                ) : null}
               </Field>
             )}
           />

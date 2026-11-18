@@ -8,6 +8,7 @@ type FormRow = { id: string; name: string };
 const FRIDGE_FORM: CreateFormInput = {
   name: `${E2E_PREFIX} Fridge reading`,
   category: "temperature",
+  appliesTo: "per_item",
   definition: {
     correctiveAction: "required_on_fail",
     fields: [
@@ -26,6 +27,7 @@ const FRIDGE_FORM: CreateFormInput = {
 const CLEANING_FORM: CreateFormInput = {
   name: `${E2E_PREFIX} Cleaning tick`,
   category: "cleaning",
+  appliesTo: "location",
   definition: {
     correctiveAction: "optional",
     fields: [

@@ -1,5 +1,6 @@
 import { isQuickCompleteForm } from "@/features/forms/lib/answer-draft";
 import { occurrenceKey } from "./today-grouping";
+import { buildTimeGroupEntries, entryItems } from "./today-rooms";
 import { findTimelineGroup } from "./today-timeline";
 import type {
   TodayTaskGroup,
@@ -20,20 +21,36 @@ export function isChainableItem(item: TodayTimelineItem): boolean {
   );
 }
 
+/** The slot's open checks in display order, room cards included. */
 export function chainableItems(group: TodayTaskGroup): TodayTimelineItem[] {
-  return group.items.filter(isChainableItem);
+  return entryItems(buildTimeGroupEntries(group.items)).filter(isChainableItem);
 }
 
-/** The rest of the tapped item's time slot, so one walk past the fridges records them all. */
+/** "slot" walks the whole time slot; "item" walks the rest of the tapped check's room card, or of the slot. */
+export type RoundScope = "slot" | "item";
+
 export function buildRoundKeys(
   timeline: TodayTimeline,
   tapped: TodayTimelineItem,
+  scope: RoundScope = "item",
 ): string[] {
   const tappedKey = occurrenceKey(tapped.task);
   const group = findTimelineGroup(timeline, tappedKey);
   if (!group) return [tappedKey];
 
-  const pending = chainableItems(group).map((item) => occurrenceKey(item.task));
+  const entries = buildTimeGroupEntries(group.items);
+  const room =
+    scope === "item"
+      ? entries.find(
+          (entry) =>
+            entry.type === "room" &&
+            entry.items.some((item) => occurrenceKey(item.task) === tappedKey),
+        )
+      : undefined;
+  const walk = room?.type === "room" ? room.items : entryItems(entries);
+  const pending = walk
+    .filter(isChainableItem)
+    .map((item) => occurrenceKey(item.task));
 
   const start = pending.indexOf(tappedKey);
   if (start === -1) return [tappedKey];

@@ -60,6 +60,8 @@ function task(overrides: Partial<TodayTaskItem> = {}): TodayTaskItem {
     formVersionId: CLEANING_VERSION,
     targetId: null,
     targetName: null,
+    targetKind: null,
+    area: null,
     resolvedLimits: {},
     scheduledTime,
     timeSlot: "morning",

@@ -7,6 +7,11 @@ import { locations } from "../../core/db/schema/locations.js";
 import { targets } from "../../core/db/schema/targets.js";
 import { taskTemplateTargets } from "../../core/db/schema/task-template-targets.js";
 import { taskTemplates } from "../../core/db/schema/task-templates.js";
+import {
+  parentTargets,
+  targetLabelColumns,
+  withTargetLabel,
+} from "../targets/target-label.js";
 
 export type FormRow = typeof forms.$inferSelect;
 export type FormVersionRow = typeof formVersions.$inferSelect;
@@ -194,6 +199,30 @@ export const formRepository = {
     return existing ? "in_use" : "not_found";
   },
 
+  /** Forms no active template uses are absent from the map. */
+  async countActiveTemplatesByForm(
+    db: DbClient,
+    formIds: string[],
+  ): Promise<Map<string, number>> {
+    if (formIds.length === 0) return new Map();
+
+    const rows = await db
+      .select({
+        formId: taskTemplates.formId,
+        count: sql<number>`count(*)::int`.mapWith(Number),
+      })
+      .from(taskTemplates)
+      .where(
+        and(
+          inArray(taskTemplates.formId, formIds),
+          isNull(taskTemplates.archivedAt),
+        ),
+      )
+      .groupBy(taskTemplates.formId);
+
+    return new Map(rows.map((row) => [row.formId, row.count]));
+  },
+
   async findActiveTemplateIdsByForm(
     db: DbClient,
     formId: string,
@@ -208,19 +237,40 @@ export const formRepository = {
     return rows.map((row) => row.id);
   },
 
+  /** How many targets each active template using this form checks, zero included. */
+  async findTemplateTargetCountsByForm(
+    db: DbClient,
+    formId: string,
+  ): Promise<{ templateId: string; targetCount: number }[]> {
+    return db
+      .select({
+        templateId: taskTemplates.id,
+        targetCount: sql<number>`count(${taskTemplateTargets.targetId})::int`,
+      })
+      .from(taskTemplates)
+      .leftJoin(
+        taskTemplateTargets,
+        eq(taskTemplateTargets.taskTemplateId, taskTemplates.id),
+      )
+      .where(
+        and(eq(taskTemplates.formId, formId), isNull(taskTemplates.archivedAt)),
+      )
+      .groupBy(taskTemplates.id);
+  },
+
   /** Every active template's per-target overrides for this form, across all locations. */
   async findTemplateOverridesByForm(
     db: DbClient,
     formId: string,
   ): Promise<TemplateOverrideRow[]> {
-    return db
+    const rows = await db
       .select({
         templateId: taskTemplates.id,
         templateTitle: taskTemplates.title,
         locationId: locations.id,
         locationName: locations.name,
         targetId: targets.id,
-        targetName: targets.name,
+        ...targetLabelColumns,
         limitOverrides: taskTemplateTargets.limitOverrides,
       })
       .from(taskTemplateTargets)
@@ -230,6 +280,7 @@ export const formRepository = {
       )
       .innerJoin(locations, eq(locations.id, taskTemplateTargets.locationId))
       .innerJoin(targets, eq(targets.id, taskTemplateTargets.targetId))
+      .leftJoin(parentTargets, eq(parentTargets.id, targets.parentId))
       .where(
         and(eq(taskTemplates.formId, formId), isNull(taskTemplates.archivedAt)),
       )
@@ -238,6 +289,8 @@ export const formRepository = {
         asc(taskTemplates.title),
         asc(targets.name),
       );
+
+    return rows.map(withTargetLabel);
   },
 
   async setLimitOverrides(
