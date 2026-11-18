@@ -9,6 +9,7 @@ import {
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../../src/core/db/client.js";
 import {
+  targets,
   taskOccurrences,
   taskTemplates,
 } from "../../src/core/db/schema/index.js";
@@ -21,8 +22,8 @@ import {
 import { apiRequest, asAdmin, asEmployee } from "./harness/request.js";
 
 /**
- * HACCP-15: Today's GET reads task_occurrences + the current task_record only —
- * never task_templates/equipment — and never materializes work as a side effect.
+ * HACCP-15: Today's GET reads task_occurrences + the current task_record — never task_templates,
+ * and targets only to place a check in its room — and never materializes work as a side effect.
  */
 describe("Today occurrences (GET)", () => {
   let org: SeededOrg;
@@ -57,6 +58,7 @@ describe("Today occurrences (GET)", () => {
     availableAt?: Date;
     dueAt?: Date | null;
     title?: string;
+    targetId?: string;
     targetName?: string;
     maxTempC?: number;
   }): Promise<string> {
@@ -87,9 +89,10 @@ describe("Today occurrences (GET)", () => {
             ? org.forms.fridgeCheck.versionId
             : org.forms.cleaning.versionId,
         targetId:
-          overrides.type === "temperature" ? org.targets.fridge.id : null,
+          overrides.targetId ??
+          (overrides.type === "temperature" ? org.targets.fridge.id : null),
         targetName:
-          overrides.type === "temperature"
+          overrides.type === "temperature" || overrides.targetId
             ? (overrides.targetName ?? "Fridge 1")
             : null,
         resolvedLimits:
@@ -233,6 +236,38 @@ describe("Today occurrences (GET)", () => {
       category: "temperature",
       version: 1,
     });
+  });
+
+  it("places each check in its room: the area itself, or the area holding the item", async () => {
+    const [kitchen] = await db
+      .insert(targets)
+      .values({ locationId: org.locations.main.id, kind: "area", name: "Kitchen 2" })
+      .returning();
+    const [walls, slicer] = await db
+      .insert(targets)
+      .values([
+        { locationId: org.locations.main.id, kind: "fixture", name: "Walls", parentId: kitchen!.id },
+        { locationId: org.locations.main.id, kind: "equipment", name: "Slicer", parentId: kitchen!.id },
+      ])
+      .returning();
+    const ids = {
+      kitchen: await insertOccurrence({ type: "cleaning", targetId: kitchen!.id, targetName: "Kitchen 2" }),
+      walls: await insertOccurrence({ type: "cleaning", targetId: walls!.id, targetName: "Kitchen 2 › Walls" }),
+      slicer: await insertOccurrence({ type: "cleaning", targetId: slicer!.id, targetName: "Slicer" }),
+      fridge: await insertOccurrence({ type: "temperature" }),
+      untargeted: await insertOccurrence({ type: "cleaning" }),
+    };
+
+    const response = await todayGet(org.locations.main.id, today());
+    const items = flatten(todayResponseSchema.parse(await response.json()));
+    const byId = (id: string) => items.find((entry) => entry.occurrenceId === id)!;
+    const room = { id: kitchen!.id, name: "Kitchen 2" };
+
+    expect(byId(ids.kitchen)).toMatchObject({ targetKind: "area", area: room });
+    expect(byId(ids.walls)).toMatchObject({ targetKind: "fixture", area: room });
+    expect(byId(ids.slicer)).toMatchObject({ targetKind: "equipment", area: room });
+    expect(byId(ids.fridge)).toMatchObject({ targetKind: "equipment", area: null });
+    expect(byId(ids.untargeted)).toMatchObject({ targetKind: null, area: null });
   });
 
   it("returns an active record's answers and result, and hides a voided one's", async () => {

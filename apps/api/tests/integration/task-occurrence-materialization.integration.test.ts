@@ -363,7 +363,7 @@ describe("Task occurrence materialization — configuration writes", () => {
         actor: asAdmin(world),
         body: JSON.stringify({
           name: "Fridge 1 (relabeled)",
-          targetTypeId: world.targetTypes.fridge.id,
+          kind: "equipment",
         }),
       },
     );
@@ -422,6 +422,82 @@ describe("Task occurrence materialization — configuration writes", () => {
     });
   });
 
+  it("lets one task check a room, its fixtures and equipment, labelling fixtures with the room", async () => {
+    const actor = asAdmin(world);
+    const targetsPath = `/locations/${world.locations.main.id}/targets`;
+    const post = async (path: string, body: unknown) => {
+      const response = await apiRequest(path, {
+        method: "POST",
+        actor,
+        body: JSON.stringify(body),
+      });
+      expect(response.status).toBe(201);
+      return (await response.json()) as { id: string };
+    };
+
+    const kitchen = await post(targetsPath, { name: "Kitchen 2", kind: "area" });
+    const bar = await post(targetsPath, { name: "Bar", kind: "area" });
+    const kitchenWalls = await post(targetsPath, {
+      name: "Walls",
+      kind: "fixture",
+      parentId: kitchen.id,
+    });
+    const barWalls = await post(targetsPath, {
+      name: "Walls",
+      kind: "fixture",
+      parentId: bar.id,
+    });
+    const form = await post("/forms", {
+      name: "Surface cleaning",
+      category: "cleaning",
+      appliesTo: "per_item",
+      definition: CLEANING_DEFINITION,
+    });
+    const template = await post(
+      `/locations/${world.locations.main.id}/task-templates`,
+      {
+        title: "Weekly walls",
+        formId: form.id,
+        weekdays: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
+        scheduledTimes: ["22:00"],
+        targets: [
+          { targetId: kitchen.id, limitOverrides: {} },
+          { targetId: kitchenWalls.id, limitOverrides: {} },
+          { targetId: barWalls.id, limitOverrides: {} },
+          { targetId: world.targets.fridge.id, limitOverrides: {} },
+        ],
+      },
+    );
+
+    const futureDate = addCalendarDays(todayLocal(), 2);
+    const labels = async () =>
+      (await findOccurrencesByTemplate(template.id))
+        .filter((row) => row.occurrenceDate === futureDate)
+        .map((row) => row.targetName)
+        .sort();
+
+    expect(await labels()).toEqual([
+      "Bar › Walls",
+      world.targets.fridge.name,
+      "Kitchen 2",
+      "Kitchen 2 › Walls",
+    ]);
+
+    const renamed = await apiRequest(`${targetsPath}/${kitchen.id}`, {
+      method: "PATCH",
+      actor,
+      body: JSON.stringify({ name: "Main kitchen", kind: "area" }),
+    });
+    expect(renamed.status).toBe(200);
+
+    expect(await labels()).toEqual([
+      "Bar › Walls",
+      world.targets.fridge.name,
+      "Main kitchen",
+      "Main kitchen › Walls",
+    ]);
+  });
+
   it("materializes one occurrence per target per slot, with each target's limits", async () => {
     const created = await apiRequest(
       `/locations/${world.locations.main.id}/targets`,
@@ -430,7 +506,7 @@ describe("Task occurrence materialization — configuration writes", () => {
         actor: asAdmin(world),
         body: JSON.stringify({
           name: "Fish fridge",
-          targetTypeId: world.targetTypes.fridge.id,
+          kind: "equipment",
         }),
       },
     );

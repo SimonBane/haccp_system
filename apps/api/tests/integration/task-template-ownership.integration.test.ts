@@ -194,7 +194,37 @@ describe("Task template form and target ownership", () => {
   });
 
   it("replaces a template's targets on update", async () => {
+    const created = await apiRequest(
+      `/locations/${world.alpha.locations.main.id}/targets`,
+      {
+        method: "POST",
+        actor: asAdmin(world.alpha),
+        body: JSON.stringify({ name: "Dairy fridge", kind: "equipment" }),
+      },
+    );
+    const dairyFridge = (await created.json()) as { id: string };
+
     const response = await apiRequest(
+      `/locations/${world.alpha.locations.main.id}/task-templates/${world.alpha.templates.temperature.id}`,
+      {
+        method: "PATCH",
+        actor: asAdmin(world.alpha),
+        body: templateBody(world.alpha, {
+          targets: [{ targetId: dairyFridge.id }],
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(
+      ((await response.json()) as TaskTemplateResponse).targets.map(
+        (target) => target.targetId,
+      ),
+    ).toEqual([dairyFridge.id]);
+  });
+
+  it("needs at least one item for a per-item form, of any kind", async () => {
+    const empty = await apiRequest(
       `/locations/${world.alpha.locations.main.id}/task-templates/${world.alpha.templates.temperature.id}`,
       {
         method: "PATCH",
@@ -202,10 +232,22 @@ describe("Task template form and target ownership", () => {
         body: templateBody(world.alpha, { targets: [] }),
       },
     );
+    expect(empty.status).toBe(400);
 
-    expect(response.status).toBe(200);
-    expect(((await response.json()) as TaskTemplateResponse).targets).toEqual(
-      [],
+    const created = await apiRequest(
+      `/locations/${world.alpha.locations.main.id}/targets`,
+      {
+        method: "POST",
+        actor: asAdmin(world.alpha),
+        body: JSON.stringify({ name: "Kitchen", kind: "area" }),
+      },
     );
+    const kitchen = (await created.json()) as { id: string };
+
+    const withArea = await create(
+      world.alpha.locations.main.id,
+      templateBody(world.alpha, { targets: [{ targetId: kitchen.id }] }),
+    );
+    expect(withArea.status).toBe(201);
   });
 });

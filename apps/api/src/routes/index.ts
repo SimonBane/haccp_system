@@ -10,7 +10,6 @@ import { healthRoutes } from "../modules/health/health.routes.js";
 import { locationRoutes } from "../modules/locations/location.routes.js";
 import { organizationRoutes } from "../modules/organizations/organization.routes.js";
 import { recordsRoutes } from "../modules/records/records.routes.js";
-import { targetTypeRoutes } from "../modules/target-types/target-type.routes.js";
 import { targetRoutes } from "../modules/targets/target.routes.js";
 import { taskOccurrenceRoutes } from "../modules/task-occurrences/task-occurrence.routes.js";
 import { taskRecordRoutes } from "../modules/task-records/task-record.routes.js";
@@ -73,7 +72,6 @@ function mountLocationScoped(
 mountProtected("/tenant", tenantRoutes);
 mountAdminProtected("/organizations", organizationRoutes);
 mountAdminProtected("/employees", employeeRoutes);
-mountAdminProtected("/target-types", targetTypeRoutes);
 mountAdminProtected("/forms", formRoutes);
 // Location-scoped routers before admin `/locations`, or Hono runs admin middleware on every `/locations/*` path.
 mountLocationScoped("/locations/:locationId/targets", targetRoutes, true);

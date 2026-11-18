@@ -94,6 +94,7 @@ beforeEach(() => {
     formId: FORM_ID,
     formName: "Fridge check",
     formCategory: "temperature",
+    appliesTo: "per_item",
     definition: FRIDGE,
   });
   taskTemplateRepository.findActiveTargetIdsAtLocation.mockResolvedValue(
@@ -222,7 +223,14 @@ describe("taskTemplateService.create", () => {
     });
   });
 
-  it("accepts a template with no targets", async () => {
+  it("accepts no targets for a whole-location form", async () => {
+    taskTemplateRepository.findActiveFormForLocation.mockResolvedValue({
+      formId: FORM_ID,
+      formName: "Goods in",
+      formCategory: "goods_in",
+      appliesTo: "location",
+      definition: FRIDGE,
+    });
     taskTemplateRepository.findActiveTargetIdsAtLocation.mockResolvedValue(
       new Set(),
     );
@@ -236,55 +244,34 @@ describe("taskTemplateService.create", () => {
       [],
     );
   });
-});
 
-describe("taskTemplateService.update", () => {
-  it("is not found for an archived or foreign template, without touching its targets", async () => {
-    taskTemplateRepository.updateActiveByIdAndLocation.mockResolvedValue(null);
+  it("requires a target for a per-item form", async () => {
+    taskTemplateRepository.findActiveTargetIdsAtLocation.mockResolvedValue(
+      new Set(),
+    );
 
     await expect(
-      taskTemplateService.update(db, LOCATION_ID, TEMPLATE_ID, input()),
-    ).rejects.toBeInstanceOf(NotFoundError);
-    expect(taskTemplateRepository.replaceTargets).not.toHaveBeenCalled();
+      taskTemplateService.create(db, LOCATION_ID, input({ targets: [] })),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(taskTemplateRepository.insert).not.toHaveBeenCalled();
   });
 
-  it("replaces the targets and reconciles", async () => {
-    await taskTemplateService.update(db, LOCATION_ID, TEMPLATE_ID, input());
-
-    expect(taskTemplateRepository.replaceTargets).toHaveBeenCalledWith(
-      db,
-      TEMPLATE_ID,
-      LOCATION_ID,
-      [{ targetId: TARGET_ID, limitOverrides: {} }],
+  it("lets a per-item form check any mix of equipment, areas and fixtures", async () => {
+    taskTemplateRepository.findActiveTargetIdsAtLocation.mockResolvedValue(
+      new Set([TARGET_ID, OTHER_TARGET_ID]),
     );
-    expect(taskOccurrenceService.reconcileTemplate).toHaveBeenCalledWith(
+
+    await taskTemplateService.create(
       db,
       LOCATION_ID,
-      TEMPLATE_ID,
+      input({
+        targets: [
+          { targetId: TARGET_ID, limitOverrides: {} },
+          { targetId: OTHER_TARGET_ID, limitOverrides: {} },
+        ],
+      }),
     );
-  });
-});
 
-describe("taskTemplateService.delete", () => {
-  it("archives the template rather than deleting it", async () => {
-    taskTemplateRepository.archiveByIdAndLocation.mockResolvedValue({
-      id: TEMPLATE_ID,
-    });
-
-    await taskTemplateService.delete(db, LOCATION_ID, TEMPLATE_ID);
-
-    expect(taskTemplateRepository.archiveByIdAndLocation).toHaveBeenCalledWith(
-      db,
-      LOCATION_ID,
-      TEMPLATE_ID,
-    );
-  });
-
-  it("raises NotFound for an unknown or already-archived template", async () => {
-    taskTemplateRepository.archiveByIdAndLocation.mockResolvedValue(null);
-
-    await expect(
-      taskTemplateService.delete(db, LOCATION_ID, TEMPLATE_ID),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    expect(taskTemplateRepository.insert).toHaveBeenCalled();
   });
 });

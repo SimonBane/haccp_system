@@ -13,8 +13,10 @@ const formRepository = vi.hoisted(() => ({
   insertVersion: vi.fn(),
   updateActive: vi.fn(),
   archiveIfUnused: vi.fn(),
+  countActiveTemplatesByForm: vi.fn(),
   findActiveTemplateIdsByForm: vi.fn(),
   findTemplateOverridesByForm: vi.fn(),
+  findTemplateTargetCountsByForm: vi.fn(),
   setLimitOverrides: vi.fn(),
 }));
 const taskOccurrenceService = vi.hoisted(() => ({
@@ -67,6 +69,7 @@ const formRow = {
   organizationId: ORG_ID,
   name: "Fridge check",
   category: "temperature",
+  appliesTo: "per_item",
   archivedAt: null,
   createdAt: new Date("2026-10-01T00:00:00Z"),
   updatedAt: new Date("2026-10-01T00:00:00Z"),
@@ -105,6 +108,29 @@ beforeEach(() => {
   );
 });
 
+describe("formService.list", () => {
+  const unusedRow = { ...formRow, id: "00000000-0000-4000-8000-0000000000d2" };
+
+  it("counts each form's active templates in one batched lookup, zero when unused", async () => {
+    formRepository.findManyActiveWithLatestVersion.mockResolvedValue([
+      { form: formRow, latestVersion: versionRow(VERSION_1_ID, 1, v1) },
+      { form: unusedRow, latestVersion: versionRow(VERSION_2_ID, 1, v1) },
+    ]);
+    formRepository.countActiveTemplatesByForm.mockResolvedValue(
+      new Map([[FORM_ID, 3]]),
+    );
+
+    const { items } = await formService.list(db, ORG_ID);
+
+    expect(formRepository.countActiveTemplatesByForm).toHaveBeenCalledTimes(1);
+    expect(formRepository.countActiveTemplatesByForm).toHaveBeenCalledWith(db, [
+      FORM_ID,
+      unusedRow.id,
+    ]);
+    expect(items.map((item) => item.templateCount)).toEqual([3, 0]);
+  });
+});
+
 describe("formService.create", () => {
   it("creates the form with version 1 in one transaction", async () => {
     formRepository.insertForm.mockResolvedValue(formRow);
@@ -115,6 +141,7 @@ describe("formService.create", () => {
     const created = await formService.create(db, ORG_ID, {
       name: "Fridge check",
       category: "temperature",
+      appliesTo: "per_item",
       definition: v1,
     });
 
@@ -133,9 +160,67 @@ describe("formService.create", () => {
       formService.create(db, ORG_ID, {
         name: "Fridge check",
         category: "temperature",
+        appliesTo: "per_item",
         definition: v1,
       }),
     ).rejects.toMatchObject({ code: API_ERROR_CODE.FORM_NAME_EXISTS });
+  });
+});
+
+describe("formService.update", () => {
+  const input = {
+    name: "Fridge check",
+    category: "temperature" as const,
+    appliesTo: "location" as const,
+  };
+
+  it("saves a new applies-to when every task still fits it", async () => {
+    formRepository.updateActive.mockResolvedValue({ id: FORM_ID });
+    formRepository.findTemplateTargetCountsByForm.mockResolvedValue([
+      { templateId: TEMPLATE_ID, targetCount: 0 },
+    ]);
+
+    await formService.update(db, ORG_ID, FORM_ID, input);
+
+    expect(formRepository.updateActive).toHaveBeenCalledWith(
+      db,
+      ORG_ID,
+      FORM_ID,
+      expect.objectContaining({ appliesTo: "location" }),
+    );
+  });
+
+  it("refuses whole-location while a task still checks targets", async () => {
+    formRepository.findTemplateTargetCountsByForm.mockResolvedValue([
+      { templateId: TEMPLATE_ID, targetCount: 0 },
+      { templateId: "00000000-0000-4000-8000-0000000000e2", targetCount: 2 },
+    ]);
+
+    await expect(
+      formService.update(db, ORG_ID, FORM_ID, {
+        ...input,
+        appliesTo: "location",
+      }),
+    ).rejects.toMatchObject({ code: API_ERROR_CODE.FORM_APPLIES_TO_IN_USE });
+  });
+
+  it("skips the check when applies-to is unchanged", async () => {
+    formRepository.updateActive.mockResolvedValue({ id: FORM_ID });
+
+    await formService.update(db, ORG_ID, FORM_ID, {
+      ...input,
+      appliesTo: "per_item",
+    });
+
+    expect(formRepository.findTemplateTargetCountsByForm).not.toHaveBeenCalled();
+  });
+
+  it("is not found for an archived or foreign form", async () => {
+    formRepository.findActiveWithLatestVersion.mockResolvedValue(null);
+
+    await expect(
+      formService.update(db, ORG_ID, FORM_ID, input),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });
 

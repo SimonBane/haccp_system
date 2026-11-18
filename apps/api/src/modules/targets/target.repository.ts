@@ -1,32 +1,56 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { DbClient } from "../../core/db/client.js";
-import { locations } from "../../core/db/schema/locations.js";
-import { targetTypes } from "../../core/db/schema/target-types.js";
 import { targets } from "../../core/db/schema/targets.js";
 import { taskTemplateTargets } from "../../core/db/schema/task-template-targets.js";
 import { taskTemplates } from "../../core/db/schema/task-templates.js";
 
-export type TargetWithTypeRow = {
-  target: typeof targets.$inferSelect;
-  targetTypeName: string;
-  kind: string;
+export type TargetRow = typeof targets.$inferSelect;
+
+export type TargetWithTaskCountRow = {
+  target: TargetRow;
+  taskCount: number;
 };
 
-const targetWithTypeColumns = {
-  target: targets,
-  targetTypeName: targetTypes.name,
-  kind: targetTypes.kind,
-};
+export type TargetHierarchyRow = Pick<
+  TargetRow,
+  "id" | "parentId" | "kind" | "name"
+>;
+
+function activeTaskCounts(db: DbClient, locationId: string) {
+  return db
+    .select({
+      targetId: taskTemplateTargets.targetId,
+      count: sql<number>`count(*)::int`.as("count"),
+    })
+    .from(taskTemplateTargets)
+    .innerJoin(
+      taskTemplates,
+      eq(taskTemplates.id, taskTemplateTargets.taskTemplateId),
+    )
+    .where(
+      and(
+        eq(taskTemplates.locationId, locationId),
+        isNull(taskTemplates.archivedAt),
+      ),
+    )
+    .groupBy(taskTemplateTargets.targetId)
+    .as("task_counts");
+}
 
 export const targetRepository = {
   async findManyActiveByLocation(
     db: DbClient,
     locationId: string,
-  ): Promise<TargetWithTypeRow[]> {
+  ): Promise<TargetWithTaskCountRow[]> {
+    const counts = activeTaskCounts(db, locationId);
+
     return db
-      .select(targetWithTypeColumns)
+      .select({
+        target: targets,
+        taskCount: sql<number>`coalesce(${counts.count}, 0)`.mapWith(Number),
+      })
       .from(targets)
-      .innerJoin(targetTypes, eq(targetTypes.id, targets.targetTypeId))
+      .leftJoin(counts, eq(counts.targetId, targets.id))
       .where(
         and(eq(targets.locationId, locationId), isNull(targets.archivedAt)),
       )
@@ -37,11 +61,16 @@ export const targetRepository = {
     db: DbClient,
     locationId: string,
     targetId: string,
-  ): Promise<TargetWithTypeRow | null> {
+  ): Promise<TargetWithTaskCountRow | null> {
+    const counts = activeTaskCounts(db, locationId);
+
     const [row] = await db
-      .select(targetWithTypeColumns)
+      .select({
+        target: targets,
+        taskCount: sql<number>`coalesce(${counts.count}, 0)`.mapWith(Number),
+      })
       .from(targets)
-      .innerJoin(targetTypes, eq(targetTypes.id, targets.targetTypeId))
+      .leftJoin(counts, eq(counts.targetId, targets.id))
       .where(
         and(
           eq(targets.id, targetId),
@@ -54,29 +83,21 @@ export const targetRepository = {
     return row ?? null;
   },
 
-  /** A type is usable at a location when it is active and belongs to that location's organisation. */
-  async findActiveTypeForLocation(
+  async findActiveHierarchyByLocation(
     db: DbClient,
     locationId: string,
-    targetTypeId: string,
-  ): Promise<{ id: string } | null> {
-    const [row] = await db
-      .select({ id: targetTypes.id })
-      .from(targetTypes)
-      .innerJoin(
-        locations,
-        eq(locations.organizationId, targetTypes.organizationId),
-      )
+  ): Promise<TargetHierarchyRow[]> {
+    return db
+      .select({
+        id: targets.id,
+        parentId: targets.parentId,
+        kind: targets.kind,
+        name: targets.name,
+      })
+      .from(targets)
       .where(
-        and(
-          eq(targetTypes.id, targetTypeId),
-          eq(locations.id, locationId),
-          isNull(targetTypes.archivedAt),
-        ),
-      )
-      .limit(1);
-
-    return row ?? null;
+        and(eq(targets.locationId, locationId), isNull(targets.archivedAt)),
+      );
   },
 
   async hasActiveChildren(db: DbClient, targetId: string): Promise<boolean> {
@@ -132,12 +153,14 @@ export const targetRepository = {
     return archived ?? null;
   },
 
-  async findActiveTemplateIdsByTarget(
+  async findActiveTemplateIdsByTargets(
     db: DbClient,
-    targetId: string,
+    targetIds: string[],
   ): Promise<string[]> {
+    if (targetIds.length === 0) return [];
+
     const rows = await db
-      .select({ id: taskTemplateTargets.taskTemplateId })
+      .selectDistinct({ id: taskTemplates.id })
       .from(taskTemplateTargets)
       .innerJoin(
         taskTemplates,
@@ -145,7 +168,7 @@ export const targetRepository = {
       )
       .where(
         and(
-          eq(taskTemplateTargets.targetId, targetId),
+          inArray(taskTemplateTargets.targetId, targetIds),
           isNull(taskTemplates.archivedAt),
         ),
       );

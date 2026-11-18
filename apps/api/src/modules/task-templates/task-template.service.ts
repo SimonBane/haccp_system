@@ -1,12 +1,15 @@
 import type {
   CreateTaskTemplateInput,
+  FormAppliesTo,
   FormDefinition,
   TaskTemplateListResponse,
   TaskTemplateResponse,
+  TemplateTargetsIssue,
   UpdateTaskTemplateInput,
 } from "@haccp/shared";
 import {
   checkMeasurementLimits,
+  checkTemplateTargets,
   getMeasurementFields,
   limitsIssueMessage,
   sortScheduledTimes,
@@ -57,6 +60,11 @@ export function assertOverridesFitForm(
   }
 }
 
+const TARGETS_ISSUE_MESSAGES: Record<TemplateTargetsIssue, string> = {
+  targets_required: "Choose at least one item for this form to check",
+  targets_not_allowed: "This form is filled in for the whole location",
+};
+
 async function assertInputUsable(
   db: DbClient,
   locationId: string,
@@ -81,6 +89,14 @@ async function assertInputUsable(
 
   if (targetIds.some((id) => !found.has(id))) {
     throw new NotFoundError("Equipment or area not found");
+  }
+
+  const issue = checkTemplateTargets(
+    form.appliesTo as FormAppliesTo,
+    targetIds.length,
+  );
+  if (issue) {
+    throw new ValidationError(TARGETS_ISSUE_MESSAGES[issue]);
   }
 
   assertOverridesFitForm(form.definition, input.targets);

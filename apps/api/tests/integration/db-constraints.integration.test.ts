@@ -2,14 +2,21 @@ import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../../src/core/db/client.js";
 import {
+  forms,
   locations,
   organizationMemberLocations,
   targets,
   taskOccurrences,
+  taskTemplates,
   taskRecords,
   taskTemplateTargets,
   users,
 } from "../../src/core/db/schema/index.js";
+import {
+  FORM_NAME_MAX_LENGTH,
+  TARGET_NAME_MAX_LENGTH,
+  TASK_TEMPLATE_TITLE_MAX_LENGTH,
+} from "@haccp/shared";
 import { PG_ERROR, postgresErrorCode } from "./harness/db.js";
 import {
   seedOccurrence,
@@ -101,7 +108,7 @@ describe("database constraints", () => {
     const duplicate = await codeFor(
       db.insert(targets).values({
         locationId: world.alpha.locations.main.id,
-        targetTypeId: world.alpha.targetTypes.fridge.id,
+        kind: "equipment",
         name: world.alpha.targets.fridge.name,
       }),
     );
@@ -111,12 +118,48 @@ describe("database constraints", () => {
     const sameNameElsewhere = await codeFor(
       db.insert(targets).values({
         locationId: world.alpha.locations.annex.id,
-        targetTypeId: world.alpha.targetTypes.fridge.id,
+        kind: "equipment",
         name: world.alpha.targets.fridge.name,
       }),
     );
 
     expect(sameNameElsewhere).toBeNull();
+  });
+
+  it("refuses a fixture outside an area", async () => {
+    const code = await codeFor(
+      db.insert(targets).values({
+        locationId: world.alpha.locations.main.id,
+        kind: "fixture",
+        name: "Walls",
+      }),
+    );
+
+    expect(code).toBe(PG_ERROR.CHECK_VIOLATION);
+  });
+
+  it("scopes fixture names to their area and keeps them apart from other names", async () => {
+    const [kitchen, bar] = await db
+      .insert(targets)
+      .values([
+        { locationId: world.alpha.locations.main.id, kind: "area", name: "Kitchen" },
+        { locationId: world.alpha.locations.main.id, kind: "area", name: "Bar" },
+      ])
+      .returning();
+    const fixture = (parentId: string, name = "Walls") =>
+      db.insert(targets).values({
+        locationId: world.alpha.locations.main.id,
+        kind: "fixture",
+        name,
+        parentId,
+      });
+
+    expect(await codeFor(fixture(kitchen!.id))).toBeNull();
+    expect(await codeFor(fixture(bar!.id))).toBeNull();
+    expect(await codeFor(fixture(kitchen!.id))).toBe(PG_ERROR.UNIQUE_VIOLATION);
+    expect(
+      await codeFor(fixture(kitchen!.id, world.alpha.targets.fridge.name)),
+    ).toBeNull();
   });
 
   it("frees an archived target's name for a new one", async () => {
@@ -128,7 +171,7 @@ describe("database constraints", () => {
     const code = await codeFor(
       db.insert(targets).values({
         locationId: world.alpha.locations.main.id,
-        targetTypeId: world.alpha.targetTypes.fridge.id,
+        kind: "equipment",
         name: world.alpha.targets.fridge.name,
       }),
     );
@@ -151,7 +194,7 @@ describe("database constraints", () => {
     const code = await codeFor(
       db.insert(targets).values({
         locationId: world.alpha.locations.annex.id,
-        targetTypeId: world.alpha.targetTypes.fridge.id,
+        kind: "equipment",
         name: "Annex shelf",
         parentId: world.alpha.targets.fridge.id,
       }),
@@ -221,7 +264,7 @@ describe("database constraints", () => {
       .insert(targets)
       .values({
         locationId: world.alpha.locations.main.id,
-        targetTypeId: world.alpha.targetTypes.fridge.id,
+        kind: "equipment",
         name: "Fridge 2",
       })
       .returning();
@@ -241,6 +284,43 @@ describe("database constraints", () => {
     );
 
     expect(code).toBeNull();
+  });
+
+  it("caps a task title at the shared limit", async () => {
+    const setTitle = (title: string) =>
+      db
+        .update(taskTemplates)
+        .set({ title })
+        .where(sql`${taskTemplates.id} = ${world.alpha.templates.cleaning.id}`);
+
+    expect(await codeFor(setTitle("a".repeat(TASK_TEMPLATE_TITLE_MAX_LENGTH)))).toBeNull();
+    expect(await codeFor(setTitle("a".repeat(TASK_TEMPLATE_TITLE_MAX_LENGTH + 1)))).toBe(
+      PG_ERROR.CHECK_VIOLATION,
+    );
+    expect(await codeFor(setTitle(""))).toBe(PG_ERROR.CHECK_VIOLATION);
+  });
+
+  it("caps form and target names at the shared limits", async () => {
+    const setFormName = (name: string) =>
+      db
+        .update(forms)
+        .set({ name })
+        .where(sql`${forms.id} = ${world.alpha.forms.cleaning.id}`);
+    const setTargetName = (name: string) =>
+      db
+        .update(targets)
+        .set({ name })
+        .where(sql`${targets.id} = ${world.alpha.targets.fridge.id}`);
+
+    expect(await codeFor(setFormName("a".repeat(FORM_NAME_MAX_LENGTH)))).toBeNull();
+    expect(await codeFor(setFormName("a".repeat(FORM_NAME_MAX_LENGTH + 1)))).toBe(
+      PG_ERROR.CHECK_VIOLATION,
+    );
+    expect(await codeFor(setTargetName("a".repeat(TARGET_NAME_MAX_LENGTH)))).toBeNull();
+    expect(await codeFor(setTargetName("a".repeat(TARGET_NAME_MAX_LENGTH + 1)))).toBe(
+      PG_ERROR.CHECK_VIOLATION,
+    );
+    expect(await codeFor(setTargetName(""))).toBe(PG_ERROR.CHECK_VIOLATION);
   });
 
   it("refuses an unknown record result", async () => {
