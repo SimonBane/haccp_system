@@ -23,7 +23,8 @@ export function AppClerkProvider({
       signUpUrl={getClerkLocalePath(locale, "/sign-up")}
       signInFallbackRedirectUrl={getClerkLocalePath(locale, "/dashboard")}
       signUpFallbackRedirectUrl={getClerkLocalePath(locale, "/dashboard")}
-      afterSignOutUrl={getClerkLocalePath(locale, "/")}
+      // A signed-out kitchen tablet should land on sign-in, not the marketing page at "/".
+      afterSignOutUrl={getClerkLocalePath(locale, "/sign-in")}
     >
       {children}
     </ClerkProvider>
