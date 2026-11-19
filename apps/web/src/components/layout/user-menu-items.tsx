@@ -116,7 +116,7 @@ export function UserMenuDropdownItems({ onNavigate }: UserMenuItemsProps) {
         variant="destructive"
         onClick={() => {
           onNavigate?.();
-          void signOut({ redirectUrl: getClerkLocalePath(locale, "/") });
+          void signOut({ redirectUrl: getClerkLocalePath(locale, "/sign-in") });
         }}
       >
         <LogOutIcon />

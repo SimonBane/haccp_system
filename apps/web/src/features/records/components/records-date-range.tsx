@@ -110,7 +110,7 @@ export function RecordsDateRangeControl({
     commit(candidate);
   }, [commit, selected, today]);
 
-  const label = `${formatOccurrenceDate(range.dateFrom)} – ${formatOccurrenceDate(range.dateTo)}`;
+  const label = `${formatOccurrenceDate(range.dateFrom)} - ${formatOccurrenceDate(range.dateTo)}`;
 
   return (
     <Popover

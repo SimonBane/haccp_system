@@ -5,10 +5,10 @@ import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
+import { EMPTY_VALUE } from "@/lib/empty-value";
 import { AnswerList } from "@/features/forms/components/answer-list";
 import {
   actorName,
-  EM_DASH,
   formatOccurrenceDate,
   formatRecordInstant,
   formatRecordTimeOfDay,
@@ -103,7 +103,7 @@ export function RecordDetailDialog({
                 name: formVersion.formName,
                 version: formVersion.version,
               })
-            : EM_DASH}
+            : EMPTY_VALUE}
         </DetailRow>
 
         {item.targetName ? (
@@ -140,7 +140,7 @@ export function RecordDetailDialog({
               className="-my-2"
             />
           ) : (
-            EM_DASH
+            EMPTY_VALUE
           )}
         </DetailRow>
 
@@ -154,26 +154,26 @@ export function RecordDetailDialog({
 
         <DetailRow label={t("createdBy")}>
           {item.record
-            ? `${actorName(item.record.createdBy) ?? EM_DASH} · ${formatRecordInstant(item.record.createdAt, locale, timeZone)}`
-            : EM_DASH}
+            ? `${actorName(item.record.createdBy) ?? EMPTY_VALUE} · ${formatRecordInstant(item.record.createdAt, locale, timeZone)}`
+            : EMPTY_VALUE}
         </DetailRow>
 
         <DetailRow label={t("recordedBy")}>
           {item.record
-            ? `${actorName(item.record.recordedBy) ?? EM_DASH} · ${formatRecordInstant(item.record.recordedAt, locale, timeZone)}`
-            : EM_DASH}
+            ? `${actorName(item.record.recordedBy) ?? EMPTY_VALUE} · ${formatRecordInstant(item.record.recordedAt, locale, timeZone)}`
+            : EMPTY_VALUE}
         </DetailRow>
 
         {item.record?.voidedAt ? (
           <DetailRow label={t("voidedBy")}>
-            {`${actorName(item.record.voidedBy) ?? EM_DASH} · ${formatRecordInstant(item.record.voidedAt, locale, timeZone)}`}
+            {`${actorName(item.record.voidedBy) ?? EMPTY_VALUE} · ${formatRecordInstant(item.record.voidedAt, locale, timeZone)}`}
           </DetailRow>
         ) : null}
 
         <DetailRow label={t("recordedTime")}>
           {item.record
             ? formatRecordTimeOfDay(item.record.recordedAt, locale, timeZone)
-            : EM_DASH}
+            : EMPTY_VALUE}
         </DetailRow>
       </dl>
     </ResponsiveFormDialog>

@@ -14,6 +14,7 @@ import { DialogFooter } from "@/components/ui/dialog";
 import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
 import { AnswerList } from "@/features/forms/components/answer-list";
 import { useOrgTimeZone } from "@/features/tenant/use-org-timezone";
+import { EMPTY_VALUE } from "@/lib/empty-value";
 import { formatTimeOfDay } from "../lib/format";
 import { needsRecordFlow } from "../lib/today-round";
 import type { TodayTimelineItem } from "../lib/today-timeline";
@@ -62,7 +63,7 @@ export function TodayRecordSheet({
       : [task.completedBy.firstName, task.completedBy.lastName]
           .filter(Boolean)
           .join(" ") || task.completedBy.id.slice(-6)
-    : "—";
+    : EMPTY_VALUE;
 
   return (
     <ResponsiveFormDialog
@@ -133,13 +134,13 @@ export function TodayRecordSheet({
             value={
               task.completedAt
                 ? formatTimeOfDay(task.completedAt, locale, timeZone)
-                : "—"
+                : EMPTY_VALUE
             }
           />
           <DetailRow label={t("record.completedBy")} value={userLabel} />
           <DetailRow
             label={t("record.category")}
-            value={form ? tForms(`categories.${form.category}`) : "—"}
+            value={form ? tForms(`categories.${form.category}`) : EMPTY_VALUE}
           />
         </div>
 

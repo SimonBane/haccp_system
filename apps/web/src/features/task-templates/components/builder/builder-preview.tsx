@@ -14,6 +14,7 @@ import { summarizeTargetNames } from "@/features/task-templates/lib/format-targe
 import { opensAt } from "@/features/task-templates/lib/schedule";
 import type { MissingStep, TaskDraft } from "@/features/task-templates/lib/task-draft";
 import { draftWindow } from "@/features/task-templates/lib/task-draft";
+import { EMPTY_VALUE } from "@/lib/empty-value";
 import { cn } from "@/lib/utils";
 
 const CARD = "flex flex-col gap-3 rounded-xl bg-card p-5 shadow-xs ring-1 ring-foreground/10";
@@ -46,7 +47,6 @@ export function BuilderPreview({
   const Icon = form ? FORM_CATEGORY_ICONS[form.category] : ClipboardCheckIcon;
   const title = draft.title.trim() || form?.name || "";
   const first = times[0];
-  const none = "—";
 
   return (
     <aside aria-label={t("label")} className="flex flex-col gap-4 lg:sticky lg:top-24">
@@ -62,12 +62,12 @@ export function BuilderPreview({
               <dd>{form.name}</dd>
               <dt className="text-muted-foreground">{t("checks")}</dt>
               <dd>
-                {summarizeTargetNames(targetNames, (count) => t("more", { count })) ?? none}
+                {summarizeTargetNames(targetNames, (count) => t("more", { count })) ?? EMPTY_VALUE}
               </dd>
               <dt className="text-muted-foreground">{t("days")}</dt>
-              <dd>{draft.weekdays.length ? labels.days(draft.weekdays) : none}</dd>
+              <dd>{draft.weekdays.length ? labels.days(draft.weekdays) : EMPTY_VALUE}</dd>
               <dt className="text-muted-foreground">{t("times")}</dt>
-              <dd className="tabular-nums">{times.length ? labels.times(times, 5) : none}</dd>
+              <dd className="tabular-nums">{times.length ? labels.times(times, 5) : EMPTY_VALUE}</dd>
               <dt className="text-muted-foreground">{t("window")}</dt>
               <dd>{labels.window(window)}</dd>
             </dl>
@@ -111,7 +111,7 @@ export function BuilderPreview({
             <Icon className="size-[18px]" />
           </span>
           <div className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate text-sm font-medium">{title || none}</span>
+            <span className="truncate text-sm font-medium">{title || EMPTY_VALUE}</span>
             <span className="truncate text-xs text-muted-foreground">
               {[
                 targetNames[0] ?? itemsText,

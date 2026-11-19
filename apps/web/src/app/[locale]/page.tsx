@@ -1,7 +1,31 @@
 import { auth } from "@clerk/nextjs/server";
-import { setRequestLocale } from "next-intl/server";
+import type { Metadata } from "next";
+import { getTranslations, setRequestLocale } from "next-intl/server";
+import { LandingView } from "@/features/landing/landing-view";
 import { redirect } from "@/i18n/navigation";
 import { type Locale } from "@/i18n/routing";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({
+    locale: locale as Locale,
+    namespace: "Landing.meta",
+  });
+
+  return {
+    title: t("title"),
+    description: t("description"),
+    openGraph: {
+      title: t("title"),
+      description: t("description"),
+      type: "website",
+    },
+  };
+}
 
 export default async function HomePage({
   params,
@@ -14,8 +38,9 @@ export default async function HomePage({
 
   const { userId } = await auth();
 
-  redirect({
-    href: userId ? "/dashboard" : "/sign-in",
-    locale: resolvedLocale,
-  });
+  if (userId) {
+    redirect({ href: "/dashboard", locale: resolvedLocale });
+  }
+
+  return <LandingView />;
 }

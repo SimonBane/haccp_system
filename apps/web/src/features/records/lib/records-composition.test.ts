@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { buildGridRequest } from "@/components/ui/data-table/server-grid/grid-request";
 import { queryKeys } from "@/lib/api/query-keys";
 import type { RecordItem } from "@haccp/shared";
-import { EM_DASH, hasJudgedResult } from "./format";
+import { hasJudgedResult } from "./format";
 import {
   buildRecordsFilterDefinitions,
   RECORDS_FILTER_KEY,
@@ -437,7 +437,6 @@ describe("result presentation", () => {
 
   it("shows no result badge for a record with nothing to judge", () => {
     expect(hasJudgedResult(base)).toBe(false);
-    expect(EM_DASH).toBe("—");
   });
 
   it("shows the badge for a pass or a fail of any category", () => {
