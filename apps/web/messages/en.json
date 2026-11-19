@@ -3,18 +3,186 @@
     "title": "SafeCheck",
     "description": "HACCP management, monitoring and compliance"
   },
-  "HomePage": {
-    "badge": "SafeCheck",
-    "title": "Monorepo skeleton",
-    "description": "Next.js web app connected to the standalone Hono API.",
-    "apiHealth": "API health",
-    "status": "Status",
-    "service": "Service",
-    "timestamp": "Timestamp",
-    "apiUnreachable": "API unreachable. Start the monorepo with",
-    "openDashboard": "Open dashboard",
-    "signIn": "Sign in",
-    "signUp": "Sign up"
+  "Landing": {
+    "meta": {
+      "title": "SafeCheck | HACCP checks your team actually completes",
+      "description": "SafeCheck turns your HACCP plan into a daily checklist for staff and an inspection-ready record for managers."
+    },
+    "nav": {
+      "home": "SafeCheck home",
+      "label": "Sections",
+      "how": "How it works",
+      "features": "Features",
+      "inspections": "Inspections",
+      "signIn": "Sign in",
+      "faq": "FAQ",
+      "theme": "Switch between light and dark theme"
+    },
+    "hero": {
+      "badge": "HACCP for food businesses",
+      "titleLine1": "Every check done.",
+      "titleLine2": "Every record ready.",
+      "body": "SafeCheck turns your HACCP plan into a simple daily checklist for your team, and a complete, printable history for the day the inspector walks in.",
+      "primaryCta": "Get started",
+      "secondaryCta": "See how it works"
+    },
+    "preview": {
+      "label": "Example of the Today checklist",
+      "today": "Today",
+      "date": "Tuesday, 18 Nov",
+      "location": "Main site",
+      "progress": "{completed} of {total} completed",
+      "attention": "{count, plural, one {# needs attention} other {# need attention}}",
+      "now": "Now, {time}",
+      "record": "Record",
+      "rows": {
+        "fridge": {
+          "task": "Fridge temperature",
+          "target": "Cold room 1"
+        },
+        "freezer": {
+          "task": "Freezer temperature",
+          "target": "Freezer 1"
+        },
+        "goodsIn": {
+          "task": "Goods-in check",
+          "target": "Dairy delivery",
+          "note": "Limit ≤ 8 °C · Rejected, supplier notified"
+        },
+        "hotHolding": {
+          "task": "Hot holding",
+          "target": "Hot cabinet"
+        },
+        "cleaning": {
+          "task": "Surface cleaning",
+          "target": "Work area"
+        }
+      }
+    },
+    "checkpoints": {
+      "label": "What you can monitor",
+      "fridges": "Fridge temperatures",
+      "freezers": "Freezers",
+      "goodsIn": "Goods-in",
+      "hotHolding": "Hot holding",
+      "cleaning": "Cleaning rounds",
+      "equipment": "Equipment checks"
+    },
+    "how": {
+      "eyebrow": "How it works",
+      "title": "From paper logbook to live checklist in an afternoon.",
+      "steps": {
+        "map": {
+          "title": "Map your site",
+          "body": "Add locations, then the equipment and areas your team checks: fridges, freezers, storage and work areas."
+        },
+        "build": {
+          "title": "Build forms and schedule tasks",
+          "body": "Start from a ready-made form or design your own, then set how often each check repeats and what it applies to."
+        },
+        "today": {
+          "title": "Staff complete it from Today",
+          "body": "Everyone sees one timeline of what's due now, what's overdue, and what needs attention. Tap, record, done."
+        }
+      }
+    },
+    "features": {
+      "eyebrow": "Built for the people doing the checks",
+      "title": "Made for busy hands, not desk time.",
+      "body": "Staff open SafeCheck on their phone, see exactly what's due, and record it in seconds.",
+      "sites": {
+        "title": "Every site, one account",
+        "body": "Run several locations with their own equipment, areas and schedules. Staff only see the sites they're assigned to."
+      },
+      "roles": {
+        "title": "Roles that make sense",
+        "body": "Managers configure forms, tasks and people. Team members just see Today. Invite staff by email."
+      },
+      "install": {
+        "title": "Installs like an app",
+        "body": "Add SafeCheck to any phone or tablet's home screen. No app store needed."
+      },
+      "languages": {
+        "title": "Bulgarian and English",
+        "body": "Each person can switch language, so the whole team works in the one they read best."
+      },
+      "photoAlt": "A team member checks a fridge temperature on a phone"
+    },
+    "inspections": {
+      "eyebrow": "Inspection-ready",
+      "title": "The proof is already written down.",
+      "body": "Every check is stored with who did it, when, and whether it was on time. Filter by date, category or result, then print a clean report.",
+      "points": {
+        "timing": "On time, late and missed checks shown side by side",
+        "print": "One-click printable report for any date range",
+        "history": "Records stay intact even when equipment or forms change"
+      },
+      "records": {
+        "label": "Example of the Records page",
+        "title": "Records",
+        "subtitle": "Main site · Last 7 days",
+        "print": "Print report",
+        "columns": {
+          "dateTime": "Date/time",
+          "task": "Task",
+          "timing": "Timing",
+          "result": "Result"
+        },
+        "timing": {
+          "onTime": "On time",
+          "late": "Late",
+          "missed": "Missed"
+        },
+        "result": {
+          "pass": "Passed",
+          "fail": "Failed",
+          "none": "No result"
+        },
+        "date": "17 Nov",
+        "rows": {
+          "fridgeMorning": "Fridge temperature · Cold room",
+          "goodsIn": "Goods-in check · Dairy",
+          "hotHolding": "Hot holding · Hot cabinet",
+          "cleaning": "Surface cleaning · Work area",
+          "fridgeEvening": "Fridge temperature · Cold room"
+        }
+      }
+    },
+    "faq": {
+      "eyebrow": "Questions",
+      "title": "Frequently asked questions",
+      "items": {
+        "install": {
+          "question": "Do I need to install anything?",
+          "answer": "No. SafeCheck runs in the browser on any phone, tablet or computer. You can also add it to the home screen so it opens like an app."
+        },
+        "ownChecks": {
+          "question": "Can I set up the checks from my own HACCP plan?",
+          "answer": "Yes. You create the forms yourself (ticks, temperatures, choices, notes and dates, each with its own limits) and schedule them as recurring tasks for every fridge, area or site."
+        },
+        "outOfRange": {
+          "question": "What happens when a reading is out of range?",
+          "answer": "It's flagged as soon as it's entered, and the form can ask for a corrective action before the record is saved. The deviation and what was done about it are recorded together."
+        },
+        "sites": {
+          "question": "Can I manage more than one site?",
+          "answer": "Yes. Add every site you have, each with its own equipment, areas and schedule. Staff only see the sites they're assigned to."
+        },
+        "inspection": {
+          "question": "What do I show an inspector?",
+          "answer": "Open the records for any day or period: every check with its time, its result and whether it was done on time, late or missed. You can print them too."
+        }
+      }
+    },
+    "cta": {
+      "title": "Put the clipboard down.",
+      "body": "Set SafeCheck up with your own fridges, forms and schedule. It takes less time than this morning's temperature round.",
+      "button": "Create your account"
+    },
+    "footer": {
+      "tagline": "HACCP management, monitoring and compliance.",
+      "copyright": "© {year} SafeCheck"
+    }
   },
   "NoOrganizationPage": {
     "title": "No organization access",
