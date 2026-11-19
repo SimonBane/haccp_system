@@ -1,6 +1,7 @@
 import type { MeasurementUnit } from "@haccp/shared";
 import type { AnswerFormatters } from "./answer-summary";
 import { formatMeasurementNumber } from "./measurement";
+import { EMPTY_VALUE } from "@/lib/empty-value";
 
 /** Dates are always `DD.MM.YYYY`, matching the rest of the records UI. */
 export function formatCalendarDate(value: string): string {
@@ -21,6 +22,6 @@ export function buildAnswerFormatters(input: {
     date: formatCalendarDate,
     yes: input.yes,
     no: input.no,
-    empty: "—",
+    empty: EMPTY_VALUE,
   };
 }

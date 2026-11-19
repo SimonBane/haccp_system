@@ -4,8 +4,6 @@ import {
   type UserSummary,
 } from "@haccp/shared";
 
-export const EM_DASH = "—";
-
 export function actorName(user: UserSummary | null): string | null {
   if (!user) return null;
   const name = `${user.firstName} ${user.lastName}`.trim();
