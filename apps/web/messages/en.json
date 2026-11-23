@@ -311,7 +311,6 @@
       "description": "Choose what you are recording.",
       "pickItem": "Choose the item you checked.",
       "back": "Back",
-      "shortButton": "Log",
       "save": "Save",
       "savedNow": "Saved with the current time, {time}.",
       "savedToDay": "Saved to {date}.",

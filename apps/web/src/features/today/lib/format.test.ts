@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatDayMonth, formatWeekdayDayMonth, relativeDay } from "./format";
+import {
+  formatDayMonth,
+  formatShortDate,
+  formatWeekdayDayMonth,
+  relativeDay,
+} from "./format";
 
 describe("relativeDay", () => {
   const today = "2026-11-23";
@@ -35,5 +40,12 @@ describe("formatWeekdayDayMonth", () => {
   it("leads with the short weekday", () => {
     expect(formatWeekdayDayMonth("2026-11-20", "bg")).toBe("пт, 20 ноември");
     expect(formatWeekdayDayMonth("2026-11-20", "en")).toBe("Fri, Nov 20");
+  });
+});
+
+describe("formatShortDate", () => {
+  it("abbreviates weekday and month, which Bulgarian prints as digits", () => {
+    expect(formatShortDate("2026-11-23", "en")).toBe("Mon, Nov 23");
+    expect(formatShortDate("2026-11-23", "bg")).toBe("пн, 23.11");
   });
 });

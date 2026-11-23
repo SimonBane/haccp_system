@@ -60,6 +60,14 @@ export function formatWeekdayDayMonth(isoDate: string, locale: string): string {
   }).format(calendarDate(isoDate));
 }
 
+export function formatShortDate(isoDate: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(calendarDate(isoDate));
+}
+
 export function formatLongDate(isoDate: string, locale: string): string {
   return new Intl.DateTimeFormat(locale, {
     day: "numeric",

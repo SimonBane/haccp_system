@@ -69,6 +69,8 @@ type PickerProps = {
   todayDate: string;
   onChange: (date: string) => void;
   align?: "start" | "center";
+  /** Replaces the day's own label, e.g. a shorter one on mobile. */
+  label?: string;
   /** Shown after the label, inside the trigger. */
   suffix?: ReactNode;
   className?: string;
@@ -80,11 +82,13 @@ export function DayPicker({
   todayDate,
   onChange,
   align = "start",
+  label: labelOverride,
   suffix,
   className,
 }: PickerProps) {
   const t = useTranslations("TodayPage.dateNavigation");
-  const label = useDayLabel(date, todayDate);
+  const dayLabel = useDayLabel(date, todayDate);
+  const label = labelOverride ?? dayLabel;
   const [open, setOpen] = useState(false);
 
   function pick(next: string) {

@@ -10,7 +10,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
-type SlotName = "title" | "center" | "actions";
+type SlotName = "lead" | "title" | "center" | "actions";
 
 type SlotTargets = Partial<Record<SlotName, HTMLElement | null>>;
 
@@ -62,6 +62,11 @@ function ShellSlot({
   const target = context?.targets[name] ?? null;
 
   return target ? createPortal(children, target) : null;
+}
+
+/** Sits left of the title and, unlike it, never clips what it holds. */
+export function MobileHeaderLead({ children }: { children: ReactNode }) {
+  return <ShellSlot name="lead">{children}</ShellSlot>;
 }
 
 export function MobileHeaderTitle({ children }: { children: ReactNode }) {
