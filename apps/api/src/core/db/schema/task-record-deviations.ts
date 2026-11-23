@@ -64,7 +64,7 @@ export const taskRecordDeviations = pgTable(
       foreignColumns: [targets.id, targets.locationId],
     }).onDelete("restrict"),
   ],
-);
+).enableRLS();
 
 /** One row per corrective answer chosen; the label is the form version's wording at the time. */
 export const taskRecordDeviationAnswers = pgTable(
@@ -81,7 +81,7 @@ export const taskRecordDeviationAnswers = pgTable(
     primaryKey({ columns: [table.deviationId, table.answerId] }),
     index("task_record_deviation_answers_answer_id_idx").on(table.answerId),
   ],
-);
+).enableRLS();
 
 export type TaskRecordDeviation = typeof taskRecordDeviations.$inferSelect;
 export type NewTaskRecordDeviation = typeof taskRecordDeviations.$inferInsert;

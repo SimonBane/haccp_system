@@ -54,7 +54,7 @@ export const taskTemplates = pgTable(
       sql`${table.completionDueAfterMinutes} IS NULL OR (${table.completionDueAfterMinutes} >= 0 AND ${table.completionDueAfterMinutes} <= 1440)`,
     ),
   ],
-);
+).enableRLS();
 
 export type TaskTemplate = typeof taskTemplates.$inferSelect;
 export type NewTaskTemplate = typeof taskTemplates.$inferInsert;

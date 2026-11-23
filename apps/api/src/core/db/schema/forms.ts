@@ -36,13 +36,16 @@ export const forms = pgTable(
       .on(table.organizationId, table.name)
       .where(sql`${table.archivedAt} IS NULL`),
     // Same limit as FORM_NAME_MAX_LENGTH in @haccp/shared.
-    check("forms_name_length", sql`char_length(${table.name}) BETWEEN 1 AND 200`),
+    check(
+      "forms_name_length",
+      sql`char_length(${table.name}) BETWEEN 1 AND 200`,
+    ),
     check(
       "forms_applies_to_valid",
       sql`${table.appliesTo} IN ('per_item', 'location')`,
     ),
   ],
-);
+).enableRLS();
 
 export type Form = typeof forms.$inferSelect;
 export type NewForm = typeof forms.$inferInsert;

@@ -92,7 +92,7 @@ export const taskRecords = pgTable(
       sql`${table.result} IN ('pass', 'fail', 'not_evaluated')`,
     ),
   ],
-);
+).enableRLS();
 
 export type TaskRecord = typeof taskRecords.$inferSelect;
 export type NewTaskRecord = typeof taskRecords.$inferInsert;

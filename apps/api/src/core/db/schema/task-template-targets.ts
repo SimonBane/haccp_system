@@ -36,7 +36,7 @@ export const taskTemplateTargets = pgTable(
       foreignColumns: [targets.id, targets.locationId],
     }).onDelete("restrict"),
   ],
-);
+).enableRLS();
 
 export type TaskTemplateTarget = typeof taskTemplateTargets.$inferSelect;
 export type NewTaskTemplateTarget = typeof taskTemplateTargets.$inferInsert;

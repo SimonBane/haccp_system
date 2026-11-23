@@ -45,7 +45,7 @@ export const taskRecordReadings = pgTable(
       foreignColumns: [targets.id, targets.locationId],
     }).onDelete("restrict"),
   ],
-);
+).enableRLS();
 
 export type TaskRecordReading = typeof taskRecordReadings.$inferSelect;
 export type NewTaskRecordReading = typeof taskRecordReadings.$inferInsert;

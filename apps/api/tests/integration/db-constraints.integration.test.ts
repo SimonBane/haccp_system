@@ -11,10 +11,7 @@ import {
   taskTemplateTargets,
   users,
 } from "../../src/core/db/schema/index.js";
-import {
-  FORM_NAME_MAX_LENGTH,
-  TARGET_NAME_MAX_LENGTH,
-} from "@haccp/shared";
+import { FORM_NAME_MAX_LENGTH, TARGET_NAME_MAX_LENGTH } from "@haccp/shared";
 import { PG_ERROR, postgresErrorCode } from "./harness/db.js";
 import {
   recordContextFor,
@@ -141,8 +138,16 @@ describe("database constraints", () => {
     const [kitchen, bar] = await db
       .insert(targets)
       .values([
-        { locationId: world.alpha.locations.main.id, kind: "area", name: "Kitchen" },
-        { locationId: world.alpha.locations.main.id, kind: "area", name: "Bar" },
+        {
+          locationId: world.alpha.locations.main.id,
+          kind: "area",
+          name: "Kitchen",
+        },
+        {
+          locationId: world.alpha.locations.main.id,
+          kind: "area",
+          name: "Bar",
+        },
       ])
       .returning();
     const fixture = (parentId: string, name = "Walls") =>
@@ -297,14 +302,18 @@ describe("database constraints", () => {
         .set({ name })
         .where(sql`${targets.id} = ${world.alpha.targets.fridge.id}`);
 
-    expect(await codeFor(setFormName("a".repeat(FORM_NAME_MAX_LENGTH)))).toBeNull();
-    expect(await codeFor(setFormName("a".repeat(FORM_NAME_MAX_LENGTH + 1)))).toBe(
-      PG_ERROR.CHECK_VIOLATION,
-    );
-    expect(await codeFor(setTargetName("a".repeat(TARGET_NAME_MAX_LENGTH)))).toBeNull();
-    expect(await codeFor(setTargetName("a".repeat(TARGET_NAME_MAX_LENGTH + 1)))).toBe(
-      PG_ERROR.CHECK_VIOLATION,
-    );
+    expect(
+      await codeFor(setFormName("a".repeat(FORM_NAME_MAX_LENGTH))),
+    ).toBeNull();
+    expect(
+      await codeFor(setFormName("a".repeat(FORM_NAME_MAX_LENGTH + 1))),
+    ).toBe(PG_ERROR.CHECK_VIOLATION);
+    expect(
+      await codeFor(setTargetName("a".repeat(TARGET_NAME_MAX_LENGTH))),
+    ).toBeNull();
+    expect(
+      await codeFor(setTargetName("a".repeat(TARGET_NAME_MAX_LENGTH + 1))),
+    ).toBe(PG_ERROR.CHECK_VIOLATION);
     expect(await codeFor(setTargetName(""))).toBe(PG_ERROR.CHECK_VIOLATION);
   });
 
@@ -359,5 +368,19 @@ describe("database constraints", () => {
     expect(tables).toContain("task_occurrences");
     expect(tables).toContain("task_records");
     expect(tables).toContain("task_templates");
+  });
+
+  // Supabase exposes `public` through its Data API; the API itself connects as the owner.
+  it("enables row-level security on every public table", async () => {
+    const tables = await db.execute<{ tablename: string; rls: boolean }>(
+      sql`select c.relname as tablename, c.relrowsecurity as rls
+          from pg_class c join pg_namespace n on n.oid = c.relnamespace
+          where n.nspname = 'public' and c.relkind in ('r', 'p')`,
+    );
+
+    expect(tables.length).toBeGreaterThan(0);
+    expect(
+      tables.filter((table) => !table.rls).map((table) => table.tablename),
+    ).toEqual([]);
   });
 });

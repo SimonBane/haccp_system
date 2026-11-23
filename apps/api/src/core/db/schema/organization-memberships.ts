@@ -56,7 +56,7 @@ export const organizationMemberships = pgTable(
       .on(table.organizationId, table.createdAt)
       .where(sql`${table.deletedAt} is null`),
   ],
-);
+).enableRLS();
 
 export type OrganizationMembership =
   typeof organizationMemberships.$inferSelect;

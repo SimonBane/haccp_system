@@ -32,7 +32,7 @@ export const users = pgTable(
       .where(sql`${table.clerkUserId} is not null`),
     uniqueIndex("users_email_unique").on(sql`lower(${table.email})`),
   ],
-);
+).enableRLS();
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;

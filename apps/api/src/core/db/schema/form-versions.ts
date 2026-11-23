@@ -32,7 +32,7 @@ export const formVersions = pgTable(
     ),
     check("form_versions_version_positive", sql`${table.version} > 0`),
   ],
-);
+).enableRLS();
 
 export type FormVersion = typeof formVersions.$inferSelect;
 export type NewFormVersion = typeof formVersions.$inferInsert;

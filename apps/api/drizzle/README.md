@@ -53,6 +53,10 @@ records, and on 2026-11-22 again to fold in record deviations and on-demand
 forms, then to drop task titles (tasks take their form's name). No data was
 kept: every database is recreated empty.
 
+On 2026-11-23 it was regenerated again to enable row-level security on every
+table, so Supabase's Data API roles see nothing; the API connects as the owner
+and bypasses it. No data was kept: every database is recreated empty.
+
 CI enforces the rule: `validate-migrations` runs `db:check` and fails if it
 produces a migration, which catches both a schema change with no migration and a
 migration the snapshots never saw.

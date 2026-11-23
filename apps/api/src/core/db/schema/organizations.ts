@@ -31,7 +31,7 @@ export const organizations = pgTable(
   (table) => [
     uniqueIndex("organizations_clerk_org_id_unique").on(table.clerkOrgId),
   ],
-);
+).enableRLS();
 
 export type Organization = typeof organizations.$inferSelect;
 export type NewOrganization = typeof organizations.$inferInsert;

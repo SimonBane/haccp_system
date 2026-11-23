@@ -44,7 +44,7 @@ export const organizationMemberLocations = pgTable(
       table.organizationId,
     ),
   ],
-);
+).enableRLS();
 
 export type OrganizationMemberLocation =
   typeof organizationMemberLocations.$inferSelect;

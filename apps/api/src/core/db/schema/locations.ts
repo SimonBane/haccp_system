@@ -40,7 +40,7 @@ export const locations = pgTable(
       .on(table.organizationId)
       .where(sql`${table.isDefault} = true`),
   ],
-);
+).enableRLS();
 
 export type Location = typeof locations.$inferSelect;
 export type NewLocation = typeof locations.$inferInsert;

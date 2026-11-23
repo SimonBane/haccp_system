@@ -12,6 +12,7 @@ CREATE TABLE "organizations" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "organizations" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "users" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"clerk_user_id" text,
@@ -25,6 +26,7 @@ CREATE TABLE "users" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "users" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "organization_memberships" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"organization_id" uuid NOT NULL,
@@ -39,6 +41,7 @@ CREATE TABLE "organization_memberships" (
 	CONSTRAINT "organization_memberships_id_organization_id_unique" UNIQUE("id","organization_id")
 );
 --> statement-breakpoint
+ALTER TABLE "organization_memberships" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "organization_member_locations" (
 	"membership_id" uuid NOT NULL,
 	"location_id" uuid NOT NULL,
@@ -47,6 +50,7 @@ CREATE TABLE "organization_member_locations" (
 	CONSTRAINT "organization_member_locations_membership_id_location_id_pk" PRIMARY KEY("membership_id","location_id")
 );
 --> statement-breakpoint
+ALTER TABLE "organization_member_locations" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "locations" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"organization_id" uuid NOT NULL,
@@ -57,6 +61,7 @@ CREATE TABLE "locations" (
 	CONSTRAINT "locations_id_organization_id_unique" UNIQUE("id","organization_id")
 );
 --> statement-breakpoint
+ALTER TABLE "locations" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "targets" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"location_id" uuid NOT NULL,
@@ -73,6 +78,7 @@ CREATE TABLE "targets" (
 	CONSTRAINT "targets_parent_not_self" CHECK ("targets"."parent_id" IS NULL OR "targets"."parent_id" <> "targets"."id")
 );
 --> statement-breakpoint
+ALTER TABLE "targets" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "forms" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"organization_id" uuid NOT NULL,
@@ -87,6 +93,7 @@ CREATE TABLE "forms" (
 	CONSTRAINT "forms_applies_to_valid" CHECK ("forms"."applies_to" IN ('per_item', 'location'))
 );
 --> statement-breakpoint
+ALTER TABLE "forms" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "form_versions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"form_id" uuid NOT NULL,
@@ -97,6 +104,7 @@ CREATE TABLE "form_versions" (
 	CONSTRAINT "form_versions_version_positive" CHECK ("form_versions"."version" > 0)
 );
 --> statement-breakpoint
+ALTER TABLE "form_versions" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "task_templates" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"location_id" uuid NOT NULL,
@@ -113,6 +121,7 @@ CREATE TABLE "task_templates" (
 	CONSTRAINT "task_templates_completion_due_after_range" CHECK ("task_templates"."completion_due_after_minutes" IS NULL OR ("task_templates"."completion_due_after_minutes" >= 0 AND "task_templates"."completion_due_after_minutes" <= 1440))
 );
 --> statement-breakpoint
+ALTER TABLE "task_templates" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "task_template_targets" (
 	"task_template_id" uuid NOT NULL,
 	"target_id" uuid NOT NULL,
@@ -121,6 +130,7 @@ CREATE TABLE "task_template_targets" (
 	CONSTRAINT "task_template_targets_task_template_id_target_id_pk" PRIMARY KEY("task_template_id","target_id")
 );
 --> statement-breakpoint
+ALTER TABLE "task_template_targets" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "task_occurrences" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"location_id" uuid NOT NULL,
@@ -139,6 +149,7 @@ CREATE TABLE "task_occurrences" (
 	CONSTRAINT "task_occurrences_id_location_id_unique" UNIQUE("id","location_id")
 );
 --> statement-breakpoint
+ALTER TABLE "task_occurrences" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "task_records" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"location_id" uuid NOT NULL,
@@ -164,6 +175,7 @@ CREATE TABLE "task_records" (
 	CONSTRAINT "task_records_result_valid" CHECK ("task_records"."result" IN ('pass', 'fail', 'not_evaluated'))
 );
 --> statement-breakpoint
+ALTER TABLE "task_records" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "task_record_readings" (
 	"task_record_id" uuid NOT NULL,
 	"field_id" text NOT NULL,
@@ -178,6 +190,7 @@ CREATE TABLE "task_record_readings" (
 	CONSTRAINT "task_record_readings_task_record_id_field_id_pk" PRIMARY KEY("task_record_id","field_id")
 );
 --> statement-breakpoint
+ALTER TABLE "task_record_readings" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "task_record_deviation_answers" (
 	"deviation_id" uuid NOT NULL,
 	"answer_id" text NOT NULL,
@@ -186,6 +199,7 @@ CREATE TABLE "task_record_deviation_answers" (
 	CONSTRAINT "task_record_deviation_answers_deviation_id_answer_id_pk" PRIMARY KEY("deviation_id","answer_id")
 );
 --> statement-breakpoint
+ALTER TABLE "task_record_deviation_answers" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "task_record_deviations" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"task_record_id" uuid NOT NULL,
@@ -200,6 +214,7 @@ CREATE TABLE "task_record_deviations" (
 	"recorded_by_user_id" uuid NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "task_record_deviations" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "organization_memberships" ADD CONSTRAINT "organization_memberships_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "organization_memberships" ADD CONSTRAINT "organization_memberships_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "organization_member_locations" ADD CONSTRAINT "organization_member_locations_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
