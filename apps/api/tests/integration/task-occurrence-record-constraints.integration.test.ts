@@ -12,10 +12,7 @@ import {
 import { PG_ERROR, postgresErrorCode } from "./harness/db.js";
 import { seedTwoTenants, type TwoTenantWorld } from "./harness/fixtures.js";
 
-/**
- * M0.1: the normalized occurrence/record tables enforce their invariants at the
- * database boundary, independent of the (not-yet-built) generation/record services.
- */
+/** The occurrence and record tables enforce their invariants at the database boundary. */
 describe("task occurrence and record constraints", () => {
   let world: TwoTenantWorld;
 
@@ -50,15 +47,26 @@ describe("task occurrence and record constraints", () => {
     };
   }
 
-  function recordValues(occurrenceId: string) {
+  function recordValues(
+    occurrenceId: string | null,
+    overrides: Record<string, unknown> = {},
+  ) {
     return {
+      locationId: world.alpha.locations.main.id,
+      // A scheduled record carries its task; an on-demand one carries neither.
+      taskTemplateId:
+        occurrenceId === null ? null : world.alpha.templates.temperature.id,
       occurrenceId,
+      title: "Morning fridge check",
       formVersionId: world.alpha.forms.fridgeCheck.versionId,
+      entryDate: "2026-08-19",
+      entryTime: "08:00",
       values: {},
       result: "pass",
       createdByUserId: world.alpha.admin.userId,
       recordedAt: new Date(),
       recordedByUserId: world.alpha.admin.userId,
+      ...overrides,
     };
   }
 
@@ -167,28 +175,86 @@ describe("task occurrence and record constraints", () => {
     expect(code).toBe(PG_ERROR.FOREIGN_KEY_VIOLATION);
   });
 
-  it("resolves a record's location and organization through its occurrence", async () => {
+  it("allows any number of records without an occurrence", async () => {
+    await db.insert(taskRecords).values(recordValues(null));
+
+    expect(
+      await codeFor(db.insert(taskRecords).values(recordValues(null))),
+    ).toBeNull();
+  });
+
+  it("refuses a record whose occurrence belongs to another location", async () => {
     const occurrenceId = await insertOccurrence();
+
+    const code = await codeFor(
+      db.insert(taskRecords).values(
+        recordValues(occurrenceId, {
+          locationId: world.alpha.locations.annex.id,
+        }),
+      ),
+    );
+
+    expect(code).toBe(PG_ERROR.FOREIGN_KEY_VIOLATION);
+  });
+
+  it("refuses a record whose template belongs to another organization", async () => {
+    const occurrenceId = await insertOccurrence();
+
+    const code = await codeFor(
+      db.insert(taskRecords).values(
+        recordValues(occurrenceId, {
+          taskTemplateId: world.beta.templates.temperature.id,
+        }),
+      ),
+    );
+
+    expect(code).toBe(PG_ERROR.FOREIGN_KEY_VIOLATION);
+  });
+
+  it("refuses an occurrence without its task, or a task without an occurrence", async () => {
+    const occurrenceId = await insertOccurrence();
+
+    expect(
+      await codeFor(
+        db
+          .insert(taskRecords)
+          .values(recordValues(occurrenceId, { taskTemplateId: null })),
+      ),
+    ).toBe(PG_ERROR.CHECK_VIOLATION);
+    expect(
+      await codeFor(
+        db.insert(taskRecords).values(
+          recordValues(null, {
+            taskTemplateId: world.alpha.templates.temperature.id,
+          }),
+        ),
+      ),
+    ).toBe(PG_ERROR.CHECK_VIOLATION);
+  });
+
+  it("refuses a record whose target belongs to another organization", async () => {
+    const code = await codeFor(
+      db.insert(taskRecords).values(
+        recordValues(null, { targetId: world.beta.targets.fridge.id }),
+      ),
+    );
+
+    expect(code).toBe(PG_ERROR.FOREIGN_KEY_VIOLATION);
+  });
+
+  it("resolves a record's organization through its own location", async () => {
     const [record] = await db
       .insert(taskRecords)
-      .values(recordValues(occurrenceId))
+      .values(recordValues(null))
       .returning({ id: taskRecords.id });
 
     const [row] = await db
-      .select({
-        locationId: locations.id,
-        organizationId: organizations.id,
-      })
+      .select({ organizationId: organizations.id })
       .from(taskRecords)
-      .innerJoin(
-        taskOccurrences,
-        eq(taskRecords.occurrenceId, taskOccurrences.id),
-      )
-      .innerJoin(locations, eq(taskOccurrences.locationId, locations.id))
+      .innerJoin(locations, eq(taskRecords.locationId, locations.id))
       .innerJoin(organizations, eq(locations.organizationId, organizations.id))
       .where(eq(taskRecords.id, record!.id));
 
-    expect(row?.locationId).toBe(world.alpha.locations.main.id);
     expect(row?.organizationId).toBe(world.alpha.organizationId);
   });
 

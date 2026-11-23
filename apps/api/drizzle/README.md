@@ -48,6 +48,11 @@ fixtures, name length limits) were squashed into a regenerated `0000_baseline.sq
 verified identical on scratch databases as above. Again no data was kept: every
 database is recreated empty.
 
+On 2026-11-19 `0000_baseline.sql` was regenerated in place for self-describing
+records, and on 2026-11-22 again to fold in record deviations and on-demand
+forms, then to drop task titles (tasks take their form's name). No data was
+kept: every database is recreated empty.
+
 CI enforces the rule: `validate-migrations` runs `db:check` and fails if it
 produces a migration, which catches both a schema change with no migration and a
 migration the snapshots never saw.

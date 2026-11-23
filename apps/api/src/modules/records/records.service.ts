@@ -138,7 +138,7 @@ function assertCompleteReport(rows: RecordRow[], total: number): void {
     );
   }
 
-  if (new Set(rows.map((row) => row.occurrenceId)).size !== rows.length) {
+  if (new Set(rows.map((row) => row.rowId)).size !== rows.length) {
     throw new InternalError("Report contained a duplicate occurrence");
   }
 }

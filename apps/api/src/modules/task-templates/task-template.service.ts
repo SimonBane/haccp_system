@@ -104,7 +104,6 @@ async function assertInputUsable(
 
 function templateColumns(input: TemplateInput) {
   return {
-    title: input.title,
     formId: input.formId,
     weekdays: sortWeekdays(input.weekdays),
     scheduledTimes: sortScheduledTimes(input.scheduledTimes),

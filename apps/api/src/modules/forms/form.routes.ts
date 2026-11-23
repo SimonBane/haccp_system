@@ -167,6 +167,7 @@ formRoutes.openapi(
     const updated = await formService.update(
       getDb(c),
       organizationId,
+      getCurrentOrganization(c).timezone,
       formId,
       c.req.valid("json"),
     );

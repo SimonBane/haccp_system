@@ -72,9 +72,9 @@ describe("normalizeRecordsQuery", () => {
     });
   });
 
-  it("defaults omitted sorting to scheduledAt ascending", () => {
+  it("defaults omitted sorting to entryAt ascending", () => {
     expect(normalizeRecordsQuery(query())).toMatchObject({
-      sortBy: "scheduledAt",
+      sortBy: "entryAt",
       sortOrder: "asc",
     });
   });
@@ -262,10 +262,11 @@ function reportQuery(
 
 function row(occurrenceId: string): RecordRow {
   return {
+    rowId: occurrenceId,
     occurrenceId,
     taskTemplateId: "33333333-3333-4333-8333-333333333333",
-    occurrenceDate: "2026-08-23",
-    scheduledTime: "08:00",
+    entryDate: "2026-08-23",
+    entryTime: "08:00",
     availableAt: new Date("2026-08-23T00:00:00.000Z"),
     dueAt: new Date("2026-08-23T05:00:00.000Z"),
     title: "Morning fridge check",
@@ -336,7 +337,7 @@ describe("normalizeRecordsReportQuery", () => {
     expect(normalizeRecordsReportQuery(reportQuery())).toEqual({
       dateFrom: "2026-08-17",
       dateTo: "2026-08-23",
-      sortBy: "scheduledAt",
+      sortBy: "entryAt",
       sortOrder: "asc",
       offset: 0,
       filters: { category: undefined, state: undefined, result: undefined },
@@ -385,7 +386,7 @@ describe("getRecordsReport", () => {
     await result;
 
     expect(findPage.mock.calls[0]![1]).toMatchObject({
-      sortBy: "scheduledAt",
+      sortBy: "entryAt",
       sortOrder: "asc",
       offset: 0,
       limit: RECORDS_PRINT_MAX_ROWS + 1,
@@ -444,7 +445,7 @@ describe("getRecordsReport", () => {
     ).rejects.toBeInstanceOf(InternalError);
   });
 
-  it("fails the whole report when an occurrence appears twice", async () => {
+  it("fails the whole report when a row appears twice", async () => {
     const duplicate = row("44444444-4444-4444-8444-444444444444");
     vi.spyOn(recordsRepository, "countPage").mockResolvedValue(2);
     vi.spyOn(recordsRepository, "findPage").mockResolvedValue([

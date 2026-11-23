@@ -1,6 +1,7 @@
 import {
   addCalendarDays,
   getWeekdayFromDate,
+  taskRecordResponseSchema,
   todayResponseSchema,
   zonedDateString,
   zonedMinutesOfDay,
@@ -134,7 +135,6 @@ describe("Today occurrences (GET)", () => {
       .insert(taskTemplates)
       .values({
         locationId: org.locations.annex.id,
-        title: "Annex cleaning",
         formId: org.forms.cleaning.id,
         weekdays: [
           "monday",
@@ -178,8 +178,11 @@ describe("Today occurrences (GET)", () => {
       },
     );
     expect(voidedCreate.status).toBe(201);
+    const voidedRecordId = taskRecordResponseSchema.parse(
+      await voidedCreate.json(),
+    ).id;
     const voidedUndo = await apiRequest(
-      recordPath(org.locations.main.id, voidedId),
+      `/locations/${org.locations.main.id}/today/records/${voidedRecordId}`,
       {
         method: "DELETE",
         actor: asEmployee(org),
@@ -198,6 +201,7 @@ describe("Today occurrences (GET)", () => {
 
     const noneItem = items.find((item) => item.occurrenceId === noneId)!;
     expect(noneItem.recordState).toBe("none");
+    expect(noneItem.recordId).toBeNull();
     expect(noneItem.completedAt).toBeNull();
 
     const activeItem = items.find((item) => item.occurrenceId === activeId)!;
@@ -207,6 +211,7 @@ describe("Today occurrences (GET)", () => {
 
     const voidedItem = items.find((item) => item.occurrenceId === voidedId)!;
     expect(voidedItem.recordState).toBe("voided");
+    expect(voidedItem.recordId).toBe(voidedRecordId);
     expect(voidedItem.completedAt).toBeNull();
     expect(voidedItem.completedBy).toBeNull();
   });
@@ -285,15 +290,19 @@ describe("Today occurrences (GET)", () => {
       actor: asEmployee(org),
       body: JSON.stringify({ values: { [FRIDGE_FIELD_ID]: 3.5 } }),
     });
-    await apiRequest(recordPath(org.locations.main.id, voidedId), {
-      method: "POST",
-      actor: asEmployee(org),
-      body: JSON.stringify({ values: { [CLEANING_FIELD_ID]: true } }),
-    });
-    await apiRequest(recordPath(org.locations.main.id, voidedId), {
-      method: "DELETE",
-      actor: asEmployee(org),
-    });
+    const voidedRecord = taskRecordResponseSchema.parse(
+      await (
+        await apiRequest(recordPath(org.locations.main.id, voidedId), {
+          method: "POST",
+          actor: asEmployee(org),
+          body: JSON.stringify({ values: { [CLEANING_FIELD_ID]: true } }),
+        })
+      ).json(),
+    );
+    await apiRequest(
+      `/locations/${org.locations.main.id}/today/records/${voidedRecord.id}`,
+      { method: "DELETE", actor: asEmployee(org) },
+    );
 
     const items = flatten(
       todayResponseSchema.parse(

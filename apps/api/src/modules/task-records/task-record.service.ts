@@ -1,5 +1,9 @@
 import type {
+  CorrectiveIssue,
   EvaluatedAnswers,
+  FormDefinition,
+  OnDemandRecordInput,
+  ResolvedLimits,
   TaskRecordInput,
   TaskRecordResponse,
 } from "@haccp/shared";
@@ -7,9 +11,13 @@ import {
   API_ERROR_CODE,
   buildAnswerSchema,
   evaluateAnswers,
-  requiresCorrectiveAction,
+  FORM_APPLIES_TO,
+  isEntryInFuture,
+  resolveCorrective,
+  resolveLimits,
 } from "@haccp/shared";
 import type { Db } from "../../core/db/client.js";
+import type { NewTaskRecord } from "../../core/db/schema/task-records.js";
 import {
   AppError,
   ConflictError,
@@ -18,61 +26,130 @@ import {
   ValidationError,
 } from "../../core/errors/app-errors.js";
 import { mapDbMutationError } from "../../lib/db-errors.js";
-import { toReadingRows, toTaskRecordResponse } from "./task-record.mapper.js";
+import { formRepository } from "../forms/form.repository.js";
+import { targetRepository } from "../targets/target.repository.js";
 import {
-  taskRecordRepository,
-  type OccurrenceForRecording,
-} from "./task-record.repository.js";
+  toDeviationRows,
+  toReadingRows,
+  toRecordCorrective,
+  toTaskRecordResponse,
+  type JudgedDeviation,
+} from "./task-record.mapper.js";
+import { taskRecordRepository } from "./task-record.repository.js";
 
-type WriteScope = {
+type ActorScope = {
   locationId: string;
-  occurrenceId: string;
   actorUserId: string;
 };
 
-type JudgedAnswers = EvaluatedAnswers & { correctiveAction: string | null };
+type JudgedAnswers = EvaluatedAnswers & {
+  correctiveAction: string | null;
+  /** Null unless the record fails. */
+  deviation: JudgedDeviation | null;
+};
 
-function assertOpened(availableAt: Date, now: Date): void {
-  if (now.getTime() < availableAt.getTime()) {
+const CORRECTIVE_ISSUE_MESSAGE: Record<CorrectiveIssue, string> = {
+  not_asked: "This form does not take a corrective action",
+  unknown_answer: "A corrective answer is not one of this form's answers",
+  single_answer_only: "This form takes a single corrective answer",
+  note_not_allowed: "This form does not take a corrective note",
+  required: "A corrective action is required when a check fails",
+};
+
+function assertOpened(availableAt: Date | null, now: Date): void {
+  if (availableAt !== null && now.getTime() < availableAt.getTime()) {
     throw new ValidationError("This task is not open for completion yet");
   }
 }
 
+function assertNotInFuture(
+  entry: { entryDate: string; entryTime: string },
+  now: Date,
+  timeZone: string,
+): void {
+  if (isEntryInFuture(entry.entryDate, entry.entryTime, now, timeZone)) {
+    throw new ValidationError("An entry cannot be in the future");
+  }
+}
+
 /**
- * Validates against the occurrence's own form version and judges with the limits it was
+ * Validates against the record's own form version and judges with the limits it was
  * created with — never the form's current version — so a record means what it meant then.
  */
 function judgeAnswers(
-  occurrence: OccurrenceForRecording,
+  context: { definition: FormDefinition; resolvedLimits: ResolvedLimits },
   input: TaskRecordInput,
 ): JudgedAnswers {
-  const answers = buildAnswerSchema(occurrence.definition).parse(input.values);
+  const answers = buildAnswerSchema(context.definition).parse(input.values);
   const evaluated = evaluateAnswers(
-    occurrence.definition,
-    occurrence.resolvedLimits,
+    context.definition,
+    context.resolvedLimits,
     answers,
   );
-  const correctiveAction = input.correctiveAction?.trim() || null;
 
-  if (
-    requiresCorrectiveAction(occurrence.definition, evaluated.result) &&
-    !correctiveAction
-  ) {
-    throw new ValidationError(
-      "A corrective action is required when a check fails",
-    );
+  if (evaluated.result !== "fail") {
+    return { ...evaluated, correctiveAction: null, deviation: null };
+  }
+
+  const corrective = resolveCorrective(context.definition, {
+    answerIds: input.correctiveAnswerIds ?? [],
+    note: input.correctiveAction ?? "",
+  });
+
+  if (corrective.issue) {
+    throw new ValidationError(CORRECTIVE_ISSUE_MESSAGE[corrective.issue]);
   }
 
   return {
     ...evaluated,
-    correctiveAction: evaluated.result === "fail" ? correctiveAction : null,
+    correctiveAction: corrective.text,
+    deviation: {
+      failedFieldIds: evaluated.failedFieldIds,
+      answers: corrective.answers,
+      note: corrective.note,
+    },
   };
+}
+
+async function insertWithReadings(
+  db: Db,
+  values: NewTaskRecord,
+  recordedAt: Date,
+  deviation: JudgedDeviation | null,
+): Promise<TaskRecordResponse> {
+  return db.transaction(async (tx) => {
+    const record = await taskRecordRepository.insertRecord(tx, values);
+
+    if (!record) {
+      throw new InternalError("Failed to create task record");
+    }
+
+    await taskRecordRepository.replaceReadings(
+      tx,
+      record.id,
+      toReadingRows({
+        recordId: record.id,
+        locationId: record.locationId,
+        targetId: record.targetId,
+        recordedAt,
+        values: record.values,
+      }),
+    );
+
+    await taskRecordRepository.replaceDeviation(
+      tx,
+      record.id,
+      deviation ? toDeviationRows(record, deviation) : null,
+    );
+
+    return toTaskRecordResponse(record, toRecordCorrective(deviation));
+  });
 }
 
 export const taskRecordService = {
   async create(
     db: Db,
-    scope: WriteScope,
+    scope: ActorScope & { occurrenceId: string },
     input: TaskRecordInput,
   ): Promise<TaskRecordResponse> {
     const now = new Date();
@@ -90,36 +167,29 @@ export const taskRecordService = {
     const judged = judgeAnswers(occurrence, input);
 
     try {
-      return await db.transaction(async (tx) => {
-        const record = await taskRecordRepository.insertRecord(tx, {
+      return await insertWithReadings(
+        db,
+        {
+          locationId: occurrence.locationId,
+          taskTemplateId: occurrence.taskTemplateId,
           occurrenceId: occurrence.id,
+          title: occurrence.title,
           formVersionId: occurrence.formVersionId,
+          targetId: occurrence.targetId,
+          targetName: occurrence.targetName,
+          resolvedLimits: occurrence.resolvedLimits,
+          entryDate: occurrence.occurrenceDate,
+          entryTime: occurrence.scheduledTime,
           values: judged.values,
           result: judged.result,
           correctiveAction: judged.correctiveAction,
           createdByUserId: scope.actorUserId,
           recordedAt: now,
           recordedByUserId: scope.actorUserId,
-        });
-
-        if (!record) {
-          throw new InternalError("Failed to create task record");
-        }
-
-        await taskRecordRepository.replaceReadings(
-          tx,
-          record.id,
-          toReadingRows({
-            recordId: record.id,
-            locationId: occurrence.locationId,
-            targetId: occurrence.targetId,
-            recordedAt: now,
-            values: judged.values,
-          }),
-        );
-
-        return toTaskRecordResponse(record);
-      });
+        },
+        now,
+        judged.deviation,
+      );
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
@@ -135,26 +205,119 @@ export const taskRecordService = {
     }
   },
 
+  async createOnDemand(
+    db: Db,
+    scope: ActorScope & {
+      organizationId: string;
+      formId: string;
+      timeZone: string;
+    },
+    input: OnDemandRecordInput,
+  ): Promise<TaskRecordResponse> {
+    const now = new Date();
+
+    const found = await formRepository.findActiveWithLatestVersion(
+      db,
+      scope.organizationId,
+      scope.formId,
+    );
+
+    if (!found || !found.form.onDemand) {
+      throw new NotFoundError("Form not found");
+    }
+
+    const { form, latestVersion } = found;
+
+    if (latestVersion.id !== input.formVersionId) {
+      throw new ConflictError("The form has changed since it was opened", {
+        code: API_ERROR_CODE.FORM_VERSION_CHANGED,
+      });
+    }
+
+    let item: { targetId: string; targetName: string } | null = null;
+    if (form.appliesTo === FORM_APPLIES_TO.PER_ITEM) {
+      item = input.targetId
+        ? await targetRepository.findActiveItem(
+            db,
+            scope.locationId,
+            input.targetId,
+          )
+        : null;
+      if (!item) {
+        throw new NotFoundError("Item not found at this location");
+      }
+    } else if (input.targetId !== null) {
+      throw new ValidationError("This form is not recorded per item");
+    }
+
+    assertNotInFuture(input, now, scope.timeZone);
+
+    const resolvedLimits = resolveLimits(latestVersion.definition, null);
+    const judged = judgeAnswers(
+      { definition: latestVersion.definition, resolvedLimits },
+      input,
+    );
+
+    try {
+      return await insertWithReadings(
+        db,
+        {
+          locationId: scope.locationId,
+          taskTemplateId: null,
+          occurrenceId: null,
+          title: form.name,
+          formVersionId: latestVersion.id,
+          targetId: item?.targetId ?? null,
+          targetName: item?.targetName ?? null,
+          resolvedLimits,
+          entryDate: input.entryDate,
+          entryTime: input.entryTime,
+          values: judged.values,
+          result: judged.result,
+          correctiveAction: judged.correctiveAction,
+          createdByUserId: scope.actorUserId,
+          recordedAt: now,
+          recordedByUserId: scope.actorUserId,
+        },
+        now,
+        judged.deviation,
+      );
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      mapDbMutationError(error, {
+        foreignKey: () => new NotFoundError("Item not found at this location"),
+      });
+    }
+  },
+
   async update(
     db: Db,
-    scope: WriteScope,
+    scope: ActorScope & { recordId: string },
     input: TaskRecordInput,
   ): Promise<TaskRecordResponse> {
     const now = new Date();
 
-    const chain = await taskRecordRepository.findRecordChain(db, scope);
+    const found = await taskRecordRepository.findRecordForWrite(db, scope);
 
-    if (!chain) {
+    if (!found) {
       throw new NotFoundError("Task record not found");
     }
 
-    assertOpened(chain.occurrence.availableAt, now);
-    const judged = judgeAnswers(chain.occurrence, input);
+    const { record } = found;
+
+    assertOpened(found.availableAt, now);
+    const judged = judgeAnswers(
+      { definition: found.definition, resolvedLimits: record.resolvedLimits },
+      input,
+    );
 
     return db.transaction(async (tx) => {
-      const record = await taskRecordRepository.updateRecordAnswers(
+      const updated = await taskRecordRepository.updateRecordAnswers(
         tx,
-        chain.record.id,
+        record.id,
         {
           values: judged.values,
           result: judged.result,
@@ -164,36 +327,48 @@ export const taskRecordService = {
         },
       );
 
-      if (!record) {
+      if (!updated) {
         throw new InternalError("Failed to update task record");
       }
 
       await taskRecordRepository.replaceReadings(
         tx,
-        record.id,
+        updated.id,
         toReadingRows({
-          recordId: record.id,
-          locationId: chain.occurrence.locationId,
-          targetId: chain.occurrence.targetId,
+          recordId: updated.id,
+          locationId: updated.locationId,
+          targetId: updated.targetId,
           recordedAt: now,
           values: judged.values,
         }),
       );
 
-      return toTaskRecordResponse(record);
+      await taskRecordRepository.replaceDeviation(
+        tx,
+        updated.id,
+        judged.deviation ? toDeviationRows(updated, judged.deviation) : null,
+      );
+
+      return toTaskRecordResponse(
+        updated,
+        toRecordCorrective(judged.deviation),
+      );
     });
   },
 
-  async remove(db: Db, scope: WriteScope): Promise<TaskRecordResponse> {
-    const chain = await taskRecordRepository.findRecordChain(db, scope);
+  async remove(
+    db: Db,
+    scope: ActorScope & { recordId: string },
+  ): Promise<TaskRecordResponse> {
+    const found = await taskRecordRepository.findRecordForWrite(db, scope);
 
-    if (!chain || chain.record.voidedAt !== null) {
+    if (!found || found.record.voidedAt !== null) {
       throw new NotFoundError("Task record not found");
     }
 
     const voided = await taskRecordRepository.voidActiveRecord(
       db,
-      chain.record.id,
+      found.record.id,
       { voidedAt: new Date(), voidedByUserId: scope.actorUserId },
     );
 

@@ -51,6 +51,10 @@ export const taskOccurrences = pgTable(
         table.scheduledTime,
       )
       .nullsNotDistinct(),
+    unique("task_occurrences_id_location_id_unique").on(
+      table.id,
+      table.locationId,
+    ),
     index("task_occurrences_location_date_time_id_idx").on(
       table.locationId,
       table.occurrenceDate,

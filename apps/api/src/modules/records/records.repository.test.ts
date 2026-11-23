@@ -1,10 +1,14 @@
 import { PgDialect } from "drizzle-orm/pg-core";
+import type { SQL } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { recordsQueryInternals } from "./records.repository.js";
+import {
+  recordsQueryInternals,
+  type RecordsFilters,
+} from "./records.repository.js";
 
 const dialect = new PgDialect();
 
-function render(query: Parameters<PgDialect["sqlToQuery"]>[0]) {
+function render(query: SQL) {
   return dialect.sqlToQuery(query);
 }
 
@@ -16,32 +20,70 @@ const SCOPE = {
   now: new Date("2026-08-23T09:00:00.000Z"),
 };
 
-describe("base condition", () => {
-  const { sql, params } = render(recordsQueryInternals.baseCondition(SCOPE));
+function recordBranch(filters: RecordsFilters = {}) {
+  const where = recordsQueryInternals.recordBranchCondition({
+    scope: SCOPE,
+    filters,
+  });
+  return where === null ? null : render(where);
+}
 
-  it("scopes to the location and to the organization that owns it", () => {
+function occurrenceBranch(filters: RecordsFilters = {}) {
+  const where = recordsQueryInternals.occurrenceBranchCondition({
+    scope: SCOPE,
+    filters,
+  });
+  return where === null ? null : render(where);
+}
+
+describe("record branch", () => {
+  const { sql, params } = recordBranch()!;
+
+  it("scopes records to the location, its organization and the entry date range", () => {
+    expect(sql).toContain('"task_records"."location_id" = ');
+    expect(sql).toContain('"locations"."organization_id" = ');
+    expect(sql).toContain('"task_records"."entry_date" >= ');
+    expect(sql).toContain('"task_records"."entry_date" <= ');
+    expect(params).toEqual(
+      expect.arrayContaining([
+        SCOPE.locationId,
+        SCOPE.organizationId,
+        SCOPE.dateFrom,
+        SCOPE.dateTo,
+      ]),
+    );
+  });
+
+  it("includes on-demand records, which have no occurrence to wait for", () => {
+    expect(sql).not.toContain("occurrence_id");
+    expect(sql).not.toContain("due_at");
+  });
+});
+
+describe("occurrence branch", () => {
+  const { sql, params } = occurrenceBranch()!;
+
+  it("scopes occurrences to the location, its organization and the date range", () => {
     expect(sql).toContain('"task_occurrences"."location_id" = ');
     expect(sql).toContain('"locations"."organization_id" = ');
-    expect(params).toContain(SCOPE.locationId);
-    expect(params).toContain(SCOPE.organizationId);
-  });
-
-  it("bounds the range inclusively on both ends", () => {
     expect(sql).toContain('"task_occurrences"."occurrence_date" >= ');
     expect(sql).toContain('"task_occurrences"."occurrence_date" <= ');
-    expect(params).toContain(SCOPE.dateFrom);
-    expect(params).toContain(SCOPE.dateTo);
   });
 
-  it("includes a row once a record exists, a finite deadline has passed, or a no-deadline occurrence has opened", () => {
-    expect(sql).toContain('"task_records"."id" is not null');
+  it("only lists occurrences that have no record", () => {
+    expect(sql).toContain("not exists (select 1 from");
+    expect(sql).toContain(
+      '"task_records"."occurrence_id" = "task_occurrences"."id"',
+    );
+  });
+
+  it("includes one once a finite deadline has passed, or a no-deadline one has opened", () => {
     expect(sql).toContain(
       '("task_occurrences"."due_at" is not null and "task_occurrences"."due_at" <= ',
     );
     expect(sql).toContain(
       '("task_occurrences"."due_at" is null and "task_occurrences"."available_at" <= ',
     );
-    // The captured instant travels as a bound parameter, not a database clock call.
     expect(params).toContain(SCOPE.now.toISOString());
   });
 
@@ -51,114 +93,63 @@ describe("base condition", () => {
   });
 });
 
-describe("display-state predicates", () => {
-  it("treats submitted as an existing, non-voided record", () => {
-    expect(
-      render(recordsQueryInternals.displayStateCondition("submitted")).sql,
-    ).toBe(
-      '("task_records"."id" is not null and "task_records"."voided_at" is null)',
+describe("state filter", () => {
+  it("maps submitted and voided onto records only", () => {
+    expect(recordBranch({ state: ["submitted"] })!.sql).toContain(
+      '"task_records"."voided_at" is null',
     );
+    expect(recordBranch({ state: ["voided"] })!.sql).toContain(
+      '"task_records"."voided_at" is not null',
+    );
+    expect(occurrenceBranch({ state: ["submitted", "voided"] })).toBeNull();
   });
 
-  it("treats voided as a retained record with a void timestamp", () => {
-    expect(
-      render(recordsQueryInternals.displayStateCondition("voided")).sql,
-    ).toBe(
-      '("task_records"."id" is not null and "task_records"."voided_at" is not null)',
+  it("maps missed and open onto unrecorded occurrences only", () => {
+    expect(occurrenceBranch({ state: ["missed"] })!.sql).toContain(
+      '"task_occurrences"."due_at" is not null)',
     );
+    expect(recordBranch({ state: ["missed", "open"] })).toBeNull();
   });
 
-  it("treats missed as no record with a finite deadline — the base predicate already made it due", () => {
-    expect(
-      render(recordsQueryInternals.displayStateCondition("missed")).sql,
-    ).toBe(
-      '("task_records"."id" is null and "task_occurrences"."due_at" is not null)',
-    );
+  it("keeps both branches when the selection spans them", () => {
+    expect(recordBranch({ state: ["submitted", "missed"] })).not.toBeNull();
+    expect(occurrenceBranch({ state: ["submitted", "missed"] })).not.toBeNull();
+  });
+});
+
+describe("result filter", () => {
+  it("maps pass and fail onto the stored record result and rules out unrecorded occurrences", () => {
+    const { sql, params } = recordBranch({ result: ["pass", "fail"] })!;
+
+    expect(sql).toContain('"task_records"."result" in ');
+    expect(params).toEqual(expect.arrayContaining(["pass", "fail"]));
+    expect(occurrenceBranch({ result: ["pass", "fail"] })).toBeNull();
   });
 
-  it("treats open as no record and no deadline — the base predicate already made it eligible", () => {
-    expect(
-      render(recordsQueryInternals.displayStateCondition("open")).sql,
-    ).toBe(
-      '("task_records"."id" is null and "task_occurrences"."due_at" is null)',
+  it("maps not_evaluated onto records judged so and every unrecorded occurrence", () => {
+    expect(recordBranch({ result: ["not_evaluated"] })!.params).toContain(
+      "not_evaluated",
+    );
+    expect(occurrenceBranch({ result: ["not_evaluated"] })!.sql).not.toContain(
+      "result",
     );
   });
 });
 
-describe("result predicates", () => {
-  it("maps pass and fail onto the stored record result", () => {
-    const pass = render(recordsQueryInternals.resultCondition("pass"));
-    const fail = render(recordsQueryInternals.resultCondition("fail"));
-
-    expect(pass.sql).toBe('"task_records"."result" = $1');
-    expect(pass.params).toEqual(["pass"]);
-    expect(fail.params).toEqual(["fail"]);
-  });
-
-  it("maps not_evaluated onto a record judged so, or no record at all", () => {
-    const notEvaluated = render(
-      recordsQueryInternals.resultCondition("not_evaluated"),
-    );
-
-    expect(notEvaluated.sql).toBe(
-      '("task_records"."id" is null or "task_records"."result" = $1)',
-    );
-    expect(notEvaluated.params).toEqual(["not_evaluated"]);
-  });
-});
-
-describe("filter composition", () => {
-  it("is absent when no optional filter is selected", () => {
-    expect(recordsQueryInternals.filterCondition({})).toBeUndefined();
-    expect(
-      recordsQueryInternals.filterCondition({
-        category: [],
-        state: [],
-        result: [],
-      }),
-    ).toBeUndefined();
-  });
-
-  it("ORs values inside one filter", () => {
-    const { sql } = render(
-      recordsQueryInternals.filterCondition({
-        state: ["submitted", "voided"],
-      })!,
-    );
-
-    expect(sql).toContain(" or ");
-    expect(sql).not.toContain(" and (");
-  });
-
-  it("ANDs different filters together", () => {
-    const { sql, params } = render(
-      recordsQueryInternals.filterCondition({
-        category: ["temperature", "cleaning"],
-        state: ["voided"],
-        result: ["fail"],
-      })!,
-    );
-
-    expect(sql).toContain('"forms"."category" in ');
-    expect(sql).toContain('"task_records"."voided_at" is not null');
-    expect(sql).toContain('"task_records"."result" = ');
-    expect(params).toEqual(
-      expect.arrayContaining(["temperature", "cleaning", "fail"]),
-    );
-  });
-
-  it("parameterizes every filter value instead of interpolating it", () => {
-    const { sql } = render(
-      recordsQueryInternals.filterCondition({ category: ["temperature"] })!,
-    );
-
-    expect(sql).not.toContain("temperature");
+describe("category filter", () => {
+  it("applies to both branches and is parameterized", () => {
+    for (const branch of [recordBranch, occurrenceBranch]) {
+      const { sql, params } = branch({ category: ["temperature"] })!;
+      expect(sql).toContain('"forms"."category" in ');
+      expect(sql).not.toContain("temperature");
+      expect(params).toContain("temperature");
+    }
   });
 });
 
 describe("ordering", () => {
   function terms(
-    sortBy: "scheduledAt" | "title",
+    sortBy: "entryAt" | "title",
     sortOrder: "asc" | "desc",
   ): string[] {
     return recordsQueryInternals
@@ -166,42 +157,32 @@ describe("ordering", () => {
       .map((term) => render(term).sql);
   }
 
-  it("sorts scheduledAt by date then time in the requested direction", () => {
-    expect(terms("scheduledAt", "asc")).toEqual([
-      '"task_occurrences"."occurrence_date" asc',
-      '"task_occurrences"."scheduled_time" asc',
-      '"task_occurrences"."id" asc',
+  it("sorts entryAt by date then time in the requested direction", () => {
+    expect(terms("entryAt", "asc")).toEqual([
+      '"row_entry_date" asc',
+      '"row_entry_time" asc',
+      '"row_id" asc',
     ]);
-    expect(terms("scheduledAt", "desc")).toEqual([
-      '"task_occurrences"."occurrence_date" desc',
-      '"task_occurrences"."scheduled_time" desc',
-      '"task_occurrences"."id" asc',
+    expect(terms("entryAt", "desc")).toEqual([
+      '"row_entry_date" desc',
+      '"row_entry_time" desc',
+      '"row_id" asc',
     ]);
   });
 
   it("sorts title in the requested direction, then chronologically", () => {
     expect(terms("title", "desc")).toEqual([
-      '"task_occurrences"."title" desc',
-      '"task_occurrences"."occurrence_date" asc',
-      '"task_occurrences"."scheduled_time" asc',
-      '"task_occurrences"."id" asc',
+      '"row_title" desc',
+      '"row_entry_date" asc',
+      '"row_entry_time" asc',
+      '"row_id" asc',
     ]);
   });
 
-  it("always ends on the occurrence id, so limit/offset paging is stable", () => {
-    for (const sortBy of ["scheduledAt", "title"] as const) {
+  it("always ends on the row id, so limit/offset paging is stable", () => {
+    for (const sortBy of ["entryAt", "title"] as const) {
       for (const sortOrder of ["asc", "desc"] as const) {
-        expect(terms(sortBy, sortOrder).at(-1)).toBe(
-          '"task_occurrences"."id" asc',
-        );
-      }
-    }
-  });
-
-  it("never interpolates the client sort value as an identifier", () => {
-    for (const sortBy of ["scheduledAt", "title"] as const) {
-      for (const term of terms(sortBy, "asc")) {
-        expect(term).toMatch(/^"task_occurrences"\."[a-z_]+" (asc|desc)$/);
+        expect(terms(sortBy, sortOrder).at(-1)).toBe('"row_id" asc');
       }
     }
   });

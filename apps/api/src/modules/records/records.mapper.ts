@@ -3,6 +3,7 @@ import {
   deriveRecordEntryState,
   deriveRecordResult,
   deriveRecordTiming,
+  RECORD_KIND,
   type FormCategory,
   type RecordDetail,
   type RecordItem,
@@ -62,11 +63,15 @@ export function toRecordItem(row: RecordRow): RecordItem {
       : { recordedAt: row.recordedAt, voidedAt: row.voidedAt };
 
   return {
+    id: row.rowId,
+    kind:
+      row.occurrenceId === null ? RECORD_KIND.ON_DEMAND : RECORD_KIND.SCHEDULED,
     occurrenceId: row.occurrenceId,
     taskTemplateId: row.taskTemplateId,
-    occurrenceDate: row.occurrenceDate,
-    scheduledTime: row.scheduledTime,
-    availableAt: row.availableAt.toISOString(),
+    entryDate: row.entryDate,
+    entryTime: row.entryTime,
+    availableAt:
+      row.availableAt === null ? null : row.availableAt.toISOString(),
     dueAt: row.dueAt === null ? null : row.dueAt.toISOString(),
     title: row.title,
     formVersionId: row.formVersionId,

@@ -4,6 +4,12 @@ import type { DbClient } from "../../core/db/client.js";
 import { formVersions } from "../../core/db/schema/form-versions.js";
 import { taskOccurrences } from "../../core/db/schema/task-occurrences.js";
 import {
+  taskRecordDeviationAnswers,
+  taskRecordDeviations,
+  type NewTaskRecordDeviation,
+  type NewTaskRecordDeviationAnswer,
+} from "../../core/db/schema/task-record-deviations.js";
+import {
   taskRecordReadings,
   type NewTaskRecordReading,
 } from "../../core/db/schema/task-record-readings.js";
@@ -16,40 +22,45 @@ import {
 export type OccurrenceForRecording = {
   id: string;
   locationId: string;
+  taskTemplateId: string;
+  title: string;
   targetId: string | null;
+  targetName: string | null;
+  occurrenceDate: string;
+  scheduledTime: string;
   availableAt: Date;
   formVersionId: string;
   definition: FormDefinition;
   resolvedLimits: ResolvedLimits;
 };
 
-export type RecordChainRow = {
+export type RecordForWrite = {
   record: TaskRecord;
-  occurrence: OccurrenceForRecording;
-};
-
-type OwnershipScope = {
-  locationId: string;
-  occurrenceId: string;
-};
-
-const occurrenceColumns = {
-  id: taskOccurrences.id,
-  locationId: taskOccurrences.locationId,
-  targetId: taskOccurrences.targetId,
-  availableAt: taskOccurrences.availableAt,
-  formVersionId: taskOccurrences.formVersionId,
-  definition: formVersions.definition,
-  resolvedLimits: taskOccurrences.resolvedLimits,
+  definition: FormDefinition;
+  /** Null for an on-demand record, which has no opening time to respect. */
+  availableAt: Date | null;
 };
 
 export const taskRecordRepository = {
   async findOccurrenceForRecording(
     db: DbClient,
-    scope: OwnershipScope,
+    scope: { locationId: string; occurrenceId: string },
   ): Promise<OccurrenceForRecording | null> {
     const [row] = await db
-      .select(occurrenceColumns)
+      .select({
+        id: taskOccurrences.id,
+        locationId: taskOccurrences.locationId,
+        taskTemplateId: taskOccurrences.taskTemplateId,
+        title: taskOccurrences.title,
+        targetId: taskOccurrences.targetId,
+        targetName: taskOccurrences.targetName,
+        occurrenceDate: taskOccurrences.occurrenceDate,
+        scheduledTime: taskOccurrences.scheduledTime,
+        availableAt: taskOccurrences.availableAt,
+        formVersionId: taskOccurrences.formVersionId,
+        definition: formVersions.definition,
+        resolvedLimits: taskOccurrences.resolvedLimits,
+      })
       .from(taskOccurrences)
       .innerJoin(
         formVersions,
@@ -66,25 +77,26 @@ export const taskRecordRepository = {
     return row ?? null;
   },
 
-  async findRecordChain(
+  async findRecordForWrite(
     db: DbClient,
-    scope: OwnershipScope,
-  ): Promise<RecordChainRow | null> {
+    scope: { locationId: string; recordId: string },
+  ): Promise<RecordForWrite | null> {
     const [row] = await db
-      .select({ record: taskRecords, occurrence: occurrenceColumns })
+      .select({
+        record: taskRecords,
+        definition: formVersions.definition,
+        availableAt: taskOccurrences.availableAt,
+      })
       .from(taskRecords)
-      .innerJoin(
+      .innerJoin(formVersions, eq(formVersions.id, taskRecords.formVersionId))
+      .leftJoin(
         taskOccurrences,
-        eq(taskRecords.occurrenceId, taskOccurrences.id),
-      )
-      .innerJoin(
-        formVersions,
-        eq(formVersions.id, taskOccurrences.formVersionId),
+        eq(taskOccurrences.id, taskRecords.occurrenceId),
       )
       .where(
         and(
-          eq(taskRecords.occurrenceId, scope.occurrenceId),
-          eq(taskOccurrences.locationId, scope.locationId),
+          eq(taskRecords.id, scope.recordId),
+          eq(taskRecords.locationId, scope.locationId),
         ),
       )
       .limit(1);
@@ -100,7 +112,7 @@ export const taskRecordRepository = {
     return created ?? null;
   },
 
-  /** Replaces the answers and reactivates a voided record; the occurrence and its form version never change. */
+  /** Replaces the answers and reactivates a voided record; its context never changes. */
   async updateRecordAnswers(
     db: DbClient,
     recordId: string,
@@ -133,6 +145,38 @@ export const taskRecordRepository = {
 
     if (readings.length > 0) {
       await db.insert(taskRecordReadings).values(readings);
+    }
+  },
+
+  /** Call inside the record's transaction: a passing record must lose the deviation it had. */
+  async replaceDeviation(
+    db: DbClient,
+    recordId: string,
+    deviation: {
+      row: NewTaskRecordDeviation;
+      answers: Omit<NewTaskRecordDeviationAnswer, "deviationId">[];
+    } | null,
+  ): Promise<void> {
+    await db
+      .delete(taskRecordDeviations)
+      .where(eq(taskRecordDeviations.taskRecordId, recordId));
+
+    if (!deviation) return;
+
+    const [created] = await db
+      .insert(taskRecordDeviations)
+      .values(deviation.row)
+      .returning({ id: taskRecordDeviations.id });
+
+    if (created && deviation.answers.length > 0) {
+      await db
+        .insert(taskRecordDeviationAnswers)
+        .values(
+          deviation.answers.map((answer) => ({
+            ...answer,
+            deviationId: created.id,
+          })),
+        );
     }
   },
 

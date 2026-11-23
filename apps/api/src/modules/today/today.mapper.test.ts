@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { OccurrenceWithRecordRow } from "./today.repository.js";
-import { sortItemsByScheduledTime, toTodayTaskItem } from "./today.mapper.js";
+import {
+  sortItemsByScheduledTime,
+  toTodayEntryItem,
+  toTodayOnDemandForm,
+  toTodayTaskItem,
+} from "./today.mapper.js";
 import type { TodayTaskItem } from "@haccp/shared";
 
 const OCCURRENCE_A = "00000000-0000-4000-8000-00000000000a";
@@ -74,6 +79,7 @@ describe("toTodayTaskItem", () => {
   ): OccurrenceWithRecordRow {
     return {
       occurrenceId: OCCURRENCE_A,
+      recordId: null,
       taskTemplateId: "00000000-0000-4000-8000-00000000000t",
       title: "Check walk-in fridge",
       formVersionId: "00000000-0000-4000-8000-0000000000f1",
@@ -96,9 +102,35 @@ describe("toTodayTaskItem", () => {
       result: null,
       values: null,
       correctiveAction: null,
+      deviationId: null,
+      correctiveNote: null,
+      correctiveAnswerIds: null,
       ...overrides,
     };
   }
+
+  it("returns what was chosen and written about a failed check", () => {
+    const item = toTodayTaskItem(
+      occurrenceRow({
+        recordId: "00000000-0000-4000-8000-0000000000c1",
+        recordedAt: new Date("2026-01-15T07:10:00Z"),
+        recordedByUserId: "00000000-0000-4000-8000-0000000000d1",
+        result: "fail",
+        values: {},
+        correctiveAction: "Moved product, Door was open",
+        deviationId: "00000000-0000-4000-8000-0000000000e9",
+        correctiveNote: "Door was open",
+        correctiveAnswerIds: ["a_moved"],
+      }),
+      NOW,
+    );
+
+    expect(item.corrective).toEqual({
+      answerIds: ["a_moved"],
+      note: "Door was open",
+    });
+    expect(toTodayTaskItem(occurrenceRow(), NOW).corrective).toBeNull();
+  });
 
   it("puts a check in its room: the area itself, or the area holding the item", () => {
     const KITCHEN = "00000000-0000-4000-8000-0000000000a2";
@@ -241,5 +273,90 @@ describe("toTodayTaskItem", () => {
     expect(item.completedBy).toBeNull();
     expect(item.result).toBeNull();
     expect(item.values).toBeNull();
+  });
+});
+
+describe("toTodayEntryItem", () => {
+  it("builds a completed on-demand item with its room and recorder", () => {
+    const item = toTodayEntryItem({
+      recordId: "00000000-0000-4000-8000-0000000000c1",
+      title: "Cooling log",
+      formVersionId: "00000000-0000-4000-8000-0000000000f1",
+      targetId: "00000000-0000-4000-8000-00000000000e",
+      targetName: "Blast chiller",
+      targetKind: "equipment",
+      targetLiveName: "Blast chiller",
+      targetParentId: "00000000-0000-4000-8000-0000000000a2",
+      targetParentName: "Kitchen",
+      resolvedLimits: {},
+      entryDate: "2026-01-15",
+      entryTime: "14:40",
+      createdAt: new Date("2026-01-15T12:45:00Z"),
+      recordedAt: new Date("2026-01-15T12:45:00Z"),
+      recordedByUserId: "00000000-0000-4000-8000-0000000000d1",
+      recordedByFirstName: "Ann",
+      recordedByLastName: null,
+      result: "pass",
+      values: {},
+      correctiveAction: null,
+      deviationId: null,
+      correctiveNote: null,
+      correctiveAnswerIds: null,
+    });
+
+    expect(item).toMatchObject({
+      kind: "on_demand",
+      occurrenceId: null,
+      recordId: "00000000-0000-4000-8000-0000000000c1",
+      scheduledTime: "14:40",
+      status: "completed",
+      area: { id: "00000000-0000-4000-8000-0000000000a2", name: "Kitchen" },
+      completedBy: { firstName: "Ann", lastName: "" },
+    });
+  });
+});
+
+describe("toTodayOnDemandForm", () => {
+  it("offers the latest version with the form's own limits", () => {
+    const form = toTodayOnDemandForm({
+      form: {
+        id: "00000000-0000-4000-8000-0000000000f8",
+        organizationId: "00000000-0000-4000-8000-0000000000o1",
+        name: "Cooling log",
+        category: "temperature",
+        appliesTo: "per_item",
+        onDemand: true,
+        archivedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00Z"),
+        updatedAt: new Date("2026-01-01T00:00:00Z"),
+      },
+      latestVersion: {
+        id: "00000000-0000-4000-8000-0000000000f9",
+        formId: "00000000-0000-4000-8000-0000000000f8",
+        version: 3,
+        definition: {
+          fields: [
+            {
+              id: "temperature",
+              type: "measurement",
+              label: "Core temperature",
+              required: true,
+              unit: "celsius",
+              limits: { min: null, max: 5 },
+            },
+          ],
+          correctiveAction: "optional",
+        } as never,
+        createdAt: new Date("2026-01-01T00:00:00Z"),
+      },
+    });
+
+    expect(form).toEqual({
+      formId: "00000000-0000-4000-8000-0000000000f8",
+      name: "Cooling log",
+      formVersionId: "00000000-0000-4000-8000-0000000000f9",
+      appliesTo: "per_item",
+      resolvedLimits: { temperature: { min: null, max: 5 } },
+    });
   });
 });

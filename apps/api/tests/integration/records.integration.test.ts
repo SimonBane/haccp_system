@@ -16,6 +16,7 @@ import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "../../src/core/db/client.js";
 import {
+  forms,
   targets,
   taskOccurrences,
   taskRecords,
@@ -24,6 +25,7 @@ import {
 import {
   CLEANING_FIELD_ID,
   FRIDGE_FIELD_ID,
+  recordContextFor,
   seedOrganization,
   seedTwoTenants,
   type SeededOrg,
@@ -143,17 +145,12 @@ describe("Records list (GET)", () => {
       };
     },
   ): Promise<string> {
-    const [occurrence] = await db
-      .select({ formVersionId: taskOccurrences.formVersionId })
-      .from(taskOccurrences)
-      .where(eq(taskOccurrences.id, occurrenceId));
     const reading = overrides.temperature;
 
     const [record] = await db
       .insert(taskRecords)
       .values({
-        occurrenceId,
-        formVersionId: occurrence!.formVersionId,
+        ...(await recordContextFor(db, occurrenceId)),
         values: reading
           ? {
               [FRIDGE_FIELD_ID]: {
@@ -483,16 +480,16 @@ describe("Records list (GET)", () => {
       expect(detail.recordedBy?.firstName).toBe("Ada");
     });
 
-    it("returns the stored occurrence values, not the current template or target", async () => {
+    it("returns the stored occurrence values, not the current form or target", async () => {
       const occurrenceId = await insertOccurrence({
         type: "temperature",
         title: "Morning fridge check",
       });
 
       await db
-        .update(taskTemplates)
-        .set({ title: "Renamed template" })
-        .where(eq(taskTemplates.id, org.templates.temperature.id));
+        .update(forms)
+        .set({ name: "Renamed form" })
+        .where(eq(forms.id, org.forms.fridgeCheck.id));
       await db
         .update(targets)
         .set({ name: "Renamed fridge" })
@@ -567,14 +564,14 @@ describe("Records list (GET)", () => {
           page: String(page),
           pageSize: "10",
         });
-        seen.push(...result.items.map((item) => item.occurrenceId));
+        seen.push(...result.items.map((item) => item.id));
       }
 
       expect(seen).toHaveLength(30);
       expect(new Set(seen).size).toBe(30);
 
       const backToFirst = await listRecords({ page: "1", pageSize: "10" });
-      expect(backToFirst.items.map((item) => item.occurrenceId)).toEqual(
+      expect(backToFirst.items.map((item) => item.id)).toEqual(
         seen.slice(0, 10),
       );
     });
@@ -584,9 +581,8 @@ describe("Records list (GET)", () => {
       const templates = await db
         .insert(taskTemplates)
         .values(
-          Array.from({ length: 12 }, (_, index) => ({
+          Array.from({ length: 12 }, () => ({
             locationId: org.locations.main.id,
-            title: `Tied template ${index}`,
             formId: org.forms.cleaning.id,
             weekdays: [
               "monday",
@@ -647,13 +643,13 @@ describe("Records list (GET)", () => {
       });
     });
 
-    it("orders scheduledAt ascending by default", async () => {
+    it("orders entryAt ascending by default", async () => {
       expect(titles(await listRecords())).toEqual(["Beta", "Alpha", "Gamma"]);
     });
 
-    it("reverses date and time together for scheduledAt descending", async () => {
+    it("reverses date and time together for entryAt descending", async () => {
       expect(
-        titles(await listRecords({ sortBy: "scheduledAt", sortOrder: "desc" })),
+        titles(await listRecords({ sortBy: "entryAt", sortOrder: "desc" })),
       ).toEqual(["Gamma", "Alpha", "Beta"]);
     });
 
@@ -894,9 +890,9 @@ describe("Records list (GET)", () => {
         dateTo: autumn,
       });
 
-      expect(find(springPage, springId).occurrenceDate).toBe(spring);
-      expect(find(springPage, springId).scheduledTime).toBe("03:30");
-      expect(find(autumnPage, autumnId).occurrenceDate).toBe(autumn);
+      expect(find(springPage, springId).entryDate).toBe(spring);
+      expect(find(springPage, springId).entryTime).toBe("03:30");
+      expect(find(autumnPage, autumnId).entryDate).toBe(autumn);
     });
 
     it("accepts a historical range longer than two months", async () => {
@@ -949,8 +945,8 @@ describe("Records list (GET)", () => {
 
       expect(manyRows.items.length).toBe(11);
       expect(selectSpy.mock.calls.length).toBe(oneRowSelects);
-      // Page, count and one batched form-version lookup — none of them per row.
-      expect(oneRowSelects).toBeLessThanOrEqual(3);
+      // Both union branches, their two counts and one batched form-version lookup; none per row.
+      expect(oneRowSelects).toBeLessThanOrEqual(5);
       for (const item of manyRows.items) {
         expect(item.record?.recordedBy).not.toBeNull();
       }
@@ -1280,7 +1276,7 @@ describe("Records list (GET)", () => {
 
       const report = await getCompleteReport();
       const keys = report.items.map(
-        (item) => `${item.occurrenceDate} ${item.scheduledTime}`,
+        (item) => `${item.entryDate} ${item.entryTime}`,
       );
 
       expect(report.total).toBe(ids.length);
@@ -1351,8 +1347,8 @@ describe("Records list (GET)", () => {
         isolationLevel: "repeatable read",
         accessMode: "read only",
       });
-      // Count, rows and their form versions, all from the same snapshot.
-      expect(selects).toHaveLength(3);
+      // Both counts, both row branches and their form versions, all from the same snapshot.
+      expect(selects).toHaveLength(5);
     });
 
     it("stays consistent when a record lands between the count and the read", async () => {

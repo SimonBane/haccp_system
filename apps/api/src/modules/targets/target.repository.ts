@@ -3,6 +3,11 @@ import type { DbClient } from "../../core/db/client.js";
 import { targets } from "../../core/db/schema/targets.js";
 import { taskTemplateTargets } from "../../core/db/schema/task-template-targets.js";
 import { taskTemplates } from "../../core/db/schema/task-templates.js";
+import {
+  parentTargets,
+  targetLabelColumns,
+  withTargetLabel,
+} from "./target-label.js";
 
 export type TargetRow = typeof targets.$inferSelect;
 
@@ -37,7 +42,48 @@ function activeTaskCounts(db: DbClient, locationId: string) {
     .as("task_counts");
 }
 
+export type TargetItemRow = { targetId: string; targetName: string };
+
 export const targetRepository = {
+  /** Every active item at the location, fixtures labelled with their area. */
+  async findActiveItemsByLocation(
+    db: DbClient,
+    locationId: string,
+  ): Promise<TargetItemRow[]> {
+    const rows = await db
+      .select({ targetId: targets.id, ...targetLabelColumns })
+      .from(targets)
+      .leftJoin(parentTargets, eq(parentTargets.id, targets.parentId))
+      .where(
+        and(eq(targets.locationId, locationId), isNull(targets.archivedAt)),
+      );
+
+    return rows
+      .map(withTargetLabel)
+      .sort((a, b) => a.targetName.localeCompare(b.targetName));
+  },
+
+  async findActiveItem(
+    db: DbClient,
+    locationId: string,
+    targetId: string,
+  ): Promise<TargetItemRow | null> {
+    const [row] = await db
+      .select({ targetId: targets.id, ...targetLabelColumns })
+      .from(targets)
+      .leftJoin(parentTargets, eq(parentTargets.id, targets.parentId))
+      .where(
+        and(
+          eq(targets.id, targetId),
+          eq(targets.locationId, locationId),
+          isNull(targets.archivedAt),
+        ),
+      )
+      .limit(1);
+
+    return row ? withTargetLabel(row) : null;
+  },
+
   async findManyActiveByLocation(
     db: DbClient,
     locationId: string,

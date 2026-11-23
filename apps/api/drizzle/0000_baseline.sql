@@ -79,6 +79,7 @@ CREATE TABLE "forms" (
 	"name" text NOT NULL,
 	"category" text NOT NULL,
 	"applies_to" text NOT NULL,
+	"on_demand" boolean DEFAULT false NOT NULL,
 	"archived_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -99,7 +100,6 @@ CREATE TABLE "form_versions" (
 CREATE TABLE "task_templates" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"location_id" uuid NOT NULL,
-	"title" text NOT NULL,
 	"form_id" uuid NOT NULL,
 	"weekdays" text[] NOT NULL,
 	"scheduled_times" text[] NOT NULL,
@@ -109,7 +109,6 @@ CREATE TABLE "task_templates" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "task_templates_id_location_id_unique" UNIQUE("id","location_id"),
-	CONSTRAINT "task_templates_title_length" CHECK (char_length("task_templates"."title") BETWEEN 1 AND 100),
 	CONSTRAINT "task_templates_completion_opens_before_range" CHECK ("task_templates"."completion_opens_before_minutes" >= 0 AND "task_templates"."completion_opens_before_minutes" <= 1440),
 	CONSTRAINT "task_templates_completion_due_after_range" CHECK ("task_templates"."completion_due_after_minutes" IS NULL OR ("task_templates"."completion_due_after_minutes" >= 0 AND "task_templates"."completion_due_after_minutes" <= 1440))
 );
@@ -136,13 +135,22 @@ CREATE TABLE "task_occurrences" (
 	"target_name" text,
 	"resolved_limits" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "task_occurrences_template_target_date_time_unique" UNIQUE NULLS NOT DISTINCT("task_template_id","target_id","occurrence_date","scheduled_time")
+	CONSTRAINT "task_occurrences_template_target_date_time_unique" UNIQUE NULLS NOT DISTINCT("task_template_id","target_id","occurrence_date","scheduled_time"),
+	CONSTRAINT "task_occurrences_id_location_id_unique" UNIQUE("id","location_id")
 );
 --> statement-breakpoint
 CREATE TABLE "task_records" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"occurrence_id" uuid NOT NULL,
+	"location_id" uuid NOT NULL,
+	"task_template_id" uuid,
+	"occurrence_id" uuid,
+	"title" text NOT NULL,
 	"form_version_id" uuid NOT NULL,
+	"target_id" uuid,
+	"target_name" text,
+	"resolved_limits" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"entry_date" date NOT NULL,
+	"entry_time" text NOT NULL,
 	"values" jsonb NOT NULL,
 	"result" text NOT NULL,
 	"corrective_action" text,
@@ -152,6 +160,7 @@ CREATE TABLE "task_records" (
 	"recorded_by_user_id" uuid NOT NULL,
 	"voided_at" timestamp with time zone,
 	"voided_by_user_id" uuid,
+	CONSTRAINT "task_records_template_with_occurrence" CHECK (("task_records"."occurrence_id" IS NULL) = ("task_records"."task_template_id" IS NULL)),
 	CONSTRAINT "task_records_result_valid" CHECK ("task_records"."result" IN ('pass', 'fail', 'not_evaluated'))
 );
 --> statement-breakpoint
@@ -167,6 +176,28 @@ CREATE TABLE "task_record_readings" (
 	"fails" boolean NOT NULL,
 	"recorded_at" timestamp with time zone NOT NULL,
 	CONSTRAINT "task_record_readings_task_record_id_field_id_pk" PRIMARY KEY("task_record_id","field_id")
+);
+--> statement-breakpoint
+CREATE TABLE "task_record_deviation_answers" (
+	"deviation_id" uuid NOT NULL,
+	"answer_id" text NOT NULL,
+	"label" text NOT NULL,
+	"position" integer NOT NULL,
+	CONSTRAINT "task_record_deviation_answers_deviation_id_answer_id_pk" PRIMARY KEY("deviation_id","answer_id")
+);
+--> statement-breakpoint
+CREATE TABLE "task_record_deviations" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"task_record_id" uuid NOT NULL,
+	"location_id" uuid NOT NULL,
+	"task_template_id" uuid,
+	"form_version_id" uuid NOT NULL,
+	"target_id" uuid,
+	"entry_date" date NOT NULL,
+	"failed_field_ids" text[] NOT NULL,
+	"note" text,
+	"recorded_at" timestamp with time zone NOT NULL,
+	"recorded_by_user_id" uuid NOT NULL
 );
 --> statement-breakpoint
 ALTER TABLE "organization_memberships" ADD CONSTRAINT "organization_memberships_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -187,14 +218,24 @@ ALTER TABLE "task_occurrences" ADD CONSTRAINT "task_occurrences_location_id_loca
 ALTER TABLE "task_occurrences" ADD CONSTRAINT "task_occurrences_form_version_id_form_versions_id_fk" FOREIGN KEY ("form_version_id") REFERENCES "public"."form_versions"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "task_occurrences" ADD CONSTRAINT "task_occurrences_task_template_id_location_id_task_templates_id_location_id_fk" FOREIGN KEY ("task_template_id","location_id") REFERENCES "public"."task_templates"("id","location_id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "task_occurrences" ADD CONSTRAINT "task_occurrences_target_location_fk" FOREIGN KEY ("target_id","location_id") REFERENCES "public"."targets"("id","location_id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "task_records" ADD CONSTRAINT "task_records_occurrence_id_task_occurrences_id_fk" FOREIGN KEY ("occurrence_id") REFERENCES "public"."task_occurrences"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_records" ADD CONSTRAINT "task_records_location_id_locations_id_fk" FOREIGN KEY ("location_id") REFERENCES "public"."locations"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "task_records" ADD CONSTRAINT "task_records_form_version_id_form_versions_id_fk" FOREIGN KEY ("form_version_id") REFERENCES "public"."form_versions"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "task_records" ADD CONSTRAINT "task_records_created_by_user_id_users_id_fk" FOREIGN KEY ("created_by_user_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "task_records" ADD CONSTRAINT "task_records_recorded_by_user_id_users_id_fk" FOREIGN KEY ("recorded_by_user_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "task_records" ADD CONSTRAINT "task_records_voided_by_user_id_users_id_fk" FOREIGN KEY ("voided_by_user_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_records" ADD CONSTRAINT "task_records_template_location_fk" FOREIGN KEY ("task_template_id","location_id") REFERENCES "public"."task_templates"("id","location_id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_records" ADD CONSTRAINT "task_records_occurrence_location_fk" FOREIGN KEY ("occurrence_id","location_id") REFERENCES "public"."task_occurrences"("id","location_id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_records" ADD CONSTRAINT "task_records_target_location_fk" FOREIGN KEY ("target_id","location_id") REFERENCES "public"."targets"("id","location_id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "task_record_readings" ADD CONSTRAINT "task_record_readings_task_record_id_task_records_id_fk" FOREIGN KEY ("task_record_id") REFERENCES "public"."task_records"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "task_record_readings" ADD CONSTRAINT "task_record_readings_location_id_locations_id_fk" FOREIGN KEY ("location_id") REFERENCES "public"."locations"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "task_record_readings" ADD CONSTRAINT "task_record_readings_target_location_fk" FOREIGN KEY ("target_id","location_id") REFERENCES "public"."targets"("id","location_id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_record_deviation_answers" ADD CONSTRAINT "task_record_deviation_answers_deviation_id_task_record_deviations_id_fk" FOREIGN KEY ("deviation_id") REFERENCES "public"."task_record_deviations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_record_deviations" ADD CONSTRAINT "task_record_deviations_task_record_id_task_records_id_fk" FOREIGN KEY ("task_record_id") REFERENCES "public"."task_records"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_record_deviations" ADD CONSTRAINT "task_record_deviations_location_id_locations_id_fk" FOREIGN KEY ("location_id") REFERENCES "public"."locations"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_record_deviations" ADD CONSTRAINT "task_record_deviations_form_version_id_form_versions_id_fk" FOREIGN KEY ("form_version_id") REFERENCES "public"."form_versions"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_record_deviations" ADD CONSTRAINT "task_record_deviations_recorded_by_user_id_users_id_fk" FOREIGN KEY ("recorded_by_user_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_record_deviations" ADD CONSTRAINT "task_record_deviations_template_location_fk" FOREIGN KEY ("task_template_id","location_id") REFERENCES "public"."task_templates"("id","location_id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_record_deviations" ADD CONSTRAINT "task_record_deviations_target_location_fk" FOREIGN KEY ("target_id","location_id") REFERENCES "public"."targets"("id","location_id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "organizations_clerk_org_id_unique" ON "organizations" USING btree ("clerk_org_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "users_clerk_user_id_unique" ON "users" USING btree ("clerk_user_id") WHERE "users"."clerk_user_id" is not null;--> statement-breakpoint
 CREATE UNIQUE INDEX "users_email_unique" ON "users" USING btree (lower("email"));--> statement-breakpoint
@@ -211,4 +252,9 @@ CREATE INDEX "task_templates_form_id_idx" ON "task_templates" USING btree ("form
 CREATE INDEX "task_template_targets_target_id_idx" ON "task_template_targets" USING btree ("target_id");--> statement-breakpoint
 CREATE INDEX "task_occurrences_location_date_time_id_idx" ON "task_occurrences" USING btree ("location_id","occurrence_date","scheduled_time","id");--> statement-breakpoint
 CREATE UNIQUE INDEX "task_records_occurrence_id_unique" ON "task_records" USING btree ("occurrence_id");--> statement-breakpoint
-CREATE INDEX "task_record_readings_target_field_recorded_at_idx" ON "task_record_readings" USING btree ("target_id","field_id","recorded_at");
+CREATE INDEX "task_records_location_entry_idx" ON "task_records" USING btree ("location_id","entry_date","entry_time","id");--> statement-breakpoint
+CREATE INDEX "task_record_readings_target_field_recorded_at_idx" ON "task_record_readings" USING btree ("target_id","field_id","recorded_at");--> statement-breakpoint
+CREATE INDEX "task_record_deviation_answers_answer_id_idx" ON "task_record_deviation_answers" USING btree ("answer_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "task_record_deviations_task_record_id_unique" ON "task_record_deviations" USING btree ("task_record_id");--> statement-breakpoint
+CREATE INDEX "task_record_deviations_location_entry_date_idx" ON "task_record_deviations" USING btree ("location_id","entry_date");--> statement-breakpoint
+CREATE INDEX "task_record_deviations_target_entry_date_idx" ON "task_record_deviations" USING btree ("target_id","entry_date");

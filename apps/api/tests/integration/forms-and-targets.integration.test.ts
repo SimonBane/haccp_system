@@ -466,7 +466,6 @@ describe("Equipment & areas and forms (HTTP)", () => {
         droppedOverrides: [
           {
             templateId: world.alpha.templates.temperature.id,
-            templateTitle: world.alpha.templates.temperature.title,
             locationId: world.alpha.locations.main.id,
             locationName: world.alpha.locations.main.name,
             targetId: world.alpha.targets.fridge.id,

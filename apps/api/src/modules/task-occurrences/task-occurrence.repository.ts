@@ -30,7 +30,9 @@ export const taskOccurrenceRepository = {
       .from(taskRecords)
       .where(inArray(taskRecords.occurrenceId, occurrenceIds));
 
-    return new Set(rows.map((row) => row.occurrenceId));
+    return new Set(
+      rows.flatMap((row) => (row.occurrenceId === null ? [] : [row.occurrenceId])),
+    );
   },
 
   async insertMany(

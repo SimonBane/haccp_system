@@ -39,12 +39,13 @@ todayRoutes.openapi(
     const { date } = c.req.valid("query");
     const { id: locationId } = getCurrentLocation(c);
     const { user } = requireOrgContext(c);
+    const organization = getCurrentOrganization(c);
     const result = await todayService.getToday(
       getDb(c),
-      locationId,
+      { organizationId: organization.id, locationId },
       date,
       user.id,
-      getCurrentOrganization(c).timezone,
+      organization.timezone,
     );
     return c.json(result, 200);
   }),

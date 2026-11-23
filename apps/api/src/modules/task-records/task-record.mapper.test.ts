@@ -9,12 +9,21 @@ const OTHER_USER_ID = "00000000-0000-4000-8000-000000000004";
 const VERSION_ID = "00000000-0000-4000-8000-000000000005";
 const LOCATION_ID = "00000000-0000-4000-8000-000000000006";
 const TARGET_ID = "00000000-0000-4000-8000-000000000007";
+const TEMPLATE_ID = "00000000-0000-4000-8000-000000000008";
 
 function makeRecord(overrides: Partial<TaskRecord> = {}): TaskRecord {
   return {
     id: RECORD_ID,
+    locationId: LOCATION_ID,
+    taskTemplateId: TEMPLATE_ID,
     occurrenceId: OCCURRENCE_ID,
+    title: "Wipe counters",
     formVersionId: VERSION_ID,
+    targetId: null,
+    targetName: null,
+    resolvedLimits: {},
+    entryDate: "2026-08-19",
+    entryTime: "08:00",
     values: { cleaned: { type: "checkbox", value: true } },
     result: "not_evaluated",
     correctiveAction: null,
@@ -32,8 +41,12 @@ describe("toTaskRecordResponse", () => {
   it("maps an active record with its answers and result", () => {
     expect(toTaskRecordResponse(makeRecord())).toEqual({
       id: RECORD_ID,
+      kind: "scheduled",
       occurrenceId: OCCURRENCE_ID,
+      taskTemplateId: TEMPLATE_ID,
       formVersionId: VERSION_ID,
+      entryDate: "2026-08-19",
+      entryTime: "08:00",
       active: true,
       createdAt: "2026-08-19T08:00:00.000Z",
       createdByUserId: USER_ID,
@@ -44,7 +57,14 @@ describe("toTaskRecordResponse", () => {
       result: "not_evaluated",
       values: { cleaned: { type: "checkbox", value: true } },
       correctiveAction: null,
+      corrective: null,
     });
+  });
+
+  it("marks a record without an occurrence as on-demand", () => {
+    expect(
+      toTaskRecordResponse(makeRecord({ occurrenceId: null })).kind,
+    ).toBe("on_demand");
   });
 
   it("marks a voided record inactive and reports void attribution", () => {

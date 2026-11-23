@@ -84,7 +84,6 @@ function planOverrideChanges(
     for (const fieldId of droppedFieldIds) {
       dropped.push({
         templateId: row.templateId,
-        templateTitle: row.templateTitle,
         locationId: row.locationId,
         locationName: row.locationName,
         targetId: row.targetId,
@@ -182,6 +181,7 @@ export const formService = {
           name: input.name,
           category: input.category,
           appliesTo: input.appliesTo,
+          onDemand: input.onDemand,
         });
         if (!form) throw new InternalError("Failed to create form");
 
@@ -203,6 +203,7 @@ export const formService = {
   async update(
     db: Db,
     organizationId: string,
+    timeZone: string,
     formId: string,
     input: UpdateFormInput,
   ): Promise<FormResponse> {
@@ -227,8 +228,20 @@ export const formService = {
           name: input.name,
           category: input.category,
           appliesTo: input.appliesTo,
+          onDemand: input.onDemand ?? current.form.onDemand,
           updatedAt: new Date(),
         });
+
+        // Tasks are named after their form, so upcoming checks take the new name.
+        if (current.form.name !== input.name) {
+          await taskOccurrenceService.reconcileTemplateIds(tx, {
+            templateIds: await formRepository.findActiveTemplateIdsByForm(
+              tx,
+              formId,
+            ),
+            timeZone,
+          });
+        }
 
         return loadResponse(tx, organizationId, formId);
       });

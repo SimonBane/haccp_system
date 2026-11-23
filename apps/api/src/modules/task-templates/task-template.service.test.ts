@@ -56,7 +56,6 @@ const FRIDGE: FormDefinition = {
 const templateRow = {
   id: TEMPLATE_ID,
   locationId: LOCATION_ID,
-  title: "Morning check",
   formId: FORM_ID,
   weekdays: ["monday"],
   scheduledTimes: ["08:00"],
@@ -71,7 +70,6 @@ function input(
   overrides: Partial<CreateTaskTemplateInput> = {},
 ): CreateTaskTemplateInput {
   return {
-    title: "Morning check",
     formId: FORM_ID,
     weekdays: ["monday"],
     scheduledTimes: ["08:00"],

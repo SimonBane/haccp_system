@@ -12,7 +12,11 @@ import { organizationRoutes } from "../modules/organizations/organization.routes
 import { recordsRoutes } from "../modules/records/records.routes.js";
 import { targetRoutes } from "../modules/targets/target.routes.js";
 import { taskOccurrenceRoutes } from "../modules/task-occurrences/task-occurrence.routes.js";
-import { taskRecordRoutes } from "../modules/task-records/task-record.routes.js";
+import {
+  onDemandRecordRoutes,
+  recordWriteRoutes,
+  taskRecordRoutes,
+} from "../modules/task-records/task-record.routes.js";
 import { taskTemplateRoutes } from "../modules/task-templates/task-template.routes.js";
 import { tenantRoutes } from "../modules/tenant/tenant.routes.js";
 import { todayRoutes } from "../modules/today/today.routes.js";
@@ -85,6 +89,16 @@ mountLocationScoped("/locations/:locationId/today", todayRoutes, false);
 mountLocationScoped(
   "/locations/:locationId/today/occurrences",
   taskRecordRoutes,
+  false,
+);
+mountLocationScoped(
+  "/locations/:locationId/today/records",
+  recordWriteRoutes,
+  false,
+);
+mountLocationScoped(
+  "/locations/:locationId/today/forms",
+  onDemandRecordRoutes,
   false,
 );
 mountAdminProtected("/locations", locationRoutes);
