@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { CLEANING_FORM_NAME } from "../../support/forms.js";
 import { E2E_PREFIX, LOCALE_PREFIX } from "../../support/env.js";
 import {
   dateRangeTrigger,
@@ -13,7 +14,7 @@ import {
   toggleFilterOption,
 } from "../../support/records.js";
 
-const CLEANING_TASK = `${E2E_PREFIX} Clean prep surface`;
+const CLEANING_TASK = CLEANING_FORM_NAME;
 
 /**
  * The server render answers the default request and the controller seeds it, so the
@@ -40,7 +41,7 @@ function spanInDays(range: { from: string; to: string }): number {
 
 test.beforeEach(async ({ page }) => {
   await page.goto(`${LOCALE_PREFIX}/dashboard`);
-  await ensureSubmittedRecord(page, CLEANING_TASK);
+  await ensureSubmittedRecord(page, { title: CLEANING_TASK });
 });
 
 test("an admin reaches Records from the sidebar and lands on the default range", async ({
@@ -80,7 +81,7 @@ test("rows-per-page is answered by the server and returns to page one", async ({
 
   expect(resized.get("pageSize")).toBe("10");
   expect(resized.get("page")).toBe("1");
-  expect(resized.get("sortBy")).toBe("scheduledAt");
+  expect(resized.get("sortBy")).toBe("entryAt");
   expect(resized.get("sortOrder")).toBe("asc");
   expect(resized.get("search")).toBeNull();
   expect(resized.get("dateFrom")).toMatch(/^\d{4}-\d{2}-\d{2}$/);
@@ -96,7 +97,7 @@ test("sortable headers ask the server for the allowlisted sort keys", async ({
   const byDate = await nextRecordsQuery(page, () =>
     sortHeader(page, "Date/time").click(),
   );
-  expect(byDate.get("sortBy")).toBe("scheduledAt");
+  expect(byDate.get("sortBy")).toBe("entryAt");
   expect(byDate.get("sortOrder")).toBe("desc");
 
   const byTitle = await nextRecordsQuery(page, () =>

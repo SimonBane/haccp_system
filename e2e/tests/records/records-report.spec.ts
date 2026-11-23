@@ -1,7 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 import { apiContext, json } from "../../support/api.js";
-import { ensureE2eForms } from "../../support/forms.js";
-import { E2E_PREFIX, LOCALE_PREFIX } from "../../support/env.js";
+import { createTask, todayItemForTask } from "../../support/tasks.js";
+import {
+  CLEANING_FORM_NAME,
+  ensureE2eForms,
+} from "../../support/forms.js";
+import { LOCALE_PREFIX } from "../../support/env.js";
 import {
   ensureSubmittedRecord,
   hasHorizontalOverflow,
@@ -9,7 +13,7 @@ import {
   recordsTable,
 } from "../../support/records.js";
 
-const CLEANING_TASK = `${E2E_PREFIX} Clean prep surface`;
+const CLEANING_TASK = CLEANING_FORM_NAME;
 const REPORT_PATH = `${LOCALE_PREFIX}/records/print`;
 
 type Tenant = { locations: { id: string; isDefault: boolean }[] };
@@ -43,6 +47,10 @@ function recordRows(page: Page) {
   return page.locator("tbody[data-report-record]");
 }
 
+function reportRow(page: Page, id: string) {
+  return page.locator(`tbody[data-report-record][data-row-id="${id}"]`);
+}
+
 async function openReportFromRecords(page: Page): Promise<void> {
   await page.goto(await reportHref(page));
   await expect(
@@ -52,7 +60,7 @@ async function openReportFromRecords(page: Page): Promise<void> {
 
 test.beforeEach(async ({ page }) => {
   await page.goto(`${LOCALE_PREFIX}/dashboard`);
-  await ensureSubmittedRecord(page, CLEANING_TASK);
+  await ensureSubmittedRecord(page, { title: CLEANING_TASK });
 });
 
 test("the print action opens the report for the grid's current selection", async ({
@@ -147,7 +155,7 @@ test("the report row count matches the Records total for the same filters", asyn
   await expect(recordRows(page)).toHaveCount(grid.total);
 });
 
-test("every reported occurrence appears exactly once, in a stable order", async ({
+test("every reported row appears exactly once, in a stable order", async ({
   page,
 }) => {
   await page.goto(RECORDS_PATH);
@@ -157,7 +165,7 @@ test("every reported occurrence appears exactly once, in a stable order", async 
     await page.goto(href);
     await expect(reportTable(page)).toBeVisible();
     return recordRows(page).evaluateAll((nodes) =>
-      nodes.map((node) => node.getAttribute("data-occurrence-id")),
+      nodes.map((node) => node.getAttribute("data-row-id")),
     );
   };
 
@@ -172,33 +180,21 @@ test("an opened no-deadline occurrence prints as Open with no deadline content",
   page,
 }) => {
   const locationId = await defaultLocationId(page);
-  const title = `E2E Report open no deadline ${Date.now()}`;
-
   const api = await apiContext(page);
-
   const forms = await ensureE2eForms(api);
-  await json(api, "post", `/locations/${locationId}/task-templates`, {
-    title,
-    formId: forms.cleaning,
-    weekdays: [
-      "monday",
-      "tuesday",
-      "wednesday",
-      "thursday",
-      "friday",
-      "saturday",
-      "sunday",
-    ],
+  const taskId = await createTask(api, locationId, {
+    formId: forms.scratchTick,
     scheduledTimes: ["23:59"],
     completionOpensBeforeMinutes: 1440,
     completionDueAfterMinutes: null,
   });
+  const { occurrenceId } = await todayItemForTask(api, taskId);
   await api.dispose();
 
   await page.goto(RECORDS_PATH);
   await openReportFromRecords(page);
 
-  const row = recordRows(page).filter({ hasText: title });
+  const row = reportRow(page, occurrenceId);
   await expect(row).toHaveCount(1);
 
   // "Open" only: no timing suffix, and no deadline or scheduling-window content.
@@ -212,23 +208,10 @@ test("a submitted record with no deadline prints as Done, never late", async ({
   page,
 }) => {
   const locationId = await defaultLocationId(page);
-  const title = `E2E Report submitted no deadline ${Date.now()}`;
-
   const api = await apiContext(page);
-
   const forms = await ensureE2eForms(api);
-  await json(api, "post", `/locations/${locationId}/task-templates`, {
-    title,
-    formId: forms.cleaning,
-    weekdays: [
-      "monday",
-      "tuesday",
-      "wednesday",
-      "thursday",
-      "friday",
-      "saturday",
-      "sunday",
-    ],
+  const taskId = await createTask(api, locationId, {
+    formId: forms.scratchTick,
     scheduledTimes: ["23:59"],
     completionOpensBeforeMinutes: 1440,
     completionDueAfterMinutes: null,
@@ -236,12 +219,12 @@ test("a submitted record with no deadline prints as Done, never late", async ({
   await api.dispose();
 
   await page.goto(`${LOCALE_PREFIX}/dashboard`);
-  await ensureSubmittedRecord(page, title);
+  const recordId = await ensureSubmittedRecord(page, { taskId });
 
   await page.goto(RECORDS_PATH);
   await openReportFromRecords(page);
 
-  const row = recordRows(page).filter({ hasText: title });
+  const row = reportRow(page, recordId);
   await expect(row).toContainText("Done");
   await expect(row).not.toContainText("late");
 });

@@ -3,7 +3,8 @@ import { expect, test } from "@playwright/test";
 import { apiContext, json } from "../../support/api.js";
 import { ensureE2eForms } from "../../support/forms.js";
 import { LOCALE_PREFIX } from "../../support/env.js";
-import { expandGroup, fetchTodayItems, occurrenceRow } from "../../support/today.js";
+import { createTask, todayItemForTask } from "../../support/tasks.js";
+import { expandGroup, occurrenceRow } from "../../support/today.js";
 
 const MINUTES_PER_DAY = 24 * 60;
 
@@ -38,34 +39,20 @@ test.describe("Today — per-occurrence completion windows", () => {
     const location =
       tenant.locations.find((entry) => entry.isDefault) ?? tenant.locations[0]!;
     const scheduledTime = nearFutureTime(tenant.organization.timezone, 15);
-    const title = `E2E Unopened ${Date.now()}`;
-
-    await json(api, "post", `/locations/${location.id}/task-templates`, {
-      title,
-      formId: forms.cleaning,
-      weekdays: [
-        "monday",
-        "tuesday",
-        "wednesday",
-        "thursday",
-        "friday",
-        "saturday",
-        "sunday",
-      ],
+    const taskId = await createTask(api, location.id, {
+      formId: forms.scratchTick,
       scheduledTimes: [scheduledTime],
       completionOpensBeforeMinutes: 0,
       completionDueAfterMinutes: 0,
     });
 
-    const items = await fetchTodayItems(api);
-    const item = items.find((entry) => entry.title === title);
-    expect(item, `Today has no occurrence titled "${title}"`).toBeDefined();
-    expect(item!.status).toBe("upcoming");
+    const item = await todayItemForTask(api, taskId);
+    expect(item.status).toBe("upcoming");
     await api.dispose();
 
     await page.reload();
     await expandGroup(page, scheduledTime);
-    const target = occurrenceRow(page, item!.occurrenceId);
+    const target = occurrenceRow(page, item.occurrenceId);
     await expect(target).toBeVisible();
     await expect(target).toContainText(/Available at/);
 
@@ -84,53 +71,33 @@ test.describe("Today — per-occurrence completion windows", () => {
     const location =
       tenant.locations.find((entry) => entry.isDefault) ?? tenant.locations[0]!;
     const scheduledTime = nearFutureTime(tenant.organization.timezone, 20);
-    const stamp = Date.now();
-    const openTitle = `E2E Mixed open ${stamp}`;
-    const closedTitle = `E2E Mixed closed ${stamp}`;
-    const weekdays = [
-      "monday",
-      "tuesday",
-      "wednesday",
-      "thursday",
-      "friday",
-      "saturday",
-      "sunday",
-    ];
-
     // Opens from the start of the day — already available despite the future scheduled time.
-    await json(api, "post", `/locations/${location.id}/task-templates`, {
-      title: openTitle,
-      formId: forms.cleaning,
-      weekdays,
+    const openTaskId = await createTask(api, location.id, {
+      formId: forms.scratchTick,
       scheduledTimes: [scheduledTime],
       completionOpensBeforeMinutes: 1440,
       completionDueAfterMinutes: 0,
     });
 
     // Opens exactly at the scheduled time — still closed right now.
-    await json(api, "post", `/locations/${location.id}/task-templates`, {
-      title: closedTitle,
-      formId: forms.cleaning,
-      weekdays,
+    const closedTaskId = await createTask(api, location.id, {
+      formId: forms.scratchTick,
       scheduledTimes: [scheduledTime],
       completionOpensBeforeMinutes: 0,
       completionDueAfterMinutes: 0,
     });
 
-    const items = await fetchTodayItems(api);
-    const openItem = items.find((entry) => entry.title === openTitle);
-    const closedItem = items.find((entry) => entry.title === closedTitle);
-    expect(openItem, `Today has no occurrence titled "${openTitle}"`).toBeDefined();
-    expect(closedItem, `Today has no occurrence titled "${closedTitle}"`).toBeDefined();
-    expect(openItem!.status).toBe("pending");
-    expect(closedItem!.status).toBe("upcoming");
+    const openItem = await todayItemForTask(api, openTaskId);
+    const closedItem = await todayItemForTask(api, closedTaskId);
+    expect(openItem.status).toBe("pending");
+    expect(closedItem.status).toBe("upcoming");
     await api.dispose();
 
     await page.reload();
     await expandGroup(page, scheduledTime);
 
-    const openRow = occurrenceRow(page, openItem!.occurrenceId);
-    const closedRow = occurrenceRow(page, closedItem!.occurrenceId);
+    const openRow = occurrenceRow(page, openItem.occurrenceId);
+    const closedRow = occurrenceRow(page, closedItem.occurrenceId);
     await expect(openRow).toBeVisible();
     await expect(closedRow).toBeVisible();
 

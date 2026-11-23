@@ -3,6 +3,7 @@ import { expect } from "@playwright/test";
 import { apiContext, json } from "./api.js";
 import { CLEANING_ANSWERS } from "./forms.js";
 import { fetchTodayItems } from "./today.js";
+import { todayItemForTask } from "./tasks.js";
 import { LOCALE_PREFIX } from "./env.js";
 
 export const RECORDS_PATH = `${LOCALE_PREFIX}/dashboard/records`;
@@ -11,20 +12,22 @@ export const RECORDS_PATH = `${LOCALE_PREFIX}/dashboard/records`;
  * A submitted record is Records-eligible immediately, even before its due time, so
  * one API write gives the grid a deterministic row without waiting for a due slot.
  */
-/** Only for tasks on the cleaning form: the record is a single required tick. */
+/** Only for tasks on a tick form: the record is a single required tick. Returns the record id. */
 export async function ensureSubmittedRecord(
   page: Page,
-  title: string,
-): Promise<void> {
+  task: { title: string } | { taskId: string },
+): Promise<string> {
   const api = await apiContext(page);
 
   try {
-    const items = await fetchTodayItems(api);
-    const item = items.find((entry) => entry.title === title);
-    expect(item, `Today has no occurrence titled "${title}"`).toBeDefined();
+    const item =
+      "taskId" in task
+        ? await todayItemForTask(api, task.taskId)
+        : (await fetchTodayItems(api)).find((entry) => entry.title === task.title);
+    expect(item, `Today has no check for ${JSON.stringify(task)}`).toBeDefined();
 
-    if (item!.recordState === "active") {
-      return;
+    if (item!.recordState === "active" && item!.recordId) {
+      return item!.recordId;
     }
 
     const tenant = await json<{
@@ -35,12 +38,15 @@ export async function ensureSubmittedRecord(
 
     // An earlier journey may have voided this occurrence's record; POST would 409,
     // so a retained record is reactivated with PUT instead.
-    await json(
+    const saved = await json<{ id: string }>(
       api,
-      item!.recordState === "voided" ? "put" : "post",
-      `/locations/${location.id}/today/occurrences/${item!.occurrenceId}/record`,
+      item!.recordId ? "put" : "post",
+      item!.recordId
+        ? `/locations/${location.id}/today/records/${item!.recordId}`
+        : `/locations/${location.id}/today/occurrences/${item!.occurrenceId}/record`,
       { values: CLEANING_ANSWERS },
     );
+    return saved.id;
   } finally {
     await api.dispose();
   }

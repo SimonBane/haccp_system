@@ -40,24 +40,31 @@ export function upcomingSameDayTimes(
   return [formatClock(first), formatClock(second)];
 }
 
+/** A scheduled check on Today; its occurrence id is always set. */
+export type ScheduledTodayItem = TodayTaskItem & { occurrenceId: string };
+
 function flattenTodayItems(response: {
   sections: {
     morning: TodayTaskItem[];
     afternoon: TodayTaskItem[];
     evening: TodayTaskItem[];
   };
-}): TodayTaskItem[] {
+}): ScheduledTodayItem[] {
   return [
     ...response.sections.morning,
     ...response.sections.afternoon,
     ...response.sections.evening,
-  ];
+  ].flatMap((item) =>
+    item.occurrenceId === null
+      ? []
+      : [{ ...item, occurrenceId: item.occurrenceId }],
+  );
 }
 
 /** Locate Today's stored occurrences — never reconstruct template/date/time identities. */
 export async function fetchTodayItems(
   api: APIRequestContext,
-): Promise<TodayTaskItem[]> {
+): Promise<ScheduledTodayItem[]> {
   const tenant = tenantContextResponseSchema.parse(
     await json(api, "get", "/tenant/current"),
   );
@@ -83,7 +90,7 @@ export async function fetchTodayItems(
 export async function findTodayItem(
   page: Page,
   title: string,
-): Promise<TodayTaskItem> {
+): Promise<ScheduledTodayItem> {
   const api = await apiContext(page);
   try {
     const items = await fetchTodayItems(api);
@@ -110,6 +117,7 @@ export function occurrenceRow(page: Page, occurrenceId: string) {
   );
 }
 
+/** A first record is created against its occurrence; edits and voids address the record itself. */
 export function waitForOccurrenceRecord(
   page: Page,
   occurrenceId: string,
@@ -117,12 +125,15 @@ export function waitForOccurrenceRecord(
 ) {
   const methods = new Set(typeof method === "string" ? [method] : method);
   return page.waitForResponse((response) => {
-    return (
-      methods.has(
-        response.request().method() as "POST" | "PUT" | "DELETE",
-      ) &&
-      response.url().includes(`/today/occurrences/${occurrenceId}/record`)
-    );
+    const requestMethod = response.request().method() as
+      | "POST"
+      | "PUT"
+      | "DELETE";
+    if (!methods.has(requestMethod)) return false;
+
+    return requestMethod === "POST"
+      ? response.url().includes(`/today/occurrences/${occurrenceId}/record`)
+      : response.url().includes("/today/records/");
   });
 }
 
@@ -153,7 +164,7 @@ export async function expandGroup(page: Page, scheduledTime: string) {
 export async function ensurePending(
   page: Page,
   title: string,
-): Promise<TodayTaskItem> {
+): Promise<ScheduledTodayItem> {
   const item = await findTodayItem(page, title);
   await expandGroup(page, item.scheduledTime);
   const target = occurrenceRow(page, item.occurrenceId);

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { E2E_PREFIX, LOCALE_PREFIX } from "../../support/env.js";
+import { CLEANING_FORM_NAME, FRIDGE_FORM_NAME } from "../../support/forms.js";
+import { LOCALE_PREFIX } from "../../support/env.js";
 import {
   ensurePending,
   expandGroup,
@@ -14,7 +15,7 @@ test.describe("Today completions", () => {
   });
 
   test("completing a task survives a reload", async ({ page }) => {
-    const title = `${E2E_PREFIX} Clean prep surface`;
+    const title = CLEANING_FORM_NAME;
     // A retry of this same test leaves the task completed from the failed
     // attempt, collapsing its group — reset it so the row is there to click.
     const task = await ensurePending(page, title);
@@ -36,7 +37,7 @@ test.describe("Today completions", () => {
   });
 
   test("recording a temperature survives a reload", async ({ page }) => {
-    const title = `${E2E_PREFIX} Fridge check`;
+    const title = FRIDGE_FORM_NAME;
     const task = await ensurePending(page, title);
     const target = occurrenceRow(page, task.occurrenceId);
 
@@ -62,7 +63,7 @@ test.describe("Today completions", () => {
   test("Undo voids without a reason, then completion reactivates through PUT", async ({
     page,
   }) => {
-    const title = `${E2E_PREFIX} Clean prep surface`;
+    const title = CLEANING_FORM_NAME;
     const task = await findTodayItem(page, title);
     await expandGroup(page, task.scheduledTime);
     const target = occurrenceRow(page, task.occurrenceId);
