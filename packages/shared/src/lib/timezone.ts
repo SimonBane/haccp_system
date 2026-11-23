@@ -59,6 +59,11 @@ export function zonedDateString(instant: Date, timeZone: string): string {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+export function zonedTimeString(instant: Date, timeZone: string): string {
+  const { hour, minute } = zonedParts(instant, timeZone);
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
 export function zonedMinutesOfDay(instant: Date, timeZone: string): number {
   const { hour, minute } = zonedParts(instant, timeZone);
   return hour * 60 + minute;
@@ -99,4 +104,17 @@ export function wallClockToInstant(
 
 export function startOfLocalDay(date: string, timeZone: string): Date {
   return wallClockToInstant(date, "00:00", timeZone);
+}
+
+/** Leeway for a device clock running slightly ahead of the server. */
+export const ENTRY_FUTURE_TOLERANCE_MINUTES = 5;
+
+export function isEntryInFuture(
+  date: string,
+  time: string,
+  now: Date,
+  timeZone: string,
+): boolean {
+  const entryAt = wallClockToInstant(date, time, timeZone).getTime();
+  return entryAt > now.getTime() + ENTRY_FUTURE_TOLERANCE_MINUTES * 60_000;
 }

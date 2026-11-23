@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  ENTRY_FUTURE_TOLERANCE_MINUTES,
+  isEntryInFuture,
   isValidTimeZone,
   wallClockToInstant,
   zonedDateString,
   zonedMinutesOfDay,
+  zonedTimeString,
   zoneOffsetMinutes,
 } from "./timezone.js";
 
@@ -161,5 +164,40 @@ describe("wallClockToInstant", () => {
     for (let i = 1; i < instants.length; i += 1) {
       expect(instants[i]).toBeGreaterThan(instants[i - 1]);
     }
+  });
+});
+
+describe("zonedTimeString", () => {
+  it("reads the local wall-clock time", () => {
+    // 2026-03-10T22:30:00Z is 00:30 on the 11th in Sofia (UTC+2).
+    expect(zonedTimeString(new Date("2026-03-10T22:30:00Z"), SOFIA)).toBe(
+      "00:30",
+    );
+  });
+});
+
+describe("isEntryInFuture", () => {
+  // 12:00 in Sofia (UTC+2).
+  const now = new Date("2026-03-10T10:00:00Z");
+
+  it("allows a past or current entry", () => {
+    expect(isEntryInFuture("2026-03-10", "11:30", now, SOFIA)).toBe(false);
+    expect(isEntryInFuture("2026-03-10", "12:00", now, SOFIA)).toBe(false);
+  });
+
+  it("allows a device clock slightly ahead", () => {
+    expect(
+      isEntryInFuture(
+        "2026-03-10",
+        `12:${String(ENTRY_FUTURE_TOLERANCE_MINUTES).padStart(2, "0")}`,
+        now,
+        SOFIA,
+      ),
+    ).toBe(false);
+  });
+
+  it("refuses an entry beyond the tolerance", () => {
+    expect(isEntryInFuture("2026-03-10", "12:30", now, SOFIA)).toBe(true);
+    expect(isEntryInFuture("2026-03-11", "00:00", now, SOFIA)).toBe(true);
   });
 });

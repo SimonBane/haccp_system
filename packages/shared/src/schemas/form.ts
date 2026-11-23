@@ -96,12 +96,15 @@ export type FieldType = z.infer<typeof fieldTypeSchema>;
 
 export const CORRECTIVE_ACTION_MODE = {
   REQUIRED_ON_FAIL: "required_on_fail",
+  /** Asked on a failed check but may be skipped; the builder no longer writes it. */
   OPTIONAL: "optional",
+  OFF: "off",
 } as const;
 
 export const correctiveActionModeSchema = z.enum([
   CORRECTIVE_ACTION_MODE.REQUIRED_ON_FAIL,
   CORRECTIVE_ACTION_MODE.OPTIONAL,
+  CORRECTIVE_ACTION_MODE.OFF,
 ]);
 
 export type CorrectiveActionMode = z.infer<typeof correctiveActionModeSchema>;
@@ -125,6 +128,8 @@ export const CHOICE_MIN_OPTIONS = 2;
 export const CHOICE_MAX_OPTIONS = 30;
 export const TEXT_ANSWER_MAX_LENGTH = 2000;
 export const CORRECTIVE_ACTION_MAX_LENGTH = 1000;
+export const CORRECTIVE_MAX_ANSWERS = 8;
+export const CORRECTIVE_ANSWER_LABEL_MAX_LENGTH = 80;
 /** Mirrored by the `forms_name_length` check in the database. */
 export const FORM_NAME_MAX_LENGTH = 200;
 export const FORM_FIELD_LABEL_MAX_LENGTH = 200;
@@ -276,13 +281,58 @@ export type ChoiceOption = z.infer<typeof choiceOptionSchema>;
 export type TextField = z.infer<typeof textFieldSchema>;
 export type DateField = z.infer<typeof dateFieldSchema>;
 
+export const correctiveAnswerSchema = z.object({
+  id: formElementIdSchema,
+  label: z.string().trim().min(1).max(CORRECTIVE_ANSWER_LABEL_MAX_LENGTH),
+});
+
+export type CorrectiveAnswer = z.infer<typeof correctiveAnswerSchema>;
+
+export const correctiveSettingsSchema = z.object({
+  answers: z.array(correctiveAnswerSchema).max(CORRECTIVE_MAX_ANSWERS),
+  multiple: z.boolean(),
+  allowNote: z.boolean(),
+});
+
+export type CorrectiveSettings = z.infer<typeof correctiveSettingsSchema>;
+
+/** What a definition published before forms could define their own answers behaves as. */
+export const DEFAULT_CORRECTIVE_SETTINGS: CorrectiveSettings = {
+  answers: [],
+  multiple: true,
+  allowNote: true,
+};
+
 export const formDefinitionSchema = z
   .object({
     fields: z.array(formFieldSchema).max(FORM_MAX_FIELDS),
     correctiveAction: correctiveActionModeSchema,
+    corrective: correctiveSettingsSchema.optional(),
   })
   .superRefine((definition, ctx) => {
     const seenFieldIds = new Set<string>();
+
+    if (definition.corrective) {
+      const { answers, allowNote } = definition.corrective;
+      const seenAnswerIds = new Set<string>();
+      answers.forEach((answer, index) => {
+        if (seenAnswerIds.has(answer.id)) {
+          ctx.addIssue({
+            code: "custom",
+            message: "Corrective answer ids must be unique",
+            path: ["corrective", "answers", index, "id"],
+          });
+        }
+        seenAnswerIds.add(answer.id);
+      });
+      if (!allowNote && answers.length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: "A form without a note needs at least one corrective answer",
+          path: ["corrective", "answers"],
+        });
+      }
+    }
 
     definition.fields.forEach((field, index) => {
       if (seenFieldIds.has(field.id)) {
@@ -337,6 +387,8 @@ export const createFormSchema = z.object({
   name: formNameSchema,
   category: formCategorySchema,
   appliesTo: formAppliesToSchema,
+  /** Staff can log it from Today whenever it happens, at every location. */
+  onDemand: z.boolean().default(false),
   definition: formDefinitionSchema,
 });
 
@@ -346,6 +398,8 @@ export const updateFormSchema = z.object({
   name: formNameSchema,
   category: formCategorySchema,
   appliesTo: formAppliesToSchema,
+  /** Left out, the form keeps its current setting. */
+  onDemand: z.boolean().optional(),
 });
 
 export type UpdateFormInput = z.infer<typeof updateFormSchema>;
@@ -377,6 +431,7 @@ export const formResponseSchema = z.object({
   name: z.string(),
   category: formCategorySchema,
   appliesTo: formAppliesToSchema,
+  onDemand: z.boolean(),
   latestVersion: formVersionResponseSchema,
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
@@ -418,7 +473,6 @@ export type FormVersionSummaryMap = z.infer<typeof formVersionSummaryMapSchema>;
 
 export const droppedOverrideSchema = z.object({
   templateId: z.uuid(),
-  templateTitle: z.string(),
   locationId: z.uuid(),
   locationName: z.string(),
   targetId: z.uuid(),

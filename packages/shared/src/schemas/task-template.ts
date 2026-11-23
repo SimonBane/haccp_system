@@ -49,9 +49,6 @@ export const TASK_TEMPLATE_HOURS = Array.from({ length: 24 }, (_, hour) =>
 
 export const TASK_TEMPLATE_MAX_SCHEDULED_TIMES = 48;
 
-/** Mirrored by the `task_templates_title_length` check in the database. */
-export const TASK_TEMPLATE_TITLE_MAX_LENGTH = 100;
-
 export const TASK_TEMPLATE_SLOT_THRESHOLDS = {
   morningStart: 5 * 60,
   morningEnd: 11 * 60 + 59,
@@ -169,7 +166,6 @@ export type TaskTemplateTargetInput = z.infer<
 >;
 
 const taskTemplateFieldsSchema = z.object({
-  title: z.string().trim().min(1).max(TASK_TEMPLATE_TITLE_MAX_LENGTH),
   formId: z.uuid(),
   weekdays: z
     .array(taskTemplateWeekdaySchema)
@@ -242,7 +238,6 @@ export type TaskTemplateTargetResponse = z.infer<
 export const taskTemplateResponseSchema = z.object({
   id: z.uuid(),
   locationId: z.uuid(),
-  title: z.string(),
   formId: z.uuid(),
   formName: z.string(),
   formCategory: formCategorySchema,

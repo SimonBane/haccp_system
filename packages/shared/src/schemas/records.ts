@@ -23,6 +23,18 @@ import {
 import { scheduledTimeSchema } from "./task-template.js";
 import { userSummarySchema } from "./user.js";
 
+export const RECORD_KIND = {
+  SCHEDULED: "scheduled",
+  ON_DEMAND: "on_demand",
+} as const;
+
+export const recordKindSchema = z.enum([
+  RECORD_KIND.SCHEDULED,
+  RECORD_KIND.ON_DEMAND,
+]);
+
+export type RecordKind = z.infer<typeof recordKindSchema>;
+
 export const RECORD_DISPLAY_STATE = {
   SUBMITTED: "submitted",
   MISSED: "missed",
@@ -77,12 +89,12 @@ export const recordsCalendarDateSchema = z
   .string()
   .refine(isRealCalendarDate, { error: "Date must be a real YYYY-MM-DD date" });
 
-export const RECORDS_SORT_FIELDS = ["scheduledAt", "title"] as const;
+export const RECORDS_SORT_FIELDS = ["entryAt", "title"] as const;
 
 export type RecordsSortField = (typeof RECORDS_SORT_FIELDS)[number];
 
 export const RECORDS_DEFAULT_SORT = {
-  sortBy: "scheduledAt",
+  sortBy: "entryAt",
   sortOrder: SORT_ORDER.ASC,
 } as const;
 
@@ -240,12 +252,16 @@ export const recordDetailSchema = z.object({
 
 export type RecordDetail = z.infer<typeof recordDetailSchema>;
 
+/** One Records row: a record (scheduled or on-demand), or a scheduled check that has none. */
 export const recordItemSchema = z.object({
-  occurrenceId: z.uuid(),
-  taskTemplateId: z.uuid(),
-  occurrenceDate: recordsCalendarDateSchema,
-  scheduledTime: scheduledTimeSchema,
-  availableAt: z.iso.datetime(),
+  /** The record id when there is a record, else the occurrence id. */
+  id: z.uuid(),
+  kind: recordKindSchema,
+  occurrenceId: z.uuid().nullable(),
+  taskTemplateId: z.uuid().nullable(),
+  entryDate: recordsCalendarDateSchema,
+  entryTime: scheduledTimeSchema,
+  availableAt: z.iso.datetime().nullable(),
   dueAt: z.iso.datetime().nullable(),
   title: z.string(),
   formVersionId: z.uuid(),
