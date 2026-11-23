@@ -10,7 +10,13 @@ import {
   MobileHeaderTitle,
 } from "@/components/layout/shell-slots";
 import { pageWidthVariants } from "@/components/layout/page-container";
-import { Pie, PieChart, type TooltipPayloadEntry } from "recharts";
+import {
+  Bar,
+  BarChart,
+  XAxis,
+  YAxis,
+  type TooltipPayloadEntry,
+} from "recharts";
 import { Button } from "@/components/ui/button";
 import {
   type ChartConfig,
@@ -35,17 +41,22 @@ type Props = {
   onLogEntry?: () => void;
 };
 
-const RING_STATUSES = ["passed", "deviations", "remaining"] as const;
-const RING_SIZE = { width: 28, height: 28 };
+const PROGRESS_STATUSES = ["passed", "deviations", "remaining"] as const;
+// The chart is taller than the 8px bar so the hover target is easier to hit.
+const BAR_SIZE = { width: 128, height: 24 };
+const BAR_MARGIN = { top: 8, right: 0, bottom: 8, left: 0 };
 
-const RING_ID = "today-progress";
-const TOOLTIP_POSITION = { x: 0, y: 36 };
+const BAR_ID = "today-progress";
+const TOOLTIP_POSITION = { x: 0, y: 28 };
 
-function ProgressRing({ progress }: { progress: Progress }) {
+function ProgressBar({
+  progress,
+  open,
+}: {
+  progress: Progress;
+  open: boolean;
+}) {
   const t = useTranslations("TodayPage.progress");
-  const [hovered, setHovered] = useState(false);
-  const [focused, setFocused] = useState(false);
-  if (progress.total === 0) return null;
 
   const counts = {
     passed: progress.done - progress.deviations,
@@ -57,15 +68,8 @@ function ProgressRing({ progress }: { progress: Progress }) {
     deviations: { label: t("deviations"), color: "var(--destructive)" },
     remaining: { label: t("remaining"), color: "var(--muted)" },
   } satisfies ChartConfig;
-  const data = RING_STATUSES.filter((status) => counts[status] > 0).map(
-    (status) => ({
-      status,
-      count: counts[status],
-      fill: `var(--color-${status})`,
-    }),
-  );
-  const rows: TooltipPayloadEntry[] = RING_STATUSES.map((status) => ({
-    graphicalItemId: RING_ID,
+  const rows: TooltipPayloadEntry[] = PROGRESS_STATUSES.map((status) => ({
+    graphicalItemId: BAR_ID,
     name: status,
     dataKey: status,
     value: counts[status],
@@ -79,25 +83,23 @@ function ProgressRing({ progress }: { progress: Progress }) {
   return (
     <ChartContainer
       config={config}
-      initialDimension={RING_SIZE}
-      role="progressbar"
-      aria-label={summary}
-      aria-valuemin={0}
-      aria-valuemax={progress.total}
-      aria-valuenow={progress.done}
-      // Focus opens it too, which is how a tap on a tablet shows it.
-      tabIndex={0}
-      onPointerEnter={() => setHovered(true)}
-      onPointerLeave={() => setHovered(false)}
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
-      className="aspect-square size-7 shrink-0 cursor-default rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      initialDimension={BAR_SIZE}
+      aria-hidden
+      className="aspect-auto h-6 w-32 shrink-0 [&_.recharts-surface]:[clip-path:inset(8px_0_round_9999px)]"
     >
-      <PieChart>
+      <BarChart
+        data={[counts]}
+        layout="vertical"
+        margin={BAR_MARGIN}
+        barCategoryGap={0}
+      >
+        <XAxis type="number" hide domain={[0, progress.total]} />
+        <YAxis type="category" hide />
         <ChartTooltip
-          active={hovered || focused}
-          // Recharts hides a tooltip with no payload of its own, as over the hole.
+          active={open}
+          // Recharts hides a tooltip with no payload of its own.
           defaultIndex={0}
+          cursor={false}
           position={TOOLTIP_POSITION}
           isAnimationActive={false}
           allowEscapeViewBox={{ x: true, y: true }}
@@ -108,22 +110,22 @@ function ProgressRing({ progress }: { progress: Progress }) {
               payload={rows}
               nameKey="status"
               labelFormatter={() => summary}
+              className="min-w-44 gap-2 px-3 py-2.5 text-sm [&_.grid]:gap-2 [&_[style*='--color-bg']]:size-3"
             />
           )}
         />
-        <Pie
-          id={RING_ID}
-          data={data}
-          // Hover state re-renders the chart, which would replay the sweep each time.
-          isAnimationActive={false}
-          dataKey="count"
-          nameKey="status"
-          innerRadius={8}
-          outerRadius={14}
-          startAngle={90}
-          endAngle={-270}
-        />
-      </PieChart>
+        {PROGRESS_STATUSES.map((status) => (
+          <Bar
+            key={status}
+            id={status === "passed" ? BAR_ID : undefined}
+            dataKey={status}
+            stackId="progress"
+            fill={`var(--color-${status})`}
+            // Hover state re-renders the chart, which would replay the grow each time.
+            isAnimationActive={false}
+          />
+        ))}
+      </BarChart>
     </ChartContainer>
   );
 }
@@ -169,21 +171,41 @@ function ProgressMeter({ progress }: { progress: Progress }) {
   );
 }
 
-/** The ring's own label already announces the count. */
+/** The bar and its count are one hover target for the breakdown. */
 function ProgressSummary({ progress }: { progress: Progress }) {
   const t = useTranslations("TodayPage.progress");
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  // An empty element still holds the header's middle column.
+  if (progress.total === 0) return <div />;
+
+  const summary = t("short", {
+    completed: progress.done,
+    total: progress.total,
+  });
 
   return (
-    <div className="flex items-center gap-2.5">
-      <ProgressRing progress={progress} />
-      {progress.total > 0 ? (
-        <span
-          aria-hidden
-          className="text-sm text-muted-foreground whitespace-nowrap tabular-nums"
-        >
-          {t("short", { completed: progress.done, total: progress.total })}
-        </span>
-      ) : null}
+    <div
+      role="progressbar"
+      aria-label={summary}
+      aria-valuemin={0}
+      aria-valuemax={progress.total}
+      aria-valuenow={progress.done}
+      // Focus opens it too, which is how a tap on a tablet shows it.
+      tabIndex={0}
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      className="flex cursor-default items-center gap-2.5 rounded-md px-1.5 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+    >
+      <ProgressBar progress={progress} open={hovered || focused} />
+      <span
+        aria-hidden
+        className="text-sm font-semibold whitespace-nowrap tabular-nums"
+      >
+        {summary}
+      </span>
     </div>
   );
 }
