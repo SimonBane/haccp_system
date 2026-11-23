@@ -138,7 +138,7 @@ UI hooks (`use-mobile`, `use-now`).
   pair every input with a label and inline validation.
 - **i18n**: `next-intl`, locales `bg` (default) and `en`, `localePrefix: "as-needed"`, routes
   under `src/app/[locale]/`. **Any user-facing string must be added to both `messages/en.json`
-  and `messages/bg.json`** — currently at exact key parity (1192 each). Pages call
+  and `messages/bg.json`** — currently at exact key parity (1170 each). Pages call
   `setRequestLocale(locale)` before rendering; middleware is `src/proxy.ts` (Clerk + intl), not
   `middleware.ts`.
 
@@ -212,9 +212,16 @@ once the work is done.
 - **Forms**: field types are code (`packages/shared/src/schemas/form.ts`), forms are data. A
   published `form_versions` row is never edited; saving new fields publishes the next version,
   and field/option ids stay stable across versions because answers and per-target
-  `limitOverrides` are keyed by them. Each occurrence pins its `formVersionId` and
-  `resolvedLimits`, and records are judged by the shared `evaluateAnswers` — never re-derive a
-  result on the web or in SQL. `task_record_readings` holds one typed row per measurement answer.
+  `limitOverrides` are keyed by them. Records describe themselves (location, template, form
+  version, target snapshot, `resolvedLimits`, entry date/time); a scheduled check sets its template
+  and occurrence, while a form flagged `onDemand` is logged from Today at any location with its own
+  limits and sets neither. Tasks have no name of their own: they show their form's, and renaming a
+  form reconciles upcoming checks. Judge with the shared `evaluateAnswers`, never on the web or in
+  SQL. `task_record_readings`: one typed row per measurement.
+  A form's `corrective` settings (its own answers, one or several, note or not) drive the fail
+  prompt — check input with the shared `resolveCorrective`. Every failed record gets a
+  `task_record_deviations` row plus one `task_record_deviation_answers` row per answer, rewritten
+  with the record like readings.
 - **Targets** have a fixed `kind` (`equipment` | `area` | `fixture`); only areas contain others
   (`parentId`), and a fixture (walls, floor) must sit in one. Fixture names are unique per area,
   everything else per location (`isTargetNameTaken`); occurrences snapshot a fixture as
