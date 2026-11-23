@@ -1,5 +1,5 @@
 {
-  "id": "9a78e5bc-115f-4bca-9644-6c121020cdc8",
+  "id": "6ce0e067-1973-4965-bdee-3f57ed5008e9",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -105,7 +105,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.users": {
       "name": "users",
@@ -215,7 +215,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.organization_memberships": {
       "name": "organization_memberships",
@@ -371,7 +371,7 @@
       },
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.organization_member_locations": {
       "name": "organization_member_locations",
@@ -498,7 +498,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.locations": {
       "name": "locations",
@@ -612,7 +612,7 @@
       },
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.targets": {
       "name": "targets",
@@ -760,7 +760,7 @@
           "value": "\"targets\".\"parent_id\" IS NULL OR \"targets\".\"parent_id\" <> \"targets\".\"id\""
         }
       },
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.forms": {
       "name": "forms",
@@ -877,7 +877,7 @@
           "value": "\"forms\".\"applies_to\" IN ('per_item', 'location')"
         }
       },
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.form_versions": {
       "name": "form_versions",
@@ -950,7 +950,7 @@
           "value": "\"form_versions\".\"version\" > 0"
         }
       },
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.task_templates": {
       "name": "task_templates",
@@ -1104,7 +1104,7 @@
           "value": "\"task_templates\".\"completion_due_after_minutes\" IS NULL OR (\"task_templates\".\"completion_due_after_minutes\" >= 0 AND \"task_templates\".\"completion_due_after_minutes\" <= 1440)"
         }
       },
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.task_template_targets": {
       "name": "task_template_targets",
@@ -1197,7 +1197,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.task_occurrences": {
       "name": "task_occurrences",
@@ -1401,7 +1401,7 @@
       },
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.task_records": {
       "name": "task_records",
@@ -1706,7 +1706,7 @@
           "value": "\"task_records\".\"result\" IN ('pass', 'fail', 'not_evaluated')"
         }
       },
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.task_record_readings": {
       "name": "task_record_readings",
@@ -1857,7 +1857,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.task_record_deviation_answers": {
       "name": "task_record_deviation_answers",
@@ -1932,7 +1932,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.task_record_deviations": {
       "name": "task_record_deviations",
@@ -2153,7 +2153,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     }
   },
   "enums": {},

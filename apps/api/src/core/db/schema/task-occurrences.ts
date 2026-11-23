@@ -71,7 +71,7 @@ export const taskOccurrences = pgTable(
       foreignColumns: [targets.id, targets.locationId],
     }).onDelete("restrict"),
   ],
-);
+).enableRLS();
 
 export type TaskOccurrence = typeof taskOccurrences.$inferSelect;
 export type NewTaskOccurrence = typeof taskOccurrences.$inferInsert;

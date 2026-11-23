@@ -44,7 +44,10 @@ export const targets = pgTable(
       foreignColumns: [table.id, table.locationId],
     }).onDelete("restrict"),
     // Same limit as TARGET_NAME_MAX_LENGTH in @haccp/shared.
-    check("targets_name_length", sql`char_length(${table.name}) BETWEEN 1 AND 100`),
+    check(
+      "targets_name_length",
+      sql`char_length(${table.name}) BETWEEN 1 AND 100`,
+    ),
     check(
       "targets_kind_valid",
       sql`${table.kind} IN ('equipment', 'area', 'fixture')`,
@@ -58,7 +61,7 @@ export const targets = pgTable(
       sql`${table.parentId} IS NULL OR ${table.parentId} <> ${table.id}`,
     ),
   ],
-);
+).enableRLS();
 
 export type Target = typeof targets.$inferSelect;
 export type NewTarget = typeof targets.$inferInsert;
