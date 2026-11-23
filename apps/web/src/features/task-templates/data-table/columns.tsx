@@ -64,7 +64,7 @@ export function getColumns({
 }: GetColumnsParams): ColumnDef<TaskTemplateResponse>[] {
   return [
     {
-      accessorKey: "title",
+      accessorKey: "formName",
       enableHiding: false,
       meta: { view_label: t("columns.title") },
       header: ({ column }) => (
@@ -80,12 +80,7 @@ export function getColumns({
             >
               <Icon className="size-4" />
             </span>
-            <div className="flex min-w-0 flex-col">
-              <span className="truncate font-medium">{row.original.title}</span>
-              <span className="truncate text-xs text-muted-foreground">
-                {row.original.formName}
-              </span>
-            </div>
+            <span className="truncate font-medium">{row.original.formName}</span>
           </div>
         );
       },

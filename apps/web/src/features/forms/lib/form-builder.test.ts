@@ -1,16 +1,22 @@
 import { formDefinitionSchema, getStarterForms } from "@haccp/shared";
 import { describe, expect, it } from "vitest";
 import {
+  addCorrectiveAnswer,
+  chooseCategory,
+  correctiveNoteShown,
   createBuilderField,
   duplicateField,
   failRules,
   insertField,
+  insertFieldAt,
   emptyBuilderState,
   hasBuilderIssues,
   mintElementId,
   moveField,
+  moveFieldTo,
   sameBuilderState,
   sameDefinition,
+  seedCorrectiveAnswers,
   toBuilderState,
   toDefinition,
   validateBuilder,
@@ -146,8 +152,11 @@ describe("validateBuilder", () => {
 
   it("requires at least one field", () => {
     expect(
-      validateBuilder({ ...emptyBuilderState(), name: "x", category: "hygiene" })
-        .fields,
+      validateBuilder({
+        ...emptyBuilderState(),
+        name: "x",
+        category: "hygiene",
+      }).fields,
     ).toBe("empty");
   });
 });
@@ -174,6 +183,28 @@ describe("moveField", () => {
   });
 });
 
+describe("moveFieldTo", () => {
+  const fields = ["a", "b", "c", "d"].map((id) => ({
+    id,
+    type: "checkbox" as const,
+    label: id,
+    required: false,
+  }));
+  const ids = (list: readonly { id: string }[]) =>
+    list.map((field) => field.id);
+
+  it("lands a dragged field at the drop position, up or down the list", () => {
+    expect(ids(moveFieldTo(fields, "a", 2))).toEqual(["b", "c", "a", "d"]);
+    expect(ids(moveFieldTo(fields, "d", 0))).toEqual(["d", "a", "b", "c"]);
+  });
+
+  it("clamps past either end and ignores a field that is gone", () => {
+    expect(ids(moveFieldTo(fields, "b", 99))).toEqual(["a", "c", "d", "b"]);
+    expect(ids(moveFieldTo(fields, "c", -1))).toEqual(["c", "a", "b", "d"]);
+    expect(ids(moveFieldTo(fields, "f_gone", 0))).toEqual(["a", "b", "c", "d"]);
+  });
+});
+
 describe("sameDefinition", () => {
   it("ignores key order but not field order", () => {
     const [goodsIn] = getStarterForms("en").filter(
@@ -181,10 +212,11 @@ describe("sameDefinition", () => {
     );
     const definition = goodsIn!.definition;
     const reordered = {
+      ...definition,
       fields: [...definition.fields].reverse(),
-      correctiveAction: definition.correctiveAction,
     };
     const rekeyed = {
+      corrective: definition.corrective,
       fields: definition.fields,
       correctiveAction: definition.correctiveAction,
     };
@@ -196,7 +228,9 @@ describe("sameDefinition", () => {
 
 function checkboxField(label: string) {
   return {
-    ...createBuilderField("checkbox", new Set(), { optionLabels: OPTION_LABELS }),
+    ...createBuilderField("checkbox", new Set(), {
+      optionLabels: OPTION_LABELS,
+    }),
     label,
   };
 }
@@ -228,6 +262,43 @@ describe("insertField", () => {
     expect(insertField([first], "f_gone", added).map((f) => f.label)).toEqual([
       "First",
       "Added",
+    ]);
+  });
+});
+
+describe("insertFieldAt", () => {
+  const first = checkboxField("First");
+  const second = checkboxField("Second");
+  const added = checkboxField("Added");
+  const labels = (list: readonly { label: string }[]) =>
+    list.map((f) => f.label);
+
+  it("places a dropped field type at the drop position", () => {
+    expect(labels(insertFieldAt([first, second], 0, added))).toEqual([
+      "Added",
+      "First",
+      "Second",
+    ]);
+    expect(labels(insertFieldAt([first, second], 1, added))).toEqual([
+      "First",
+      "Added",
+      "Second",
+    ]);
+    expect(labels(insertFieldAt([first, second], 2, added))).toEqual([
+      "First",
+      "Second",
+      "Added",
+    ]);
+  });
+
+  it("clamps a position outside the list", () => {
+    expect(labels(insertFieldAt([first], 5, added))).toEqual([
+      "First",
+      "Added",
+    ]);
+    expect(labels(insertFieldAt([first], -2, added))).toEqual([
+      "Added",
+      "First",
     ]);
   });
 });
@@ -282,7 +353,10 @@ describe("failRules", () => {
 
   it("leaves out unlabelled fields, open measurements and invalid limits", () => {
     const open = { ...measurementField(), label: "Probe" };
-    const unlabelled = { ...measurementField(), limits: { min: "0", max: "5" } };
+    const unlabelled = {
+      ...measurementField(),
+      limits: { min: "0", max: "5" },
+    };
     const inverted = {
       ...measurementField(),
       label: "Inverted",
@@ -311,5 +385,136 @@ describe("sameBuilderState", () => {
 
     expect(sameBuilderState(state, reordered)).toBe(true);
     expect(sameBuilderState(state, { ...state, name: "Freezer" })).toBe(false);
+  });
+});
+
+describe("corrective settings", () => {
+  const withAnswers = (labels: string[], allowNote = true): BuilderState => ({
+    ...emptyBuilderState(),
+    corrective: {
+      answers: labels.map((label, index) => ({ id: `a_${index}`, label })),
+      multiple: false,
+      allowNote,
+    },
+  });
+
+  it("reads a definition without settings as note-only", () => {
+    const state = toBuilderState(
+      {
+        name: "Old form",
+        category: "cleaning",
+        appliesTo: "location",
+        definition: { fields: [], correctiveAction: "optional" },
+      },
+      ".",
+    );
+
+    expect(state.corrective).toEqual({
+      answers: [],
+      multiple: true,
+      allowNote: true,
+    });
+  });
+
+  it("publishes trimmed answers with their ids and settings", () => {
+    expect(
+      toDefinition(withAnswers([" Moved product "], false)).corrective,
+    ).toEqual({
+      answers: [{ id: "a_0", label: "Moved product" }],
+      multiple: false,
+      allowNote: false,
+    });
+  });
+
+  it("keeps the note on when there are no answers to pick", () => {
+    const state = withAnswers([], false);
+
+    expect(correctiveNoteShown(state.corrective)).toBe(true);
+    expect(toDefinition(state).corrective?.allowNote).toBe(true);
+  });
+
+  it("flags answers with a blank label", () => {
+    const issues = validateBuilder(withAnswers(["Moved product", "  "]));
+
+    expect(issues.correctiveLabels).toEqual([1]);
+    expect(hasBuilderIssues(issues)).toBe(true);
+  });
+
+  it("ignores blank answers while corrective action is off, and does not publish them", () => {
+    const state: BuilderState = {
+      ...withAnswers(["Moved product", "  "]),
+      correctiveAction: "off",
+    };
+
+    expect(validateBuilder(state).correctiveLabels).toBeUndefined();
+    expect(toDefinition(state)).toMatchObject({
+      correctiveAction: "off",
+      corrective: { answers: [{ id: "a_0", label: "Moved product" }] },
+    });
+    expect(formDefinitionSchema.safeParse(toDefinition(state)).success).toBe(
+      true,
+    );
+  });
+
+  it("opens an optional form as required, since the builder only turns it on or off", () => {
+    const source = {
+      name: "Old form",
+      category: "cleaning" as const,
+      appliesTo: "location" as const,
+    };
+
+    expect(
+      toBuilderState(
+        { ...source, definition: { fields: [], correctiveAction: "optional" } },
+        ".",
+      ).correctiveAction,
+    ).toBe("required_on_fail");
+    expect(
+      toBuilderState(
+        { ...source, definition: { fields: [], correctiveAction: "off" } },
+        ".",
+      ).correctiveAction,
+    ).toBe("off");
+  });
+
+  it("adds answers with fresh ids, up to the limit", () => {
+    let corrective = emptyBuilderState().corrective;
+    for (let index = 0; index < 10; index += 1) {
+      corrective = addCorrectiveAnswer(corrective, `Answer ${index}`);
+    }
+
+    expect(corrective.answers).toHaveLength(8);
+    expect(new Set(corrective.answers.map((answer) => answer.id)).size).toBe(8);
+  });
+
+  it("seeds a new form's answers and leaves existing ones alone", () => {
+    const seeded = seedCorrectiveAnswers(emptyBuilderState(), [
+      "Moved product",
+      "Notified manager",
+    ]);
+
+    expect(seeded.corrective.answers.map((answer) => answer.label)).toEqual([
+      "Moved product",
+      "Notified manager",
+    ]);
+    expect(seedCorrectiveAnswers(seeded, ["Called service"])).toBe(seeded);
+  });
+
+  it("seeds answers when a blank form gets its first category, not when it changes", () => {
+    const first = chooseCategory(emptyBuilderState(), "temperature", [
+      "Moved product",
+    ]);
+    expect(first.category).toBe("temperature");
+    expect(first.corrective.answers.map((answer) => answer.label)).toEqual([
+      "Moved product",
+    ]);
+
+    const cleared = {
+      ...first,
+      corrective: { ...first.corrective, answers: [] },
+    };
+    const switched = chooseCategory(cleared, "cleaning", ["Cleaned again"]);
+    expect(switched.category).toBe("cleaning");
+    expect(switched.corrective.answers).toEqual([]);
   });
 });

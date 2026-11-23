@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { limitChipClass } from "@/features/forms/components/limit-chip";
 import { useAnswerFormat } from "@/features/forms/hooks/use-answer-format";
 import {
   formatMeasurementNumber,
@@ -202,13 +203,9 @@ export function SelectedTargets({
     const sub = t(`kinds.${target.kind}`);
     const Icon = TARGET_KIND_ICONS[target.kind];
     const chipText = own ? ownText(selection) : formLimits;
-    const chipClass = cn(
-      "inline-flex h-8 max-w-44 cursor-pointer items-center gap-1.5 truncate rounded-lg border px-2.5 text-[13px] font-medium whitespace-nowrap outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-      hasIssue
-        ? "border-destructive/50 bg-destructive/10 text-destructive"
-        : own
-          ? "border-primary/35 bg-primary/[0.08] text-primary"
-          : "border-border bg-background text-muted-foreground hover:bg-muted",
+    const chipClass = limitChipClass(
+      hasIssue ? "invalid" : own ? "own" : "default",
+      { interactive: true },
     );
     const isEditing = editing === target.id;
 

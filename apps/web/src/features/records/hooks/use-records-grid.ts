@@ -81,7 +81,7 @@ export function useRecordsGrid(options: UseRecordsGridOptions): RecordsGrid {
     defaultSort: RECORDS_DEFAULT_SORT,
     defaultPageSize: GRID_DEFAULT_PAGE_SIZE,
     capabilities: RECORDS_GRID_CAPABILITIES,
-    getRowId: (item) => item.occurrenceId,
+    getRowId: (item) => item.id,
     // Seeding is additionally gated on the range: the SSR payload answers the initial range only.
     initialPage: shouldSeedRecordsPage({
       range,

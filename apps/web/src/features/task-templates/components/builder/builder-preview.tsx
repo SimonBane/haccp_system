@@ -45,7 +45,6 @@ export function BuilderPreview({
   const labels = useScheduleLabels();
   const window = draftWindow(draft);
   const Icon = form ? FORM_CATEGORY_ICONS[form.category] : ClipboardCheckIcon;
-  const title = draft.title.trim() || form?.name || "";
   const first = times[0];
 
   return (
@@ -54,12 +53,10 @@ export function BuilderPreview({
         <span className="text-xs font-semibold text-muted-foreground">{t("summary")}</span>
         {form ? (
           <>
-            <p className="truncate text-base font-semibold" title={title}>
-              {title}
+            <p className="truncate text-base font-semibold" title={form.name}>
+              {form.name}
             </p>
             <dl className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-[13px] [&_dd]:break-words">
-              <dt className="text-muted-foreground">{t("form")}</dt>
-              <dd>{form.name}</dd>
               <dt className="text-muted-foreground">{t("checks")}</dt>
               <dd>
                 {summarizeTargetNames(targetNames, (count) => t("more", { count })) ?? EMPTY_VALUE}
@@ -111,7 +108,7 @@ export function BuilderPreview({
             <Icon className="size-[18px]" />
           </span>
           <div className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate text-sm font-medium">{title || EMPTY_VALUE}</span>
+            <span className="truncate text-sm font-medium">{form?.name ?? EMPTY_VALUE}</span>
             <span className="truncate text-xs text-muted-foreground">
               {[
                 targetNames[0] ?? itemsText,

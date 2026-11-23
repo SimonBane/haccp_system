@@ -1,6 +1,5 @@
 import {
   TASK_TEMPLATE_ALL_WEEKDAYS,
-  TASK_TEMPLATE_MAX_SCHEDULED_TIMES,
   TASK_TEMPLATE_WEEKDAYS,
   parseScheduledTimeToMinutes,
   sortScheduledTimes,
@@ -9,7 +8,7 @@ import {
 
 const MINUTES_PER_DAY = 1440;
 
-export const REPEAT_INTERVALS = [30, 60, 120, 180, 240, 360] as const;
+const REPEAT_INTERVALS = [30, 60, 120, 180, 240, 360] as const;
 
 export type DayPreset = "every" | "weekdays" | "weekends";
 
@@ -42,22 +41,7 @@ export function matchDayPreset(days: readonly TaskTemplateWeekday[]): DayPreset 
   return null;
 }
 
-/** Every `every` minutes from `from` up to and including `until`; empty when the range is backwards. */
-export function generateRepeatTimes(every: number, from: string, until: string): string[] {
-  if (!from || !until || every <= 0) return [];
-  const end = parseScheduledTimeToMinutes(until);
-  const times: string[] = [];
-  for (
-    let minute = parseScheduledTimeToMinutes(from);
-    minute <= end && times.length < TASK_TEMPLATE_MAX_SCHEDULED_TIMES;
-    minute += every
-  ) {
-    times.push(minutesToTime(minute));
-  }
-  return times;
-}
-
-/** The repeat interval when 3+ times are evenly spaced by one of the offered intervals, so editing reopens "Repeat every". */
+/** The gap when 3+ times are evenly spaced by a familiar interval, so a summary can say "every 2 h". */
 export function detectRepeatInterval(times: readonly string[]): number | null {
   if (times.length < 3) return null;
   const minutes = sortScheduledTimes([...times]).map(parseScheduledTimeToMinutes);

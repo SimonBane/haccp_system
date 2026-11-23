@@ -73,7 +73,7 @@ export function TaskTemplatesData({
       columns={columns}
       data={items}
       enableSearch
-      searchColumn="title"
+      searchColumn="formName"
       searchPlaceholder={t("searchPlaceholder")}
       emptyMessage={t("emptyTitle")}
       emptyDescription={t("emptyDescription")}
@@ -88,7 +88,11 @@ export function TaskTemplatesData({
       onRowSelectionChange={onRowSelectionChange}
       toolbar={
         selectedCount > 0 ? (
-          <Button type="button" variant="destructive" onClick={onBulkDelete}>
+          <Button
+            type="button"
+            variant="destructive-solid"
+            onClick={onBulkDelete}
+          >
             <Trash2Icon />
             {tTable("selection.deleteSelected")}
           </Button>
@@ -103,7 +107,7 @@ export function TaskTemplatesData({
       renderMobileRow={renderMobileRow}
       mobileVariant="card"
       getRowActions={(row) => getRowActions(row.original)}
-      getRowLabel={(row) => row.original.title}
+      getRowLabel={(row) => row.original.formName}
     />
   );
 }

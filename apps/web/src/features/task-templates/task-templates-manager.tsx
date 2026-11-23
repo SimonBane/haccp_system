@@ -15,6 +15,7 @@ import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFormsQuery } from "@/features/forms/hooks/use-forms-query";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { DayPlan } from "@/features/task-templates/components/day-plan";
 import { TaskTemplatesData } from "@/features/task-templates/data-table/data";
 import { useTaskTemplatesMutations } from "@/features/task-templates/hooks/use-task-templates-mutations";
@@ -55,6 +56,7 @@ export function TaskTemplatesManager({
   const { remove } = useTaskTemplatesMutations();
 
   const [view, setView] = useState<View>("list");
+  const isMobile = useIsMobile();
   const [highlightId, setHighlightId] = useState(savedId);
   const [deleteTarget, setDeleteTarget] = useState<TaskTemplateResponse | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -133,7 +135,12 @@ export function TaskTemplatesManager({
 
       <PageHeader title={t("title")} description={t("description")} />
 
-      <Tabs value={view} onValueChange={(next) => setView(next as View)}>
+      {/* The day plan's timeline needs a wide screen, so phones get the list alone. */}
+      <Tabs
+        value={view}
+        onValueChange={(next) => setView(next as View)}
+        className="max-md:hidden"
+      >
         <TabsList variant="line" aria-label={t("views.label")}>
           <TabsTrigger value="list">
             <ListIcon aria-hidden />
@@ -152,7 +159,7 @@ export function TaskTemplatesManager({
         </div>
       ) : isError ? (
         <ApiQueryError error={error} onRetry={() => void refetch()} />
-      ) : view === "plan" ? (
+      ) : view === "plan" && !isMobile ? (
         <DayPlan items={items} appliesToOf={appliesToOf} onEdit={openEdit} />
       ) : (
         <TaskTemplatesData
@@ -180,7 +187,7 @@ export function TaskTemplatesManager({
         title={t("deleteDialog.title")}
         description={
           deleteTarget
-            ? t("deleteConfirm", { title: deleteTarget.title })
+            ? t("deleteConfirm", { title: deleteTarget.formName })
             : t("deleteDialog.fallback")
         }
         cancelLabel={t("deleteDialog.cancel")}

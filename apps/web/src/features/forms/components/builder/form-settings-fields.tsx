@@ -1,24 +1,24 @@
 "use client";
 
 import {
-  FORM_NAME_MAX_LENGTH,
-  CORRECTIVE_ACTION_MODE,
+  FORM_APPLIES_TO,
   FORM_APPLIES_TO_VALUES,
   FORM_CATEGORY_VALUES,
+  FORM_NAME_MAX_LENGTH,
   type FormAppliesTo,
   type FormCategory,
 } from "@haccp/shared";
-import { InfoIcon } from "lucide-react";
+import { BuildingIcon, LayersIcon, type LucideIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { CharacterCount } from "@/components/character-count";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   REQUIRED_LABEL_CLASS,
   Field,
-  FieldContent,
   FieldDescription,
   FieldError,
   FieldLabel,
+  FieldLegend,
+  FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
@@ -29,65 +29,72 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import type { BuilderIssues, BuilderState } from "../../lib/form-builder";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { cn } from "@/lib/utils";
 import { FORM_CATEGORY_ICONS } from "../../lib/category-icon";
+import type { BuilderIssues, BuilderState } from "../../lib/form-builder";
+import { SwitchCard } from "./switch-card";
+
+const APPLIES_TO_ICONS: Record<FormAppliesTo, LucideIcon> = {
+  [FORM_APPLIES_TO.PER_ITEM]: LayersIcon,
+  [FORM_APPLIES_TO.LOCATION]: BuildingIcon,
+};
 
 type Props = {
   idPrefix: string;
   state: BuilderState;
   issues: BuilderIssues | null;
   nameTaken: boolean;
-  /** Null for a form that has never been published. */
-  publishedVersion: number | null;
+  /** A blank form opens here with the cursor in the name. */
+  autoFocusName: boolean;
   onPatch: (patch: Partial<BuilderState>) => void;
 };
 
+/** The form's own details: name, category, what it is filled in for, and whether staff can log it any time. */
 export function FormSettingsFields({
   idPrefix,
   state,
   issues,
   nameTaken,
-  publishedVersion,
+  autoFocusName,
   onPatch,
 }: Props) {
   const t = useTranslations("FormsPage.builder");
   const tForms = useTranslations("Forms");
-
+  const nameInvalid = Boolean(issues?.name) || nameTaken;
   const categoryItems = FORM_CATEGORY_VALUES.map((category) => ({
     value: category,
     label: tForms(`categories.${category}`),
   }));
-  const appliesToItems = FORM_APPLIES_TO_VALUES.map((value) => ({
-    value,
-    label: tForms(`appliesTo.${value}`),
-  }));
-  const nameInvalid = Boolean(issues?.name) || nameTaken;
 
   return (
-    <div className="grid gap-5">
+    <div className="flex flex-col gap-6">
       <Field data-invalid={nameInvalid}>
-        <FieldLabel htmlFor={`${idPrefix}-name`} className={REQUIRED_LABEL_CLASS}>
-          {t("nameLabel")}
-        </FieldLabel>
+        <div className="flex items-baseline justify-between gap-3">
+          <FieldLabel
+            htmlFor={`${idPrefix}-name`}
+            className={REQUIRED_LABEL_CLASS}
+          >
+            {t("nameLabel")}
+          </FieldLabel>
+          <CharacterCount value={state.name} max={FORM_NAME_MAX_LENGTH} />
+        </div>
         <Input
           id={`${idPrefix}-name`}
           value={state.name}
           maxLength={FORM_NAME_MAX_LENGTH}
           placeholder={t("namePlaceholder")}
           aria-invalid={nameInvalid}
+          autoFocus={autoFocusName}
           onChange={(event) => onPatch({ name: event.target.value })}
         />
-        <div className="flex items-start justify-between gap-3">
-          {issues?.name ? (
-            <FieldError errors={[{ message: t("errors.name") }]} />
-          ) : nameTaken ? (
-            <FieldError errors={[{ message: t("errors.nameTaken") }]} />
-          ) : (
-            <span />
-          )}
-          <CharacterCount value={state.name} max={FORM_NAME_MAX_LENGTH} />
-        </div>
+        {issues?.name ? (
+          <FieldError errors={[{ message: t("errors.name") }]} />
+        ) : nameTaken ? (
+          <FieldError errors={[{ message: t("errors.nameTaken") }]} />
+        ) : (
+          <FieldDescription>{t("nameHint")}</FieldDescription>
+        )}
       </Field>
 
       <Field data-invalid={Boolean(issues?.category)}>
@@ -100,16 +107,27 @@ export function FormSettingsFields({
         <Select
           items={categoryItems}
           value={state.category || null}
-          onValueChange={(value: unknown) =>
-            onPatch({ category: value as FormCategory })
-          }
+          onValueChange={(value) => {
+            if (value) onPatch({ category: value as FormCategory });
+          }}
         >
           <SelectTrigger
             id={`${idPrefix}-category`}
             aria-invalid={Boolean(issues?.category)}
             className="w-full"
           >
-            <SelectValue placeholder={t("categoryPlaceholder")} />
+            <SelectValue>
+              {(value: FormCategory | null) => {
+                if (!value) return t("categoryPlaceholder");
+                const Icon = FORM_CATEGORY_ICONS[value];
+                return (
+                  <span className="flex items-center gap-2">
+                    <Icon className="size-4" aria-hidden />
+                    {tForms(`categories.${value}`)}
+                  </span>
+                );
+              }}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent alignItemWithTrigger={false}>
             <SelectGroup>
@@ -130,82 +148,57 @@ export function FormSettingsFields({
         ) : null}
       </Field>
 
-      <Field data-invalid={Boolean(issues?.appliesTo)}>
-        <FieldLabel
-          htmlFor={`${idPrefix}-applies-to`}
-          className={REQUIRED_LABEL_CLASS}
-        >
+      <FieldSet data-invalid={Boolean(issues?.appliesTo)}>
+        <FieldLegend variant="label" className={REQUIRED_LABEL_CLASS}>
           {t("appliesToLabel")}
-        </FieldLabel>
-        <Select
-          items={appliesToItems}
-          value={state.appliesTo || null}
-          onValueChange={(value: unknown) =>
-            onPatch({ appliesTo: value as FormAppliesTo })
-          }
+        </FieldLegend>
+        <ToggleGroup
+          aria-label={t("appliesToLabel")}
+          value={state.appliesTo ? [state.appliesTo] : []}
+          onValueChange={(next) => {
+            const value = next[0] as FormAppliesTo | undefined;
+            if (value) onPatch({ appliesTo: value });
+          }}
+          className="grid w-full gap-2"
         >
-          <SelectTrigger
-            id={`${idPrefix}-applies-to`}
-            aria-invalid={Boolean(issues?.appliesTo)}
-            className="w-full"
-          >
-            <SelectValue placeholder={t("appliesToPlaceholder")} />
-          </SelectTrigger>
-          <SelectContent alignItemWithTrigger={false}>
-            <SelectGroup>
-              {appliesToItems.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  <span className="flex flex-col">
-                    <span>{item.label}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {tForms(`appliesToHints.${item.value}`)}
-                    </span>
+          {FORM_APPLIES_TO_VALUES.map((value) => {
+            const Icon = APPLIES_TO_ICONS[value];
+            return (
+              <ToggleGroupItem
+                key={value}
+                value={value}
+                className={cn(
+                  "group/card h-auto w-full items-start justify-start gap-3 rounded-xl border border-input p-3.5 text-left font-normal whitespace-normal",
+                  "aria-pressed:border-primary aria-pressed:bg-primary/[0.04] aria-pressed:ring-1 aria-pressed:ring-primary",
+                )}
+              >
+                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted group-aria-pressed/card:bg-primary group-aria-pressed/card:text-primary-foreground">
+                  <Icon aria-hidden />
+                </span>
+                <span className="flex flex-col gap-0.5">
+                  <span className="font-medium">
+                    {tForms(`appliesTo.${value}`)}
                   </span>
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+                  <span className="text-xs text-muted-foreground">
+                    {tForms(`appliesToHints.${value}`)}
+                  </span>
+                </span>
+              </ToggleGroupItem>
+            );
+          })}
+        </ToggleGroup>
         {issues?.appliesTo ? (
           <FieldError errors={[{ message: t("errors.appliesTo") }]} />
-        ) : (
-          <FieldDescription>{t("appliesToHint")}</FieldDescription>
-        )}
-      </Field>
+        ) : null}
+      </FieldSet>
 
-      <Field orientation="horizontal" className="items-start justify-between">
-        <FieldContent>
-          <FieldLabel htmlFor={`${idPrefix}-corrective`}>
-            {t("correctiveLabel")}
-          </FieldLabel>
-          <FieldDescription>{t("correctiveDescription")}</FieldDescription>
-        </FieldContent>
-        <Switch
-          id={`${idPrefix}-corrective`}
-          checked={
-            state.correctiveAction === CORRECTIVE_ACTION_MODE.REQUIRED_ON_FAIL
-          }
-          onCheckedChange={(required) =>
-            onPatch({
-              correctiveAction: required
-                ? CORRECTIVE_ACTION_MODE.REQUIRED_ON_FAIL
-                : CORRECTIVE_ACTION_MODE.OPTIONAL,
-            })
-          }
-        />
-      </Field>
-
-      <Alert>
-        <InfoIcon />
-        <AlertDescription>
-          {publishedVersion === null
-            ? t("versionNoteNew")
-            : t("versionNote", {
-                version: publishedVersion,
-                next: publishedVersion + 1,
-              })}
-        </AlertDescription>
-      </Alert>
+      <SwitchCard
+        id={`${idPrefix}-on-demand`}
+        label={t("onDemandLabel")}
+        description={t("onDemandHint")}
+        checked={state.onDemand}
+        onCheckedChange={(onDemand) => onPatch({ onDemand })}
+      />
     </div>
   );
 }

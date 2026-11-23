@@ -3,15 +3,16 @@
 import type { StarterForm } from "@haccp/shared";
 import { useLocale } from "next-intl";
 import { useMemo, useState } from "react";
+import { useCorrectiveSeed } from "../../hooks/use-corrective-seed";
 import {
   emptyBuilderState,
+  seedCorrectiveAnswers,
   toBuilderState,
   type BuilderState,
 } from "../../lib/form-builder";
 import { decimalSeparator } from "../../lib/measurement";
 import { FormBuilder } from "../builder/form-builder";
-import { CreateStepsHeader, type CreateStep } from "./create-steps";
-import { SetupStep } from "./setup-step";
+import { CreateHeader } from "./create-header";
 import { TemplateStep } from "./template-step";
 
 type Props = {
@@ -19,39 +20,44 @@ type Props = {
   duplicateOf: StarterForm | null;
 };
 
+/** Pick a starting point, then build: name, category and fields are all set in the builder. */
 export function FormCreateView({ duplicateOf }: Props) {
   const locale = useLocale();
   const separator = useMemo(() => decimalSeparator(locale), [locale]);
-  const [step, setStep] = useState<CreateStep>(duplicateOf ? "setup" : "start");
-  const [source, setSource] = useState<StarterForm | null>(duplicateOf);
-  const [state, setState] = useState<BuilderState>(() =>
-    duplicateOf ? toBuilderState(duplicateOf, separator) : emptyBuilderState(),
+  const seed = useCorrectiveSeed();
+  // A copy keeps its source's answers, even none; a starter gets its category's usual ones.
+  const [initial, setInitial] = useState<BuilderState | null>(() =>
+    duplicateOf ? toBuilderState(duplicateOf, separator) : null,
   );
 
-  if (step === "fields") {
-    return <FormBuilder mode={{ kind: "create", initial: state }} />;
+  if (initial) {
+    return (
+      <FormBuilder
+        mode={{
+          kind: "create",
+          initial,
+          // A copy was opened from the forms list, so that is where it goes back to.
+          onBack: duplicateOf ? undefined : () => setInitial(null),
+        }}
+      />
+    );
   }
 
   return (
     <div className="flex flex-col gap-8">
-      <CreateStepsHeader current={step} />
-      {step === "start" ? (
-        <TemplateStep
-          onPick={(picked) => {
-            setSource(picked);
-            setState(picked ? toBuilderState(picked, separator) : emptyBuilderState());
-            setStep("setup");
-          }}
-        />
-      ) : (
-        <SetupStep
-          state={state}
-          sourceName={source?.name ?? null}
-          onChange={setState}
-          onBack={() => setStep("start")}
-          onContinue={() => setStep("fields")}
-        />
-      )}
+      <CreateHeader />
+      <TemplateStep
+        onPick={(picked) =>
+          setInitial(
+            picked
+              ? seedCorrectiveAnswers(
+                  toBuilderState(picked, separator),
+                  seed(picked.category),
+                )
+              : emptyBuilderState(),
+          )
+        }
+      />
     </div>
   );
 }

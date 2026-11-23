@@ -42,7 +42,7 @@ type FormPickerProps = {
 
 type FormGroup = { value: string; items: FormListItem[] };
 
-/** "Equipment · 0 – 4 °C" or "Areas · 6 questions": what a form checks, readable before picking it. */
+/** "Equipment · 0 to 4 °C" or "Areas · 6 questions": what a form checks, readable before picking it. */
 function useFormMeta() {
   const t = useTranslations("TasksPage.builder.form");
   const tForms = useTranslations("Forms");

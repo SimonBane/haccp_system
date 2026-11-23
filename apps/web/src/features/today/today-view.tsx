@@ -1,43 +1,84 @@
 "use client";
 
-import type { AnswersInput, TodayResponse, TodayTaskItem } from "@haccp/shared";
-import { API_ERROR_CODE, RECORD_STATE, zonedDateString } from "@haccp/shared";
+import {
+  addCalendarDays,
+  API_ERROR_CODE,
+  zonedDateString,
+  zonedTimeString,
+  type AnswersInput,
+  type CorrectiveInput,
+  type TodayOnDemandForm,
+  type TodayOnDemandItem,
+  type TodayResponse,
+} from "@haccp/shared";
+import {
+  CheckIcon,
+  ChevronRightIcon,
+  CircleAlertIcon,
+  ClipboardPlusIcon,
+} from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { ApiQueryError } from "@/components/api-query-error";
-import { pageWidthVariants } from "@/components/layout/page-container";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { useNow } from "@/hooks/use-now";
+import { pageWidthVariants } from "@/components/layout/page-container";
+import {
+  FALLBACK_FORM_ICON,
+  FORM_CATEGORY_ICONS,
+} from "@/features/forms/lib/category-icon";
 import { useLocation } from "@/features/tenant/tenant-provider";
 import { useOrgTimeZone } from "@/features/tenant/use-org-timezone";
+import { useNow } from "@/hooks/use-now";
 import { ApiRequestError } from "@/lib/api-utils";
-import { useApiErrorToast } from "@/lib/api/use-api-error-toast";
-import { formatLocalDate, shiftLocalDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
-import { quickCompleteAnswers } from "@/features/forms/lib/answer-draft";
-import { RecordFlow, type RecordCheck } from "./components/record-flow";
-import { TodayAllDone } from "./components/today-all-done";
+import { useApiErrorToast } from "@/lib/api/use-api-error-toast";
+import { CheckForm } from "./components/check-form";
+import {
+  CheckPanel,
+  PANEL_COLUMN_CLASS,
+  type PanelHeading,
+} from "./components/check-panel";
+import { ItemChecks } from "./components/item-checks";
+import { LogEntryPanel } from "./components/log-entry-panel";
+import { InlineCheck, type CheckSave } from "./components/inline-check";
 import { TodayEmptyState } from "./components/today-empty-state";
-import { TodayJumpToNow } from "./components/today-jump-to-now";
-import { TodayRecordSheet } from "./components/today-record-sheet";
-import { TodayStickyHeader } from "./components/today-sticky-header";
-import { TodayTimeline } from "./components/today-timeline";
-import { useRecordRound, type RoundTally } from "./hooks/use-record-round";
+import { TodayHeader } from "./components/today-header";
+import { TodaySections } from "./components/today-sections";
+import { useSideBySide } from "./hooks/use-side-by-side";
+import { useTodayLabels } from "./hooks/use-today-labels";
 import { useTodayMutations } from "./hooks/use-today-mutations";
 import { useTodayQuery } from "./hooks/use-today-query";
+import { formatLongDate } from "./lib/format";
+import { correctiveFields, savedCorrective } from "./lib/corrective-action";
 import { tapFeedback } from "./lib/haptics";
-import { flatTodayTasks, occurrenceKey } from "./lib/today-grouping";
-import { needsRecordFlow, type RoundScope } from "./lib/today-round";
+import { inlineField, type InlineDrafts } from "./lib/inline-check";
 import {
-  applyClock,
-  buildTodayTaskGroups,
-  findTimelineItem,
-  isStaleResponse,
-  type TodayTimelineItem,
-} from "./lib/today-timeline";
+  buildTodayDay,
+  checkShape,
+  findGroup,
+  type TodayCheck,
+  type TodayDay,
+  type TodayEntry,
+  type TodayGroup,
+} from "./lib/today-day";
 
-const UNDO_TOAST_DURATION_MS = 5000;
+type Selection =
+  | { type: "group"; key: string }
+  | { type: "entry"; key: string }
+  | { type: "log" };
+
+/** What opens beside the list on a wide screen before anything is picked. */
+function defaultSelection(day: TodayDay): Selection | null {
+  const group =
+    day.todo[0] ?? day.later.find((item) => !item.isLocked) ?? day.done[0];
+  if (group) return { type: "group", key: group.key };
+  const [entry] = day.entries;
+  return entry ? { type: "entry", key: entry.key } : null;
+}
 
 export function TodayView({
   initialData,
@@ -49,10 +90,12 @@ export function TodayView({
   initialLocationId: string;
 }) {
   const t = useTranslations("TodayPage");
-  const showApiError = useApiErrorToast();
   const locale = useLocale();
+  const showApiError = useApiErrorToast();
   const now = useNow();
   const timeZone = useOrgTimeZone();
+  // A sheet over the list until both fit side by side.
+  const isMobile = !useSideBySide();
   const { locationId } = useLocation();
 
   // Recalculate from the ticking clock so an overnight tablet does not keep yesterday's date.
@@ -61,445 +104,478 @@ export function TodayView({
     [now, timeZone],
   );
   const [selectedDate, setSelectedDate] = useState(initialDate);
-  const [syncingKeys, setSyncingKeys] = useState<ReadonlySet<string>>(
-    () => new Set(),
-  );
-  const [recordKey, setRecordKey] = useState<string | null>(null);
-  const [editKey, setEditKey] = useState<string | null>(null);
+  const [selection, setSelection] = useState<Selection | null>(null);
+  const [lastSelection, setLastSelection] = useState<Selection | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  const [inlineDrafts, setInlineDrafts] = useState<InlineDrafts>({});
+
+  // Latched so the sheet still has its content while it slides away.
+  if (selection && selection !== lastSelection) setLastSelection(selection);
+
+  // Reset during render: another day or location must not open with this one's check.
+  const scope = `${locationId}|${selectedDate}`;
+  const [resetFor, setResetFor] = useState(scope);
+  if (resetFor !== scope) {
+    setResetFor(scope);
+    setSelection(null);
+    setLastSelection(null);
+  }
 
   const {
     data: response,
-    isLoading,
-    isError,
     error,
-    isFetching,
     refetch,
   } = useTodayQuery(selectedDate, {
     initialData: selectedDate === initialDate ? initialData : undefined,
     initialLocationId,
   });
 
-  const currentUserId = response?.currentUserId ?? initialData.currentUserId;
-  const { createRecord, updateRecord, voidRecord } =
-    useTodayMutations(currentUserId);
+  const yesterdayDate = addCalendarDays(todayDate, -1);
+  const { data: yesterday } = useTodayQuery(yesterdayDate, {
+    enabled: selectedDate === todayDate,
+  });
 
-  const isStale = isStaleResponse(response?.date, selectedDate);
+  const currentUserId = response?.currentUserId ?? initialData.currentUserId;
+  const { createRecord, updateRecord, createEntry } =
+    useTodayMutations(currentUserId);
+  const labels = useTodayLabels(currentUserId, timeZone);
 
   // Depend on the stable mutate functions, not the result object (fresh every render).
   const runCreate = createRecord.mutateAsync;
   const runUpdate = updateRecord.mutateAsync;
-  const runVoid = voidRecord.mutateAsync;
+  const runCreateEntry = createEntry.mutateAsync;
 
-  // Group on the response; applyClock layers live state so TodayTaskRow can bail out between ticks.
-  const taskGroups = useMemo(
+  // A response for another day is only the placeholder while the right one loads.
+  const day = useMemo(
     () =>
-      response
-        ? buildTodayTaskGroups(flatTodayTasks(response), response.formVersions)
-        : buildTodayTaskGroups([]),
-    [response],
+      response && response.date === selectedDate
+        ? buildTodayDay(response, now, timeZone)
+        : null,
+    [response, selectedDate, now, timeZone],
   );
 
-  const timeline = useMemo(
-    () => applyClock(taskGroups, now, selectedDate, timeZone),
-    [taskGroups, now, selectedDate, timeZone],
-  );
+  const yesterdayOpen = useMemo(() => {
+    if (!yesterday || yesterday.date !== yesterdayDate) return 0;
+    const built = buildTodayDay(yesterday, now, timeZone);
+    return built.total - built.doneCount;
+  }, [yesterday, yesterdayDate, now, timeZone]);
 
-  // Hold a key, not the item: the clock rebuilds the timeline every minute.
-  const recordItem = useMemo(
-    () => findTimelineItem(timeline, recordKey),
-    [timeline, recordKey],
-  );
-
-  const editItem = useMemo(
-    () => findTimelineItem(timeline, editKey),
-    [timeline, editKey],
-  );
-
-  const round = useRecordRound(timeline);
-  const {
-    open: openRound,
-    recordSaved,
-    advance: advanceRound,
-    skip: skipRound,
-    close: closeRound,
-  } = round;
-
-  useEffect(() => {
-    closeRound();
-    setRecordKey(null);
-    setEditKey(null);
-  }, [selectedDate, locationId, closeRound]);
-
-  // Latch the last non-null check so Base UI can run the exit after round/recordItem go null.
-  const isRoundOpen =
-    round.item !== null &&
-    round.currentKey !== null &&
-    round.item.form !== null;
-
-  // Latch during render, not an effect — an effect would mount the popup already open.
-  const [lastCheck, setLastCheck] = useState<RecordCheck | null>(null);
-
-  const liveCheck: RecordCheck | null =
-    isRoundOpen && round.item && round.currentKey
-      ? {
-          item: round.item,
-          occurrenceKey: round.currentKey,
-          position: round.position,
-          size: round.size,
-          initialValues: null,
-        }
-      : null;
-
-  if (liveCheck && lastCheck?.occurrenceKey !== liveCheck.occurrenceKey) {
-    setLastCheck(liveCheck);
-  }
-
-  const [lastRecordItem, setLastRecordItem] =
-    useState<TodayTimelineItem | null>(null);
-
-  if (recordItem && lastRecordItem !== recordItem) {
-    setLastRecordItem(recordItem);
-  }
-
-  // Live data while open; the latched copy only covers the slide-away.
-  const shownCheck = liveCheck ?? lastCheck;
-  const shownRecordItem = recordItem ?? lastRecordItem;
-
-  const isEditOpen = editItem !== null && editItem.form !== null;
-
-  const [lastEditCheck, setLastEditCheck] = useState<RecordCheck | null>(null);
-
-  const liveEditCheck: RecordCheck | null =
-    isEditOpen && editItem && editKey
-      ? {
-          item: editItem,
-          occurrenceKey: editKey,
-          position: 1,
-          size: 1,
-          initialValues: editItem.task.values,
-        }
-      : null;
-
-  if (
-    liveEditCheck &&
-    lastEditCheck?.occurrenceKey !== liveEditCheck.occurrenceKey
-  ) {
-    setLastEditCheck(liveEditCheck);
-  }
-
-  const shownEditCheck = liveEditCheck ?? lastEditCheck;
-
-  const markSyncing = useCallback((key: string, syncing: boolean) => {
-    setSyncingKeys((previous) => {
-      const next = new Set(previous);
-      if (syncing) next.add(key);
-      else next.delete(key);
-      return next;
-    });
-  }, []);
-
-  const handleUndo = useCallback(
-    async function undo(task: TodayTaskItem): Promise<void> {
-      const key = occurrenceKey(task);
-      markSyncing(key, true);
-      try {
-        await runVoid({ occurrenceId: task.occurrenceId, date: task.date });
-        setRecordKey(null);
-        setAnnouncement(t("a11y.undone", { title: task.title }));
-      } catch (error) {
-        showApiError(error, {
-          action: {
-            label: t("error.retry"),
-            onClick: () => void undo(task),
-          },
+  /** A voided check reactivates its existing record; only an unrecorded one is created. */
+  const saveCheck = useCallback(
+    async (
+      check: TodayCheck,
+      values: AnswersInput,
+      corrective?: CorrectiveInput,
+    ) => {
+      const { task } = check;
+      if (task.recordId) {
+        await runUpdate({
+          key: check.key,
+          recordId: task.recordId,
+          date: task.date,
+          values,
+          ...correctiveFields(corrective),
         });
-      } finally {
-        markSyncing(key, false);
+        return;
       }
+      await runCreate({
+        key: check.key,
+        occurrenceId: check.key,
+        date: task.date,
+        values,
+        ...correctiveFields(corrective),
+      });
     },
-    [markSyncing, runVoid, showApiError, t],
+    [runCreate, runUpdate],
   );
 
-  const handleComplete = useCallback(
-    async function complete(item: TodayTimelineItem): Promise<void> {
-      const { task, form } = item;
-      if (!form) return;
-      const key = occurrenceKey(task);
-      // A voided occurrence reactivates its existing record; only an unrecorded one is created.
-      const run =
-        task.recordState === RECORD_STATE.NONE ? runCreate : runUpdate;
-      markSyncing(key, true);
+  const saveOne = useCallback(
+    async (
+      check: TodayCheck,
+      values: AnswersInput,
+      corrective?: CorrectiveInput,
+    ): Promise<boolean> => {
       tapFeedback();
       try {
-        await run({
-          occurrenceId: task.occurrenceId,
-          date: task.date,
-          values: quickCompleteAnswers(form.definition),
-        });
-        setAnnouncement(t("a11y.completed", { title: task.title }));
-        toast.success(t("toasts.completed", { title: task.title }), {
-          duration: UNDO_TOAST_DURATION_MS,
-          action: {
-            label: t("actions.undo"),
-            onClick: () => void handleUndo(task),
-          },
-        });
-      } catch (error) {
-        if (
-          error instanceof ApiRequestError &&
-          error.code === API_ERROR_CODE.TASK_RECORD_ALREADY_EXISTS
-        ) {
-          showApiError(error);
-          return;
-        }
-        showApiError(error, {
-          action: {
-            label: t("error.retry"),
-            onClick: () => void complete(item),
-          },
-        });
-      } finally {
-        markSyncing(key, false);
+        await saveCheck(check, values, corrective);
+        return true;
+      } catch (saveError) {
+        showApiError(saveError);
+        return false;
       }
     },
-    [handleUndo, markSyncing, runCreate, runUpdate, showApiError, t],
+    [saveCheck, showApiError],
   );
 
-  /** One toast for a finished round instead of a toast per save. */
-  const summariseRound = useCallback(
-    (tally: RoundTally, roundSize: number) => {
-      if (roundSize <= 1 || tally.saved === 0) return;
-      toast.success(
-        tally.deviations > 0
-          ? t("recordDialog.roundSummaryDeviations", {
-              saved: tally.saved,
-              deviations: tally.deviations,
-            })
-          : t("recordDialog.roundSummary", { count: tally.saved }),
+  /** One toast for the whole batch: twelve failed rows should not stack twelve errors. */
+  const saveAll = useCallback(
+    async (saves: CheckSave[]): Promise<string[]> => {
+      tapFeedback();
+      const results = await Promise.allSettled(
+        saves.map((save) =>
+          saveCheck(save.check, save.values, save.corrective),
+        ),
       );
+      const failed = results.find((result) => result.status === "rejected");
+      if (failed?.status === "rejected") showApiError(failed.reason);
+
+      return saves
+        .filter((_save, index) => results[index]?.status === "fulfilled")
+        .map((save) => save.check.key);
+    },
+    [saveCheck, showApiError],
+  );
+
+  const announceRecorded = useCallback(
+    (title: string) => {
+      setAnnouncement(t("a11y.recorded", { title }));
+      toast.success(t("toasts.recorded", { title }));
     },
     [t],
   );
 
-  const handleRecordConfirm = useCallback(
-    async (
-      values: AnswersInput,
-      correctiveAction?: string,
-    ): Promise<boolean> => {
-      const task = round.item?.task;
-      if (!task) return false;
+  const closePanel = useCallback(() => setSelection(null), []);
 
-      const key = occurrenceKey(task);
-      // Captured before advancing, which clears the round it describes.
-      const roundSize = round.size;
-      const run =
-        task.recordState === RECORD_STATE.NONE ? runCreate : runUpdate;
-      markSyncing(key, true);
+  /** On a phone the check closes once it is done; beside the list it stays to show the result. */
+  const finish = useCallback(
+    (title: string) => {
+      announceRecorded(title);
+      if (isMobile) setSelection(null);
+    },
+    [announceRecorded, isMobile],
+  );
+
+  const handleCreateEntry = useCallback(
+    async (
+      form: TodayOnDemandForm,
+      item: TodayOnDemandItem | null,
+      values: AnswersInput,
+      corrective?: CorrectiveInput,
+    ): Promise<boolean> => {
       tapFeedback();
       try {
-        const record = await run({
-          occurrenceId: task.occurrenceId,
-          date: task.date,
+        await runCreateEntry({
+          formId: form.formId,
+          formVersionId: form.formVersionId,
+          targetId: item?.targetId ?? null,
           values,
-          correctiveAction,
+          ...correctiveFields(corrective),
+          // Filed under the day being viewed; the record itself keeps when it was really entered.
+          entryDate: selectedDate,
+          entryTime: zonedTimeString(new Date(), timeZone),
         });
-        setAnnouncement(t("a11y.recorded", { title: task.title }));
-        toast.success(t("toasts.recorded", { title: task.title }), {
-          duration: UNDO_TOAST_DURATION_MS,
-          action: {
-            label: t("actions.undo"),
-            onClick: () => void handleUndo(task),
-          },
-        });
-
-        recordSaved(record.result);
-
-        const result = advanceRound();
-        if (result.done) summariseRound(result, roundSize);
+        announceRecorded(form.name);
+        setSelection(null);
         return true;
-      } catch (error) {
+      } catch (createError) {
+        showApiError(createError);
         if (
-          error instanceof ApiRequestError &&
-          error.code === API_ERROR_CODE.TASK_RECORD_ALREADY_EXISTS
+          createError instanceof ApiRequestError &&
+          createError.code === API_ERROR_CODE.FORM_VERSION_CHANGED
         ) {
-          showApiError(error);
-          return false;
+          // The answers no longer fit the form; start again from the fresh one.
+          setSelection(null);
+          void refetch();
         }
-        // Stay on the same check so the answers are not lost.
-        showApiError(error);
         return false;
-      } finally {
-        markSyncing(key, false);
       }
     },
     [
-      advanceRound,
-      handleUndo,
-      markSyncing,
-      recordSaved,
-      round.item,
-      round.size,
-      runCreate,
-      runUpdate,
+      announceRecorded,
+      refetch,
+      runCreateEntry,
+      selectedDate,
       showApiError,
-      summariseRound,
-      t,
+      timeZone,
     ],
   );
 
-  const handleEditConfirm = useCallback(
-    async (
-      values: AnswersInput,
-      correctiveAction?: string,
-    ): Promise<boolean> => {
-      const task = editItem?.task;
-      if (!task) return false;
+  const onDemandForms = response?.onDemand.forms ?? [];
+  const canLog = day !== null && !day.isFuture && onDemandForms.length > 0;
 
-      const key = occurrenceKey(task);
-      markSyncing(key, true);
-      tapFeedback();
-      try {
-        await runUpdate({
-          occurrenceId: task.occurrenceId,
-          date: task.date,
-          values,
-          correctiveAction,
-        });
-        setAnnouncement(t("a11y.recorded", { title: task.title }));
-        toast.success(t("toasts.recorded", { title: task.title }));
-        setEditKey(null);
-        return true;
-      } catch (error) {
-        showApiError(error);
-        return false;
-      } finally {
-        markSyncing(key, false);
+  const shown = isMobile
+    ? (selection ?? lastSelection)
+    : (selection ?? (day ? defaultSelection(day) : null));
+
+  let activeGroup: TodayGroup | null = null;
+  let activeEntry: TodayEntry | null = null;
+  if (day && shown?.type === "group") {
+    activeGroup = findGroup(day, shown.key);
+  } else if (day && shown?.type === "entry") {
+    activeEntry = day.entries.find((entry) => entry.key === shown.key) ?? null;
+  }
+  const isLogging = shown?.type === "log" && canLog;
+
+  let heading: PanelHeading | null = null;
+  let body: ReactNode = null;
+
+  if (activeGroup) {
+    const group = activeGroup;
+    const form = group.form;
+    const CategoryIcon = form
+      ? FORM_CATEGORY_ICONS[form.category]
+      : FALLBACK_FORM_ICON;
+
+    heading = {
+      title: group.title,
+      subtitle: group.isComplete
+        ? t("panel.completed", {
+            when: labels.completion(group.completedAt, group.completedBy),
+          })
+        : `${labels.when(group.window, group.scheduledTime)} · ${labels.progress(group)}`,
+      icon: group.isComplete
+        ? group.hasDeviation
+          ? CircleAlertIcon
+          : CheckIcon
+        : CategoryIcon,
+      tone: group.isComplete
+        ? group.hasDeviation
+          ? "destructive"
+          : "success"
+        : group.isLate
+          ? "destructive"
+          : "primary",
+      badge: group.isComplete ? (
+        <Badge variant="success">
+          <CheckIcon />
+          {t("panel.completedBadge")}
+        </Badge>
+      ) : group.isLate ? (
+        <Badge variant="destructive">{t("row.late")}</Badge>
+      ) : undefined,
+    };
+
+    if (!form) {
+      body = (
+        <Alert>
+          <AlertDescription>{t("toasts.missingForm")}</AlertDescription>
+        </Alert>
+      );
+    } else {
+      const shape = checkShape(group);
+      const field = inlineField(form.definition);
+      const [only] = group.checks;
+
+      if (shape === "inline" && field) {
+        body = (
+          <InlineCheck
+            group={group}
+            form={form}
+            field={field}
+            drafts={inlineDrafts}
+            setDrafts={setInlineDrafts}
+            onSaveAll={saveAll}
+            onComplete={() => finish(group.title)}
+          />
+        );
+      } else if (shape === "items") {
+        body = (
+          <ItemChecks
+            group={group}
+            form={form}
+            onSave={saveOne}
+            onComplete={() => finish(group.title)}
+          />
+        );
+      } else if (only) {
+        body = (
+          <CheckForm
+            entryKey={only.key}
+            definition={form.definition}
+            limits={only.task.resolvedLimits}
+            initialValues={only.task.values}
+            initialCorrective={savedCorrective(only.task)}
+            saveLabel={t("recordDialog.save")}
+            disabled={only.status === "upcoming"}
+            onSubmit={async (values, corrective) => {
+              const saved = await saveOne(only, values, corrective);
+              if (saved) finish(group.title);
+              return saved;
+            }}
+          />
+        );
       }
-    },
-    [editItem, markSyncing, runUpdate, showApiError, t],
-  );
+    }
+  } else if (activeEntry) {
+    const entry = activeEntry;
 
-  const handleEditClose = useCallback(() => setEditKey(null), []);
-
-  const handleRoundSkip = useCallback(() => {
-    const roundSize = round.size;
-    const result = skipRound();
-    if (result.done) summariseRound(result, roundSize);
-  }, [round.size, skipRound, summariseRound]);
-
-  const handleRoundClose = useCallback(() => {
-    const roundSize = round.size;
-    summariseRound(closeRound(), roundSize);
-  }, [closeRound, round.size, summariseRound]);
-
-  const handleActivate = useCallback(
-    (item: TodayTimelineItem, scope?: RoundScope) => {
-      if (isStale) return;
-      if (!item.isCompleted && item.liveStatus === "upcoming") return;
-
-      if (item.isCompleted) {
-        setRecordKey(occurrenceKey(item.task));
-        return;
-      }
-
-      if (!item.form) {
-        toast.error(t("toasts.missingForm"));
-        return;
-      }
-
-      if (needsRecordFlow(item)) {
-        // Same gate as the time group's Record button.
-        openRound(item, scope);
-        return;
-      }
-
-      void handleComplete(item);
-    },
-    [handleComplete, isStale, openRound, t],
-  );
-
-  const isToday = selectedDate === todayDate;
-  const dateLabel = formatLocalDate(response?.date ?? selectedDate, locale);
-
-  const goToPreviousDay = useCallback(
-    () => setSelectedDate((date) => shiftLocalDate(date, -1)),
-    [],
-  );
-  const goToNextDay = useCallback(
-    () => setSelectedDate((date) => shiftLocalDate(date, 1)),
-    [],
-  );
-  const goToToday = useCallback(() => setSelectedDate(todayDate), [todayDate]);
+    heading = {
+      title: entry.task.title,
+      subtitle: [
+        labels.completion(entry.task.completedAt, entry.task.completedBy),
+        entry.task.targetName,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      icon: entry.isDeviation ? CircleAlertIcon : CheckIcon,
+      tone: entry.isDeviation ? "destructive" : "success",
+    };
+    body = entry.form ? (
+      <CheckForm
+        entryKey={entry.key}
+        definition={entry.form.definition}
+        limits={entry.task.resolvedLimits}
+        initialValues={entry.task.values}
+        initialCorrective={savedCorrective(entry.task)}
+        saveLabel={t("recordDialog.save")}
+        onSubmit={async (values, corrective) => {
+          const saved = await saveOne(
+            {
+              key: entry.key,
+              task: entry.task,
+              status: "completed",
+              isDone: true,
+              isDeviation: entry.isDeviation,
+            },
+            values,
+            corrective,
+          );
+          if (saved) finish(entry.task.title);
+          return saved;
+        }}
+      />
+    ) : (
+      <Alert>
+        <AlertDescription>{t("toasts.missingForm")}</AlertDescription>
+      </Alert>
+    );
+  } else if (isLogging && response) {
+    heading = {
+      title: t("logEntry.title"),
+      subtitle: formatLongDate(selectedDate, locale),
+      icon: ClipboardPlusIcon,
+      tone: "primary",
+    };
+    body = (
+      <LogEntryPanel
+        forms={onDemandForms}
+        items={response.onDemand.items}
+        formVersions={response.formVersions}
+        savedNote={
+          day?.isToday
+            ? t("logEntry.savedNow", { time: zonedTimeString(now, timeZone) })
+            : t("logEntry.savedToDay", {
+                date: formatLongDate(selectedDate, locale),
+              })
+        }
+        onCreate={handleCreateEntry}
+      />
+    );
+  }
 
   const header = (
-    <TodayStickyHeader
-      timeline={timeline}
-      selectedDate={selectedDate}
-      dateLabel={dateLabel}
-      isToday={isToday}
-      onPreviousDay={goToPreviousDay}
-      onToday={goToToday}
-      onNextDay={goToNextDay}
+    <TodayHeader
+      date={selectedDate}
+      todayDate={todayDate}
+      now={now}
+      timeZone={timeZone}
+      progress={{
+        total: day?.total ?? 0,
+        done: day?.doneCount ?? 0,
+        deviations: day?.deviationCount ?? 0,
+      }}
+      onDateChange={setSelectedDate}
+      onLogEntry={canLog ? () => setSelection({ type: "log" }) : undefined}
     />
   );
 
-  if (isLoading && !response) {
+  if (!day) {
     return (
       <div className="flex flex-1 flex-col">
         {header}
-        <div className="flex items-center justify-center py-24">
-          <Spinner className="size-8" />
-        </div>
+        {error && !response ? (
+          <div className={cn(pageWidthVariants(), "pt-6")}>
+            <ApiQueryError error={error} onRetry={() => void refetch()} />
+          </div>
+        ) : (
+          <div className="flex justify-center py-24" aria-busy="true">
+            <Spinner className="size-8" />
+            <span className="sr-only">{t("loading")}</span>
+          </div>
+        )}
       </div>
     );
   }
 
-  if (isError || !response) {
-    return (
-      <div className="flex flex-1 flex-col">
-        {header}
-        <div className={cn(pageWidthVariants({ width: "narrow" }), "pt-6")}>
-          <ApiQueryError error={error} onRetry={() => void refetch()} />
-        </div>
-      </div>
-    );
-  }
+  const isEmpty = day.total === 0 && day.entries.length === 0;
+  const hasPanel = heading !== null;
 
   return (
     <div className="flex flex-1 flex-col">
       {header}
 
       <div
-        className={cn(pageWidthVariants({ width: "narrow" }), "relative pb-16")}
+        className={cn(
+          pageWidthVariants(),
+          "flex flex-1 flex-col gap-6 pt-4 pb-16 md:pt-6 xl:flex-row xl:items-start",
+        )}
       >
-        {isFetching && response.date !== selectedDate ? (
-          <div className="absolute inset-x-0 top-1 z-10 flex justify-center">
-            <Spinner className="size-5" />
-          </div>
-        ) : null}
+        <div className="flex min-w-0 flex-col gap-5 xl:flex-1">
+          {day.isToday && yesterdayOpen > 0 ? (
+            <Button
+              variant="outline"
+              className="h-auto min-h-11 w-full justify-start px-3.5 py-2 text-left font-normal whitespace-normal [&>span]:w-full [&>span]:justify-between"
+              onClick={() => setSelectedDate(yesterdayDate)}
+              data-testid="yesterday-hint"
+            >
+              {t("yesterdayHint", { count: yesterdayOpen })}
+              <ChevronRightIcon className="shrink-0 text-muted-foreground" />
+            </Button>
+          ) : null}
 
-        {timeline.total === 0 ? (
-          <TodayEmptyState />
-        ) : (
-          <div className="space-y-4">
-            {timeline.isAllDone ? (
-              <TodayAllDone
-                total={timeline.total}
-                deviationCount={timeline.deviationCount}
-              />
-            ) : null}
-
-            <TodayTimeline
-              timeline={timeline}
-              timeZone={timeZone}
-              scrollKey={selectedDate}
-              syncingKeys={syncingKeys}
+          {isEmpty ? (
+            <TodayEmptyState />
+          ) : (
+            <TodaySections
+              day={day}
+              selectedKey={
+                !isMobile && shown && shown.type !== "log" ? shown.key : null
+              }
               currentUserId={currentUserId}
-              onActivate={handleActivate}
+              timeZone={timeZone}
+              onOpenGroup={(group) =>
+                setSelection({ type: "group", key: group.key })
+              }
+              onOpenEntry={(entry) =>
+                setSelection({ type: "entry", key: entry.key })
+              }
             />
+          )}
 
-            <TodayJumpToNow nowLineIndex={timeline.nowLineIndex} />
+          {day.isFuture && !isEmpty ? (
+            <p className="px-1 text-sm text-muted-foreground">
+              {t("futureNote")}
+            </p>
+          ) : null}
+        </div>
+
+        {isMobile ? (
+          <CheckPanel
+            mode="sheet"
+            open={selection !== null && hasPanel}
+            heading={heading}
+            backLabel={t("panel.back")}
+            onClose={closePanel}
+          >
+            {body}
+          </CheckPanel>
+        ) : isEmpty && !hasPanel ? null : (
+          <div className={cn("min-w-0", PANEL_COLUMN_CLASS)}>
+            <CheckPanel
+              mode="card"
+              open
+              heading={heading}
+              backLabel={t("panel.back")}
+              onClose={closePanel}
+            >
+              {hasPanel ? (
+                body
+              ) : (
+                <p className="py-10 text-center text-sm text-muted-foreground">
+                  {day.isFuture ? t("futureNote") : t("panel.empty")}
+                </p>
+              )}
+            </CheckPanel>
           </div>
         )}
       </div>
@@ -507,41 +583,6 @@ export function TodayView({
       <span aria-live="polite" className="sr-only">
         {announcement}
       </span>
-
-      {/* Mounted from first paint and toggled by `open` so Base UI can run enter/exit. */}
-      <RecordFlow
-        open={isRoundOpen}
-        check={shownCheck}
-        onSubmit={handleRecordConfirm}
-        onSkip={handleRoundSkip}
-        onClose={handleRoundClose}
-      />
-
-      {/* Edit reuses the same flow in single-record mode (no skip, size 1). */}
-      <RecordFlow
-        open={isEditOpen}
-        check={shownEditCheck}
-        onSubmit={handleEditConfirm}
-        onSkip={handleEditClose}
-        onClose={handleEditClose}
-      />
-
-      {shownRecordItem ? (
-        <TodayRecordSheet
-          open={Boolean(recordItem)}
-          onOpenChange={(open) => {
-            if (!open) setRecordKey(null);
-          }}
-          item={shownRecordItem}
-          currentUserId={currentUserId}
-          isUndoing={syncingKeys.has(occurrenceKey(shownRecordItem.task))}
-          onUndo={(item) => void handleUndo(item.task)}
-          onEdit={(item) => {
-            setRecordKey(null);
-            setEditKey(occurrenceKey(item.task));
-          }}
-        />
-      ) : null}
     </div>
   );
 }

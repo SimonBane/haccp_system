@@ -31,7 +31,7 @@ export default async function NewFormPage({
     : null;
 
   return (
-    <PageContainer width="full">
+    <PageContainer width="full" className="md:pt-0">
       <FormCreateView duplicateOf={duplicateOf} />
     </PageContainer>
   );

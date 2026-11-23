@@ -219,30 +219,6 @@ export function evaluateAnswerDraft(
   return evaluateAnswers(definition, limits, draftToAnswers(definition, draft));
 }
 
-/** A lone required checkbox is answered by the tap itself, as cleaning ticks always were. */
-export function isQuickCompleteForm(definition: FormDefinition): boolean {
-  const [only] = definition.fields;
-  return (
-    definition.fields.length === 1 &&
-    only?.type === FIELD_TYPE.CHECKBOX &&
-    only.required
-  );
-}
-
-export function quickCompleteAnswers(definition: FormDefinition): AnswersInput {
-  return Object.fromEntries(definition.fields.map((field) => [field.id, true]));
-}
-
-/** A form that is just one measurement gets the large readout and gauge. */
-export function featuredMeasurementField(
-  definition: FormDefinition,
-): MeasurementField | null {
-  const [only] = definition.fields;
-  return definition.fields.length === 1 && only?.type === FIELD_TYPE.MEASUREMENT
-    ? only
-    : null;
-}
-
 export function limitsFor(
   field: MeasurementField,
   limits: ResolvedLimits,

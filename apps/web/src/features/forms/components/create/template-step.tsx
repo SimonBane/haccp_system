@@ -23,8 +23,8 @@ type Props = {
 
 type Filter = FormCategory | "all";
 
-export const CHIP_CLASS =
-  "h-9 rounded-full border border-input px-3 aria-pressed:border-primary aria-pressed:bg-primary/10 aria-pressed:text-foreground";
+const CHIP_CLASS =
+  "h-9 rounded-full border border-input px-3 aria-pressed:border-primary aria-pressed:bg-primary/10 aria-pressed:text-foreground max-md:h-11";
 
 const CARD_CLASS =
   "h-auto w-full rounded-xl bg-card text-left font-normal whitespace-normal shadow-xs ring-1 ring-foreground/10 transition-shadow hover:bg-card hover:shadow-md hover:ring-foreground/20 [&>span]:w-full";
@@ -43,7 +43,9 @@ export function TemplateStep({ onPick }: Props) {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
       <div className="flex flex-col gap-1.5">
-        <h1 className="text-2xl font-semibold tracking-tight">{t("startTitle")}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {t("startTitle")}
+        </h1>
         <p className="text-sm text-muted-foreground">{t("startDescription")}</p>
       </div>
 
@@ -62,9 +64,14 @@ export function TemplateStep({ onPick }: Props) {
         </span>
         <span className="flex flex-1 flex-col">
           <span className="font-medium">{t("blank")}</span>
-          <span className="text-sm text-muted-foreground">{t("blankDescription")}</span>
+          <span className="text-sm text-muted-foreground">
+            {t("blankDescription")}
+          </span>
         </span>
-        <ChevronRightIcon className="size-4 text-muted-foreground" aria-hidden />
+        <ChevronRightIcon
+          className="size-4 text-muted-foreground"
+          aria-hidden
+        />
       </Button>
 
       <section className="flex flex-col gap-4" aria-labelledby="starters-title">
@@ -81,7 +88,11 @@ export function TemplateStep({ onPick }: Props) {
             }}
             className="flex-wrap gap-1.5"
           >
-            <ToggleGroupItem value="all" size="sm" className={cn(CHIP_CLASS, "h-8")}>
+            <ToggleGroupItem
+              value="all"
+              size="sm"
+              className={cn(CHIP_CLASS, "h-8")}
+            >
               {t("all")}
             </ToggleGroupItem>
             {FORM_CATEGORY_VALUES.map((category) => (
@@ -141,7 +152,9 @@ export function TemplateStep({ onPick }: Props) {
                       );
                     })}
                     <span className="ml-auto text-xs text-muted-foreground tabular-nums">
-                      {t("fieldCount", { count: starter.definition.fields.length })}
+                      {t("fieldCount", {
+                        count: starter.definition.fields.length,
+                      })}
                     </span>
                   </span>
                 </Button>

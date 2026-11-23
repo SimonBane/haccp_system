@@ -1,4 +1,4 @@
-import { getTranslations, setRequestLocale } from "next-intl/server";
+import { setRequestLocale } from "next-intl/server";
 import { PageContainer } from "@/components/layout/page-container";
 import { TaskBuilder } from "@/features/task-templates/components/builder/task-builder";
 import { type Locale } from "@/i18n/routing";
@@ -30,18 +30,11 @@ export default async function NewTaskTemplatePage({
   ]);
   const duplicateOf =
     taskTemplates?.items.find((task) => task.id === from) ?? null;
-  const t = await getTranslations("TasksPage");
 
   return (
     <PageContainer width="content" className="min-h-min pb-6">
       <TaskBuilder
-        mode={{
-          kind: "create",
-          duplicateOf,
-          duplicateTitle: duplicateOf
-            ? t("duplicateSuggestedTitle", { title: duplicateOf.title })
-            : null,
-        }}
+        mode={{ kind: "create", duplicateOf }}
         initialForms={forms.items}
         initialTargets={targets.items}
         initialLocationId={locationId}

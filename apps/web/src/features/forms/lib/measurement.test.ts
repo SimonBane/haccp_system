@@ -91,18 +91,21 @@ describe("measurementVerdict", () => {
 });
 
 describe("formatLimits", () => {
-  it("renders a band, a floor and a ceiling", () => {
-    expect(formatLimits({ min: 0, max: 4 }, "celsius", "en", "°C")).toBe(
-      "0 – 4 °C",
-    );
-    expect(formatLimits({ min: 63, max: null }, "celsius", "en", "°C")).toBe(
-      "≥ 63 °C",
-    );
-    expect(formatLimits({ min: null, max: 24 }, "percent", "bg", "%")).toBe(
-      "≤ 24 %",
+  it("renders a band with the locale's word between its ends, a floor and a ceiling", () => {
+    expect(formatLimits({ min: 0, max: 4 }, "celsius", "en", "°C", "to")).toBe(
+      "0 to 4 °C",
     );
     expect(
-      formatLimits({ min: null, max: null }, "celsius", "en", "°C"),
+      formatLimits({ min: -2.5, max: 4 }, "celsius", "bg", "°C", "до"),
+    ).toBe("-2,5 до 4 °C");
+    expect(
+      formatLimits({ min: 63, max: null }, "celsius", "en", "°C", "to"),
+    ).toBe("≥ 63 °C");
+    expect(
+      formatLimits({ min: null, max: 24 }, "percent", "bg", "%", "до"),
+    ).toBe("≤ 24 %");
+    expect(
+      formatLimits({ min: null, max: null }, "celsius", "en", "°C", "to"),
     ).toBeNull();
   });
 });

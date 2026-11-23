@@ -84,7 +84,7 @@ export function DayPlan({ items, appliesToOf, onEdit }: DayPlanProps) {
                 className="grid cursor-pointer grid-cols-[15rem_minmax(0,1fr)] items-center gap-4 border-b py-2.5 text-left outline-none hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 <span className="flex min-w-0 flex-col">
-                  <span className="truncate text-sm font-medium">{task.title}</span>
+                  <span className="truncate text-sm font-medium">{task.formName}</span>
                   <span className="truncate text-xs text-muted-foreground">
                     {t("plan.rowSub", {
                       checks: checksPerDay(task, appliesToOf(task)),
@@ -96,7 +96,7 @@ export function DayPlan({ items, appliesToOf, onEdit }: DayPlanProps) {
                   times={times}
                   window={window}
                   gridHours={HOUR_MARKS.wide}
-                  label={`${task.title}: ${times.join(", ")}`}
+                  label={`${task.formName}: ${times.join(", ")}`}
                   className="h-7"
                 />
               </button>

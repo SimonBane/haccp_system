@@ -42,7 +42,7 @@ export function MobileTopBar() {
 
         <div
           ref={actionsRef}
-          className="flex w-10 shrink-0 items-center justify-end gap-1"
+          className="flex min-w-10 shrink-0 items-center justify-end gap-1"
         />
       </div>
     </header>

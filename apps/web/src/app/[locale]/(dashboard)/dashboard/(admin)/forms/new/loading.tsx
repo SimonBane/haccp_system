@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function NewFormLoading() {
   return (
-    <PageContainer width="full">
+    <PageContainer width="full" className="md:pt-0">
       <Skeleton className="h-12 w-full" />
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
         <Skeleton className="h-8 w-72" />

@@ -219,7 +219,8 @@
       "taskRecordAlreadyExists": "Задачата вече е записана. Показва се последната запазена стойност.",
       "targetKindInUse": "Не може да се смени между оборудване и помещение, докато задачи го проверяват или в него има други неща.",
       "targetParentNotArea": "Само помещение може да съдържа други неща.",
-      "formAppliesToInUse": "Задачи с този формуляр проверяват неща, които вече няма да отговарят. Първо променете тези задачи."
+      "formAppliesToInUse": "Задачи с този формуляр проверяват неща, които вече няма да отговарят. Първо променете тези задачи.",
+      "formVersionChanged": "Формулярът е променен. Отворете го отново, за да използвате последната версия."
     }
   },
   "ForbiddenPage": {
@@ -247,134 +248,105 @@
   "TodayPage": {
     "title": "Днес",
     "loading": "Зареждане",
-    "actions": {
-      "complete": "Изпълни",
-      "record": "Запиши",
-      "recordAll": "Запиши всички",
-      "undo": "Отмени",
-      "edit": "Редактирай",
-      "viewRecord": "Виж записа"
-    },
-    "timeline": {
-      "now": "Сега",
-      "overdue": "Просрочени",
-      "remaining": "{count, plural, one {остава #} other {остават #}}",
-      "doneCount": "{count, plural, one {# изпълнена} other {# изпълнени}}",
-      "deviations": "{count, plural, one {# изисква внимание} other {# изискват внимание}}",
-      "jumpToOverdue": "Към просрочените задачи ({count})",
-      "jumpToDeviation": "Към проверките, които изискват внимание ({count})",
-      "nowLine": "Сега, {time}",
-      "jumpToNow": "Към сега",
-      "recordRound": "Запиши проверките за {time} ({count})"
-    },
     "row": {
-      "lastReadingAt": "Последно {time}",
-      "availableAt": "Достъпно от {time}",
-      "needsAttention": "Изисква внимание"
-    },
-    "record": {
-      "close": "Затвори",
-      "completedAt": "Изпълнено в",
-      "completedBy": "Изпълнено от",
-      "category": "Категория",
-      "pass": "Успешна",
-      "fail": "Изисква внимание"
-    },
-    "allDone": {
-      "title": "Всичко е изпълнено",
-      "description": "{count, plural, one {# задача за деня} other {# задачи за деня}}",
-      "withDeviations": "{count, plural, one {# проверка изисква внимание} other {# проверки изискват внимание}}"
+      "needsAttention": "Изисква внимание",
+      "late": "Закъсняла",
+      "opensAt": "Отваря се в {time}",
+      "filledIn": "{done} от {total} попълнени",
+      "items": "{count, plural, one {# елемент} other {# елемента}}",
+      "questions": "{count, plural, one {# въпрос} other {# въпроса}}",
+      "window": {
+        "range": "{from}-{to}",
+        "from": "от {time}",
+        "until": "до {time}"
+      }
     },
     "progress": {
-      "summary": "{completed} от {total} изпълнени"
+      "summary": "{completed} от {total} изпълнени",
+      "short": "{completed} от {total} изпълнени",
+      "passed": "В норма",
+      "deviations": "Отклонения",
+      "remaining": "Оставащи"
     },
     "dateNavigation": {
       "ariaLabel": "Избор на ден",
       "previous": "Предишен ден",
       "next": "Следващ ден",
-      "jumpToToday": "Към днес"
-    },
-    "relative": {
-      "inMinutes": "След {count} мин",
-      "inHours": "След {count} ч",
-      "inHoursMinutes": "След {hours} ч {minutes} мин",
-      "lateByMinutes": "+{count} мин",
-      "lateByHours": "+{count} ч",
-      "lateByHoursMinutes": "+{hours} ч {minutes} мин"
+      "today": "Днес",
+      "relativeDate": "{day}, {date}"
     },
     "audit": {
-      "you": "Вие",
-      "correctiveAction": "Коригиращо действие"
+      "you": "Вие"
     },
     "recordDialog": {
-      "allowed": "Допустимо {limits}",
-      "withinLimits": "В границите",
-      "outsideLimits": "Извън границите",
-      "srWithinLimits": "{value}, в допустимите граници",
-      "srOutsideLimits": "{value}, извън допустимите граници",
-      "noPriorReading": "Първо измерване днес",
-      "lastReading": "Последно: {value} в {time}",
-      "presets": {
-        "movedProduct": "Преместих продуктите",
-        "adjustedThermostat": "Настроих термостата",
-        "calledService": "Извиках сервиз",
-        "rejectedDelivery": "Върнах доставката",
-        "discardedProduct": "Бракувах продукта",
-        "recleaned": "Почистих отново",
-        "rechecked": "Повторих проверката",
-        "notifiedManager": "Уведомих отговорника"
-      },
       "validation": {
-        "readingRequired": "Въведете измерена стойност",
-        "readingInvalid": "Въведете валидно число за тази мерна единица",
         "correctiveRequired": "Изберете или опишете предприетото коригиращо действие",
         "notesMax": "Бележките може да са до 900 знака"
       },
-      "close": "Затвори",
-      "back": "Назад",
-      "continue": "Продължи",
       "save": "Запиши",
       "saveDeviation": "Запиши отклонението",
-      "skip": "Пропусни",
-      "skipLabel": "Пропусни {title}",
-      "roundProgress": "{position} / {total}",
-      "roundProgressLabel": "Проверка {position} от {total}",
-      "roundSummary": "{count, plural, one {Записана # проверка} other {Записани # проверки}}",
-      "roundSummaryDeviations": "{saved} записани · {deviations} изискват внимание",
-      "failedTitle": "Проверката е неуспешна",
-      "correctiveTitle": "Какво предприехте?",
-      "correctiveTitleOptional": "Какво предприехте? (по желание)",
+      "correctiveTitle": "Коригиращо действие",
+      "correctiveTitleOptional": "Коригиращо действие (по желание)",
       "notesLabel": "Бележки",
-      "notesPlaceholder": "Напр. преместих продуктите и уведомих отговорника…",
-      "notesCharacterCount": "{current} / {max}"
+      "notesPlaceholder": "Добавете бележка",
+      "noteOnlyPlaceholder": "Опишете какво е направено"
     },
     "a11y": {
-      "completed": "{title} е изпълнена",
-      "recorded": "{title} е записана",
-      "undone": "{title} е отменена"
+      "recorded": "{title} е записана"
     },
     "empty": {
       "title": "Няма задачи за днес",
       "description": "За тази локация няма насрочени задачи за избрания ден."
     },
-    "error": {
-      "title": "Задачите за днес не можаха да се заредят",
-      "description": "Проверете връзката и опитайте отново.",
-      "retry": "Опитай отново"
-    },
     "toasts": {
-      "completed": "Изпълнено · {title}",
       "recorded": "Записано · {title}",
-      "undoError": "Неуспешно връщане назад",
-      "doneError": "Неуспешно приключване",
-      "alreadyRecorded": "Вече е записано. Показва се последната запазена стойност",
       "missingForm": "Формулярът на задачата не можа да се зареди. Презаредете и опитайте отново."
     },
     "room": {
-      "progress": "{done} от {total} готови",
-      "recordRoom": "Запиши помещението",
-      "recordRoomLabel": "Запиши проверките в {room} ({count})",
       "wholeRoom": "Цялото помещение"
+    },
+    "logEntry": {
+      "button": "Нов запис",
+      "title": "Нов запис",
+      "description": "Изберете какво записвате.",
+      "pickItem": "Изберете проверения елемент.",
+      "back": "Назад",
+      "shortButton": "Запис",
+      "save": "Запиши",
+      "savedNow": "Записва се с текущия час, {time}.",
+      "savedToDay": "Записва се към {date}.",
+      "noItems": "Тази локация още няма оборудване или зони."
+    },
+    "day": {
+      "yesterday": "Вчера",
+      "tomorrow": "Утре"
+    },
+    "yesterdayHint": "{count, plural, one {# проверка от вчера не е попълнена} other {# проверки от вчера не са попълнени}}",
+    "sections": {
+      "todo": "Сега",
+      "later": "По-късно",
+      "planned": "Планирани",
+      "done": "Изпълнени",
+      "count": "{count, plural, one {# проверка} other {# проверки}}",
+      "doneWithDeviations": "{count} · {deviations, plural, one {# изисква внимание} other {# изискват внимание}}"
+    },
+    "futureNote": "Тези проверки се отварят в самия ден.",
+    "panel": {
+      "completed": "Изпълнена · {when}",
+      "completedBadge": "Изпълнена",
+      "empty": "Изберете проверка от списъка.",
+      "back": "Назад"
+    },
+    "inline": {
+      "completeAll": "Попълни всички",
+      "done": "Готово",
+      "reset": "Нулирай",
+      "savedAction": "Предприето: {action}",
+      "notePlaceholder": "Добавете бележка"
+    },
+    "items": {
+      "anyOrder": "Отворете който и да е елемент, за да го попълните. Редът е по ваш избор.",
+      "saveNext": "Запиши и напред"
     }
   },
   "DataTable": {
@@ -630,9 +602,6 @@
       "nameLabel": "Име",
       "namePlaceholder": "Проверка на хладилник",
       "categoryLabel": "Категория",
-      "categoryPlaceholder": "Изберете категория",
-      "correctiveLabel": "Изисквай коригиращо действие при неуспешна проверка",
-      "correctiveDescription": "Служителите описват предприетото, преди да запишат неуспешна проверка.",
       "fieldsLabel": "Полета",
       "addField": "Добави поле",
       "fieldTypeHints": {
@@ -659,17 +628,14 @@
       "helpLabel": "Пояснение",
       "helpPlaceholder": "Незадължителна подсказка под въпроса",
       "requiredLabel": "Задължителен отговор",
-      "requiredCheckbox": "Трябва да е отметнато, за да се запише",
       "multiline": "Позволи няколко реда",
       "unitLabel": "Мерна единица",
       "limitsLabel": "Граници",
       "limitMin": "Минимум",
       "limitMax": "Максимум",
       "noLimit": "Без граница",
-      "limitsHint": "Стойност извън границите проваля проверката. Оставете едната страна празна за долна или горна граница. Задачите могат да задават свои граници за всяко оборудване или зона.",
       "multiple": "Позволи няколко отговора",
       "optionsLabel": "Отговори",
-      "optionsHint": "Отбележете отговорите, които означават неуспешна проверка.",
       "optionLabel": "Отговор {index}",
       "optionFails": "Неуспех",
       "removeOption": "Премахни отговор {index}",
@@ -694,11 +660,8 @@
         "published": "Публикувана е версия {version}."
       },
       "appliesToLabel": "Попълва се за",
-      "appliesToPlaceholder": "Изберете какво проверява",
-      "appliesToHint": "Задачите с такъв формуляр избират всякакво оборудване, помещения и части от тях.",
       "backToForms": "Формуляри",
       "untitledForm": "Формуляр без име",
-      "versionBadge": "v{version}",
       "fieldCountOf": "{count} от {max} полета",
       "modeLabel": "Режим",
       "modeBuild": "Изграждане",
@@ -707,17 +670,14 @@
       "publish": "Публикувай",
       "save": "Запази",
       "addFieldTitle": "Добавете поле",
-      "addFieldHint": "Добавя се под избраното поле.",
+      "addFieldHint": "Щракнете, за да добавите под избраното поле, или го плъзнете във формуляра.",
       "failsWhenTitle": "Записът е неуспешен, когато",
       "failsWhenEmpty": "Все още няма условия. Задайте граници на измерване или отбележете вариант като неуспешен.",
-      "failsWhenCorrective": "Тогава служителите описват предприетото коригиращо действие.",
       "failRuleRange": "{field} е под {min} или над {max}",
       "failRuleBelow": "{field} е под {min}",
       "failRuleAbove": "{field} е над {max}",
       "failRuleOptions": "{field}: {options}",
-      "formSettings": "Настройки на формуляра",
-      "fieldTab": "Поле",
-      "inspectorLabel": "Настройки на полето",
+      "inspectorLabel": "Подробности",
       "selectFieldTitle": "Изберете поле, за да го редактирате",
       "selectFieldDescription": "Или добавете ново от списъка вляво.",
       "fieldPosition": "Поле {index} от {count}",
@@ -731,30 +691,81 @@
       "passesAlways": "Всяко измерване е успешно",
       "failsBelow": "Неуспешно под {value}",
       "failsAbove": "Неуспешно над {value}",
-      "requiredHint": "Служителите не могат да запазят записа без отговор.",
-      "requiredCheckboxHint": "Служителите не могат да запазят записа, докато това не е отметнато.",
       "optional": "Незадължително",
       "tickToConfirm": "Отметнете за потвърждение",
       "typeNote": "Въведете бележка",
       "pickDate": "Изберете дата",
       "untitledOption": "Вариант без име",
       "failingOptions": "{failing} от {total} са неуспешни",
-      "correctiveBadge": "Коригиращо действие при неуспех",
-      "emptyCanvas": "Все още няма полета. Добавете първото.",
-      "versionNoteNew": "Формулярът още не е публикуван. Публикуването създава версия 1. По-късните промени в полетата публикуват нова версия; запазените записи пазят версията, с която са направени.",
-      "versionNote": "Версия {version} е активна. Промяната на полетата публикува версия {next}; запазените записи пазят версията, с която са направени.",
+      "emptyCanvas": "Все още няма полета. Щракнете върху тип или го плъзнете тук.",
       "discardTitle": "Да се отхвърлят ли промените?",
       "discardDescription": "Имате непубликувани промени. Ако излезете сега, ще ги загубите.",
       "discardCancel": "Продължи редакцията",
       "discardConfirm": "Отхвърли",
       "close": "Затвори",
-      "done": "Готово"
+      "done": "Готово",
+      "corrective": {
+        "heading": "Коригиращи действия",
+        "subheading": "При неуспешна проверка",
+        "answersLabel": "Отговори",
+        "answersCount": "{count} от {max}",
+        "answerLabel": "Отговор {index}",
+        "answerPlaceholder": "Опишете действието",
+        "removeAnswer": "Премахни отговор {index}",
+        "addAnswer": "Добави отговор",
+        "empty": "Все още няма отговори. Служителите пишат бележка.",
+        "suggestionsLabel": "Чести за тази категория",
+        "allowNote": "Позволи бележка",
+        "divider": "При неуспешна проверка",
+        "editCard": "Редактирай коригиращите действия",
+        "untitledAnswer": "Отговор без име",
+        "meta": "{count, plural, =0 {Само бележка} one {# отговор} other {# отговора}}",
+        "answerLabelError": "Всеки отговор трябва да има текст.",
+        "suggestions": {
+          "movedProduct": "Преместих продуктите",
+          "adjustedThermostat": "Настроих термостата",
+          "calledService": "Извиках сервиз",
+          "rejectedDelivery": "Върнах доставката",
+          "discardedProduct": "Бракувах продукта",
+          "recleaned": "Почистих отново",
+          "rechecked": "Повторих проверката",
+          "notifiedManager": "Уведомих отговорника"
+        },
+        "onDescription": "Служителите записват какво са направили",
+        "offDescription": "Изключено за този формуляр",
+        "multipleHint": "Може повече от едно действие",
+        "allowNoteHint": "Служителят може да добави текст"
+      },
+      "formDetails": "Данни за формуляра",
+      "formDetailsHint": "Име, категория и за какво се попълва",
+      "editFormDetails": "Редактирай данните за формуляра",
+      "nameHint": "Служителите виждат това име в списъка си за днес.",
+      "categoryMissing": "Изберете категория",
+      "appliesToMissing": "Изберете за какво се попълва",
+      "addFieldEnd": "Добавете поле в края",
+      "emptyCanvasMobile": "Все още няма полета. Докоснете „Добави поле“, за да започнете.",
+      "reorderHint": "Плъзнете дръжката, за да пренаредите",
+      "dragHandle": "Плъзнете, за да преместите {label}",
+      "dnd": {
+        "instructions": "За да вземете поле, натиснете интервал или Enter. Преместете го със стрелките, пуснете го с интервал или Enter, или натиснете Escape за отказ.",
+        "pickedUp": "Взехте {label}, позиция {position} от {count}.",
+        "movedTo": "{label} е преместено на позиция {position} от {count}.",
+        "dropped": "{label} е пуснато на позиция {position} от {count}.",
+        "cancelled": "Преместването на {label} е отменено."
+      },
+      "onDemandLabel": "Запис при нужда",
+      "onDemandHint": "Записва се от „Днес“, без график",
+      "backToStart": "Назад",
+      "categoryPlaceholder": "Изберете категория",
+      "requiredHint": "Нужен е, за да се запази",
+      "multilineHint": "По-голямо поле за бележки",
+      "multipleHint": "Може повече от един избор",
+      "dropHere": "Пуснете тук"
     },
     "preview": {
       "hint": "Изпробвайте. Нищо не се записва.",
       "emptyTitle": "Все още няма какво да се покаже",
       "emptyDescription": "Добавете поле, за да видите формуляра като служителите.",
-      "correctiveActionRequired": "При запис ще се изиска коригиращо действие.",
       "tryTitle": "Изпробвайте",
       "tryDescription": "Попълнете го като служител. Нищо не се запазва.",
       "resultTitle": "Резултат",
@@ -764,7 +775,6 @@
         "fail": "Изисква корекция",
         "incomplete": "Непълно"
       },
-      "needsAttentionTitle": "Тази проверка изисква корекция",
       "reasonFailed": "{field} не преминава проверката",
       "reasonMissing": "{field} е задължително",
       "reasonAllPass": "Всички отговори са в границите.",
@@ -787,7 +797,7 @@
       "summaryAppliesTo": "Попълва се за",
       "summaryOnFail": "При неуспех",
       "onFailRequired": "Изисква се коригиращо действие",
-      "onFailOptional": "Коригиращото действие не е задължително",
+      "onFailOff": "Без коригиращо действие",
       "noIssues": "Няма открити проблеми",
       "lockNote": "Публикуваните полета не се променят. По-късните редакции публикуват нова версия; запазените записи пазят версията, с която са направени.",
       "doneTitle": "„{name}“ е публикуван",
@@ -799,13 +809,6 @@
     "create": {
       "title": "Нов формуляр",
       "close": "Затвори",
-      "progress": "Напредък",
-      "stepOf": "Стъпка {current} от {total}",
-      "steps": {
-        "start": "Начало",
-        "setup": "Настройка",
-        "fields": "Полета"
-      },
       "startTitle": "Как искате да започнете?",
       "startDescription": "Готовите формуляри следват често срещани HACCP проверки. Можете да промените всяко поле, преди да публикувате.",
       "blank": "Празен формуляр",
@@ -813,14 +816,7 @@
       "starters": "Готови формуляри",
       "filterLabel": "Филтър по категория",
       "all": "Всички",
-      "fieldCount": "{count, plural, one {# поле} other {# полета}}",
-      "setupTitle": "Настройте формуляра",
-      "setupDescription": "Тези избори определят как се използва формулярът. Можете да ги промените по-късно от „Настройки на формуляра“.",
-      "nameHint": "Служителите виждат това име в списъка си за днес.",
-      "startingFrom": "Започвате от",
-      "fieldsNext": "В следващата стъпка ще добавяте, премахвате и подреждате полетата.",
-      "back": "Назад",
-      "continue": "Към полетата"
+      "fieldCount": "{count, plural, one {# поле} other {# полета}}"
     }
   },
   "Forms": {
@@ -881,7 +877,8 @@
       "signToggle": "Отрицателна стойност",
       "withinLimits": "В границите",
       "outsideLimits": "Извън границите",
-      "allowed": "Допустимо {limits}"
+      "allowed": "Допустимо {limits}",
+      "rangeTo": "до"
     },
     "answerValidation": {
       "required": "Този отговор е задължителен.",
@@ -898,9 +895,11 @@
       "location": "Целия обект"
     },
     "appliesToHints": {
-      "per_item": "Отделна проверка за всеки хладилник, помещение, стена… (напр. температури, почистване)",
-      "location": "Веднъж за всеки час (напр. проверка при отваряне)"
-    }
+      "per_item": "Проверка за всеки избран обект",
+      "location": "Една проверка за всеки час"
+    },
+    "datePlaceholder": "Изберете дата",
+    "dateClear": "Изчисти датата"
   },
   "RecordsPage": {
     "title": "Записи",
@@ -983,7 +982,12 @@
       "form": "Формуляр",
       "formVersion": "{name} · версия {version}",
       "target": "Оборудване или зона",
-      "answers": "Отговори"
+      "answers": "Отговори",
+      "happened": "Случило се",
+      "kind": "Вид"
+    },
+    "kind": {
+      "onDemand": "При нужда"
     }
   },
   "RecordsReportPage": {
@@ -1043,7 +1047,8 @@
     "footer": {
       "generatedBy": "Генериран от SafeCheck",
       "disclaimer": "Отчетът показва стойността, съхранена за всеки запис към момента на генериране."
-    }
+    },
+    "onDemandSuffix": "при нужда"
   },
   "TasksPage": {
     "title": "Задачи",
@@ -1052,7 +1057,6 @@
     "emptyDescription": "Добавете първата задача, за да изградите дневния списък.",
     "searchPlaceholder": "Търсене на задачи",
     "add": "Добави задача",
-    "duplicateSuggestedTitle": "{title} (Копие)",
     "edit": "Редактирай",
     "duplicate": "Дублирай",
     "delete": "Изтрий",
@@ -1179,11 +1183,6 @@
         "noForms": "Все още няма формуляри.",
         "createForm": "Създайте формуляр",
         "required": "Изберете формуляр.",
-        "titleLabel": "Име на задачата",
-        "titlePlaceholder": "напр. Температури на хладилника за подготовка",
-        "titleHint": "Показва се на екипа в списъка за днес.",
-        "titleRequired": "Въведете име на задачата.",
-        "titleMaxLength": "Името трябва да е до {max} знака.",
         "choose": "Изберете формуляр",
         "change": "Промени",
         "search": "Търсене в {count, plural, one {# формуляр} other {# формуляра}}",
@@ -1282,30 +1281,17 @@
         "times": "Часове",
         "timesCount": "{count, plural, one {# път на ден} other {# пъти на ден}}",
         "timesUpTo": "До {max} на ден",
-        "modeLabel": "Как се задават часовете",
-        "modeTimes": "В определени часове",
-        "modeRepeat": "Повтаряй на всеки…",
-        "noTimes": "Още няма часове. Добавете първия отдолу.",
-        "noTimesShort": "Още няма часове.",
-        "timeToAdd": "Час за добавяне",
-        "addTime": "Добави час",
-        "add": "Добави",
         "clearAll": "Изчисти всички",
-        "enterHint": "Enter добавя часа · до {max} на ден",
-        "removeTime": "Премахни {time}",
-        "every": "На всеки",
-        "from": "От",
-        "until": "До",
-        "repeatSummary": "{count, plural, one {# проверка на ден} other {# проверки на ден}}, на всеки {interval} от {from} до {until}",
-        "repeatEmpty": "Задайте начален час преди крайния.",
-        "toList": "Редактирай часовете поотделно",
         "timesRequired": "Добавете поне един час.",
-        "enterTime": "Първо въведете час.",
-        "duplicateTime": "{time} вече е в списъка.",
         "maxTimes": "Можете да добавите до {max} часа на ден.",
         "glance": "Денят накратко",
         "daysDescription": "В кои дни се повтаря",
-        "timesDescription": "Кога е всяка проверка"
+        "timesDescription": "Кога е всяка проверка",
+        "timesPlaceholder": "Добавете час, напр. 08:00",
+        "noTimeMatch": "Няма такъв час",
+        "timeToAdd": "Час за добавяне",
+        "add": "Добави",
+        "removeTime": "Премахни {time}"
       },
       "window": {
         "title": "Времеви прозорец",
@@ -1339,7 +1325,6 @@
         "label": "Преглед",
         "summary": "Обобщение",
         "start": "Изберете формуляр, за да започнете. Тук ще се попълва в движение.",
-        "form": "Формуляр",
         "checks": "Проверки",
         "days": "Дни",
         "times": "Часове",
@@ -1360,7 +1345,6 @@
         "stillNeeded": "Още липсва",
         "missing": {
           "form": "Изберете формуляр",
-          "title": "Дайте име на задачата",
           "targets": "Изберете какво проверява",
           "days": "Изберете поне един ден",
           "times": "Добавете поне един час"

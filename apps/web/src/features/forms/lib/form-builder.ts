@@ -2,10 +2,13 @@ import {
   CHOICE_MAX_OPTIONS,
   CHOICE_MIN_OPTIONS,
   CORRECTIVE_ACTION_MODE,
+  CORRECTIVE_MAX_ANSWERS,
+  correctiveSettings,
   FIELD_TYPE,
   FORM_MAX_FIELDS,
   isValidMeasurementValue,
   type CorrectiveActionMode,
+  type CorrectiveSettings,
   type FieldType,
   type FormAppliesTo,
   type FormCategory,
@@ -30,7 +33,11 @@ export type BuilderState = {
   name: string;
   category: FormCategory | "";
   appliesTo: FormAppliesTo | "";
+  /** Staff can log it from Today whenever it happens. */
+  onDemand: boolean;
   correctiveAction: CorrectiveActionMode;
+  /** Answer labels stay as typed until save, so one can be blank mid-edit. */
+  corrective: CorrectiveSettings;
   fields: BuilderField[];
 };
 
@@ -47,6 +54,8 @@ export type BuilderIssues = {
   category?: true;
   appliesTo?: true;
   fields?: "empty";
+  /** Indexes of corrective answers with an empty label. */
+  correctiveLabels?: number[];
   byField: Record<string, FieldIssues>;
 };
 
@@ -61,7 +70,7 @@ function randomSuffix(): string {
 
 /** Ids are minted once and never derived from labels, so renaming a field keeps its answers and overrides. */
 export function mintElementId(
-  prefix: "f" | "o",
+  prefix: "f" | "o" | "a",
   taken: ReadonlySet<string>,
 ): string {
   let id = `${prefix}_${randomSuffix()}`;
@@ -83,9 +92,56 @@ export function emptyBuilderState(): BuilderState {
     name: "",
     category: "",
     appliesTo: "",
+    onDemand: false,
     correctiveAction: CORRECTIVE_ACTION_MODE.REQUIRED_ON_FAIL,
+    corrective: { answers: [], multiple: true, allowNote: true },
     fields: [],
   };
+}
+
+export function addCorrectiveAnswer(
+  corrective: CorrectiveSettings,
+  label: string,
+): CorrectiveSettings {
+  if (corrective.answers.length >= CORRECTIVE_MAX_ANSWERS) return corrective;
+  const id = mintElementId(
+    "a",
+    new Set(corrective.answers.map((answer) => answer.id)),
+  );
+  return { ...corrective, answers: [...corrective.answers, { id, label }] };
+}
+
+/** A new form starts with its category's usual answers; one that already has some is left alone. */
+export function seedCorrectiveAnswers(
+  state: BuilderState,
+  labels: readonly string[],
+): BuilderState {
+  if (state.corrective.answers.length > 0) return state;
+  return {
+    ...state,
+    corrective: labels.reduce(addCorrectiveAnswer, state.corrective),
+  };
+}
+
+/** The first category picked on a blank form brings its usual answers; switching later keeps the admin's. */
+export function chooseCategory(
+  state: BuilderState,
+  category: FormCategory,
+  seedLabels: readonly string[],
+): BuilderState {
+  const next = { ...state, category };
+  return state.category === "" ? seedCorrectiveAnswers(next, seedLabels) : next;
+}
+
+export function correctiveOn(
+  state: Pick<BuilderState, "correctiveAction">,
+): boolean {
+  return state.correctiveAction !== CORRECTIVE_ACTION_MODE.OFF;
+}
+
+/** With no answers the note is all there is to fill in, so it cannot be turned off. */
+export function correctiveNoteShown(corrective: CorrectiveSettings): boolean {
+  return corrective.allowNote || corrective.answers.length === 0;
 }
 
 export function toBuilderState(
@@ -93,6 +149,8 @@ export function toBuilderState(
     name: string;
     category: FormCategory;
     appliesTo: FormAppliesTo;
+    /** Starter forms leave it out: a new form is scheduled-only until the admin says otherwise. */
+    onDemand?: boolean;
     definition: FormDefinition;
   },
   separator: string,
@@ -101,7 +159,12 @@ export function toBuilderState(
     name: source.name,
     category: source.category,
     appliesTo: source.appliesTo,
-    correctiveAction: source.definition.correctiveAction,
+    onDemand: source.onDemand ?? false,
+    correctiveAction:
+      source.definition.correctiveAction === CORRECTIVE_ACTION_MODE.OFF
+        ? CORRECTIVE_ACTION_MODE.OFF
+        : CORRECTIVE_ACTION_MODE.REQUIRED_ON_FAIL,
+    corrective: correctiveSettings(source.definition),
     fields: source.definition.fields.map((field) =>
       field.type === FIELD_TYPE.MEASUREMENT
         ? { ...field, limits: limitsToDraft(field, separator) }
@@ -164,13 +227,39 @@ export function moveField(
   return next;
 }
 
+/** Moves a field so it ends up at `toIndex`, as a dragged card lands where it was dropped. */
+export function moveFieldTo(
+  fields: readonly BuilderField[],
+  fieldId: string,
+  toIndex: number,
+): BuilderField[] {
+  const from = fields.findIndex((f) => f.id === fieldId);
+  const next = [...fields];
+  if (from === -1) return next;
+  const [moved] = next.splice(from, 1);
+  next.splice(Math.max(0, Math.min(toIndex, next.length)), 0, moved!);
+  return next;
+}
+
+/** Inserts at `index`, clamped to the list, where a field type dragged from the palette was dropped. */
+export function insertFieldAt(
+  fields: readonly BuilderField[],
+  index: number,
+  field: BuilderField,
+): BuilderField[] {
+  const next = [...fields];
+  next.splice(Math.max(0, Math.min(index, next.length)), 0, field);
+  return next;
+}
+
 /** Inserts after `afterId`, or at the end when it is null or no longer present. */
 export function insertField(
   fields: readonly BuilderField[],
   afterId: string | null,
   field: BuilderField,
 ): BuilderField[] {
-  const index = afterId === null ? -1 : fields.findIndex((f) => f.id === afterId);
+  const index =
+    afterId === null ? -1 : fields.findIndex((f) => f.id === afterId);
   const next = [...fields];
   next.splice(index === -1 ? next.length : index + 1, 0, field);
   return next;
@@ -219,7 +308,13 @@ export function failRules(fields: readonly BuilderField[]): FailRule[] {
       if (min === "invalid" || max === "invalid") return [];
       if (min === null && max === null) return [];
       return [
-        { kind: "limits", fieldId: field.id, label, unit: field.unit, limits: { min, max } },
+        {
+          kind: "limits",
+          fieldId: field.id,
+          label,
+          unit: field.unit,
+          limits: { min, max },
+        },
       ];
     }
 
@@ -299,6 +394,13 @@ export function validateBuilder(state: BuilderState): BuilderIssues {
   if (state.appliesTo === "") issues.appliesTo = true;
   if (state.fields.length === 0) issues.fields = "empty";
 
+  if (correctiveOn(state)) {
+    const blankAnswers = state.corrective.answers.flatMap((answer, index) =>
+      answer.label.trim() === "" ? [index] : [],
+    );
+    if (blankAnswers.length > 0) issues.correctiveLabels = blankAnswers;
+  }
+
   for (const field of state.fields) {
     const found = fieldIssues(field);
     if (Object.keys(found).length > 0) issues.byField[field.id] = found;
@@ -310,7 +412,11 @@ export function validateBuilder(state: BuilderState): BuilderIssues {
 export function hasBuilderIssues(issues: BuilderIssues): boolean {
   return (
     Boolean(
-      issues.name || issues.category || issues.appliesTo || issues.fields,
+      issues.name ||
+      issues.category ||
+      issues.appliesTo ||
+      issues.fields ||
+      issues.correctiveLabels,
     ) || Object.keys(issues.byField).length > 0
   );
 }
@@ -327,6 +433,15 @@ function withLabelAndHelp<T extends BuilderField>(field: T): T {
 export function toDefinition(state: BuilderState): FormDefinition {
   return {
     correctiveAction: state.correctiveAction,
+    corrective: {
+      // Blank answers can only be left behind while corrective action is off.
+      answers: state.corrective.answers.flatMap((answer) => {
+        const label = answer.label.trim();
+        return label ? [{ ...answer, label }] : [];
+      }),
+      multiple: state.corrective.multiple,
+      allowNote: correctiveNoteShown(state.corrective),
+    },
     fields: state.fields.map((field): FormField => {
       const tidy = withLabelAndHelp(field);
 
@@ -379,4 +494,5 @@ export const BUILDER_LIMITS = {
   maxFields: FORM_MAX_FIELDS,
   maxOptions: CHOICE_MAX_OPTIONS,
   minOptions: CHOICE_MIN_OPTIONS,
+  maxCorrectiveAnswers: CORRECTIVE_MAX_ANSWERS,
 } as const;

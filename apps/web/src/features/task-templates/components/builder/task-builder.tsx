@@ -3,7 +3,6 @@
 import {
   API_ERROR_CODE,
   FORM_APPLIES_TO,
-  TASK_TEMPLATE_TITLE_MAX_LENGTH,
   getMeasurementFields,
   targetDisplayName,
   sortWeekdays,
@@ -22,10 +21,8 @@ import {
   MobileHeaderActions,
   MobileHeaderTitle,
 } from "@/components/layout/shell-slots";
-import { CharacterCount } from "@/components/character-count";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ResponsiveFormSheet } from "@/components/ui/responsive-form-sheet";
@@ -82,10 +79,9 @@ import { useApiErrorToast } from "@/lib/api/use-api-error-toast";
 
 const ID = "task-builder";
 const TASKS_PATH = "/dashboard/task-templates";
-const TITLE_MAX = TASK_TEMPLATE_TITLE_MAX_LENGTH;
 
 export type TaskBuilderMode =
-  | { kind: "create"; duplicateOf: TaskTemplateResponse | null; duplicateTitle: string | null }
+  | { kind: "create"; duplicateOf: TaskTemplateResponse | null }
   | { kind: "edit"; task: TaskTemplateResponse };
 
 type TaskBuilderProps = {
@@ -98,7 +94,7 @@ type TaskBuilderProps = {
 function initialDraft(mode: TaskBuilderMode, separator: string): TaskDraft {
   if (mode.kind === "edit") return draftFromTask(mode.task, separator);
   if (mode.duplicateOf) {
-    return draftFromTask(mode.duplicateOf, separator, mode.duplicateTitle ?? mode.duplicateOf.title);
+    return draftFromTask(mode.duplicateOf, separator);
   }
   return emptyDraft();
 }
@@ -180,7 +176,7 @@ export function TaskBuilder({
     : selectedIds.map((id) => names.get(id) ?? "");
 
   const done = {
-    form: !missing.includes("form") && !missing.includes("title"),
+    form: !missing.includes("form"),
     targets: Boolean(form) && !missing.includes("targets"),
     when: !missing.includes("days") && !missing.includes("times"),
   };
@@ -202,7 +198,6 @@ export function TaskBuilder({
     setDraft((current) => ({
       ...current,
       formId: next.id,
-      title: current.titleTouched ? current.title : next.name,
       targets: next.appliesTo === FORM_APPLIES_TO.LOCATION ? [] : current.targets,
     }));
     setIssues({});
@@ -242,13 +237,6 @@ export function TaskBuilder({
       if (first) setOpenSection(SECTION_OF[first]);
       return;
     }
-    const title = draft.title.trim();
-    if (title.length > TITLE_MAX) {
-      setShowErrors(true);
-      setOpenSection("form");
-      return;
-    }
-
     const { targets: targetInputs, issues: limitIssues } = toTargetInputs(
       isLocationForm ? [] : selections,
       form.latestVersion.definition,
@@ -260,7 +248,6 @@ export function TaskBuilder({
     }
 
     const payload: TaskTemplateFieldsInput = {
-      title,
       formId: form.id,
       weekdays: sortWeekdays(draft.weekdays),
       scheduledTimes: times,
@@ -300,39 +287,6 @@ export function TaskBuilder({
       : mode.duplicateOf
         ? tb("duplicateTitle")
         : tb("newTitle");
-  const titleTooLong = showErrors && draft.title.trim().length > TITLE_MAX;
-
-  const titleField = (
-    <div className="flex max-w-md flex-col gap-2">
-      <label htmlFor={`${ID}-title`} className="text-sm leading-none font-medium">
-        {tb("form.titleLabel")}
-      </label>
-      <Input
-        id={`${ID}-title`}
-        placeholder={tb("form.titlePlaceholder")}
-        value={draft.title}
-        maxLength={TITLE_MAX}
-        aria-invalid={isMissing("title") || titleTooLong}
-        onChange={(event) =>
-          patch({ title: event.target.value.slice(0, TITLE_MAX), titleTouched: true })
-        }
-      />
-      {isMissing("title") ? (
-        <p role="alert" className="text-sm text-destructive">
-          {tb("form.titleRequired")}
-        </p>
-      ) : titleTooLong ? (
-        <p role="alert" className="text-sm text-destructive">
-          {tb("form.titleMaxLength", { max: TITLE_MAX })}
-        </p>
-      ) : null}
-      <div className="flex items-start justify-between gap-3 text-[13px] text-muted-foreground">
-        <p>{tb("form.titleHint")}</p>
-        <CharacterCount value={draft.title} max={TITLE_MAX} />
-      </div>
-    </div>
-  );
-
   const formPicker = (
     <>
       <div className="flex max-w-md flex-col gap-2">
@@ -484,9 +438,7 @@ export function TaskBuilder({
           done={done.form}
           doneLabel={tb("stepDone")}
           title={tb("form.mobileTitle")}
-          summary={
-            form ? `${draft.title.trim() || form.name} · ${form.name}` : tb("preview.notChosen")
-          }
+          summary={form ? form.name : tb("preview.notChosen")}
           summaryInvalid={sectionInvalid("form")}
           open={openSection === "form"}
           onToggle={() => toggle("form")}
@@ -495,7 +447,6 @@ export function TaskBuilder({
             {tb("form.mobileDescription")}
           </p>
           {formPicker}
-          {titleField}
           {continueButton("form")}
         </MobileBuilderSection>
 
@@ -673,7 +624,6 @@ export function TaskBuilder({
             description={tb("form.description")}
           >
             {formPicker}
-            {titleField}
           </BuilderSection>
 
           {hasTargetsStep ? (

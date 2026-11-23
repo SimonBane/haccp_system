@@ -17,7 +17,7 @@ export default async function EditFormPage({
   if (!form) notFound();
 
   return (
-    <PageContainer width="full">
+    <PageContainer width="full" className="md:pt-0">
       <FormBuilder key={form.latestVersion.id} mode={{ kind: "edit", form }} />
     </PageContainer>
   );

@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  asksForCorrectiveAction,
+  correctiveSettings,
   RECORD_RESULT,
   requiresCorrectiveAction,
   resolveLimits,
@@ -16,7 +18,6 @@ import {
 import { useLocale, useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -27,6 +28,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { CorrectivePanel } from "@/features/today/components/corrective-panel";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import {
@@ -35,6 +37,7 @@ import {
   validateAnswerDraft,
   type AnswerDraft,
 } from "../../lib/answer-draft";
+import { toggleCorrectiveAnswer } from "../../lib/corrective-answers";
 import { decimalSeparator } from "../../lib/measurement";
 import { AnswerFields } from "../answer-fields";
 
@@ -44,6 +47,13 @@ type Props = {
 };
 
 type Outcome = "pass" | "fail" | "incomplete";
+
+type PreviewState = {
+  shape: string;
+  draft: AnswerDraft;
+  answerIds: string[];
+  note: string;
+};
 
 /** The shape decides when to reset answers: retyping a label keeps them, adding a field or changing a unit does not. */
 function shapeKey(definition: FormDefinition): string {
@@ -71,20 +81,16 @@ export function FormPreview({ definition, formName }: Props) {
   const limits = useMemo(() => resolveLimits(definition, null), [definition]);
   const shape = shapeKey(definition);
 
-  const [state, setState] = useState<{ shape: string; draft: AnswerDraft }>(
-    () => ({
-      shape,
-      draft: createAnswerDraft(definition, limits, null, separator),
-    }),
-  );
+  const fresh = (): PreviewState => ({
+    shape,
+    draft: createAnswerDraft(definition, limits, null, separator),
+    answerIds: [],
+    note: "",
+  });
+  const [state, setState] = useState<PreviewState>(fresh);
 
   // Reset during render, not in an effect, so a stale draft never renders against a new shape.
-  if (state.shape !== shape) {
-    setState({
-      shape,
-      draft: createAnswerDraft(definition, limits, null, separator),
-    });
-  }
+  if (state.shape !== shape) setState(fresh());
 
   if (definition.fields.length === 0) {
     return (
@@ -103,7 +109,10 @@ export function FormPreview({ definition, formName }: Props) {
   const evaluated = evaluateAnswerDraft(definition, limits, state.draft);
   const missing = validateAnswerDraft(definition, state.draft);
   const failed = new Set(evaluated.failedFieldIds);
-  const needsAction = requiresCorrectiveAction(definition, evaluated.result);
+  const corrective = correctiveSettings(definition);
+  const showCorrective =
+    evaluated.result === RECORD_RESULT.FAIL &&
+    asksForCorrectiveAction(definition);
   const outcome: Outcome =
     evaluated.result === RECORD_RESULT.FAIL
       ? "fail"
@@ -135,19 +144,28 @@ export function FormPreview({ definition, formName }: Props) {
     />
   );
 
-  const correctiveNotice = needsAction ? (
-    <Alert variant="destructive">
-      <CircleAlertIcon />
-      <AlertTitle>{t("needsAttentionTitle")}</AlertTitle>
-      <AlertDescription>{t("correctiveActionRequired")}</AlertDescription>
-    </Alert>
+  const correctiveNotice = showCorrective ? (
+    <CorrectivePanel
+      idPrefix="form-preview-corrective"
+      settings={corrective}
+      selected={state.answerIds}
+      onToggle={(answerId) =>
+        setState((current) => ({
+          ...current,
+          answerIds: toggleCorrectiveAnswer(
+            current.answerIds,
+            answerId,
+            corrective.multiple,
+          ),
+        }))
+      }
+      required={requiresCorrectiveAction(definition, evaluated.result)}
+      notes={state.note}
+      onNotesChange={(note) => setState((current) => ({ ...current, note }))}
+    />
   ) : null;
 
-  const reset = () =>
-    setState({
-      shape,
-      draft: createAnswerDraft(definition, limits, null, separator),
-    });
+  const reset = () => setState(fresh());
   const record = () => toast.info(t("recordToast"));
 
   if (isMobile) {
@@ -163,16 +181,17 @@ export function FormPreview({ definition, formName }: Props) {
         {fields}
         {correctiveNotice}
         <div className="sticky bottom-0 -mx-4 flex flex-col gap-2.5 border-t bg-background px-4 pt-3 pb-4">
-          <div
-            className="flex items-center justify-between"
-            aria-live="polite"
-          >
+          <div className="flex items-center justify-between" aria-live="polite">
             <span className="text-xs text-muted-foreground">
               {t("resultIfRecorded")}
             </span>
             {resultBadge}
           </div>
-          <Button type="button" className="h-14 rounded-2xl text-base" onClick={record}>
+          <Button
+            type="button"
+            className="h-14 rounded-2xl text-base"
+            onClick={record}
+          >
             {t("record")}
           </Button>
         </div>
@@ -181,8 +200,8 @@ export function FormPreview({ definition, formName }: Props) {
   }
 
   return (
-    <div className="flex flex-wrap items-start justify-center gap-6">
-      <Card className="w-[25rem] max-w-full gap-0 py-0 shadow-lg">
+    <div className="flex flex-wrap items-start justify-center gap-6 @min-[66rem]:grid @min-[66rem]:grid-cols-[minmax(0,1fr)_25rem_minmax(0,1fr)]">
+      <Card className="w-[25rem] max-w-full gap-0 py-0 shadow-lg @min-[66rem]:col-start-2">
         <div className="flex flex-col gap-1 px-6 pt-5 pb-4">
           <h2 className="truncate text-base font-medium">{formName}</h2>
           <p className="text-sm text-muted-foreground">{t("hint")}</p>
@@ -198,7 +217,7 @@ export function FormPreview({ definition, formName }: Props) {
         </div>
       </Card>
 
-      <aside className="flex w-80 flex-col gap-4">
+      <aside className="flex w-80 max-w-full flex-col gap-4 @min-[66rem]:w-full @min-[66rem]:max-w-80">
         <div className="flex flex-col gap-1">
           <h2 className="text-lg font-medium">{t("tryTitle")}</h2>
           <p className="text-sm text-muted-foreground">{t("tryDescription")}</p>
@@ -236,7 +255,9 @@ export function FormPreview({ definition, formName }: Props) {
             })}
           </ul>
           {outcome === "pass" ? (
-            <p className="text-sm text-muted-foreground">{t("reasonAllPass")}</p>
+            <p className="text-sm text-muted-foreground">
+              {t("reasonAllPass")}
+            </p>
           ) : null}
         </Card>
         <Button

@@ -13,6 +13,7 @@ import {
   RECORD_DISPLAY_STATE_VARIANT,
   RECORD_RESULT_VARIANT,
   RECORD_TIMING_VARIANT,
+  isOnDemand,
   timingBadgeValue,
   type RecordsLabels,
 } from "@/features/records/lib/labels";
@@ -47,13 +48,14 @@ export function RecordsMobileCard({
       details={
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs text-muted-foreground tabular-nums">
-            {formatOccurrenceDate(item.occurrenceDate)} ·{" "}
-            {item.scheduledTime}
+            {formatOccurrenceDate(item.entryDate)} · {item.entryTime}
           </span>
           <Badge variant={RECORD_DISPLAY_STATE_VARIANT[item.displayState]}>
             {labels.displayState[item.displayState]}
           </Badge>
-          {timing ? (
+          {isOnDemand(item) ? (
+            <Badge variant="outline">{labels.onDemand}</Badge>
+          ) : timing ? (
             <Badge variant={RECORD_TIMING_VARIANT[timing]}>
               {labels.timing[timing]}
             </Badge>

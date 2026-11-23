@@ -16,8 +16,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   REQUIRED_LABEL_CLASS,
   Field,
-  FieldContent,
-  FieldDescription,
   FieldError,
   FieldLabel,
   FieldLegend,
@@ -38,9 +36,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { useAnswerFormat } from "../../hooks/use-answer-format";
 import {
   BUILDER_LIMITS,
   mintElementId,
@@ -49,11 +47,11 @@ import {
 } from "../../lib/form-builder";
 import {
   decimalSeparator,
-  formatLimits,
   formatMeasurementNumber,
   parseMeasurementDraft,
   sanitizeMeasurementDraft,
 } from "../../lib/measurement";
+import { SwitchCard } from "./switch-card";
 
 type Props = {
   idPrefix: string;
@@ -62,62 +60,48 @@ type Props = {
   onChange: (next: BuilderField) => void;
 };
 
-function SwitchRow({
-  id,
-  label,
-  description,
-  checked,
-  onCheckedChange,
-}: {
-  id: string;
-  label: string;
-  description?: string;
-  checked: boolean;
-  onCheckedChange: (checked: boolean) => void;
-}) {
-  return (
-    <Field orientation="horizontal" className="items-start justify-between">
-      <FieldContent>
-        <FieldLabel htmlFor={id}>{label}</FieldLabel>
-        {description ? <FieldDescription>{description}</FieldDescription> : null}
-      </FieldContent>
-      <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} />
-    </Field>
-  );
-}
-
 /** Everything about one field except its position, which the canvas owns. */
 export function FieldSettings({ idPrefix, field, issues, onChange }: Props) {
   const t = useTranslations("FormsPage.builder");
   const id = `${idPrefix}-${field.id}`;
-  const isCheckbox = field.type === FIELD_TYPE.CHECKBOX;
 
   return (
     <div className="grid gap-5" data-testid="form-builder-field-settings">
       <Field data-invalid={Boolean(issues?.label)}>
-        <FieldLabel htmlFor={`${id}-label`} className={REQUIRED_LABEL_CLASS}>
-          {t("labelLabel")}
-        </FieldLabel>
+        <div className="flex items-baseline justify-between gap-3">
+          <FieldLabel htmlFor={`${id}-label`} className={REQUIRED_LABEL_CLASS}>
+            {t("labelLabel")}
+          </FieldLabel>
+          <CharacterCount
+            value={field.label}
+            max={FORM_FIELD_LABEL_MAX_LENGTH}
+            showFrom={0.8}
+          />
+        </div>
         <Input
           id={`${id}-label`}
           value={field.label}
           maxLength={FORM_FIELD_LABEL_MAX_LENGTH}
           aria-invalid={Boolean(issues?.label)}
           placeholder={t(`labelPlaceholder.${field.type}`)}
-          onChange={(event) => onChange({ ...field, label: event.target.value })}
+          onChange={(event) =>
+            onChange({ ...field, label: event.target.value })
+          }
         />
-        <div className="flex items-start justify-between gap-3">
-          {issues?.label ? (
-            <FieldError errors={[{ message: t("errors.label") }]} />
-          ) : (
-            <span />
-          )}
-          <CharacterCount value={field.label} max={FORM_FIELD_LABEL_MAX_LENGTH} showFrom={0.8} />
-        </div>
+        {issues?.label ? (
+          <FieldError errors={[{ message: t("errors.label") }]} />
+        ) : null}
       </Field>
 
       <Field>
-        <FieldLabel htmlFor={`${id}-help`}>{t("helpLabel")}</FieldLabel>
+        <div className="flex items-baseline justify-between gap-3">
+          <FieldLabel htmlFor={`${id}-help`}>{t("helpLabel")}</FieldLabel>
+          <CharacterCount
+            value={field.help ?? ""}
+            max={FORM_FIELD_HELP_MAX_LENGTH}
+            showFrom={0.8}
+          />
+        </div>
         <Textarea
           id={`${id}-help`}
           value={field.help ?? ""}
@@ -126,12 +110,6 @@ export function FieldSettings({ idPrefix, field, issues, onChange }: Props) {
           className="min-h-16"
           placeholder={t("helpPlaceholder")}
           onChange={(event) => onChange({ ...field, help: event.target.value })}
-        />
-        <CharacterCount
-          value={field.help ?? ""}
-          max={FORM_FIELD_HELP_MAX_LENGTH}
-          showFrom={0.8}
-          className="self-end"
         />
       </Field>
 
@@ -145,22 +123,28 @@ export function FieldSettings({ idPrefix, field, issues, onChange }: Props) {
       ) : null}
 
       {field.type === FIELD_TYPE.CHOICE ? (
-        <ChoiceSettings id={id} field={field} issues={issues} onChange={onChange} />
+        <ChoiceSettings
+          id={id}
+          field={field}
+          issues={issues}
+          onChange={onChange}
+        />
       ) : null}
 
       {field.type === FIELD_TYPE.TEXT ? (
-        <SwitchRow
+        <SwitchCard
           id={`${id}-multiline`}
           label={t("multiline")}
+          description={t("multilineHint")}
           checked={field.multiline}
           onCheckedChange={(multiline) => onChange({ ...field, multiline })}
         />
       ) : null}
 
-      <SwitchRow
+      <SwitchCard
         id={`${id}-required`}
-        label={isCheckbox ? t("requiredCheckbox") : t("requiredLabel")}
-        description={isCheckbox ? t("requiredCheckboxHint") : t("requiredHint")}
+        label={t("requiredLabel")}
+        description={t("requiredHint")}
         checked={field.required}
         onCheckedChange={(required) => onChange({ ...field, required })}
       />
@@ -176,12 +160,17 @@ function LimitsRange({
   const t = useTranslations("FormsPage.builder");
   const tForms = useTranslations("Forms");
   const locale = useLocale();
+  const format = useAnswerFormat();
   const symbol = tForms(`units.${field.unit}.symbol`);
-  const min = field.limits.min.trim() ? parseMeasurementDraft(field.limits.min) : null;
-  const max = field.limits.max.trim() ? parseMeasurementDraft(field.limits.max) : null;
+  const min = field.limits.min.trim()
+    ? parseMeasurementDraft(field.limits.min)
+    : null;
+  const max = field.limits.max.trim()
+    ? parseMeasurementDraft(field.limits.max)
+    : null;
   const value = (n: number) =>
     `${formatMeasurementNumber(n, field.unit, locale)} ${symbol}`;
-  const passes = formatLimits({ min, max }, field.unit, locale, symbol);
+  const passes = format.limits({ min, max }, field.unit);
 
   return (
     <div
@@ -189,9 +178,13 @@ function LimitsRange({
       data-testid="form-builder-limits-range"
     >
       <div className="flex h-2 gap-0.5" aria-hidden>
-        {min !== null ? <span className="flex-1 rounded-full bg-destructive/25" /> : null}
+        {min !== null ? (
+          <span className="flex-1 rounded-full bg-destructive/25" />
+        ) : null}
         <span className="flex-[2] rounded-full bg-success" />
-        {max !== null ? <span className="flex-1 rounded-full bg-destructive/25" /> : null}
+        {max !== null ? (
+          <span className="flex-1 rounded-full bg-destructive/25" />
+        ) : null}
       </div>
       <div className="flex justify-between gap-2 text-xs tabular-nums">
         {min !== null ? (
@@ -258,7 +251,11 @@ function MeasurementSettings({
               ...field,
               limits: {
                 ...field.limits,
-                [bound]: sanitizeMeasurementDraft(event.target.value, separator, field.unit),
+                [bound]: sanitizeMeasurementDraft(
+                  event.target.value,
+                  separator,
+                  field.unit,
+                ),
               },
             })
           }
@@ -284,8 +281,16 @@ function MeasurementSettings({
               ...field,
               unit,
               limits: {
-                min: sanitizeMeasurementDraft(field.limits.min, separator, unit),
-                max: sanitizeMeasurementDraft(field.limits.max, separator, unit),
+                min: sanitizeMeasurementDraft(
+                  field.limits.min,
+                  separator,
+                  unit,
+                ),
+                max: sanitizeMeasurementDraft(
+                  field.limits.max,
+                  separator,
+                  unit,
+                ),
               },
             });
           }}
@@ -316,7 +321,6 @@ function MeasurementSettings({
         ) : (
           <LimitsRange field={field} />
         )}
-        <p className="text-xs text-muted-foreground">{t("limitsHint")}</p>
       </FieldSet>
     </>
   );
@@ -355,7 +359,6 @@ function ChoiceSettings({
     <>
       <FieldSet className="gap-2" data-invalid={blankOptions.size > 0}>
         <FieldLegend variant="label">{t("optionsLabel")}</FieldLegend>
-        <p className="text-xs text-muted-foreground">{t("optionsHint")}</p>
         <ul className="flex flex-col gap-2">
           {field.options.map((option, optionIndex) => {
             const optionId = `${id}-option-${option.id}`;
@@ -452,9 +455,10 @@ function ChoiceSettings({
         </div>
       </FieldSet>
 
-      <SwitchRow
+      <SwitchCard
         id={`${id}-multiple`}
         label={t("multiple")}
+        description={t("multipleHint")}
         checked={field.multiple}
         onCheckedChange={(multiple) => onChange({ ...field, multiple })}
       />

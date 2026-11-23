@@ -20,7 +20,7 @@ export function useAnswerFormat() {
       no: t("answers.no"),
     });
     const limits = (value: MeasurementLimits, unit: MeasurementUnit) =>
-      formatLimits(value, unit, locale, symbol(unit));
+      formatLimits(value, unit, locale, symbol(unit), t("measurement.rangeTo"));
 
     return {
       locale,

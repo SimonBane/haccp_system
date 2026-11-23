@@ -148,7 +148,6 @@ export function hasTaskChanges(
   task: TaskTemplateResponse,
 ): boolean {
   return (
-    payload.title !== task.title ||
     payload.formId !== task.formId ||
     !sameMembers(payload.weekdays, task.weekdays) ||
     !sameMembers(payload.scheduledTimes, task.scheduledTimes) ||

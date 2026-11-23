@@ -104,7 +104,7 @@ export function SelectionActions({
         {standaloneButton}
         <Button
           type="button"
-          variant="destructive"
+          variant="destructive-solid"
           size="icon-lg"
           disabled={isPending || !canDelete}
           aria-label={t("deleteCount", { count })}
@@ -129,7 +129,7 @@ export function SelectionActions({
       {standaloneButton}
       <Button
         type="button"
-        variant="destructive"
+        variant="destructive-solid"
         size="sm"
         disabled={isPending || !canDelete}
         onClick={onDelete}

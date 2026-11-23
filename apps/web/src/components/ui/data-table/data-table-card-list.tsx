@@ -64,6 +64,7 @@ function CardListRow<TData>({
     <div
       ref={longPressRef}
       data-testid="data-table-card"
+      data-row-key={row.id}
       className={cn(
         "relative",
         hasActions && "[&_[data-slot=mobile-list-row]]:pe-12",
