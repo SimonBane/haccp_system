@@ -6,6 +6,7 @@ import {
   FORM_NAME_MAX_LENGTH,
   checkMeasurementLimits,
   createFormSchema,
+  updateFormSchema,
   checkTemplateTargets,
   createFormVersionSchema,
   formCategorySchema,
@@ -34,6 +35,7 @@ describe("formListItemSchema", () => {
     name: "Fridge",
     category: "temperature",
     appliesTo: "per_item",
+    onDemand: false,
     latestVersion: {
       id: "0c6a1f2e-5d4b-4b3a-8f2e-1a9b8c7d6e5f",
       formId: "7b0d7f1e-3b9a-4a51-9a64-2f1b0f6d8a11",
@@ -230,6 +232,74 @@ describe("formDefinitionSchema", () => {
   });
 });
 
+describe("formDefinitionSchema corrective settings", () => {
+  const withCorrective = (corrective: unknown) =>
+    formDefinitionSchema.safeParse({
+      fields: [],
+      correctiveAction: "required_on_fail",
+      corrective,
+    });
+
+  it("accepts a definition published before forms had their own answers", () => {
+    expect(
+      formDefinitionSchema.safeParse({ fields: [], correctiveAction: "optional" })
+        .success,
+    ).toBe(true);
+  });
+
+  it("accepts corrective action turned off", () => {
+    expect(
+      formDefinitionSchema.safeParse({ fields: [], correctiveAction: "off" }).success,
+    ).toBe(true);
+  });
+
+  it("accepts answers and trims their labels", () => {
+    const parsed = withCorrective({
+      answers: [{ id: "a_moved", label: "  Moved product " }],
+      multiple: false,
+      allowNote: false,
+    });
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.corrective?.answers[0]?.label).toBe("Moved product");
+  });
+
+  it("rejects duplicate answer ids", () => {
+    expect(
+      withCorrective({
+        answers: [
+          { id: "a_same", label: "Moved product" },
+          { id: "a_same", label: "Notified manager" },
+        ],
+        multiple: true,
+        allowNote: true,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects a form that takes neither answers nor a note", () => {
+    expect(
+      withCorrective({ answers: [], multiple: true, allowNote: false }).success,
+    ).toBe(false);
+  });
+
+  it("rejects a blank label, an overlong one and more than eight answers", () => {
+    const settings = (answers: unknown[]) =>
+      withCorrective({ answers, multiple: true, allowNote: true }).success;
+
+    expect(settings([{ id: "a_1", label: "  " }])).toBe(false);
+    expect(settings([{ id: "a_1", label: "x".repeat(81) }])).toBe(false);
+    expect(
+      settings(
+        Array.from({ length: 9 }, (_, index) => ({
+          id: `a_${index}`,
+          label: `Answer ${index}`,
+        })),
+      ),
+    ).toBe(false);
+  });
+});
+
 describe("createFormVersionSchema", () => {
   it("does not confirm dropped overrides unless asked", () => {
     const parsed = createFormVersionSchema.parse({
@@ -293,5 +363,31 @@ describe("form text limits", () => {
     expect(parse("Form", choice(over(FORM_FIELD_LABEL_MAX_LENGTH), "Yes"))).toBe(false);
     expect(parse("Form", choice("Clean?", over(CHOICE_OPTION_LABEL_MAX_LENGTH)))).toBe(false);
     expect(parse("Form", choice("Clean?", "Yes", over(FORM_FIELD_HELP_MAX_LENGTH)))).toBe(false);
+  });
+});
+
+describe("on-demand flag", () => {
+  const base = {
+    name: "Spill clean-up",
+    category: "cleaning",
+    appliesTo: "location",
+    definition: {
+      fields: [{ id: "cleaned", type: "checkbox", label: "Cleaned", required: true }],
+      correctiveAction: "optional",
+    },
+  };
+
+  it("is off unless the form asks for it", () => {
+    expect(createFormSchema.parse(base).onDemand).toBe(false);
+    expect(createFormSchema.parse({ ...base, onDemand: true }).onDemand).toBe(true);
+  });
+
+  it("is left unchanged by an update that does not mention it", () => {
+    const settings = {
+      name: base.name,
+      category: base.category,
+      appliesTo: base.appliesTo,
+    };
+    expect(updateFormSchema.parse(settings).onDemand).toBeUndefined();
   });
 });

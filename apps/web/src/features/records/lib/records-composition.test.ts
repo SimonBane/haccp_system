@@ -68,7 +68,7 @@ describe("default request and query string", () => {
     expect(defaultRecordsGridRequest()).toEqual({
       page: 1,
       pageSize: GRID_DEFAULT_PAGE_SIZE,
-      sortBy: "scheduledAt",
+      sortBy: "entryAt",
       sortOrder: "asc",
     });
   });
@@ -82,7 +82,7 @@ describe("default request and query string", () => {
 
   it("prefixes the required range onto the harness query string", () => {
     expect(defaultRecordsQueryString(RANGE)).toBe(
-      "dateFrom=2026-08-17&dateTo=2026-08-23&page=1&pageSize=25&sortBy=scheduledAt&sortOrder=asc",
+      "dateFrom=2026-08-17&dateTo=2026-08-23&page=1&pageSize=25&sortBy=entryAt&sortOrder=asc",
     );
   });
 
@@ -142,7 +142,7 @@ describe("query-key isolation", () => {
     sorting: null,
     filters: {},
     capabilities: RECORDS_GRID_CAPABILITIES,
-    defaultSort: { sortBy: "scheduledAt", sortOrder: "asc" as const },
+    defaultSort: { sortBy: "entryAt", sortOrder: "asc" as const },
   };
 
   it("roots every Records key under the location, for one-shot invalidation", () => {
@@ -416,10 +416,12 @@ describe("report URL", () => {
 
 describe("result presentation", () => {
   const base: RecordItem = {
+    id: "occ",
+    kind: "scheduled",
     occurrenceId: "occ",
     taskTemplateId: "tpl",
-    occurrenceDate: "2026-08-23",
-    scheduledTime: "08:00",
+    entryDate: "2026-08-23",
+    entryTime: "08:00",
     availableAt: "2026-08-23T00:00:00.000Z",
     dueAt: "2026-08-23T05:00:00.000Z",
     title: "Clean prep surface",

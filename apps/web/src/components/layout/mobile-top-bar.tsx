@@ -11,6 +11,7 @@ export function MobileTopBar() {
   const t = useTranslations("Sidebar");
   const isMobile = useIsMobile();
   const { toggleSidebar } = useSidebar();
+  const leadRef = useShellSlotRef("lead");
   const titleRef = useShellSlotRef("title");
   const centerRef = useShellSlotRef("center");
   const actionsRef = useShellSlotRef("actions");
@@ -34,6 +35,10 @@ export function MobileTopBar() {
 
         <div className="flex min-w-0 flex-1 items-center justify-center gap-1.5">
           <div
+            ref={leadRef}
+            className="flex shrink-0 items-center empty:hidden"
+          />
+          <div
             ref={titleRef}
             className="min-w-0 truncate text-center text-base font-semibold tracking-tight"
           />
@@ -42,7 +47,7 @@ export function MobileTopBar() {
 
         <div
           ref={actionsRef}
-          className="flex w-10 shrink-0 items-center justify-end gap-1"
+          className="flex min-w-10 shrink-0 items-center justify-end gap-1"
         />
       </div>
     </header>

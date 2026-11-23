@@ -156,6 +156,7 @@ export function RecordsView({
         fail: t("result.fail"),
         not_evaluated: t("result.notEvaluated"),
       },
+      onDemand: t("kind.onDemand"),
       category: Object.fromEntries(
         FORM_CATEGORY_VALUES.map((category) => [
           category,

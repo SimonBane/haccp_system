@@ -1,7 +1,11 @@
 "use client";
 
-import type { TaskRecordInput, TodayResponse } from "@haccp/shared";
-import { taskRecordInputSchema, taskRecordResponseSchema } from "@haccp/shared";
+import type { OnDemandRecordInput, TodayResponse } from "@haccp/shared";
+import {
+  onDemandRecordInputSchema,
+  taskRecordInputSchema,
+  taskRecordResponseSchema,
+} from "@haccp/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "@/features/tenant/tenant-provider";
 import { useAuthenticatedFetch } from "@/lib/api/client";
@@ -15,21 +19,23 @@ type OptimisticContext = {
   previous: TodayResponse | undefined;
 };
 
-type VoidRecordInput = { occurrenceId: string; date: string };
-type RecordInput = RecordMutationInput & { date: string };
+type CreateRecordInput = RecordMutationInput & {
+  occurrenceId: string;
+  date: string;
+};
+type UpdateRecordInput = RecordMutationInput & {
+  recordId: string;
+  date: string;
+};
+type VoidRecordInput = { key: string; recordId: string; date: string };
+type CreateEntryInput = OnDemandRecordInput & { formId: string };
+
+const JSON_HEADERS = { "Content-Type": "application/json" };
 
 export function useTodayMutations(currentUserId: string) {
   const { locationId } = useLocation();
   const { fetchJson } = useAuthenticatedFetch();
   const queryClient = useQueryClient();
-
-  function recordPath(occurrenceId: string): string {
-    return locationScopedPath(
-      locationId,
-      "today/occurrences",
-      `/${occurrenceId}/record`,
-    );
-  }
 
   async function beginOptimistic(
     date: string,
@@ -47,11 +53,13 @@ export function useTodayMutations(currentUserId: string) {
     queryClient.setQueryData(context.key, context.previous);
   }
 
-  function settle(context: OptimisticContext | undefined) {
-    if (!context) return;
-    void queryClient.invalidateQueries({ queryKey: context.key });
+  function settle() {
+    // Every date: Today also reads yesterday's checks, so one cached day is not enough.
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.todayByLocation(locationId),
+    });
     // The whole location-scoped Records family: any cached range, page or filter
-    // variant may now hold a stale row for this occurrence.
+    // variant may now hold a stale row for this record.
     void queryClient.invalidateQueries({
       queryKey: queryKeys.records(locationId),
     });
@@ -59,67 +67,84 @@ export function useTodayMutations(currentUserId: string) {
 
   const createRecord = useMutation({
     meta: { handlesError: true },
-    mutationFn: async (input: RecordInput) => {
-      // Extra keys (occurrenceId, date) are stripped by the plain (non-strict) object schema.
-      const payload: TaskRecordInput = taskRecordInputSchema.parse(input);
-      return fetchJson(
-        recordPath(input.occurrenceId),
+    mutationFn: async (input: CreateRecordInput) =>
+      // Extra keys (key, occurrenceId, date) are stripped by the plain (non-strict) object schema.
+      fetchJson(
+        locationScopedPath(
+          locationId,
+          "today/occurrences",
+          `/${input.occurrenceId}/record`,
+        ),
         taskRecordResponseSchema,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          headers: JSON_HEADERS,
+          body: JSON.stringify(taskRecordInputSchema.parse(input)),
         },
-      );
-    },
+      ),
     onMutate: (input) =>
       beginOptimistic(input.date, (previous) =>
         applyOptimisticRecord(previous, input, currentUserId),
       ),
     onError: (_error, _input, context) => rollback(context),
-    onSettled: (_data, _error, _input, context) => settle(context),
+    onSettled: () => settle(),
   });
 
   const updateRecord = useMutation({
     meta: { handlesError: true },
-    mutationFn: async (input: RecordInput) => {
-      const payload: TaskRecordInput = taskRecordInputSchema.parse(input);
-      return fetchJson(
-        recordPath(input.occurrenceId),
+    mutationFn: async (input: UpdateRecordInput) =>
+      fetchJson(
+        locationScopedPath(locationId, "today/records", `/${input.recordId}`),
         taskRecordResponseSchema,
         {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          headers: JSON_HEADERS,
+          body: JSON.stringify(taskRecordInputSchema.parse(input)),
         },
-      );
-    },
+      ),
     onMutate: (input) =>
       beginOptimistic(input.date, (previous) =>
         applyOptimisticRecord(previous, input, currentUserId),
       ),
     onError: (_error, _input, context) => rollback(context),
-    onSettled: (_data, _error, _input, context) => settle(context),
+    onSettled: () => settle(),
   });
 
   const voidRecord = useMutation({
     meta: { handlesError: true },
-    mutationFn: async (input: VoidRecordInput) => {
-      return fetchJson(
-        recordPath(input.occurrenceId),
+    mutationFn: async (input: VoidRecordInput) =>
+      fetchJson(
+        locationScopedPath(locationId, "today/records", `/${input.recordId}`),
         taskRecordResponseSchema,
-        {
-          method: "DELETE",
-        },
-      );
-    },
+        { method: "DELETE" },
+      ),
     onMutate: (input) =>
       beginOptimistic(input.date, (previous) =>
-        applyOptimisticVoid(previous, input.occurrenceId),
+        applyOptimisticVoid(previous, input.key),
       ),
     onError: (_error, _input, context) => rollback(context),
-    onSettled: (_data, _error, _input, context) => settle(context),
+    onSettled: () => settle(),
   });
 
-  return { createRecord, updateRecord, voidRecord };
+  // Not optimistic: there is no item to patch until the server has created it.
+  const createEntry = useMutation({
+    meta: { handlesError: true },
+    mutationFn: async (input: CreateEntryInput) =>
+      fetchJson(
+        locationScopedPath(
+          locationId,
+          "today/forms",
+          `/${input.formId}/records`,
+        ),
+        taskRecordResponseSchema,
+        {
+          method: "POST",
+          headers: JSON_HEADERS,
+          body: JSON.stringify(onDemandRecordInputSchema.parse(input)),
+        },
+      ),
+    onSettled: () => settle(),
+  });
+
+  return { createRecord, updateRecord, voidRecord, createEntry };
 }

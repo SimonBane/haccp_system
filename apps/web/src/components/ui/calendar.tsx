@@ -8,6 +8,9 @@ import {
   type Locale,
 } from "react-day-picker";
 
+import { useLocale } from "next-intl";
+import { bg, enGB } from "react-day-picker/locale";
+import type { Locale as AppLocale } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -16,13 +19,16 @@ import {
   ChevronDownIcon,
 } from "lucide-react";
 
+const CALENDAR_LOCALES: Record<AppLocale, Locale> = { bg, en: enGB };
+
 function Calendar({
   className,
   classNames,
   showOutsideDays = true,
   captionLayout = "label",
   buttonVariant = "ghost",
-  locale,
+  locale: localeProp,
+  weekStartsOn = 1,
   formatters,
   components,
   ...props
@@ -30,6 +36,8 @@ function Calendar({
   buttonVariant?: React.ComponentProps<typeof Button>["variant"];
 }) {
   const defaultClassNames = getDefaultClassNames();
+  const appLocale = useLocale() as AppLocale;
+  const locale = localeProp ?? CALENDAR_LOCALES[appLocale];
 
   return (
     <DayPicker
@@ -42,6 +50,7 @@ function Calendar({
       )}
       captionLayout={captionLayout}
       locale={locale}
+      weekStartsOn={weekStartsOn}
       formatters={{
         formatMonthDropdown: (date) =>
           date.toLocaleString(locale?.code, { month: "short" }),

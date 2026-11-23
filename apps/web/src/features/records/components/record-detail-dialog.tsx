@@ -14,6 +14,7 @@ import {
   formatRecordTimeOfDay,
 } from "@/features/records/lib/format";
 import {
+  isOnDemand,
   RECORD_DISPLAY_STATE_VARIANT,
   RECORD_RESULT_VARIANT,
   RECORD_TIMING_VARIANT,
@@ -66,6 +67,7 @@ export function RecordDetailDialog({
   }
 
   const timing = resolvedTiming(item);
+  const onDemand = isOnDemand(item);
   const values = item.record?.values ?? null;
 
   return (
@@ -73,25 +75,35 @@ export function RecordDetailDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={item.title}
-      description={`${formatOccurrenceDate(item.occurrenceDate)} · ${item.scheduledTime}`}
+      description={`${formatOccurrenceDate(item.entryDate)} · ${item.entryTime}`}
       closeLabel={t("close")}
       className="sm:max-w-lg"
     >
       <dl className="flex flex-col">
-        <DetailRow label={t("scheduled")}>
-          {formatOccurrenceDate(item.occurrenceDate)} ·{" "}
-          <span className="tabular-nums">{item.scheduledTime}</span>
+        <DetailRow label={onDemand ? t("happened") : t("scheduled")}>
+          {formatOccurrenceDate(item.entryDate)} ·{" "}
+          <span className="tabular-nums">{item.entryTime}</span>
         </DetailRow>
 
-        <DetailRow label={t("available")}>
-          {formatRecordInstant(item.availableAt, locale, timeZone)}
-        </DetailRow>
+        {onDemand ? (
+          <DetailRow label={t("kind")}>
+            <Badge variant="outline">{labels.onDemand}</Badge>
+          </DetailRow>
+        ) : (
+          <>
+            {item.availableAt === null ? null : (
+              <DetailRow label={t("available")}>
+                {formatRecordInstant(item.availableAt, locale, timeZone)}
+              </DetailRow>
+            )}
 
-        <DetailRow label={t("due")}>
-          {item.dueAt === null
-            ? t("noDeadline")
-            : formatRecordInstant(item.dueAt, locale, timeZone)}
-        </DetailRow>
+            <DetailRow label={t("due")}>
+              {item.dueAt === null
+                ? t("noDeadline")
+                : formatRecordInstant(item.dueAt, locale, timeZone)}
+            </DetailRow>
+          </>
+        )}
 
         <DetailRow label={t("category")}>
           {labels.category[item.category]}
@@ -120,11 +132,13 @@ export function RecordDetailDialog({
           {labels.recordState[item.recordState]}
         </DetailRow>
 
-        <DetailRow label={t("timing")}>
-          <Badge variant={RECORD_TIMING_VARIANT[timing]}>
-            {labels.timing[timing]}
-          </Badge>
-        </DetailRow>
+        {onDemand ? null : (
+          <DetailRow label={t("timing")}>
+            <Badge variant={RECORD_TIMING_VARIANT[timing]}>
+              {labels.timing[timing]}
+            </Badge>
+          </DetailRow>
+        )}
 
         <DetailRow label={t("result")}>
           <Badge variant={RECORD_RESULT_VARIANT[item.result]}>

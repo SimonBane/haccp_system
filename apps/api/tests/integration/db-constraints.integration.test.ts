@@ -7,7 +7,6 @@ import {
   organizationMemberLocations,
   targets,
   taskOccurrences,
-  taskTemplates,
   taskRecords,
   taskTemplateTargets,
   users,
@@ -15,10 +14,10 @@ import {
 import {
   FORM_NAME_MAX_LENGTH,
   TARGET_NAME_MAX_LENGTH,
-  TASK_TEMPLATE_TITLE_MAX_LENGTH,
 } from "@haccp/shared";
 import { PG_ERROR, postgresErrorCode } from "./harness/db.js";
 import {
+  recordContextFor,
   seedOccurrence,
   seedTwoTenants,
   type TwoTenantWorld,
@@ -286,20 +285,6 @@ describe("database constraints", () => {
     expect(code).toBeNull();
   });
 
-  it("caps a task title at the shared limit", async () => {
-    const setTitle = (title: string) =>
-      db
-        .update(taskTemplates)
-        .set({ title })
-        .where(sql`${taskTemplates.id} = ${world.alpha.templates.cleaning.id}`);
-
-    expect(await codeFor(setTitle("a".repeat(TASK_TEMPLATE_TITLE_MAX_LENGTH)))).toBeNull();
-    expect(await codeFor(setTitle("a".repeat(TASK_TEMPLATE_TITLE_MAX_LENGTH + 1)))).toBe(
-      PG_ERROR.CHECK_VIOLATION,
-    );
-    expect(await codeFor(setTitle(""))).toBe(PG_ERROR.CHECK_VIOLATION);
-  });
-
   it("caps form and target names at the shared limits", async () => {
     const setFormName = (name: string) =>
       db
@@ -331,8 +316,7 @@ describe("database constraints", () => {
 
     const code = await codeFor(
       db.insert(taskRecords).values({
-        occurrenceId,
-        formVersionId: world.alpha.forms.cleaning.versionId,
+        ...(await recordContextFor(db, occurrenceId)),
         values: {},
         result: "ok",
         createdByUserId: world.alpha.admin.userId,

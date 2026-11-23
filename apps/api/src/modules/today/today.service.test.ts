@@ -3,23 +3,33 @@ import { InternalError } from "../../core/errors/app-errors.js";
 
 const todayRepository = vi.hoisted(() => ({
   findOccurrencesWithRecords: vi.fn(),
+  findOnDemandEntries: vi.fn().mockResolvedValue([]),
 }));
 
 const formRepository = vi.hoisted(() => ({
   findVersionSummariesByIds: vi.fn().mockResolvedValue([]),
+  findManyActiveOnDemandWithLatestVersion: vi.fn().mockResolvedValue([]),
+}));
+
+const targetRepository = vi.hoisted(() => ({
+  findActiveItemsByLocation: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("./today.repository.js", () => ({ todayRepository }));
 vi.mock("../forms/form.repository.js", () => ({ formRepository }));
+vi.mock("../targets/target.repository.js", () => ({ targetRepository }));
 
 const { todayService } = await import("./today.service.js");
 
 const LOCATION = "00000000-0000-4000-8000-0000000000l1";
+const ORG = "00000000-0000-4000-8000-0000000000o1";
+const SCOPE = { organizationId: ORG, locationId: LOCATION };
 const USER = "00000000-0000-4000-8000-0000000000u1";
 
 function occurrenceRow(overrides: Record<string, unknown> = {}) {
   return {
     occurrenceId: "00000000-0000-4000-8000-00000000000a",
+    recordId: null,
     taskTemplateId: "00000000-0000-4000-8000-00000000000t",
     title: "Wipe counters",
     formVersionId: "00000000-0000-4000-8000-0000000000f1",
@@ -47,7 +57,7 @@ describe("todayService.getToday — timezone guard", () => {
     await expect(
       todayService.getToday(
         {} as never,
-        LOCATION,
+        SCOPE,
         "2026-01-15",
         USER,
         "Not/AZone",
@@ -77,7 +87,7 @@ describe("todayService.getToday — grouping", () => {
 
     const result = await todayService.getToday(
       {} as never,
-      LOCATION,
+      SCOPE,
       "2026-01-15",
       USER,
       "Europe/Sofia",
@@ -99,7 +109,7 @@ describe("todayService.getToday — grouping", () => {
 
     await todayService.getToday(
       {} as never,
-      LOCATION,
+      SCOPE,
       "2026-01-15",
       USER,
       "Europe/Sofia",
@@ -110,12 +120,12 @@ describe("todayService.getToday — grouping", () => {
     ]);
   });
 
-  it("does not query task templates or targets", async () => {
+  it("reads the location's occurrences and on-demand entries for the date", async () => {
     todayRepository.findOccurrencesWithRecords.mockResolvedValueOnce([]);
 
     await todayService.getToday(
       {} as never,
-      LOCATION,
+      SCOPE,
       "2026-01-15",
       USER,
       "Europe/Sofia",
@@ -125,6 +135,78 @@ describe("todayService.getToday — grouping", () => {
       {},
       LOCATION,
       "2026-01-15",
+    );
+    expect(todayRepository.findOnDemandEntries).toHaveBeenCalledWith(
+      {},
+      LOCATION,
+      "2026-01-15",
+    );
+  });
+
+  it("lists the organisation's on-demand forms, the location's items and their versions", async () => {
+    const VERSION = "00000000-0000-4000-8000-0000000000f9";
+    todayRepository.findOccurrencesWithRecords.mockResolvedValueOnce([]);
+    formRepository.findManyActiveOnDemandWithLatestVersion.mockResolvedValueOnce([
+      {
+        form: {
+          id: "00000000-0000-4000-8000-0000000000f8",
+          name: "Cooling log",
+          appliesTo: "per_item",
+          onDemand: true,
+        },
+        latestVersion: {
+          id: VERSION,
+          definition: {
+            fields: [
+              {
+                id: "temperature",
+                type: "measurement",
+                label: "Core temperature",
+                required: true,
+                unit: "celsius",
+                limits: { min: null, max: 5 },
+              },
+            ],
+            correctiveAction: "optional",
+          },
+        },
+      },
+    ]);
+    targetRepository.findActiveItemsByLocation.mockResolvedValueOnce([
+      { targetId: "00000000-0000-4000-8000-0000000000e1", targetName: "Blast chiller" },
+    ]);
+
+    const response = await todayService.getToday(
+      {} as never,
+      SCOPE,
+      "2026-01-15",
+      USER,
+      "Europe/Sofia",
+    );
+
+    expect(formRepository.findManyActiveOnDemandWithLatestVersion).toHaveBeenCalledWith(
+      {},
+      ORG,
+    );
+    expect(targetRepository.findActiveItemsByLocation).toHaveBeenCalledWith(
+      {},
+      LOCATION,
+    );
+    expect(response.onDemand.forms).toEqual([
+      {
+        formId: "00000000-0000-4000-8000-0000000000f8",
+        name: "Cooling log",
+        formVersionId: VERSION,
+        appliesTo: "per_item",
+        resolvedLimits: { temperature: { min: null, max: 5 } },
+      },
+    ]);
+    expect(response.onDemand.items).toEqual([
+      { targetId: "00000000-0000-4000-8000-0000000000e1", targetName: "Blast chiller" },
+    ]);
+    expect(formRepository.findVersionSummariesByIds).toHaveBeenLastCalledWith(
+      {},
+      [VERSION],
     );
   });
 });

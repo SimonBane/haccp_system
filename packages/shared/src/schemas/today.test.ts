@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildTodayEntryItem,
   buildTodayTaskItemFromOccurrence,
   deriveRecordState,
   deriveTodayTaskStatusFromOccurrence,
@@ -121,6 +122,7 @@ describe("deriveTodayTaskStatusFromOccurrence", () => {
 describe("buildTodayTaskItemFromOccurrence", () => {
   const BASE = {
     occurrenceId: "00000000-0000-4000-8000-00000000000a",
+    recordId: null,
     templateId: "00000000-0000-4000-8000-00000000000t",
     title: "Check walk-in fridge",
     formVersionId: "00000000-0000-4000-8000-00000000000f",
@@ -252,5 +254,42 @@ describe("Today contracts — removed M0 fields", () => {
     expect(keys).not.toContain("organizationId");
     expect(keys).not.toContain("timeZone");
     expect(keys.some((key) => key.endsWith("Snapshot"))).toBe(false);
+  });
+});
+
+describe("buildTodayEntryItem", () => {
+  it("builds a completed on-demand item keyed by its record", () => {
+    const createdAt = new Date("2026-01-15T09:05:00Z");
+    const recordedAt = new Date("2026-01-15T09:20:00Z");
+    const item = buildTodayEntryItem({
+      recordId: "00000000-0000-4000-8000-00000000000b",
+      title: "Cooling log",
+      formVersionId: "00000000-0000-4000-8000-00000000000f",
+      targetId: null,
+      targetName: null,
+      resolvedLimits: {},
+      entryDate: "2026-01-15",
+      entryTime: "14:40",
+      createdAt,
+      recordedAt,
+      recordedBy: {
+        id: "00000000-0000-4000-8000-00000000000d",
+        firstName: "Ann",
+        lastName: "Lee",
+      },
+      answers: { result: "pass", values: {}, correctiveAction: null },
+    });
+
+    expect(todayTaskItemSchema.parse(item)).toMatchObject({
+      kind: "on_demand",
+      occurrenceId: null,
+      templateId: null,
+      recordId: "00000000-0000-4000-8000-00000000000b",
+      scheduledTime: "14:40",
+      timeSlot: "afternoon",
+      status: "completed",
+      availableAt: createdAt.toISOString(),
+      completedAt: recordedAt.toISOString(),
+    });
   });
 });

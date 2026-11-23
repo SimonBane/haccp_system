@@ -76,7 +76,7 @@ export const taskTemplateRepository = {
           isNull(taskTemplates.archivedAt),
         ),
       )
-      .orderBy(asc(taskTemplates.title));
+      .orderBy(asc(forms.name), asc(taskTemplates.createdAt));
   },
 
   async findActiveWithFormById(
@@ -257,8 +257,9 @@ export const taskTemplateRepository = {
     if (templateIds.length === 0) return [];
 
     const templates = await db
-      .select()
+      .select({ template: taskTemplates, formName: forms.name })
       .from(taskTemplates)
+      .innerJoin(forms, eq(forms.id, taskTemplates.formId))
       .where(
         and(
           inArray(taskTemplates.id, templateIds),
@@ -268,7 +269,9 @@ export const taskTemplateRepository = {
 
     if (templates.length === 0) return [];
 
-    const formIds = [...new Set(templates.map((template) => template.formId))];
+    const formIds = [
+      ...new Set(templates.map(({ template }) => template.formId)),
+    ];
 
     const [latestVersions, links] = await Promise.all([
       db
@@ -294,7 +297,7 @@ export const taskTemplateRepository = {
           and(
             inArray(
               taskTemplateTargets.taskTemplateId,
-              templates.map((template) => template.id),
+              templates.map(({ template }) => template.id),
             ),
             isNull(targets.archivedAt),
           ),
@@ -315,7 +318,7 @@ export const taskTemplateRepository = {
       linksByTemplate.set(link.taskTemplateId, list);
     }
 
-    return templates.flatMap((template) => {
+    return templates.flatMap(({ template, formName }) => {
       const version = versionByForm.get(template.formId);
       if (!version) return [];
 
@@ -323,7 +326,7 @@ export const taskTemplateRepository = {
         {
           id: template.id,
           locationId: template.locationId,
-          title: template.title,
+          title: formName,
           weekdays: template.weekdays,
           scheduledTimes: template.scheduledTimes,
           completionOpensBeforeMinutes: template.completionOpensBeforeMinutes,

@@ -432,6 +432,7 @@ export function DataTable<TData, TValue>({
                   return (
                     <TableRow
                       key={row.id}
+                      data-row-key={row.id}
                       data-state={row.getIsSelected() ? "selected" : undefined}
                       className={cn(
                         "group h-8 md:h-auto",

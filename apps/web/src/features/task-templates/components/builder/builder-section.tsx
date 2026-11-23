@@ -25,7 +25,7 @@ export function StepBadge({
     BADGE_SIZE[size],
   );
   return done ? (
-    <span role="img" aria-label={doneLabel} className={cn(base, "bg-success/15 text-success")}>
+    <span role="img" aria-label={doneLabel} className={cn(base, "bg-success text-success-foreground")}>
       <CheckIcon className="size-4" />
     </span>
   ) : (

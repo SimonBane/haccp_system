@@ -1,31 +1,42 @@
 import { describe, expect, it } from "vitest";
-import {
-  composeCorrectiveAction,
-  correctivePresetsFor,
-} from "./corrective-action";
+import { correctiveFields, savedCorrective } from "./corrective-action";
 
-describe("correctivePresetsFor", () => {
-  it("offers the thermostat only for temperature checks", () => {
-    expect(correctivePresetsFor("temperature")).toContain("adjustedThermostat");
-    expect(correctivePresetsFor("goods_in")).not.toContain(
-      "adjustedThermostat",
-    );
-    expect(correctivePresetsFor("goods_in")).toContain("rejectedDelivery");
+describe("savedCorrective", () => {
+  it("returns the answers and note as they were entered", () => {
+    expect(
+      savedCorrective({
+        correctiveAction: "Moved product, Door was open",
+        corrective: { answerIds: ["a_moved"], note: "Door was open" },
+      }),
+    ).toEqual({ answerIds: ["a_moved"], note: "Door was open" });
   });
 
-  it("falls back to the generic picks without a category", () => {
-    expect(correctivePresetsFor(null)).toEqual(["rechecked", "notifiedManager"]);
+  it("returns an older record's text as the note", () => {
+    expect(
+      savedCorrective({ correctiveAction: "Moved product", corrective: null }),
+    ).toEqual({ answerIds: [], note: "Moved product" });
+  });
+
+  it("returns nothing for a record with no corrective action", () => {
+    expect(savedCorrective({ correctiveAction: null })).toBeNull();
   });
 });
 
-describe("composeCorrectiveAction", () => {
-  it("joins picked presets and trimmed notes", () => {
+describe("correctiveFields", () => {
+  it("sends the note trimmed and the answers by id", () => {
     expect(
-      composeCorrectiveAction(
-        ["Moved product", "Notified manager"],
-        "  Door seal torn ",
-      ),
-    ).toBe("Moved product, Notified manager, Door seal torn");
-    expect(composeCorrectiveAction([], "   ")).toBe("");
+      correctiveFields({ answerIds: ["a_moved"], note: "  Door seal torn " }),
+    ).toEqual({
+      correctiveAction: "Door seal torn",
+      correctiveAnswerIds: ["a_moved"],
+    });
+  });
+
+  it("sends nothing for a passing check or an empty answer", () => {
+    expect(correctiveFields(undefined)).toEqual({});
+    expect(correctiveFields({ answerIds: [], note: "  " })).toEqual({
+      correctiveAction: undefined,
+      correctiveAnswerIds: undefined,
+    });
   });
 });

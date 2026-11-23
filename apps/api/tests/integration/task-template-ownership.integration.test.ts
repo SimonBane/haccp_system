@@ -28,7 +28,6 @@ describe("Task template form and target ownership", () => {
     overrides: Record<string, unknown> = {},
   ): string {
     return JSON.stringify({
-      title: "Fridge round",
       formId: org.forms.fridgeCheck.id,
       weekdays: ["monday"],
       scheduledTimes: ["08:00"],

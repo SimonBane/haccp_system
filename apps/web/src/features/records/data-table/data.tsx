@@ -67,7 +67,7 @@ export function RecordsData({
       enableSearch={false}
       enableRowSelection={false}
       enableColumnVisibility={false}
-      getRowId={(row) => row.occurrenceId}
+      getRowId={(row) => row.id}
       mobileVariant="card"
       emptyMessage={emptyMessage}
       noResultsMessage={noResultsMessage}

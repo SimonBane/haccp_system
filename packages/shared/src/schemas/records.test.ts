@@ -45,10 +45,12 @@ function parse(query: Record<string, string>) {
 
 function item(overrides: Record<string, unknown> = {}) {
   return {
+    id: RECORD_ID,
+    kind: "scheduled",
     occurrenceId: OCCURRENCE_ID,
     taskTemplateId: TEMPLATE_ID,
-    occurrenceDate: DATE_TO,
-    scheduledTime: "08:00",
+    entryDate: DATE_TO,
+    entryTime: "08:00",
     availableAt: "2026-08-23T00:00:00.000Z",
     dueAt: "2026-08-23T05:00:00.000Z",
     title: "Morning fridge check",
@@ -87,9 +89,9 @@ function item(overrides: Record<string, unknown> = {}) {
 
 describe("records constants", () => {
   it("pins the sort allowlist, filter values and default range", () => {
-    expect(RECORDS_SORT_FIELDS).toEqual(["scheduledAt", "title"]);
+    expect(RECORDS_SORT_FIELDS).toEqual(["entryAt", "title"]);
     expect(RECORDS_DEFAULT_SORT).toEqual({
-      sortBy: "scheduledAt",
+      sortBy: "entryAt",
       sortOrder: "asc",
     });
     expect(RECORDS_CATEGORY_FILTER_VALUES).toEqual([
@@ -400,6 +402,21 @@ describe("recordItemSchema", () => {
 
     expect(parsed.dueAt).toBeNull();
     expect(parsed.displayState).toBe("open");
+  });
+
+  it("accepts an on-demand row with no occurrence or opening time", () => {
+    const parsed = recordItemSchema.parse(
+      item({
+        kind: "on_demand",
+        occurrenceId: null,
+        availableAt: null,
+        dueAt: null,
+        timing: "no_deadline",
+      }),
+    );
+
+    expect(parsed.kind).toBe("on_demand");
+    expect(parsed.occurrenceId).toBeNull();
   });
 
   it("has no last-edit or void-reason metadata M0 does not store", () => {

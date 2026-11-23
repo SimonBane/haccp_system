@@ -19,7 +19,6 @@ export const taskTemplates = pgTable(
     locationId: uuid("location_id")
       .notNull()
       .references(() => locations.id, { onDelete: "restrict" }),
-    title: text("title").notNull(),
     formId: uuid("form_id")
       .notNull()
       .references(() => forms.id, { onDelete: "restrict" }),
@@ -45,11 +44,6 @@ export const taskTemplates = pgTable(
     unique("task_templates_id_location_id_unique").on(
       table.id,
       table.locationId,
-    ),
-    // Same limit as TASK_TEMPLATE_TITLE_MAX_LENGTH in @haccp/shared.
-    check(
-      "task_templates_title_length",
-      sql`char_length(${table.title}) BETWEEN 1 AND 100`,
     ),
     check(
       "task_templates_completion_opens_before_range",

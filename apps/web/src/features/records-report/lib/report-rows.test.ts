@@ -70,10 +70,12 @@ const BORIS = {
 
 function item(overrides: Partial<RecordItem> = {}): RecordItem {
   return {
+    id: OCCURRENCE_ID,
+    kind: "scheduled",
     occurrenceId: OCCURRENCE_ID,
     taskTemplateId: "22222222-2222-4222-8222-222222222222",
-    occurrenceDate: "2026-08-23",
-    scheduledTime: "08:00",
+    entryDate: "2026-08-23",
+    entryTime: "08:00",
     availableAt: "2026-08-23T00:00:00.000Z",
     dueAt: "2026-08-23T05:00:00.000Z",
     title: "Сутрешна проверка на хладилника",
@@ -209,6 +211,27 @@ describe("toReportRow minimal facts", () => {
     expect(row.recordedBy).toBeNull();
   });
 
+  it("marks an on-demand entry and never calls it late", () => {
+    const row = toReportRow(
+      item({
+        kind: "on_demand",
+        occurrenceId: null,
+        availableAt: null,
+        dueAt: null,
+        timing: "no_deadline",
+        entryTime: "14:40",
+        record: record(),
+      }),
+      CONTEXT,
+    );
+
+    expect(row).toMatchObject({
+      onDemand: true,
+      late: false,
+      scheduledTime: "14:40",
+    });
+  });
+
   it("carries no scheduling window, range or audit trail", () => {
     const row = toReportRow(item({ record: record() }), CONTEXT);
 
@@ -216,7 +239,8 @@ describe("toReportRow minimal facts", () => {
       [
         "targetName",
         "late",
-        "occurrenceId",
+        "id",
+        "onDemand",
         "recordedBy",
         "scheduledDate",
         "scheduledTime",
@@ -282,11 +306,11 @@ describe("toReportRows", () => {
     );
 
     const rows = toReportRows(
-      ids.map((occurrenceId) => item({ occurrenceId })),
+      ids.map((id) => item({ id })),
       CONTEXT,
     );
 
-    expect(rows.map((row) => row.occurrenceId)).toEqual(ids);
+    expect(rows.map((row) => row.id)).toEqual(ids);
   });
 });
 
@@ -294,9 +318,9 @@ describe("groupReportRowsByDate", () => {
   it("groups consecutive rows under their date without re-sorting", () => {
     const rows = toReportRows(
       [
-        item({ occurrenceId: "1", occurrenceDate: "2026-08-23" }),
-        item({ occurrenceId: "2", occurrenceDate: "2026-08-23" }),
-        item({ occurrenceId: "3", occurrenceDate: "2026-08-24" }),
+        item({ id: "1", entryDate: "2026-08-23" }),
+        item({ id: "2", entryDate: "2026-08-23" }),
+        item({ id: "3", entryDate: "2026-08-24" }),
       ],
       CONTEXT,
     );
@@ -304,7 +328,7 @@ describe("groupReportRowsByDate", () => {
     expect(
       groupReportRowsByDate(rows).map((group) => ({
         date: group.date,
-        ids: group.rows.map((row) => row.occurrenceId),
+        ids: group.rows.map((row) => row.id),
       })),
     ).toEqual([
       { date: "23.08.2026", ids: ["1", "2"] },

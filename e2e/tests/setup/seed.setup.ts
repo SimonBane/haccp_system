@@ -1,7 +1,13 @@
 import { test as setup, expect } from "@playwright/test";
 import type { APIRequestContext } from "@playwright/test";
 import { apiContext, json } from "../../support/api.js";
-import { ensureE2eForms } from "../../support/forms.js";
+import {
+  CLEANING_FORM_NAME,
+  FRIDGE_FORM_NAME,
+  SCRATCH_READING_FORM_NAME,
+  SCRATCH_TICK_FORM_NAME,
+  ensureE2eForms,
+} from "../../support/forms.js";
 import {
   E2E_PREFIX,
   LOCALE_PREFIX,
@@ -23,7 +29,7 @@ type Tenant = {
   };
   locations: Location[];
 };
-type Named = { id: string; name?: string; title?: string };
+type Named = { id: string; name?: string; formName?: string };
 
 const ALL_WEEKDAYS = [
   "monday",
@@ -38,7 +44,7 @@ const ALL_WEEKDAYS = [
 /**
  * Task-template DELETE archives rather than removes the row (HACCP-11), which would
  * leave an unremovable FK on its targets forever. So seeding never deletes — it
- * finds each fixture row by name/title and PATCHes it back to canonical values,
+ * finds each fixture row by name and PATCHes it back to canonical values,
  * creating it only the first time. Nothing accumulates across runs.
  */
 async function upsertByLabel(
@@ -87,6 +93,13 @@ setup("seed locations, forms, equipment and templates", async ({ page }) => {
 
   const forms = await ensureE2eForms(api);
 
+  // Journeys make their own tasks on the scratch forms; archive the last run's before they pile up.
+  const scratchForms = new Set([SCRATCH_TICK_FORM_NAME, SCRATCH_READING_FORM_NAME]);
+  const { items: tasks } = await json<{ items: Named[] }>(api, "get", templatePath);
+  for (const task of tasks.filter((row) => scratchForms.has(row.formName ?? ""))) {
+    await json(api, "delete", `${templatePath}/${task.id}`);
+  }
+
   const fridges: Named[] = [];
   for (let index = 1; index <= TARGET_COUNT; index += 1) {
     // Zero-padded so the 11th row is identifiable by name, not by position.
@@ -107,10 +120,9 @@ setup("seed locations, forms, equipment and templates", async ({ page }) => {
   await upsertByLabel(
     api,
     templatePath,
-    (row) => row.title ?? "",
-    `${E2E_PREFIX} Fridge check`,
+    (row) => row.formName ?? "",
+    FRIDGE_FORM_NAME,
     {
-      title: `${E2E_PREFIX} Fridge check`,
       formId: forms.fridgeReading,
       weekdays: ALL_WEEKDAYS,
       scheduledTimes: [fridgeTime],
@@ -121,10 +133,9 @@ setup("seed locations, forms, equipment and templates", async ({ page }) => {
   await upsertByLabel(
     api,
     templatePath,
-    (row) => row.title ?? "",
-    `${E2E_PREFIX} Clean prep surface`,
+    (row) => row.formName ?? "",
+    CLEANING_FORM_NAME,
     {
-      title: `${E2E_PREFIX} Clean prep surface`,
       formId: forms.cleaning,
       weekdays: ALL_WEEKDAYS,
       scheduledTimes: [cleaningTime],
@@ -138,8 +149,8 @@ setup("seed locations, forms, equipment and templates", async ({ page }) => {
   ).toBe(TARGET_COUNT);
 
   const todayTitles = (await fetchTodayItems(api)).map((item) => item.title);
-  expect(todayTitles).toContain(`${E2E_PREFIX} Fridge check`);
-  expect(todayTitles).toContain(`${E2E_PREFIX} Clean prep surface`);
+  expect(todayTitles).toContain(FRIDGE_FORM_NAME);
+  expect(todayTitles).toContain(CLEANING_FORM_NAME);
 
   await api.dispose();
 });

@@ -1,5 +1,6 @@
 import {
   CORRECTIVE_ACTION_MODE,
+  DEFAULT_CORRECTIVE_SETTINGS,
   FIELD_TYPE,
   FORM_APPLIES_TO,
   FORM_CATEGORY,
@@ -457,6 +458,7 @@ export function getStarterForms(locale: LibraryLocale): StarterForm[] {
     definition: {
       fields: entry.fields.map((field) => toField(field, locale)),
       correctiveAction: CORRECTIVE_ACTION_MODE.REQUIRED_ON_FAIL,
+      corrective: { ...DEFAULT_CORRECTIVE_SETTINGS, answers: [] },
     },
   }));
 }

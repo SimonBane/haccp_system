@@ -3,7 +3,6 @@ import {
   buildTimeline,
   daysForPreset,
   detectRepeatInterval,
-  generateRepeatTimes,
   matchDayPreset,
   minutesToTime,
   opensAt,
@@ -11,27 +10,6 @@ import {
   smallestGap,
   windowsOverlap,
 } from "./schedule";
-
-describe("generateRepeatTimes", () => {
-  it("includes both ends when they line up with the interval", () => {
-    expect(generateRepeatTimes(120, "08:00", "22:00")).toEqual([
-      "08:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20:00", "22:00",
-    ]);
-  });
-
-  it("stops before the end when the interval overshoots it", () => {
-    expect(generateRepeatTimes(180, "08:00", "16:00")).toEqual(["08:00", "11:00", "14:00"]);
-  });
-
-  it("is empty when the range runs backwards or a bound is missing", () => {
-    expect(generateRepeatTimes(60, "22:00", "08:00")).toEqual([]);
-    expect(generateRepeatTimes(60, "", "08:00")).toEqual([]);
-  });
-
-  it("caps at the 48 times a task may hold", () => {
-    expect(generateRepeatTimes(30, "00:00", "23:59")).toHaveLength(48);
-  });
-});
 
 describe("detectRepeatInterval", () => {
   it("finds an offered interval in evenly spaced times, in any order", () => {

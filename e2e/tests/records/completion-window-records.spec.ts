@@ -3,6 +3,7 @@ import { apiContext, json } from "../../support/api.js";
 import { ensureE2eForms } from "../../support/forms.js";
 import { LOCALE_PREFIX } from "../../support/env.js";
 import { RECORDS_PATH } from "../../support/records.js";
+import { createTask, rowByKey, todayItemForTask } from "../../support/tasks.js";
 
 type Tenant = {
   locations: { id: string; isDefault: boolean }[];
@@ -22,30 +23,19 @@ test("an opened, unrecorded Never-overdue occurrence shows as Open with No deadl
   const tenant = await json<Tenant>(api, "get", "/tenant/current");
   const location =
     tenant.locations.find((entry) => entry.isDefault) ?? tenant.locations[0]!;
-  const title = `E2E Open no deadline ${Date.now()}`;
-
-  await json(api, "post", `/locations/${location.id}/task-templates`, {
-    title,
-    formId: forms.cleaning,
-    weekdays: [
-      "monday",
-      "tuesday",
-      "wednesday",
-      "thursday",
-      "friday",
-      "saturday",
-      "sunday",
-    ],
+  const taskId = await createTask(api, location.id, {
+    formId: forms.scratchTick,
     // A future scheduled time with the default (start-of-day) opening window is
     // already available now; a null deadline never becomes Missed.
     scheduledTimes: ["23:59"],
     completionOpensBeforeMinutes: 1440,
     completionDueAfterMinutes: null,
   });
+  const { occurrenceId } = await todayItemForTask(api, taskId);
   await api.dispose();
 
   await page.goto(RECORDS_PATH);
-  const row = page.getByRole("button").filter({ hasText: title });
+  const row = rowByKey(page, occurrenceId);
   await expect(row).toBeVisible();
   await expect(row.getByText("Open", { exact: true })).toBeVisible();
   await expect(row.getByText("No deadline", { exact: true })).toBeVisible();

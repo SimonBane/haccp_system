@@ -30,3 +30,15 @@ export function formatLocalDate(dateStr: string, locale: string): string {
     day: "2-digit",
   }).format(date);
 }
+
+/** A "YYYY-MM-DD" calendar date as local midnight, for date pickers; dates stay strings elsewhere. */
+export function calendarDateToLocalDate(date: string): Date {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(year ?? 0, (month ?? 1) - 1, day ?? 1);
+}
+
+/** "19.11.2026", the same in every locale. */
+export function formatNumericDate(date: string): string {
+  const [year, month, day] = date.split("-");
+  return `${day}.${month}.${year}`;
+}

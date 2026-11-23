@@ -1,61 +1,34 @@
-import { FORM_CATEGORY, type FormCategory } from "@haccp/shared";
+import type {
+  CorrectiveInput,
+  TaskRecordInput,
+  TodayTaskItem,
+} from "@haccp/shared";
 
-const PRESET_DELIMITER = ", ";
-
-/** Headroom for presets inside the API's 1000-character field. */
+/** Headroom for the answers' labels inside the API's 1000-character field. */
 export const NOTES_MAX_LENGTH = 900;
 
-export const CORRECTIVE_PRESET_KEYS = [
-  "movedProduct",
-  "adjustedThermostat",
-  "calledService",
-  "rejectedDelivery",
-  "discardedProduct",
-  "recleaned",
-  "rechecked",
-  "notifiedManager",
-] as const;
-
-export type CorrectivePresetKey = (typeof CORRECTIVE_PRESET_KEYS)[number];
-
-const PRESETS_BY_CATEGORY: Record<
-  FormCategory,
-  readonly CorrectivePresetKey[]
-> = {
-  [FORM_CATEGORY.TEMPERATURE]: [
-    "movedProduct",
-    "adjustedThermostat",
-    "notifiedManager",
-    "calledService",
-  ],
-  [FORM_CATEGORY.GOODS_IN]: [
-    "rejectedDelivery",
-    "discardedProduct",
-    "notifiedManager",
-  ],
-  [FORM_CATEGORY.CLEANING]: ["recleaned", "notifiedManager"],
-  [FORM_CATEGORY.HYGIENE]: ["recleaned", "notifiedManager"],
-  [FORM_CATEGORY.PEST_CONTROL]: ["calledService", "notifiedManager"],
-};
-
-const GENERIC_PRESETS: readonly CorrectivePresetKey[] = [
-  "rechecked",
-  "notifiedManager",
-];
-
-/** Quick picks that make sense for the kind of check that failed. */
-export function correctivePresetsFor(
-  category: FormCategory | null,
-): readonly CorrectivePresetKey[] {
-  return category ? PRESETS_BY_CATEGORY[category] : GENERIC_PRESETS;
+/** A record saved before forms had their own answers only has the text, which returns as the note. */
+export function savedCorrective(
+  task: Pick<TodayTaskItem, "corrective" | "correctiveAction">,
+): CorrectiveInput | null {
+  if (task.corrective) {
+    return {
+      answerIds: task.corrective.answerIds,
+      note: task.corrective.note ?? "",
+    };
+  }
+  return task.correctiveAction === null
+    ? null
+    : { answerIds: [], note: task.correctiveAction };
 }
 
-export function composeCorrectiveAction(
-  presetLabels: string[],
-  notes: string,
-): string {
-  const trimmedNotes = notes.trim();
-  const parts = [...presetLabels];
-  if (trimmedNotes) parts.push(trimmedNotes);
-  return parts.join(PRESET_DELIMITER);
+export function correctiveFields(
+  corrective: CorrectiveInput | undefined,
+): Pick<TaskRecordInput, "correctiveAction" | "correctiveAnswerIds"> {
+  if (!corrective) return {};
+  return {
+    correctiveAction: corrective.note.trim() || undefined,
+    correctiveAnswerIds:
+      corrective.answerIds.length > 0 ? [...corrective.answerIds] : undefined,
+  };
 }

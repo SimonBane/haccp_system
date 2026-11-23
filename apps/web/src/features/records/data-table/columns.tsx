@@ -14,6 +14,7 @@ import {
   RECORD_DISPLAY_STATE_VARIANT,
   RECORD_RESULT_VARIANT,
   RECORD_TIMING_VARIANT,
+  isOnDemand,
   timingBadgeValue,
   type RecordsLabels,
 } from "@/features/records/lib/labels";
@@ -47,8 +48,8 @@ export function getRecordsColumns({
   return [
     {
       // Ids of sortable columns must match the API sort allowlist exactly.
-      id: "scheduledAt",
-      accessorFn: (row) => `${row.occurrenceDate} ${row.scheduledTime}`,
+      id: "entryAt",
+      accessorFn: (row) => `${row.entryDate} ${row.entryTime}`,
       enableHiding: false,
       meta: { view_label: copy.dateTime },
       header: ({ column }) => (
@@ -57,10 +58,10 @@ export function getRecordsColumns({
       cell: ({ row }) => (
         <div className="flex flex-col">
           <span>
-            {formatOccurrenceDate(row.original.occurrenceDate)}
+            {formatOccurrenceDate(row.original.entryDate)}
           </span>
           <span className="text-muted-foreground tabular-nums">
-            {row.original.scheduledTime}
+            {row.original.entryTime}
           </span>
         </div>
       ),
@@ -99,6 +100,9 @@ export function getRecordsColumns({
       meta: { view_label: copy.timing },
       header: () => copy.timing,
       cell: ({ row }) => {
+        if (isOnDemand(row.original)) {
+          return <Badge variant="outline">{labels.onDemand}</Badge>;
+        }
         const timing = timingBadgeValue(row.original);
 
         return timing ? (

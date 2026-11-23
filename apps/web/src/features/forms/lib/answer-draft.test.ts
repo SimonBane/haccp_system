@@ -4,9 +4,6 @@ import {
   createAnswerDraft,
   draftToAnswers,
   evaluateAnswerDraft,
-  featuredMeasurementField,
-  isQuickCompleteForm,
-  quickCompleteAnswers,
   validateAnswerDraft,
 } from "./answer-draft";
 
@@ -176,25 +173,5 @@ describe("evaluateAnswerDraft", () => {
         draft,
       ).result,
     ).toBe("fail");
-  });
-});
-
-describe("form shapes", () => {
-  it("treats a lone required checkbox as a one-tap completion", () => {
-    const cleaning: FormDefinition = {
-      correctiveAction: "optional",
-      fields: [
-        { id: "cleaned", type: "checkbox", label: "Cleaned", required: true },
-      ],
-    };
-
-    expect(isQuickCompleteForm(cleaning)).toBe(true);
-    expect(quickCompleteAnswers(cleaning)).toEqual({ cleaned: true });
-    expect(isQuickCompleteForm(GOODS_IN)).toBe(false);
-  });
-
-  it("features the measurement only when it is the whole form", () => {
-    expect(featuredMeasurementField(FREEZER)?.id).toBe("temperature");
-    expect(featuredMeasurementField(GOODS_IN)).toBeNull();
   });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  onDemandRecordInputSchema,
   taskRecordInputSchema,
   taskRecordResponseSchema,
 } from "./task-record.js";
@@ -51,5 +52,29 @@ describe("taskRecordResponseSchema — removed M0 fields", () => {
     expect(keys).not.toContain("lastEditedAt");
     expect(keys).not.toContain("lastEditedByUserId");
     expect(keys).not.toContain("voidReason");
+  });
+});
+
+describe("onDemandRecordInputSchema", () => {
+  const base = {
+    values: { cleaned: true },
+    formVersionId: "11111111-1111-4111-8111-111111111111",
+    targetId: null,
+    entryDate: "2026-11-19",
+    entryTime: "09:30",
+  };
+
+  it("accepts a location-level entry", () => {
+    expect(onDemandRecordInputSchema.safeParse(base).success).toBe(true);
+  });
+
+  it("rejects an impossible date or a malformed time", () => {
+    expect(
+      onDemandRecordInputSchema.safeParse({ ...base, entryDate: "2026-02-30" })
+        .success,
+    ).toBe(false);
+    expect(
+      onDemandRecordInputSchema.safeParse({ ...base, entryTime: "9:30" }).success,
+    ).toBe(false);
   });
 });

@@ -11,3 +11,4 @@ export * from "./task-template-targets.js";
 export * from "./task-occurrences.js";
 export * from "./task-records.js";
 export * from "./task-record-readings.js";
+export * from "./task-record-deviations.js";

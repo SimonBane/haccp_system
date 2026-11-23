@@ -1,9 +1,13 @@
 "use client";
 
 import {
+  asksForCorrectiveAction,
   CORRECTIVE_ACTION_MODE,
+  correctiveSettings,
   RECORD_RESULT,
+  resolveCorrective,
   type AnswersInput,
+  type CorrectiveInput,
   type FormDefinition,
   type RecordValues,
   type ResolvedLimits,
@@ -18,14 +22,10 @@ import {
   type AnswerDraft,
   type FieldDraft,
 } from "@/features/forms/lib/answer-draft";
+import { toggleCorrectiveAnswer } from "@/features/forms/lib/corrective-answers";
+import { correctiveNoteShown } from "@/features/forms/lib/form-builder";
 import { decimalSeparator } from "@/features/forms/lib/measurement";
-import {
-  composeCorrectiveAction,
-  NOTES_MAX_LENGTH,
-  type CorrectivePresetKey,
-} from "../lib/corrective-action";
-
-export type RecordEntryStep = "answers" | "corrective";
+import { NOTES_MAX_LENGTH } from "../lib/corrective-action";
 
 const EMPTY_DEFINITION: FormDefinition = {
   fields: [],
@@ -33,26 +33,26 @@ const EMPTY_DEFINITION: FormDefinition = {
 };
 
 type Params = {
-  occurrenceKey: string;
+  /** Changes when another check takes the form's place, which resets it. */
+  entryKey: string;
   definition: FormDefinition | null;
   limits: ResolvedLimits;
   /** An edit starts from the saved answers; a new record from blanks. */
   initialValues: RecordValues | null;
+  initialCorrective: CorrectiveInput | null;
   onSubmit: (
     values: AnswersInput,
-    correctiveAction?: string,
+    corrective?: CorrectiveInput,
   ) => Promise<boolean>;
 };
 
-/**
- * Entry as plain state: react-hook-form's reset cannot run during render, which
- * advancing to the next check in a round needs.
- */
+/** Entry as plain state: react-hook-form's reset cannot run during render, which moving to the next check needs. */
 export function useRecordEntry({
-  occurrenceKey,
+  entryKey,
   definition: maybeDefinition,
   limits,
   initialValues,
+  initialCorrective,
   onSubmit,
 }: Params) {
   const t = useTranslations("TodayPage.recordDialog");
@@ -63,21 +63,27 @@ export function useRecordEntry({
   const freshDraft = () =>
     createAnswerDraft(definition, limits, initialValues, separator);
 
-  const [step, setStep] = useState<RecordEntryStep>("answers");
   const [draft, setDraft] = useState<AnswerDraft>(freshDraft);
-  const [presets, setPresets] = useState<CorrectivePresetKey[]>([]);
-  const [notes, setNotes] = useState("");
+  const settings = correctiveSettings(definition);
+  const noteShown = correctiveNoteShown(settings);
+  const [askedForAction, setAskedForAction] = useState(
+    initialCorrective !== null,
+  );
+  const [answerIds, setAnswerIds] = useState<string[]>(() => [
+    ...(initialCorrective?.answerIds ?? []),
+  ]);
+  const [notes, setNotes] = useState(initialCorrective?.note ?? "");
   const [showErrors, setShowErrors] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Reset during render so the next check never flashes the answers just saved.
-  const [resetFor, setResetFor] = useState(occurrenceKey);
-  if (resetFor !== occurrenceKey) {
-    setResetFor(occurrenceKey);
-    setStep("answers");
+  const [resetFor, setResetFor] = useState(entryKey);
+  if (resetFor !== entryKey) {
+    setResetFor(entryKey);
     setDraft(freshDraft());
-    setPresets([]);
-    setNotes("");
+    setAskedForAction(initialCorrective !== null);
+    setAnswerIds([...(initialCorrective?.answerIds ?? [])]);
+    setNotes(initialCorrective?.note ?? "");
     setShowErrors(false);
   }
 
@@ -85,14 +91,24 @@ export function useRecordEntry({
   const evaluated = evaluateAnswerDraft(definition, limits, draft);
   const hasIssues = Object.keys(issues).length > 0;
   const isFailing = evaluated.result === RECORD_RESULT.FAIL;
+  const asksForAction = asksForCorrectiveAction(definition);
+  const showCorrective = askedForAction && isFailing && asksForAction;
   const correctiveRequired =
     definition.correctiveAction === CORRECTIVE_ACTION_MODE.REQUIRED_ON_FAIL;
 
+  // A note typed before the form stopped taking one is not sent: the server would refuse it.
+  const corrective: CorrectiveInput = {
+    answerIds,
+    note: noteShown ? notes : "",
+  };
+
   const notesError =
-    notes.length > NOTES_MAX_LENGTH ? t("validation.notesMax") : null;
+    noteShown && notes.length > NOTES_MAX_LENGTH
+      ? t("validation.notesMax")
+      : null;
 
   const correctiveError =
-    correctiveRequired && presets.length === 0 && notes.trim().length === 0
+    resolveCorrective(definition, corrective).issue === "required"
       ? t("validation.correctiveRequired")
       : null;
 
@@ -100,10 +116,10 @@ export function useRecordEntry({
     setDraft((current) => ({ ...current, [fieldId]: next }));
   }
 
-  async function submit(correctiveAction?: string) {
+  async function submit(sent?: CorrectiveInput) {
     setIsSubmitting(true);
     try {
-      await onSubmit(draftToAnswers(definition, draft), correctiveAction);
+      await onSubmit(draftToAnswers(definition, draft), sent);
     } finally {
       setIsSubmitting(false);
     }
@@ -113,42 +129,39 @@ export function useRecordEntry({
     setShowErrors(true);
     if (hasIssues) return;
 
-    if (step === "answers") {
-      if (isFailing) {
-        setShowErrors(false);
-        setStep("corrective");
-        return;
-      }
+    if (!isFailing || !asksForAction) {
       await submit();
+      return;
+    }
+
+    if (!showCorrective) {
+      setShowErrors(false);
+      setAskedForAction(true);
       return;
     }
 
     if (notesError || correctiveError) return;
 
-    const labels = presets.map((key) => t(`presets.${key}`));
-    await submit(composeCorrectiveAction(labels, notes) || undefined);
+    await submit(corrective);
   }
 
-  function togglePreset(key: CorrectivePresetKey) {
-    setPresets((current) =>
-      current.includes(key)
-        ? current.filter((preset) => preset !== key)
-        : [...current, key],
+  function toggleAnswer(answerId: string) {
+    setAnswerIds((current) =>
+      toggleCorrectiveAnswer(current, answerId, settings.multiple),
     );
   }
 
   return {
-    step,
-    goToAnswers: () => setStep("answers"),
     draft,
     changeField,
     separator,
     evaluated,
     isFailing,
-    hasIssues,
+    showCorrective,
     correctiveRequired,
-    presets,
-    togglePreset,
+    correctiveSettings: settings,
+    answerIds,
+    toggleAnswer,
     notes,
     setNotes,
     isSubmitting,

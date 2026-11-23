@@ -39,7 +39,6 @@ function makeTask(
   return {
     id: "00000000-0000-4000-8000-000000000001",
     locationId: "00000000-0000-4000-8000-000000000002",
-    title: "Morning check",
     formId: "00000000-0000-4000-8000-000000000003",
     formName: "Fridge check",
     formCategory: "temperature",
@@ -142,7 +141,6 @@ describe("hasTaskChanges", () => {
     ],
   });
   const payload = {
-    title: task.title,
     formId: task.formId,
     weekdays: ["tuesday", "monday"] as TaskTemplateResponse["weekdays"],
     scheduledTimes: ["14:00", "08:00"],

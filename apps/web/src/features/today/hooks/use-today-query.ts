@@ -11,6 +11,7 @@ import { locationScopedPath } from "@/lib/api/paths";
 type UseTodayQueryOptions = {
   initialData?: TodayResponse;
   initialLocationId?: string;
+  enabled?: boolean;
 };
 
 export function useTodayQuery(date: string, options?: UseTodayQueryOptions) {
@@ -32,6 +33,7 @@ export function useTodayQuery(date: string, options?: UseTodayQueryOptions) {
         todayResponseSchema,
       ),
     initialData,
+    enabled: options?.enabled ?? true,
     // Today is shared across tablets; other lists skip this so a focus refetch
     // cannot clobber rows under an open dialog. No refetchInterval: a poll
     // between optimistic patch and confirm would flash completed rows back.

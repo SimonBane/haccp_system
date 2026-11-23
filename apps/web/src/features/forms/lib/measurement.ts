@@ -136,18 +136,20 @@ export function formatMeasurementNumber(
   }).format(value);
 }
 
-/** "0 – 4 °C", "≥ 63 °C" or "≤ 24 %"; null when the field has no limits. */
+/** "0 to 4 °C", "≥ 63 °C" or "≤ 24 %"; null when the field has no limits. */
 export function formatLimits(
   limits: MeasurementLimits,
   unit: MeasurementUnit,
   locale: string,
   symbol: string,
+  /** "to" in the reader's language; a dash reads as a minus next to a negative limit. */
+  to: string,
 ): string | null {
   const format = (value: number) =>
     formatMeasurementNumber(value, unit, locale);
 
   if (limits.min !== null && limits.max !== null) {
-    return `${format(limits.min)} – ${format(limits.max)} ${symbol}`;
+    return `${format(limits.min)} ${to} ${format(limits.max)} ${symbol}`;
   }
   if (limits.min !== null) return `≥ ${format(limits.min)} ${symbol}`;
   if (limits.max !== null) return `≤ ${format(limits.max)} ${symbol}`;

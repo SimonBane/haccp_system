@@ -6,7 +6,6 @@ import {
   TASK_TEMPLATE_COMPLETION_MINUTES_MIN,
   TASK_TEMPLATE_COMPLETION_OPENS_BEFORE_DEFAULT_MINUTES,
   TASK_TEMPLATE_MAX_SCHEDULED_TIMES,
-  TASK_TEMPLATE_TITLE_MAX_LENGTH,
 } from "./task-template.js";
 
 const FORM_ID = "11111111-1111-4111-8111-111111111111";
@@ -15,7 +14,6 @@ const TARGET_B = "33333333-3333-4333-8333-333333333333";
 
 function baseInput(overrides: Record<string, unknown> = {}) {
   return {
-    title: "Morning check",
     formId: FORM_ID,
     weekdays: ["monday"],
     scheduledTimes: ["08:00"],
@@ -192,18 +190,6 @@ describe("scheduled times", () => {
     const tooMany = [...every30, "23:59"];
     expect(
       createTaskTemplateSchema.safeParse(baseInput({ scheduledTimes: tooMany })).success,
-    ).toBe(false);
-  });
-});
-
-describe("title", () => {
-  it("accepts a title at the limit once trimmed and rejects one over it", () => {
-    const atLimit = "a".repeat(TASK_TEMPLATE_TITLE_MAX_LENGTH);
-    expect(
-      createTaskTemplateSchema.safeParse(baseInput({ title: `  ${atLimit}  ` })).success,
-    ).toBe(true);
-    expect(
-      createTaskTemplateSchema.safeParse(baseInput({ title: `${atLimit}a` })).success,
     ).toBe(false);
   });
 });

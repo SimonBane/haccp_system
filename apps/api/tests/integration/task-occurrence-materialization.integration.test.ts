@@ -15,6 +15,7 @@ import {
 import {
   CLEANING_DEFINITION,
   FRIDGE_FIELD_ID,
+  recordContextFor,
   seedOrganization,
   type SeededOrg,
   type TwoTenantWorld,
@@ -66,8 +67,7 @@ async function recordOccurrence(
   options: { voided?: boolean } = {},
 ): Promise<void> {
   await db.insert(taskRecords).values({
-    occurrenceId: occurrence.id,
-    formVersionId: occurrence.formVersionId,
+    ...(await recordContextFor(db, occurrence.id)),
     values: {},
     result: "not_evaluated",
     createdByUserId: world.admin.userId,
@@ -84,7 +84,6 @@ function cleaningTemplateBody(
   overrides: Record<string, unknown> = {},
 ): string {
   return JSON.stringify({
-    title: world.templates.cleaning.title,
     formId: world.forms.cleaning.id,
     weekdays: [
       "monday",
@@ -173,7 +172,6 @@ describe("Task occurrence materialization — daily job", () => {
       .insert(taskTemplates)
       .values({
         locationId: world.locations.main.id,
-        title: "Long-lived cleaning check",
         formId: world.forms.cleaning.id,
         weekdays: [weekday],
         scheduledTimes: [pastTimeToday()],
@@ -263,7 +261,6 @@ describe("Task occurrence materialization — configuration writes", () => {
         method: "POST",
         actor: asAdmin(world),
         body: JSON.stringify({
-          title: "Evening close-down",
           formId: world.forms.cleaning.id,
           weekdays: [weekday],
           scheduledTimes: ["23:59"],
@@ -286,7 +283,6 @@ describe("Task occurrence materialization — configuration writes", () => {
         method: "POST",
         actor: asAdmin(world),
         body: JSON.stringify({
-          title: "Should skip today",
           formId: world.forms.cleaning.id,
           weekdays: [weekday],
           scheduledTimes: [pastTimeToday()],
@@ -375,7 +371,6 @@ describe("Task occurrence materialization — configuration writes", () => {
         method: "PATCH",
         actor: asAdmin(world),
         body: JSON.stringify({
-          title: world.templates.temperature.title,
           formId: world.forms.fridgeCheck.id,
           weekdays: [
             "monday",
@@ -456,7 +451,6 @@ describe("Task occurrence materialization — configuration writes", () => {
     const template = await post(
       `/locations/${world.locations.main.id}/task-templates`,
       {
-        title: "Weekly walls",
         formId: form.id,
         weekdays: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
         scheduledTimes: ["22:00"],
@@ -518,7 +512,6 @@ describe("Task occurrence materialization — configuration writes", () => {
         method: "PATCH",
         actor: asAdmin(world),
         body: JSON.stringify({
-          title: world.templates.temperature.title,
           formId: world.forms.fridgeCheck.id,
           weekdays: [
             "monday",
@@ -864,14 +857,16 @@ describe("Task occurrence materialization — configuration writes", () => {
     await recordOccurrence(world, recordedRow!);
     await recordOccurrence(world, voidedRow!, { voided: true });
 
-    const response = await apiRequest(
-      `/locations/${world.locations.main.id}/task-templates/${world.templates.cleaning.id}`,
-      {
-        method: "PATCH",
-        actor: asAdmin(world),
-        body: cleaningTemplateBody(world, { title: "Renamed cleaning check" }),
-      },
-    );
+    // Tasks are named after their form, so renaming the form is what renames a task.
+    const response = await apiRequest(`/forms/${world.forms.cleaning.id}`, {
+      method: "PATCH",
+      actor: asAdmin(world),
+      body: JSON.stringify({
+        name: "Deep cleaning",
+        category: "cleaning",
+        appliesTo: "location",
+      }),
+    });
     expect(response.status).toBe(200);
 
     const recordedAfter = await findOccurrence(
@@ -884,10 +879,16 @@ describe("Task occurrence materialization — configuration writes", () => {
       voidedDate,
       "09:00",
     );
+    const upcomingAfter = await findOccurrence(
+      world.templates.cleaning.id,
+      addCalendarDays(todayLocal(), 4),
+      "09:00",
+    );
 
     expect(recordedAfter!.id).toBe(recordedRow!.id);
-    expect(recordedAfter!.title).toBe("Clean prep surface");
+    expect(recordedAfter!.title).toBe(world.templates.cleaning.title);
     expect(voidedAfter!.id).toBe(voidedRow!.id);
-    expect(voidedAfter!.title).toBe("Clean prep surface");
+    expect(voidedAfter!.title).toBe(world.templates.cleaning.title);
+    expect(upcomingAfter!.title).toBe("Deep cleaning");
   });
 });

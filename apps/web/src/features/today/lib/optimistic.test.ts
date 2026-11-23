@@ -48,7 +48,9 @@ function summary(id: string, definition: FormDefinition) {
 
 function task(overrides: Partial<TodayTaskItem> = {}): TodayTaskItem {
   return {
+    kind: "scheduled",
     occurrenceId: OCCURRENCE_A,
+    recordId: null,
     templateId: TEMPLATE_A,
     title: "Task",
     formVersionId: CLEANING_VERSION,
@@ -77,6 +79,7 @@ function response(tasks: {
   morning?: TodayTaskItem[];
   afternoon?: TodayTaskItem[];
   evening?: TodayTaskItem[];
+  entries?: TodayTaskItem[];
 }): TodayResponse {
   return {
     date: DATE,
@@ -91,11 +94,12 @@ function response(tasks: {
       afternoon: tasks.afternoon ?? [],
       evening: tasks.evening ?? [],
     },
+    onDemand: { forms: [], items: [], entries: tasks.entries ?? [] },
   };
 }
 
-function ordinaryInput(occurrenceId: string): RecordMutationInput {
-  return { occurrenceId, values: { cleaned: true } };
+function ordinaryInput(key: string): RecordMutationInput {
+  return { key, values: { cleaned: true } };
 }
 
 describe("applyOptimisticRecord — completion", () => {
@@ -252,7 +256,7 @@ describe("applyOptimisticRecord — judged answers", () => {
     correctiveAction?: string,
   ): RecordMutationInput {
     return {
-      occurrenceId: OCCURRENCE_A,
+      key: OCCURRENCE_A,
       values: { temperature },
       ...(correctiveAction === undefined ? {} : { correctiveAction }),
     };
@@ -314,7 +318,7 @@ describe("applyOptimisticRecord — judged answers", () => {
     const before = response({ morning: [fridge] });
     const after = applyOptimisticRecord(
       before,
-      { occurrenceId: OCCURRENCE_A, values: { temperature: "warm" } },
+      { key: OCCURRENCE_A, values: { temperature: "warm" } },
       USER,
       NOW,
     );
@@ -336,5 +340,38 @@ describe("applyOptimisticRecord — judged answers", () => {
       status: "completed",
       result: null,
     });
+  });
+});
+
+describe("on-demand entries", () => {
+  const RECORD_ID = "00000000-0000-4000-8000-0000000rec1";
+  const entry = task({
+    kind: "on_demand",
+    occurrenceId: null,
+    recordId: RECORD_ID,
+    recordState: "active",
+    status: "completed",
+    completedAt: "2026-01-15T09:00:00.000Z",
+    completedBy: { id: USER, firstName: "Ann", lastName: "Lee" },
+    result: "not_evaluated",
+    values: { cleaned: { type: "checkbox", value: true } },
+  });
+
+  it("patches an edited entry by its record id", () => {
+    const before = response({ entries: [entry] });
+    const after = applyOptimisticRecord(before, ordinaryInput(RECORD_ID), USER, NOW);
+
+    expect(after?.onDemand.entries[0]).toMatchObject({
+      completedAt: NOW.toISOString(),
+      completedBy: { id: USER },
+    });
+  });
+
+  it("removes an undone entry instead of leaving it waiting", () => {
+    const before = response({ morning: [task()], entries: [entry] });
+    const after = applyOptimisticVoid(before, RECORD_ID, NOW);
+
+    expect(after?.onDemand.entries).toEqual([]);
+    expect(after?.sections.morning[0]).toBe(before.sections.morning[0]);
   });
 });

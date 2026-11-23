@@ -23,7 +23,6 @@ export type FormWithLatestVersion = {
 
 export type TemplateOverrideRow = {
   templateId: string;
-  templateTitle: string;
   locationId: string;
   locationName: string;
   targetId: string;
@@ -90,6 +89,31 @@ export const formRepository = {
       .from(forms)
       .where(
         and(eq(forms.organizationId, organizationId), isNull(forms.archivedAt)),
+      )
+      .orderBy(asc(forms.name));
+
+    return withLatest(
+      rows,
+      await findLatestVersions(
+        db,
+        rows.map((row) => row.id),
+      ),
+    );
+  },
+
+  async findManyActiveOnDemandWithLatestVersion(
+    db: DbClient,
+    organizationId: string,
+  ): Promise<FormWithLatestVersion[]> {
+    const rows = await db
+      .select()
+      .from(forms)
+      .where(
+        and(
+          eq(forms.organizationId, organizationId),
+          eq(forms.onDemand, true),
+          isNull(forms.archivedAt),
+        ),
       )
       .orderBy(asc(forms.name));
 
@@ -266,7 +290,6 @@ export const formRepository = {
     const rows = await db
       .select({
         templateId: taskTemplates.id,
-        templateTitle: taskTemplates.title,
         locationId: locations.id,
         locationName: locations.name,
         targetId: targets.id,
@@ -286,8 +309,8 @@ export const formRepository = {
       )
       .orderBy(
         asc(locations.name),
-        asc(taskTemplates.title),
         asc(targets.name),
+        asc(taskTemplates.createdAt),
       );
 
     return rows.map(withTargetLabel);

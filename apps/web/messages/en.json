@@ -219,7 +219,8 @@
       "taskRecordAlreadyExists": "This task was already recorded. The latest saved value is shown.",
       "targetKindInUse": "This cannot change between equipment and area while tasks check it or items sit inside it.",
       "targetParentNotArea": "Only an area can contain other items.",
-      "formAppliesToInUse": "Tasks using this form check items that would no longer fit. Change those tasks first."
+      "formAppliesToInUse": "Tasks using this form check items that would no longer fit. Change those tasks first.",
+      "formVersionChanged": "This form was updated. Open it again to use the latest version."
     }
   },
   "ForbiddenPage": {
@@ -247,134 +248,104 @@
   "TodayPage": {
     "title": "Today",
     "loading": "Loading",
-    "actions": {
-      "complete": "Complete",
-      "record": "Record",
-      "recordAll": "Record all",
-      "undo": "Undo",
-      "edit": "Edit",
-      "viewRecord": "View record"
-    },
-    "timeline": {
-      "now": "Now",
-      "overdue": "Overdue",
-      "remaining": "{count, plural, one {# left} other {# left}}",
-      "doneCount": "{count, plural, one {# done} other {# done}}",
-      "deviations": "{count, plural, one {# needs attention} other {# need attention}}",
-      "jumpToOverdue": "Go to overdue tasks ({count})",
-      "jumpToDeviation": "Go to checks that need attention ({count})",
-      "nowLine": "Now, {time}",
-      "jumpToNow": "Jump to now",
-      "recordRound": "Record the {time} checks ({count})"
-    },
     "row": {
-      "lastReadingAt": "Last {time}",
-      "availableAt": "Available at {time}",
-      "needsAttention": "Needs attention"
-    },
-    "record": {
-      "close": "Close",
-      "completedAt": "Completed at",
-      "completedBy": "Completed by",
-      "category": "Category",
-      "pass": "Passed",
-      "fail": "Needs attention"
-    },
-    "allDone": {
-      "title": "All done",
-      "description": "{count, plural, one {# task today} other {# tasks today}}",
-      "withDeviations": "{count, plural, one {# check needs attention} other {# checks need attention}}"
+      "needsAttention": "Needs attention",
+      "late": "Late",
+      "opensAt": "Opens at {time}",
+      "filledIn": "{done} of {total} filled in",
+      "items": "{count, plural, one {# item} other {# items}}",
+      "questions": "{count, plural, one {# question} other {# questions}}",
+      "window": {
+        "range": "{from}-{to}",
+        "from": "from {time}",
+        "until": "until {time}"
+      }
     },
     "progress": {
-      "summary": "{completed} of {total} completed"
+      "summary": "{completed} of {total} completed",
+      "short": "{completed} of {total} done",
+      "passed": "Passed",
+      "deviations": "Deviations",
+      "remaining": "Remaining"
     },
     "dateNavigation": {
       "ariaLabel": "Choose a day",
       "previous": "Previous day",
       "next": "Next day",
-      "jumpToToday": "Jump to today"
-    },
-    "relative": {
-      "inMinutes": "In {count}m",
-      "inHours": "In {count}h",
-      "inHoursMinutes": "In {hours}h {minutes}m",
-      "lateByMinutes": "+{count}m",
-      "lateByHours": "+{count}h",
-      "lateByHoursMinutes": "+{hours}h {minutes}m"
+      "today": "Today",
+      "relativeDate": "{day}, {date}"
     },
     "audit": {
-      "you": "You",
-      "correctiveAction": "Corrective action"
+      "you": "You"
     },
     "recordDialog": {
-      "allowed": "Allowed {limits}",
-      "withinLimits": "Within limits",
-      "outsideLimits": "Outside limits",
-      "srWithinLimits": "{value}, within the allowed limits",
-      "srOutsideLimits": "{value}, outside the allowed limits",
-      "noPriorReading": "First reading today",
-      "lastReading": "Last: {value} at {time}",
-      "presets": {
-        "movedProduct": "Moved product",
-        "adjustedThermostat": "Adjusted thermostat",
-        "calledService": "Called service",
-        "rejectedDelivery": "Rejected the delivery",
-        "discardedProduct": "Discarded product",
-        "recleaned": "Cleaned again",
-        "rechecked": "Repeated the check",
-        "notifiedManager": "Notified manager"
-      },
       "validation": {
-        "readingRequired": "Enter a reading",
-        "readingInvalid": "Enter a valid number for this unit",
         "correctiveRequired": "Select or describe the corrective action taken",
         "notesMax": "Notes can be up to 900 characters"
       },
-      "close": "Close",
-      "back": "Back",
-      "continue": "Continue",
       "save": "Save",
       "saveDeviation": "Save deviation",
-      "skip": "Skip",
-      "skipLabel": "Skip {title}",
-      "roundProgress": "{position} / {total}",
-      "roundProgressLabel": "Check {position} of {total}",
-      "roundSummary": "{count, plural, one {# check saved} other {# checks saved}}",
-      "roundSummaryDeviations": "{saved} saved · {deviations} need attention",
-      "failedTitle": "This check failed",
-      "correctiveTitle": "What did you do?",
-      "correctiveTitleOptional": "What did you do? (optional)",
+      "correctiveTitle": "Corrective action",
+      "correctiveTitleOptional": "Corrective action (optional)",
       "notesLabel": "Notes",
-      "notesPlaceholder": "For example, moved the products and notified the manager…",
-      "notesCharacterCount": "{current} / {max}"
+      "notesPlaceholder": "Add a note",
+      "noteOnlyPlaceholder": "Describe what was done"
     },
     "a11y": {
-      "completed": "{title} completed",
-      "recorded": "{title} recorded",
-      "undone": "{title} undone"
+      "recorded": "{title} recorded"
     },
     "empty": {
       "title": "No tasks for today",
       "description": "There is nothing scheduled for this location on the selected day."
     },
-    "error": {
-      "title": "Could not load today's tasks",
-      "description": "Check your connection and try again.",
-      "retry": "Retry"
-    },
     "toasts": {
-      "completed": "Completed · {title}",
       "recorded": "Recorded · {title}",
-      "undoError": "Could not undo task",
-      "doneError": "Could not complete task",
-      "alreadyRecorded": "Already recorded. Showing the latest saved value",
       "missingForm": "This task's form could not be loaded. Refresh and try again."
     },
     "room": {
-      "progress": "{done} of {total} done",
-      "recordRoom": "Record room",
-      "recordRoomLabel": "Record the {room} checks ({count})",
       "wholeRoom": "Whole room"
+    },
+    "logEntry": {
+      "button": "Log an entry",
+      "title": "Log an entry",
+      "description": "Choose what you are recording.",
+      "pickItem": "Choose the item you checked.",
+      "back": "Back",
+      "save": "Save",
+      "savedNow": "Saved with the current time, {time}.",
+      "savedToDay": "Saved to {date}.",
+      "noItems": "This location has no equipment or areas yet."
+    },
+    "day": {
+      "yesterday": "Yesterday",
+      "tomorrow": "Tomorrow"
+    },
+    "yesterdayHint": "{count, plural, one {# check from yesterday is not filled in} other {# checks from yesterday are not filled in}}",
+    "sections": {
+      "todo": "Now",
+      "later": "Later",
+      "planned": "Planned",
+      "done": "Done",
+      "count": "{count, plural, one {# check} other {# checks}}",
+      "doneWithDeviations": "{count} · {deviations, plural, one {# needs attention} other {# need attention}}"
+    },
+    "futureNote": "These checks open on the day.",
+    "panel": {
+      "completed": "Completed · {when}",
+      "completedBadge": "Completed",
+      "empty": "Select a check from the list.",
+      "back": "Back"
+    },
+    "inline": {
+      "completeAll": "Complete all",
+      "done": "Done",
+      "reset": "Reset",
+      "savedAction": "Action taken: {action}",
+      "notePlaceholder": "Add a note"
+    },
+    "items": {
+      "anyOrder": "Open any item to fill it in. The order is up to you.",
+      "saveNext": "Save and next"
     }
   },
   "DataTable": {
@@ -630,9 +601,6 @@
       "nameLabel": "Name",
       "namePlaceholder": "Fridge check",
       "categoryLabel": "Category",
-      "categoryPlaceholder": "Select a category",
-      "correctiveLabel": "Require a corrective action when a check fails",
-      "correctiveDescription": "Staff must describe what they did before saving a failed record.",
       "fieldsLabel": "Fields",
       "addField": "Add field",
       "fieldTypeHints": {
@@ -659,17 +627,14 @@
       "helpLabel": "Help text",
       "helpPlaceholder": "Optional hint shown under the question",
       "requiredLabel": "Answer required",
-      "requiredCheckbox": "Must be ticked to save",
       "multiline": "Allow several lines",
       "unitLabel": "Unit",
       "limitsLabel": "Limits",
       "limitMin": "Minimum",
       "limitMax": "Maximum",
       "noLimit": "No limit",
-      "limitsHint": "A reading outside the limits fails the check. Leave one side empty for a floor or a ceiling. Tasks can set their own limits per equipment or area.",
       "multiple": "Allow several answers",
       "optionsLabel": "Options",
-      "optionsHint": "Mark the options that mean the check failed.",
       "optionLabel": "Option {index}",
       "optionFails": "Fails",
       "removeOption": "Remove option {index}",
@@ -694,11 +659,8 @@
         "published": "Version {version} published."
       },
       "appliesToLabel": "Filled in for",
-      "appliesToPlaceholder": "Select what it checks",
-      "appliesToHint": "Tasks using an each-item form pick any mix of equipment, rooms and fixtures.",
       "backToForms": "Forms",
       "untitledForm": "Untitled form",
-      "versionBadge": "v{version}",
       "fieldCountOf": "{count} of {max} fields",
       "modeLabel": "Mode",
       "modeBuild": "Build",
@@ -707,17 +669,14 @@
       "publish": "Publish",
       "save": "Save",
       "addFieldTitle": "Add a field",
-      "addFieldHint": "Adds it below the selected field.",
+      "addFieldHint": "Click to add below the selected field, or drag it onto the form.",
       "failsWhenTitle": "A record fails when",
       "failsWhenEmpty": "Nothing yet. Add limits to a measurement or mark a choice option as failing.",
-      "failsWhenCorrective": "Staff then describe the corrective action they took.",
       "failRuleRange": "{field} is below {min} or above {max}",
       "failRuleBelow": "{field} is below {min}",
       "failRuleAbove": "{field} is above {max}",
       "failRuleOptions": "{field}: {options}",
-      "formSettings": "Form settings",
-      "fieldTab": "Field",
-      "inspectorLabel": "Field settings",
+      "inspectorLabel": "Details",
       "selectFieldTitle": "Select a field to edit it",
       "selectFieldDescription": "Or add one from the list on the left.",
       "fieldPosition": "Field {index} of {count}",
@@ -731,30 +690,81 @@
       "passesAlways": "Every reading passes",
       "failsBelow": "Fails below {value}",
       "failsAbove": "Fails above {value}",
-      "requiredHint": "Staff can't save the record without an answer.",
-      "requiredCheckboxHint": "Staff can't save the record until this is ticked.",
       "optional": "Optional",
       "tickToConfirm": "Tick to confirm",
       "typeNote": "Type a note",
       "pickDate": "Pick a date",
       "untitledOption": "Untitled option",
       "failingOptions": "{failing} of {total} fail",
-      "correctiveBadge": "Corrective action on fail",
-      "emptyCanvas": "No fields yet. Add the first one.",
-      "versionNoteNew": "Not published yet. Publishing creates version 1. Later changes to the fields publish a new version; saved records keep the version they were recorded with.",
-      "versionNote": "Version {version} is live. Changing the fields publishes version {next}; saved records keep the version they were recorded with.",
+      "emptyCanvas": "No fields yet. Click a type or drag one in.",
       "discardTitle": "Discard your changes?",
       "discardDescription": "You have changes that aren't published. Leaving now loses them.",
       "discardCancel": "Keep editing",
       "discardConfirm": "Discard",
       "close": "Close",
-      "done": "Done"
+      "done": "Done",
+      "corrective": {
+        "heading": "Corrective actions",
+        "subheading": "When a check fails",
+        "answersLabel": "Answers",
+        "answersCount": "{count} of {max}",
+        "answerLabel": "Answer {index}",
+        "answerPlaceholder": "Describe the action",
+        "removeAnswer": "Remove answer {index}",
+        "addAnswer": "Add answer",
+        "empty": "No answers yet. Staff write a note instead.",
+        "suggestionsLabel": "Common for this category",
+        "allowNote": "Allow a note",
+        "divider": "When a check fails",
+        "editCard": "Edit corrective actions",
+        "untitledAnswer": "Untitled answer",
+        "meta": "{count, plural, =0 {Note only} one {# answer} other {# answers}}",
+        "answerLabelError": "Every answer needs a label.",
+        "suggestions": {
+          "movedProduct": "Moved product",
+          "adjustedThermostat": "Adjusted thermostat",
+          "calledService": "Called service",
+          "rejectedDelivery": "Rejected the delivery",
+          "discardedProduct": "Discarded product",
+          "recleaned": "Cleaned again",
+          "rechecked": "Repeated the check",
+          "notifiedManager": "Notified manager"
+        },
+        "onDescription": "Staff record what they did",
+        "offDescription": "Off for this form",
+        "multipleHint": "Staff can pick more than one",
+        "allowNoteHint": "Staff can add their own words"
+      },
+      "formDetails": "Form details",
+      "formDetailsHint": "Name, category and what it's filled in for",
+      "editFormDetails": "Edit form details",
+      "nameHint": "Staff see this name on their Today list.",
+      "categoryMissing": "Choose a category",
+      "appliesToMissing": "Choose what it's filled in for",
+      "addFieldEnd": "Add a field at the end",
+      "emptyCanvasMobile": "No fields yet. Tap Add field to start.",
+      "reorderHint": "Drag the grip to reorder",
+      "dragHandle": "Drag to reorder {label}",
+      "dnd": {
+        "instructions": "To pick up a field, press Space or Enter. Use the arrow keys to move it, then Space or Enter to drop it, or Escape to cancel.",
+        "pickedUp": "Picked up {label}, position {position} of {count}.",
+        "movedTo": "{label} moved to position {position} of {count}.",
+        "dropped": "{label} dropped at position {position} of {count}.",
+        "cancelled": "Moving {label} cancelled."
+      },
+      "onDemandLabel": "Log this when needed",
+      "onDemandHint": "Logged from Today, without a schedule",
+      "backToStart": "Back",
+      "categoryPlaceholder": "Select a category",
+      "requiredHint": "Needed to save the check",
+      "multilineHint": "A bigger box for long notes",
+      "multipleHint": "Staff can pick more than one",
+      "dropHere": "Drop here"
     },
     "preview": {
       "hint": "Try it out. Nothing is saved.",
       "emptyTitle": "Nothing to preview yet",
       "emptyDescription": "Add a field to see the form as staff will.",
-      "correctiveActionRequired": "Saving this would ask for a corrective action.",
       "tryTitle": "Try it out",
       "tryDescription": "Fill it in as staff would. Nothing is saved.",
       "resultTitle": "Result",
@@ -764,7 +774,6 @@
         "fail": "Needs attention",
         "incomplete": "Not complete"
       },
-      "needsAttentionTitle": "This check needs attention",
       "reasonFailed": "{field} fails the check",
       "reasonMissing": "{field} is required",
       "reasonAllPass": "Every answer is within limits.",
@@ -787,7 +796,7 @@
       "summaryAppliesTo": "Filled in for",
       "summaryOnFail": "On fail",
       "onFailRequired": "Corrective action required",
-      "onFailOptional": "Corrective action optional",
+      "onFailOff": "No corrective action",
       "noIssues": "No issues found",
       "lockNote": "Published fields don't change. Later edits publish a new version; saved records keep the version they were recorded with.",
       "doneTitle": "{name} is published",
@@ -799,13 +808,6 @@
     "create": {
       "title": "New form",
       "close": "Close",
-      "progress": "Progress",
-      "stepOf": "Step {current} of {total}",
-      "steps": {
-        "start": "Start",
-        "setup": "Set up",
-        "fields": "Fields"
-      },
       "startTitle": "How do you want to start?",
       "startDescription": "Ready-made forms follow common HACCP checks. You can change every field before you publish.",
       "blank": "Blank form",
@@ -813,14 +815,7 @@
       "starters": "Ready-made forms",
       "filterLabel": "Filter by category",
       "all": "All",
-      "fieldCount": "{count, plural, one {# field} other {# fields}}",
-      "setupTitle": "Set up the form",
-      "setupDescription": "These choices shape how the form is used. You can change them later in Form settings.",
-      "nameHint": "Staff see this name on their Today list.",
-      "startingFrom": "Starting from",
-      "fieldsNext": "You'll add, remove and reorder fields in the next step.",
-      "back": "Back",
-      "continue": "Continue to fields"
+      "fieldCount": "{count, plural, one {# field} other {# fields}}"
     }
   },
   "Forms": {
@@ -881,7 +876,8 @@
       "signToggle": "Negative value",
       "withinLimits": "Within limits",
       "outsideLimits": "Outside limits",
-      "allowed": "Allowed {limits}"
+      "allowed": "Allowed {limits}",
+      "rangeTo": "to"
     },
     "answerValidation": {
       "required": "This answer is required.",
@@ -898,9 +894,11 @@
       "location": "Whole location"
     },
     "appliesToHints": {
-      "per_item": "One check per fridge, room, wall… a task picks (e.g. temperatures, cleaning)",
-      "location": "Once per time slot (e.g. opening checklist)"
-    }
+      "per_item": "One check per item a task picks",
+      "location": "One check per time slot"
+    },
+    "datePlaceholder": "Pick a date",
+    "dateClear": "Clear date"
   },
   "RecordsPage": {
     "title": "Records",
@@ -983,7 +981,12 @@
       "form": "Form",
       "formVersion": "{name} · version {version}",
       "target": "Equipment or area",
-      "answers": "Answers"
+      "answers": "Answers",
+      "happened": "Happened",
+      "kind": "Type"
+    },
+    "kind": {
+      "onDemand": "On demand"
     }
   },
   "RecordsReportPage": {
@@ -1043,7 +1046,8 @@
     "footer": {
       "generatedBy": "Generated by SafeCheck",
       "disclaimer": "This report shows the value currently stored for each record at the time it was generated."
-    }
+    },
+    "onDemandSuffix": "on demand"
   },
   "TasksPage": {
     "title": "Tasks",
@@ -1052,7 +1056,6 @@
     "emptyDescription": "Add your first task to build the daily checklist.",
     "searchPlaceholder": "Search tasks",
     "add": "Add task",
-    "duplicateSuggestedTitle": "{title} (Copy)",
     "edit": "Edit",
     "duplicate": "Duplicate",
     "delete": "Delete",
@@ -1179,11 +1182,6 @@
         "noForms": "There are no forms yet.",
         "createForm": "Create a form",
         "required": "Choose a form.",
-        "titleLabel": "Task name",
-        "titlePlaceholder": "e.g. Prep fridge temperatures",
-        "titleHint": "Shown to staff on the Today list.",
-        "titleRequired": "Enter a task name.",
-        "titleMaxLength": "Keep the name to {max} characters or fewer.",
         "choose": "Choose a form",
         "change": "Change",
         "search": "Search {count, plural, one {# form} other {# forms}}",
@@ -1282,30 +1280,17 @@
         "times": "Times",
         "timesCount": "{count, plural, one {# time a day} other {# times a day}}",
         "timesUpTo": "Up to {max} a day",
-        "modeLabel": "How the times are set",
-        "modeTimes": "At set times",
-        "modeRepeat": "Repeat every…",
-        "noTimes": "No times yet. Add the first one below.",
-        "noTimesShort": "No times yet.",
-        "timeToAdd": "Time to add",
-        "addTime": "Add time",
-        "add": "Add",
         "clearAll": "Clear all",
-        "enterHint": "Enter adds the time · up to {max} a day",
-        "removeTime": "Remove {time}",
-        "every": "Every",
-        "from": "From",
-        "until": "Until",
-        "repeatSummary": "{count, plural, one {# check a day} other {# checks a day}}, every {interval} from {from} to {until}",
-        "repeatEmpty": "Set a start time before the end time.",
-        "toList": "Edit these times one by one",
         "timesRequired": "Add at least one time.",
-        "enterTime": "Enter a time first.",
-        "duplicateTime": "{time} is already on the list.",
         "maxTimes": "You can add up to {max} times a day.",
         "glance": "Day at a glance",
         "daysDescription": "Which days it repeats on",
-        "timesDescription": "When each check is due"
+        "timesDescription": "When each check is due",
+        "timesPlaceholder": "Add a time, e.g. 08:00",
+        "noTimeMatch": "No matching time",
+        "timeToAdd": "Time to add",
+        "add": "Add",
+        "removeTime": "Remove {time}"
       },
       "window": {
         "title": "Time window",
@@ -1339,7 +1324,6 @@
         "label": "Preview",
         "summary": "Summary",
         "start": "Choose a form to start. This fills in as you go.",
-        "form": "Form",
         "checks": "Checks",
         "days": "Days",
         "times": "Times",
@@ -1360,7 +1344,6 @@
         "stillNeeded": "Still needed",
         "missing": {
           "form": "Choose a form",
-          "title": "Name the task",
           "targets": "Choose what it checks",
           "days": "Choose at least one day",
           "times": "Add at least one time"

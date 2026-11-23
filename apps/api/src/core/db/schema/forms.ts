@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   pgTable,
   text,
@@ -19,6 +20,8 @@ export const forms = pgTable(
     name: text("name").notNull(),
     category: text("category").notNull(),
     appliesTo: text("applies_to").notNull(),
+    /** Staff may log it from Today whenever it happens, at any location, with the form's own limits. */
+    onDemand: boolean("on_demand").notNull().default(false),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()

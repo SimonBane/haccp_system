@@ -31,6 +31,7 @@ export function toFormResponse({
     name: form.name,
     category: form.category as FormResponse["category"],
     appliesTo: form.appliesTo as FormResponse["appliesTo"],
+    onDemand: form.onDemand,
     latestVersion: toFormVersionResponse(latestVersion),
     createdAt: form.createdAt.toISOString(),
     updatedAt: form.updatedAt.toISOString(),

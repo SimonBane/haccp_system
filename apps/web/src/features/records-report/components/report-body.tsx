@@ -42,9 +42,9 @@ export function ReportBody({ rows }: { rows: ReportRow[] }) {
         </tbody>,
         ...group.rows.map((row) => (
           <tbody
-            key={row.occurrenceId}
+            key={row.id}
             data-report-record
-            data-occurrence-id={row.occurrenceId}
+            data-row-id={row.id}
             className="border-b border-black/15 align-top"
           >
             <tr>
@@ -66,9 +66,13 @@ export function ReportBody({ rows }: { rows: ReportRow[] }) {
                     : "py-0.5 pr-2"
                 }
               >
-                {row.late
-                  ? `${t(`status.${row.status}`)}, ${t("lateSuffix")}`
-                  : t(`status.${row.status}`)}
+                {[
+                  t(`status.${row.status}`),
+                  row.late ? t("lateSuffix") : null,
+                  row.onDemand ? t("onDemandSuffix") : null,
+                ]
+                  .filter(Boolean)
+                  .join(", ")}
               </td>
               <td className="py-0.5 [overflow-wrap:anywhere]">
                 {row.recordedBy === undefined

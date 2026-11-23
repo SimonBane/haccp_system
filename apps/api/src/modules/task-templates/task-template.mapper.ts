@@ -14,7 +14,6 @@ export function toTaskTemplateResponse(
   return {
     id: template.id,
     locationId: template.locationId,
-    title: template.title,
     formId: template.formId,
     formName: row.formName,
     formCategory: row.formCategory as TaskTemplateResponse["formCategory"],

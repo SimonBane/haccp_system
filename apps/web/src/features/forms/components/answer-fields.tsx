@@ -9,10 +9,8 @@ import {
   type MeasurementField,
   type ResolvedLimits,
 } from "@haccp/shared";
-import { CheckIcon, CircleAlertIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   REQUIRED_LABEL_CLASS,
@@ -22,6 +20,7 @@ import {
   FieldLabel,
   FieldTitle,
 } from "@/components/ui/field";
+import { DatePicker } from "@/components/date-picker";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -32,7 +31,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import { useAnswerFormat } from "../hooks/use-answer-format";
 import {
@@ -43,6 +41,8 @@ import {
   type FieldDraft,
 } from "../lib/answer-draft";
 import { measurementVerdict } from "../lib/measurement";
+import { ChoiceToggles } from "./choice-toggles";
+import { LimitChip } from "./limit-chip";
 import { MeasurementInput } from "./measurement-input";
 
 /** Above this a row of toggles wraps badly on a phone, so a single choice becomes a select. */
@@ -210,14 +210,13 @@ function AnswerField({
           }
         />
       ) : (
-        <Input
+        <DatePicker
           id={id}
-          type="date"
           value={value}
-          aria-invalid={Boolean(issue)}
-          onChange={(event) =>
-            onChange({ type: FIELD_TYPE.DATE, value: event.target.value })
-          }
+          invalid={Boolean(issue)}
+          placeholder={t("datePlaceholder")}
+          clearLabel={field.required ? undefined : t("dateClear")}
+          onChange={(next) => onChange({ type: FIELD_TYPE.DATE, value: next })}
         />
       )}
       {help}
@@ -260,39 +259,39 @@ function MeasurementAnswer({
 
   return (
     <Field data-invalid={invalid}>
-      <FieldLabel
-        htmlFor={id}
-        className={field.required ? REQUIRED_LABEL_CLASS : undefined}
-      >
-        {field.label}
-      </FieldLabel>
+      <div className="flex items-center justify-between gap-3">
+        <FieldLabel
+          htmlFor={id}
+          className={field.required ? REQUIRED_LABEL_CLASS : undefined}
+        >
+          {field.label}
+        </FieldLabel>
+        {limitsText ? (
+          <LimitChip
+            limits={limitsText}
+            label={t("measurement.allowed", { limits: limitsText })}
+            verdict={verdict}
+          />
+        ) : null}
+      </div>
       <MeasurementInput
         id={id}
         unit={field.unit}
         symbol={format.symbol(field.unit)}
         draft={draft}
         separator={separator}
+        verdict={verdict}
         invalid={invalid}
         describedById={statusId}
         signLabel={t("measurement.signToggle")}
         onChange={(next) => onChange({ type: FIELD_TYPE.MEASUREMENT, ...next })}
       />
-      <div
-        id={statusId}
-        aria-live="polite"
-        className="flex min-h-5 flex-wrap items-center gap-2 text-xs text-muted-foreground"
-      >
-        {verdict ? (
-          <Badge variant={verdict === "pass" ? "success" : "destructive"}>
-            {verdict === "pass" ? <CheckIcon /> : <CircleAlertIcon />}
-            {verdict === "pass"
-              ? t("measurement.withinLimits")
-              : t("measurement.outsideLimits")}
-          </Badge>
-        ) : null}
-        {limitsText ? (
-          <span>{t("measurement.allowed", { limits: limitsText })}</span>
-        ) : null}
+      <div id={statusId} aria-live="polite" className="sr-only">
+        {verdict === "pass"
+          ? t("measurement.withinLimits")
+          : verdict === "fail"
+            ? t("measurement.outsideLimits")
+            : null}
       </div>
       {help}
       {error}
@@ -397,25 +396,13 @@ function ChoiceAnswer({
       <FieldTitle id={`${id}-label`} className={labelClass}>
         {field.label}
       </FieldTitle>
-      <ToggleGroup
-        aria-labelledby={`${id}-label`}
-        aria-invalid={invalid}
-        value={selected.slice(0, 1)}
-        onValueChange={(next) => onChange(next.slice(-1))}
-        variant="outline"
-        spacing={2}
-        className="flex w-full flex-wrap"
-      >
-        {field.options.map((option) => (
-          <ToggleGroupItem
-            key={option.id}
-            value={option.id}
-            className="h-auto min-h-(--control-h) min-w-20 flex-[1_1_auto] cursor-pointer py-1.5 whitespace-normal aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary/90"
-          >
-            {option.label}
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
+      <ChoiceToggles
+        labelledBy={`${id}-label`}
+        options={field.options}
+        selected={selected}
+        invalid={invalid}
+        onChange={(next) => onChange(next.slice(-1))}
+      />
       {help}
       {error}
     </Field>

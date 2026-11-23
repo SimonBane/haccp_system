@@ -37,7 +37,7 @@ export type PublishSummary = {
   fieldCount: number;
   appliesToLabel: string;
   rules: FailRule[];
-  correctiveRequired: boolean;
+  hasCorrective: boolean;
 };
 
 type Props = {
@@ -71,7 +71,7 @@ export function PublishDialog({
         {step?.kind === "done" ? (
           <>
             <AlertDialogHeader>
-              <AlertDialogMedia className="bg-success/10 text-success">
+              <AlertDialogMedia className="bg-success text-success-foreground">
                 <CircleCheckIcon />
               </AlertDialogMedia>
               <AlertDialogTitle>
@@ -124,9 +124,7 @@ export function PublishDialog({
                 [t("summaryAppliesTo"), summary.appliesToLabel],
                 [
                   t("summaryOnFail"),
-                  summary.correctiveRequired
-                    ? t("onFailRequired")
-                    : t("onFailOptional"),
+                  summary.hasCorrective ? t("onFailRequired") : t("onFailOff"),
                 ],
               ].map(([term, value]) => (
                 <div key={term} className="flex justify-between gap-4 py-2.5">
@@ -136,7 +134,7 @@ export function PublishDialog({
               ))}
             </dl>
 
-            <FailRulesSummary rules={summary.rules} correctiveRequired={false} />
+            <FailRulesSummary rules={summary.rules} />
 
             <p className="flex items-center gap-2 text-sm">
               <CheckIcon className="size-4 text-success" aria-hidden />
@@ -196,9 +194,7 @@ function DropsContent({
               key={`${drop.templateId}:${drop.targetId}:${drop.fieldId}`}
               className="flex flex-col gap-0.5 px-3 py-2"
             >
-              <span className="font-medium">
-                {drop.templateTitle} · {drop.targetName}
-              </span>
+              <span className="font-medium">{drop.targetName}</span>
               <span className="text-muted-foreground">
                 {t("dropLine", {
                   field: drop.fieldLabel,

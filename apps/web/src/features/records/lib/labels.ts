@@ -1,6 +1,8 @@
 import {
   type FormCategory,
   RECORD_DISPLAY_STATE,
+  RECORD_KIND,
+  type RecordKind,
   RECORD_RESULT,
   RECORD_TIMING,
   type RecordDisplayState,
@@ -43,6 +45,7 @@ export type RecordsLabels = {
   timing: Record<RecordTiming, string>;
   result: Record<RecordResult, string>;
   category: Record<FormCategory, string>;
+  onDemand: string;
 };
 
 /** Timing only qualifies an active submission — an Open row's own badge already reads "Open". */
@@ -66,12 +69,18 @@ export function resolvedTiming(item: {
     : item.timing;
 }
 
+/** An on-demand entry has no deadline to be on time for, so it is labelled by kind instead. */
+export function isOnDemand(item: { kind: RecordKind }): boolean {
+  return item.kind === RECORD_KIND.ON_DEMAND;
+}
+
 /** Badge value for the compact grid/mobile views — null when nothing should render. */
 export function timingBadgeValue(item: {
+  kind: RecordKind;
   displayState: RecordDisplayState;
   timing: RecordTiming;
 }): RecordTiming | null {
-  if (!showsTiming(item.displayState, item.timing)) {
+  if (isOnDemand(item) || !showsTiming(item.displayState, item.timing)) {
     return null;
   }
   return item.timing === RECORD_TIMING.NO_DEADLINE

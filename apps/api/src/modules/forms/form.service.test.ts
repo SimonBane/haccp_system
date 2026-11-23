@@ -70,6 +70,7 @@ const formRow = {
   name: "Fridge check",
   category: "temperature",
   appliesTo: "per_item",
+  onDemand: false,
   archivedAt: null,
   createdAt: new Date("2026-10-01T00:00:00Z"),
   updatedAt: new Date("2026-10-01T00:00:00Z"),
@@ -87,7 +88,6 @@ function versionRow(id: string, version: number, definition: FormDefinition) {
 
 const overrideRow = {
   templateId: TEMPLATE_ID,
-  templateTitle: "Morning fridge check",
   locationId: LOCATION_ID,
   locationName: "Main kitchen",
   targetId: TARGET_ID,
@@ -142,6 +142,7 @@ describe("formService.create", () => {
       name: "Fridge check",
       category: "temperature",
       appliesTo: "per_item",
+      onDemand: false,
       definition: v1,
     });
 
@@ -161,6 +162,7 @@ describe("formService.create", () => {
         name: "Fridge check",
         category: "temperature",
         appliesTo: "per_item",
+        onDemand: false,
         definition: v1,
       }),
     ).rejects.toMatchObject({ code: API_ERROR_CODE.FORM_NAME_EXISTS });
@@ -180,7 +182,7 @@ describe("formService.update", () => {
       { templateId: TEMPLATE_ID, targetCount: 0 },
     ]);
 
-    await formService.update(db, ORG_ID, FORM_ID, input);
+    await formService.update(db, ORG_ID, TIME_ZONE, FORM_ID, input);
 
     expect(formRepository.updateActive).toHaveBeenCalledWith(
       db,
@@ -197,17 +199,54 @@ describe("formService.update", () => {
     ]);
 
     await expect(
-      formService.update(db, ORG_ID, FORM_ID, {
+      formService.update(db, ORG_ID, TIME_ZONE, FORM_ID, {
         ...input,
         appliesTo: "location",
       }),
     ).rejects.toMatchObject({ code: API_ERROR_CODE.FORM_APPLIES_TO_IN_USE });
   });
 
+  it("keeps the on-demand setting when the update leaves it out", async () => {
+    formRepository.updateActive.mockResolvedValue({ id: FORM_ID });
+    formRepository.findActiveWithLatestVersion.mockResolvedValueOnce({
+      form: { ...formRow, onDemand: true },
+      latestVersion: versionRow(VERSION_1_ID, 1, v1),
+    });
+
+    await formService.update(db, ORG_ID, TIME_ZONE, FORM_ID, {
+      ...input,
+      appliesTo: "per_item",
+    });
+
+    expect(formRepository.updateActive).toHaveBeenCalledWith(
+      db,
+      ORG_ID,
+      FORM_ID,
+      expect.objectContaining({ onDemand: true }),
+    );
+  });
+
+  it("turns logging when needed on and off", async () => {
+    formRepository.updateActive.mockResolvedValue({ id: FORM_ID });
+
+    await formService.update(db, ORG_ID, TIME_ZONE, FORM_ID, {
+      ...input,
+      appliesTo: "per_item",
+      onDemand: true,
+    });
+
+    expect(formRepository.updateActive).toHaveBeenCalledWith(
+      db,
+      ORG_ID,
+      FORM_ID,
+      expect.objectContaining({ onDemand: true }),
+    );
+  });
+
   it("skips the check when applies-to is unchanged", async () => {
     formRepository.updateActive.mockResolvedValue({ id: FORM_ID });
 
-    await formService.update(db, ORG_ID, FORM_ID, {
+    await formService.update(db, ORG_ID, TIME_ZONE, FORM_ID, {
       ...input,
       appliesTo: "per_item",
     });
@@ -215,11 +254,37 @@ describe("formService.update", () => {
     expect(formRepository.findTemplateTargetCountsByForm).not.toHaveBeenCalled();
   });
 
+  it("renames the upcoming checks of tasks using a renamed form", async () => {
+    formRepository.updateActive.mockResolvedValue({ id: FORM_ID });
+
+    await formService.update(db, ORG_ID, TIME_ZONE, FORM_ID, {
+      ...input,
+      name: "Fridge temperature",
+      appliesTo: "per_item",
+    });
+
+    expect(taskOccurrenceService.reconcileTemplateIds).toHaveBeenCalledWith(db, {
+      templateIds: [TEMPLATE_ID],
+      timeZone: TIME_ZONE,
+    });
+  });
+
+  it("leaves upcoming checks alone when the name is unchanged", async () => {
+    formRepository.updateActive.mockResolvedValue({ id: FORM_ID });
+
+    await formService.update(db, ORG_ID, TIME_ZONE, FORM_ID, {
+      ...input,
+      appliesTo: "per_item",
+    });
+
+    expect(taskOccurrenceService.reconcileTemplateIds).not.toHaveBeenCalled();
+  });
+
   it("is not found for an archived or foreign form", async () => {
     formRepository.findActiveWithLatestVersion.mockResolvedValue(null);
 
     await expect(
-      formService.update(db, ORG_ID, FORM_ID, input),
+      formService.update(db, ORG_ID, TIME_ZONE, FORM_ID, input),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 });
@@ -310,7 +375,6 @@ describe("formService.createVersion", () => {
       droppedOverrides: [
         {
           templateId: TEMPLATE_ID,
-          templateTitle: "Morning fridge check",
           locationId: LOCATION_ID,
           locationName: "Main kitchen",
           targetId: TARGET_ID,

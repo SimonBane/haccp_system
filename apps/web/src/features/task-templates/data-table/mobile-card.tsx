@@ -45,8 +45,8 @@ export function TaskTemplatesMobileCard({
           <CategoryIcon className="size-[18px]" aria-hidden />
         </span>
       }
-      title={task.title}
-      subtitle={`${task.formName} · ${targetsText(task, appliesTo, t).names}`}
+      title={task.formName}
+      subtitle={targetsText(task, appliesTo, t).names}
       details={
         <div className="flex flex-col gap-2">
           <TimeChips times={times.length > 4 ? [labels.times(times)] : times} />

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   CORRECTIVE_ACTION_MODE,
+  DEFAULT_CORRECTIVE_SETTINGS,
   FIELD_TYPE,
   formElementIdSchema,
   isCalendarDateString,
@@ -10,6 +11,8 @@ import {
   RECORD_RESULT,
   TEXT_ANSWER_MAX_LENGTH,
   type ChoiceField,
+  type CorrectiveAnswer,
+  type CorrectiveSettings,
   type FormDefinition,
   type FormField,
   type LimitOverrides,
@@ -290,6 +293,71 @@ export function requiresCorrectiveAction(
     result === RECORD_RESULT.FAIL &&
     definition.correctiveAction === CORRECTIVE_ACTION_MODE.REQUIRED_ON_FAIL
   );
+}
+
+export function asksForCorrectiveAction(definition: FormDefinition): boolean {
+  return definition.correctiveAction !== CORRECTIVE_ACTION_MODE.OFF;
+}
+
+export function correctiveSettings(definition: FormDefinition): CorrectiveSettings {
+  return definition.corrective ?? DEFAULT_CORRECTIVE_SETTINGS;
+}
+
+export type CorrectiveInput = { answerIds: readonly string[]; note: string };
+
+export type CorrectiveIssue =
+  | "not_asked"
+  | "unknown_answer"
+  | "single_answer_only"
+  | "note_not_allowed"
+  | "required";
+
+export type ResolvedCorrective = {
+  /** The chosen answers in the form's own order. */
+  answers: CorrectiveAnswer[];
+  note: string | null;
+  /** Answers then note, as one line for a record's `correctiveAction`. */
+  text: string | null;
+  issue: CorrectiveIssue | null;
+};
+
+const CORRECTIVE_TEXT_DELIMITER = ", ";
+
+/** Checks what was recorded about a failed check against the form's own corrective settings. */
+export function resolveCorrective(
+  definition: FormDefinition,
+  input: CorrectiveInput,
+): ResolvedCorrective {
+  const settings = correctiveSettings(definition);
+  const chosen = new Set(input.answerIds);
+  const answers = settings.answers.filter((answer) => chosen.has(answer.id));
+  const note = input.note.trim() || null;
+  // A form with no answers always takes the note: there is nothing else to fill in.
+  const noteAllowed = settings.allowNote || settings.answers.length === 0;
+
+  let issue: CorrectiveIssue | null = null;
+  if (!asksForCorrectiveAction(definition) && (chosen.size > 0 || note !== null)) {
+    issue = "not_asked";
+  } else if (answers.length !== chosen.size) issue = "unknown_answer";
+  else if (!settings.multiple && answers.length > 1) issue = "single_answer_only";
+  else if (note !== null && !noteAllowed) issue = "note_not_allowed";
+  else if (
+    definition.correctiveAction === CORRECTIVE_ACTION_MODE.REQUIRED_ON_FAIL &&
+    answers.length === 0 &&
+    note === null
+  ) {
+    issue = "required";
+  }
+
+  const parts = answers.map((answer) => answer.label);
+  if (note !== null) parts.push(note);
+
+  return {
+    answers,
+    note,
+    text: parts.length > 0 ? parts.join(CORRECTIVE_TEXT_DELIMITER) : null,
+    issue,
+  };
 }
 
 /**

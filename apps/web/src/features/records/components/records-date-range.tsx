@@ -20,17 +20,8 @@ import {
   type RecordsRangePreset,
 } from "@/features/records/lib/date-range";
 import { formatOccurrenceDate } from "@/features/records/lib/format";
+import { calendarDateToLocalDate, localTodayDateFromDate } from "@/lib/date";
 import type { RecordsDateRange } from "@/features/records/lib/records-grid-config";
-
-/** The picker is a widget: dates stay canonical strings, only the UI uses `Date`. */
-function toPickerDate(date: string): Date {
-  const [year, month, day] = date.split("-").map(Number);
-  return new Date(year!, month! - 1, day!);
-}
-
-function fromPickerDate(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
 
 type RecordsDateRangeControlProps = {
   range: RecordsDateRange;
@@ -52,8 +43,8 @@ export function RecordsDateRangeControl({
   const selected = useMemo<DateRange>(
     () =>
       draft ?? {
-        from: toPickerDate(range.dateFrom),
-        to: toPickerDate(range.dateTo),
+        from: calendarDateToLocalDate(range.dateFrom),
+        to: calendarDateToLocalDate(range.dateTo),
       },
     [draft, range.dateFrom, range.dateTo],
   );
@@ -63,8 +54,8 @@ export function RecordsDateRangeControl({
 
     const error = recordsRangeError(
       {
-        dateFrom: fromPickerDate(selected.from),
-        dateTo: fromPickerDate(selected.to),
+        dateFrom: localTodayDateFromDate(selected.from),
+        dateTo: localTodayDateFromDate(selected.to),
       },
       today,
     );
@@ -101,8 +92,8 @@ export function RecordsDateRangeControl({
     if (!selected.from || !selected.to) return;
 
     const candidate = {
-      dateFrom: fromPickerDate(selected.from),
-      dateTo: fromPickerDate(selected.to),
+      dateFrom: localTodayDateFromDate(selected.from),
+      dateTo: localTodayDateFromDate(selected.to),
     };
 
     if (recordsRangeError(candidate, today)) return;
@@ -156,11 +147,11 @@ export function RecordsDateRangeControl({
               mode="range"
               autoFocus
               numberOfMonths={isMobile ? 1 : 2}
-              endMonth={toPickerDate(range.dateTo)}
+              endMonth={calendarDateToLocalDate(range.dateTo)}
               selected={selected}
               onSelect={handleSelect}
               // A crafted request is rejected by the API too; this stops the mistake earlier.
-              disabled={{ after: toPickerDate(today) }}
+              disabled={{ after: calendarDateToLocalDate(today) }}
             />
             <div className="flex items-center justify-between gap-2 border-t px-3 py-2">
               <p role="alert" className="text-xs text-destructive">

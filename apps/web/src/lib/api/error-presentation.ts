@@ -22,7 +22,8 @@ type ApiErrorMessageKey =
   | "codes.defaultLocationDeleteForbidden"
   | "codes.lastLocationDeleteForbidden"
   | "codes.locationHasDependencies"
-  | "codes.taskRecordAlreadyExists";
+  | "codes.taskRecordAlreadyExists"
+  | "codes.formVersionChanged";
 
 type Translate = (
   key: ApiErrorMessageKey,
@@ -51,6 +52,7 @@ const actionableCodeKeys: Record<string, ApiErrorMessageKey> = {
     "codes.lastLocationDeleteForbidden",
   [API_ERROR_CODE.LOCATION_HAS_DEPENDENCIES]: "codes.locationHasDependencies",
   [API_ERROR_CODE.TASK_RECORD_ALREADY_EXISTS]: "codes.taskRecordAlreadyExists",
+  [API_ERROR_CODE.FORM_VERSION_CHANGED]: "codes.formVersionChanged",
 };
 
 function fallbackKey(error: ApiRequestError): ApiErrorMessageKey {

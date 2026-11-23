@@ -1,5 +1,5 @@
 {
-  "id": "dba43f2f-b9c6-4bd3-9016-5f238dc3aaa4",
+  "id": "9a78e5bc-115f-4bca-9644-6c121020cdc8",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -797,6 +797,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "on_demand": {
+          "name": "on_demand",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "archived_at": {
           "name": "archived_at",
           "type": "timestamp with time zone",
@@ -962,12 +969,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "title": {
-          "name": "title",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
         "form_id": {
           "name": "form_id",
           "type": "uuid",
@@ -1094,10 +1095,6 @@
       },
       "policies": {},
       "checkConstraints": {
-        "task_templates_title_length": {
-          "name": "task_templates_title_length",
-          "value": "char_length(\"task_templates\".\"title\") BETWEEN 1 AND 100"
-        },
         "task_templates_completion_opens_before_range": {
           "name": "task_templates_completion_opens_before_range",
           "value": "\"task_templates\".\"completion_opens_before_minutes\" >= 0 AND \"task_templates\".\"completion_opens_before_minutes\" <= 1440"
@@ -1392,6 +1389,14 @@
             "occurrence_date",
             "scheduled_time"
           ]
+        },
+        "task_occurrences_id_location_id_unique": {
+          "name": "task_occurrences_id_location_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "id",
+            "location_id"
+          ]
         }
       },
       "policies": {},
@@ -1409,15 +1414,64 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
+        "location_id": {
+          "name": "location_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "task_template_id": {
+          "name": "task_template_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "occurrence_id": {
           "name": "occurrence_id",
           "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
         "form_version_id": {
           "name": "form_version_id",
           "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target_id": {
+          "name": "target_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "target_name": {
+          "name": "target_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resolved_limits": {
+          "name": "resolved_limits",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "entry_date": {
+          "name": "entry_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entry_time": {
+          "name": "entry_time",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -1492,15 +1546,48 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "task_records_location_entry_idx": {
+          "name": "task_records_location_entry_idx",
+          "columns": [
+            {
+              "expression": "location_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "entry_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "entry_time",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
-        "task_records_occurrence_id_task_occurrences_id_fk": {
-          "name": "task_records_occurrence_id_task_occurrences_id_fk",
+        "task_records_location_id_locations_id_fk": {
+          "name": "task_records_location_id_locations_id_fk",
           "tableFrom": "task_records",
-          "tableTo": "task_occurrences",
+          "tableTo": "locations",
           "columnsFrom": [
-            "occurrence_id"
+            "location_id"
           ],
           "columnsTo": [
             "id"
@@ -1559,12 +1646,61 @@
           ],
           "onDelete": "restrict",
           "onUpdate": "no action"
+        },
+        "task_records_template_location_fk": {
+          "name": "task_records_template_location_fk",
+          "tableFrom": "task_records",
+          "tableTo": "task_templates",
+          "columnsFrom": [
+            "task_template_id",
+            "location_id"
+          ],
+          "columnsTo": [
+            "id",
+            "location_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "task_records_occurrence_location_fk": {
+          "name": "task_records_occurrence_location_fk",
+          "tableFrom": "task_records",
+          "tableTo": "task_occurrences",
+          "columnsFrom": [
+            "occurrence_id",
+            "location_id"
+          ],
+          "columnsTo": [
+            "id",
+            "location_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "task_records_target_location_fk": {
+          "name": "task_records_target_location_fk",
+          "tableFrom": "task_records",
+          "tableTo": "targets",
+          "columnsFrom": [
+            "target_id",
+            "location_id"
+          ],
+          "columnsTo": [
+            "id",
+            "location_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
+        "task_records_template_with_occurrence": {
+          "name": "task_records_template_with_occurrence",
+          "value": "(\"task_records\".\"occurrence_id\" IS NULL) = (\"task_records\".\"task_template_id\" IS NULL)"
+        },
         "task_records_result_valid": {
           "name": "task_records_result_valid",
           "value": "\"task_records\".\"result\" IN ('pass', 'fail', 'not_evaluated')"
@@ -1718,6 +1854,302 @@
           ]
         }
       },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.task_record_deviation_answers": {
+      "name": "task_record_deviation_answers",
+      "schema": "",
+      "columns": {
+        "deviation_id": {
+          "name": "deviation_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "answer_id": {
+          "name": "answer_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "task_record_deviation_answers_answer_id_idx": {
+          "name": "task_record_deviation_answers_answer_id_idx",
+          "columns": [
+            {
+              "expression": "answer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "task_record_deviation_answers_deviation_id_task_record_deviations_id_fk": {
+          "name": "task_record_deviation_answers_deviation_id_task_record_deviations_id_fk",
+          "tableFrom": "task_record_deviation_answers",
+          "tableTo": "task_record_deviations",
+          "columnsFrom": [
+            "deviation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "task_record_deviation_answers_deviation_id_answer_id_pk": {
+          "name": "task_record_deviation_answers_deviation_id_answer_id_pk",
+          "columns": [
+            "deviation_id",
+            "answer_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.task_record_deviations": {
+      "name": "task_record_deviations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "task_record_id": {
+          "name": "task_record_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "location_id": {
+          "name": "location_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "task_template_id": {
+          "name": "task_template_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "form_version_id": {
+          "name": "form_version_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target_id": {
+          "name": "target_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "entry_date": {
+          "name": "entry_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "failed_field_ids": {
+          "name": "failed_field_ids",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recorded_at": {
+          "name": "recorded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recorded_by_user_id": {
+          "name": "recorded_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "task_record_deviations_task_record_id_unique": {
+          "name": "task_record_deviations_task_record_id_unique",
+          "columns": [
+            {
+              "expression": "task_record_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "task_record_deviations_location_entry_date_idx": {
+          "name": "task_record_deviations_location_entry_date_idx",
+          "columns": [
+            {
+              "expression": "location_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "entry_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "task_record_deviations_target_entry_date_idx": {
+          "name": "task_record_deviations_target_entry_date_idx",
+          "columns": [
+            {
+              "expression": "target_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "entry_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "task_record_deviations_task_record_id_task_records_id_fk": {
+          "name": "task_record_deviations_task_record_id_task_records_id_fk",
+          "tableFrom": "task_record_deviations",
+          "tableTo": "task_records",
+          "columnsFrom": [
+            "task_record_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "task_record_deviations_location_id_locations_id_fk": {
+          "name": "task_record_deviations_location_id_locations_id_fk",
+          "tableFrom": "task_record_deviations",
+          "tableTo": "locations",
+          "columnsFrom": [
+            "location_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "task_record_deviations_form_version_id_form_versions_id_fk": {
+          "name": "task_record_deviations_form_version_id_form_versions_id_fk",
+          "tableFrom": "task_record_deviations",
+          "tableTo": "form_versions",
+          "columnsFrom": [
+            "form_version_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "task_record_deviations_recorded_by_user_id_users_id_fk": {
+          "name": "task_record_deviations_recorded_by_user_id_users_id_fk",
+          "tableFrom": "task_record_deviations",
+          "tableTo": "users",
+          "columnsFrom": [
+            "recorded_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "task_record_deviations_template_location_fk": {
+          "name": "task_record_deviations_template_location_fk",
+          "tableFrom": "task_record_deviations",
+          "tableTo": "task_templates",
+          "columnsFrom": [
+            "task_template_id",
+            "location_id"
+          ],
+          "columnsTo": [
+            "id",
+            "location_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "task_record_deviations_target_location_fk": {
+          "name": "task_record_deviations_target_location_fk",
+          "tableFrom": "task_record_deviations",
+          "tableTo": "targets",
+          "columnsFrom": [
+            "target_id",
+            "location_id"
+          ],
+          "columnsTo": [
+            "id",
+            "location_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},

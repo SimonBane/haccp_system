@@ -1,4 +1,5 @@
 import { ORG_ROLE, type FormDefinition } from "@haccp/shared";
+import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import type { Db } from "../../../src/core/db/client.js";
 import {
@@ -266,14 +267,12 @@ export async function seedOrganization(
       .values([
         {
           locationId: main.id,
-          title: "Morning fridge check",
           formId: fridgeForm.id,
           weekdays: ALL_WEEKDAYS,
           scheduledTimes: ["08:00"],
         },
         {
           locationId: main.id,
-          title: "Clean prep surface",
           formId: cleaningForm.id,
           weekdays: ALL_WEEKDAYS,
           scheduledTimes: ["09:00"],
@@ -344,11 +343,8 @@ export async function seedOrganization(
         cleaning: { id: cleaningForm.id, versionId: cleaningVersion.id },
       },
       templates: {
-        temperature: {
-          id: temperatureTemplate.id,
-          title: temperatureTemplate.title,
-        },
-        cleaning: { id: cleaningTemplate.id, title: cleaningTemplate.title },
+        temperature: { id: temperatureTemplate.id, title: fridgeForm.name },
+        cleaning: { id: cleaningTemplate.id, title: cleaningForm.name },
       },
     } satisfies SeededOrg;
   });
@@ -422,4 +418,29 @@ export async function seedTwoTenants(db: Db): Promise<TwoTenantWorld> {
   });
 
   return { alpha, beta };
+}
+
+/** A record's own context, copied from its occurrence as the record service does. */
+export async function recordContextFor(db: Db, occurrenceId: string) {
+  const [occurrence] = await db
+    .select()
+    .from(taskOccurrences)
+    .where(eq(taskOccurrences.id, occurrenceId));
+
+  if (!occurrence) {
+    throw new Error(`No occurrence ${occurrenceId} to record against`);
+  }
+
+  return {
+    locationId: occurrence.locationId,
+    taskTemplateId: occurrence.taskTemplateId,
+    occurrenceId: occurrence.id,
+    title: occurrence.title,
+    formVersionId: occurrence.formVersionId,
+    targetId: occurrence.targetId,
+    targetName: occurrence.targetName,
+    resolvedLimits: occurrence.resolvedLimits,
+    entryDate: occurrence.occurrenceDate,
+    entryTime: occurrence.scheduledTime,
+  };
 }

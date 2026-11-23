@@ -16,10 +16,11 @@ const DUE_AT = new Date("2026-08-23T05:00:00.000Z");
 
 function row(overrides: Partial<RecordRow> = {}): RecordRow {
   return {
+    rowId: RECORD_ID,
     occurrenceId: OCCURRENCE_ID,
     taskTemplateId: TEMPLATE_ID,
-    occurrenceDate: "2026-08-23",
-    scheduledTime: "08:00",
+    entryDate: "2026-08-23",
+    entryTime: "08:00",
     availableAt: new Date("2026-08-23T00:00:00.000Z"),
     dueAt: DUE_AT,
     title: "Morning fridge check",
@@ -82,10 +83,12 @@ describe("toRecordItem stored occurrence values", () => {
     const item = toRecordItem(row());
 
     expect(item).toMatchObject({
+      id: RECORD_ID,
+      kind: "scheduled",
       occurrenceId: OCCURRENCE_ID,
       taskTemplateId: TEMPLATE_ID,
-      occurrenceDate: "2026-08-23",
-      scheduledTime: "08:00",
+      entryDate: "2026-08-23",
+      entryTime: "08:00",
       dueAt: DUE_AT.toISOString(),
       title: "Morning fridge check",
       formVersionId: VERSION_ID,
@@ -278,5 +281,28 @@ describe("toRecordItem record detail", () => {
       "voidedAt",
       "voidedBy",
     ]);
+  });
+});
+
+describe("toRecordItem on-demand entries", () => {
+  it("marks a record without an occurrence as on-demand with no deadline", () => {
+    const item = toRecordItem(
+      row({
+        ...submittedRecord,
+        occurrenceId: null,
+        availableAt: null,
+        dueAt: null,
+      }),
+    );
+
+    expect(item).toMatchObject({
+      id: RECORD_ID,
+      kind: "on_demand",
+      occurrenceId: null,
+      availableAt: null,
+      dueAt: null,
+      displayState: "submitted",
+      timing: "no_deadline",
+    });
   });
 });

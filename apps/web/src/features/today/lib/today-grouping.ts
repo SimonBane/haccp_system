@@ -5,8 +5,9 @@ export function parseScheduledTimeToMinutes(time: string): number {
   return hours * 60 + minutes;
 }
 
-export function occurrenceKey(task: TodayTaskItem): string {
-  return task.occurrenceId;
+/** A scheduled check is keyed by its occurrence; an on-demand entry by its record. */
+export function todayItemKey(task: TodayTaskItem): string {
+  return task.occurrenceId ?? task.recordId ?? "";
 }
 
 export function flatTodayTasks(response: TodayResponse): TodayTaskItem[] {

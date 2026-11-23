@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { FormDefinition, FormField } from "../schemas/form.js";
 import {
+  asksForCorrectiveAction,
   buildAnswerSchema,
+  correctiveSettings,
   evaluateAnswers,
   findUnusableOverrideFieldIds,
   requiresCorrectiveAction,
+  resolveCorrective,
   resolveLimits,
 } from "./form-answers.js";
 
@@ -315,6 +318,15 @@ describe("requiresCorrectiveAction", () => {
     expect(requiresCorrectiveAction(form([]), "fail")).toBe(true);
     expect(requiresCorrectiveAction(form([]), "pass")).toBe(false);
     expect(requiresCorrectiveAction(form([], "optional"), "fail")).toBe(false);
+    expect(requiresCorrectiveAction(form([], "off"), "fail")).toBe(false);
+  });
+});
+
+describe("asksForCorrectiveAction", () => {
+  it("asks on every form except one with corrective action turned off", () => {
+    expect(asksForCorrectiveAction(form([]))).toBe(true);
+    expect(asksForCorrectiveAction(form([], "optional"))).toBe(true);
+    expect(asksForCorrectiveAction(form([], "off"))).toBe(false);
   });
 });
 
@@ -353,5 +365,108 @@ describe("findUnusableOverrideFieldIds", () => {
     expect(findUnusableOverrideFieldIds(previous, next, overrides)).toEqual([
       "temperature",
     ]);
+  });
+});
+
+describe("resolveCorrective", () => {
+  const definition: FormDefinition = {
+    fields: [],
+    correctiveAction: "required_on_fail",
+    corrective: {
+      answers: [
+        { id: "a_moved", label: "Moved product" },
+        { id: "a_manager", label: "Notified manager" },
+      ],
+      multiple: true,
+      allowNote: true,
+    },
+  };
+  const withSettings = (
+    corrective: Partial<NonNullable<FormDefinition["corrective"]>>,
+  ): FormDefinition => ({
+    ...definition,
+    corrective: { ...definition.corrective!, ...corrective },
+  });
+
+  it("lists the chosen answers in the form's order, then the trimmed note", () => {
+    expect(
+      resolveCorrective(definition, {
+        answerIds: ["a_manager", "a_moved"],
+        note: "  Door was open ",
+      }),
+    ).toEqual({
+      answers: definition.corrective!.answers,
+      note: "Door was open",
+      text: "Moved product, Notified manager, Door was open",
+      issue: null,
+    });
+  });
+
+  it("asks for something when the form requires it, and not when it is optional", () => {
+    const nothing = { answerIds: [], note: "  " };
+
+    expect(resolveCorrective(definition, nothing)).toMatchObject({
+      text: null,
+      issue: "required",
+    });
+    expect(
+      resolveCorrective({ ...definition, correctiveAction: "optional" }, nothing)
+        .issue,
+    ).toBeNull();
+  });
+
+  it("takes nothing on a form with corrective action turned off", () => {
+    const off: FormDefinition = { ...definition, correctiveAction: "off" };
+
+    expect(resolveCorrective(off, { answerIds: [], note: " " })).toMatchObject({
+      text: null,
+      issue: null,
+    });
+    expect(
+      resolveCorrective(off, { answerIds: ["a_moved"], note: "" }).issue,
+    ).toBe("not_asked");
+    expect(resolveCorrective(off, { answerIds: [], note: "Moved" }).issue).toBe(
+      "not_asked",
+    );
+  });
+
+  it("refuses an answer the form does not have", () => {
+    expect(
+      resolveCorrective(definition, { answerIds: ["a_other"], note: "" }).issue,
+    ).toBe("unknown_answer");
+  });
+
+  it("refuses several answers when the form takes one", () => {
+    expect(
+      resolveCorrective(withSettings({ multiple: false }), {
+        answerIds: ["a_moved", "a_manager"],
+        note: "",
+      }).issue,
+    ).toBe("single_answer_only");
+  });
+
+  it("refuses a note when the form takes none", () => {
+    expect(
+      resolveCorrective(withSettings({ allowNote: false }), {
+        answerIds: ["a_moved"],
+        note: "Door was open",
+      }).issue,
+    ).toBe("note_not_allowed");
+  });
+
+  it("treats a definition without settings as note-only", () => {
+    const legacy: FormDefinition = {
+      fields: [],
+      correctiveAction: "required_on_fail",
+    };
+
+    expect(
+      resolveCorrective(legacy, { answerIds: [], note: "Moved stock" }),
+    ).toMatchObject({ text: "Moved stock", issue: null });
+    expect(correctiveSettings(legacy)).toEqual({
+      answers: [],
+      multiple: true,
+      allowNote: true,
+    });
   });
 });

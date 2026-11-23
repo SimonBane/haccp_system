@@ -15,7 +15,6 @@ function makeTask(overrides: Partial<TaskTemplateResponse> = {}): TaskTemplateRe
   return {
     id: "00000000-0000-4000-8000-000000000001",
     locationId: "00000000-0000-4000-8000-000000000002",
-    title: "Hot holding",
     formId: "00000000-0000-4000-8000-000000000003",
     formName: "Hot holding",
     formCategory: "temperature",
@@ -43,10 +42,8 @@ describe("emptyDraft", () => {
 });
 
 describe("draftFromTask", () => {
-  it("reopens evenly spaced times as a repeat and keeps the window", () => {
+  it("reopens the times in order and keeps the window", () => {
     const draft = draftFromTask(makeTask(), ".");
-    expect(draft.timeMode).toBe("repeat");
-    expect(draft.repeat).toEqual({ every: 120, from: "11:00", until: "15:00" });
     expect(draftTimes(draft)).toEqual(["11:00", "13:00", "15:00"]);
     expect(draft.weekdays).toEqual(["monday", "wednesday"]);
     expect(draftWindowFields(draft)).toEqual({
@@ -55,7 +52,7 @@ describe("draftFromTask", () => {
     });
   });
 
-  it("keeps irregular times as a list and reads an always-available task as no window", () => {
+  it("reads an always-available task as no window", () => {
     const draft = draftFromTask(
       makeTask({
         scheduledTimes: ["08:00", "09:30"],
@@ -64,13 +61,8 @@ describe("draftFromTask", () => {
       }),
       ".",
     );
-    expect(draft.timeMode).toBe("times");
     expect(draft.times).toEqual(["08:00", "09:30"]);
     expect(draft.windowOn).toBe(false);
-  });
-
-  it("uses the suggested title for a duplicate", () => {
-    expect(draftFromTask(makeTask(), ".", "Hot holding (Copy)").title).toBe("Hot holding (Copy)");
   });
 });
 
@@ -87,7 +79,7 @@ describe("builderSections", () => {
 
 describe("missingSteps", () => {
   it("lists every blocker of a fresh draft", () => {
-    expect(missingSteps(emptyDraft(), null, new Set())).toEqual(["form", "title", "times"]);
+    expect(missingSteps(emptyDraft(), null, new Set())).toEqual(["form", "times"]);
   });
 
   it("needs a selected target that still exists", () => {
@@ -101,9 +93,8 @@ describe("missingSteps", () => {
     expect(missingSteps(draft, "location", new Set())).toEqual([]);
   });
 
-  it("flags an empty repeat range as missing times", () => {
-    const draft = draftFromTask(makeTask(), ".");
-    draft.repeat = { every: 60, from: "20:00", until: "08:00" };
+  it("flags a task with no times", () => {
+    const draft = { ...draftFromTask(makeTask(), "."), times: [] };
     expect(missingSteps(draft, "per_item", new Set([TARGET_ID]))).toEqual(["times"]);
   });
 });

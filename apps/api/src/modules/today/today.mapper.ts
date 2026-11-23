@@ -1,15 +1,27 @@
 import type {
+  RecordCorrective,
   RecordResult,
   TargetKind,
   TodayArea,
+  TodayOnDemandForm,
   TodayTaskItem,
 } from "@haccp/shared";
 import {
   TARGET_KIND,
+  buildTodayEntryItem,
   buildTodayTaskItemFromOccurrence,
   parseScheduledTimeToMinutes,
+  resolveLimits,
 } from "@haccp/shared";
-import type { OccurrenceWithRecordRow } from "./today.repository.js";
+import type { FormWithLatestVersion } from "../forms/form.repository.js";
+import type {
+  OccurrenceWithRecordRow,
+  OnDemandEntryRow,
+} from "./today.repository.js";
+
+function todayItemKey(item: TodayTaskItem): string {
+  return item.occurrenceId ?? item.recordId ?? "";
+}
 
 /** Within a time, by what is checked: fixture labels lead with their room, so one walk covers "Kitchen 2 › Floor" then "› Walls". */
 export function sortItemsByScheduledTime(
@@ -24,17 +36,36 @@ export function sortItemsByScheduledTime(
     if (byTarget !== 0) return byTarget;
     const byTitle = a.title.localeCompare(b.title);
     if (byTitle !== 0) return byTitle;
-    return a.occurrenceId < b.occurrenceId ? -1 : 1;
+    return todayItemKey(a) < todayItemKey(b) ? -1 : 1;
   });
 }
 
-function areaOf(row: OccurrenceWithRecordRow): TodayArea | null {
+function areaOf(
+  row: Pick<
+    OccurrenceWithRecordRow,
+    | "targetId"
+    | "targetKind"
+    | "targetLiveName"
+    | "targetParentId"
+    | "targetParentName"
+  >,
+): TodayArea | null {
   if (row.targetKind === TARGET_KIND.AREA && row.targetId && row.targetLiveName) {
     return { id: row.targetId, name: row.targetLiveName };
   }
   return row.targetParentId && row.targetParentName
     ? { id: row.targetParentId, name: row.targetParentName }
     : null;
+}
+
+function toCorrective(row: {
+  deviationId: string | null;
+  correctiveNote: string | null;
+  correctiveAnswerIds: string[] | null;
+}): RecordCorrective | null {
+  return row.deviationId === null
+    ? null
+    : { answerIds: row.correctiveAnswerIds ?? [], note: row.correctiveNote };
 }
 
 export function toTodayTaskItem(
@@ -61,11 +92,13 @@ export function toTodayTaskItem(
           result: row.result as RecordResult,
           values: row.values,
           correctiveAction: row.correctiveAction,
+      corrective: toCorrective(row),
         }
       : null;
 
   return buildTodayTaskItemFromOccurrence({
     occurrenceId: row.occurrenceId,
+    recordId: row.recordId,
     templateId: row.taskTemplateId,
     title: row.title,
     formVersionId: row.formVersionId,
@@ -83,4 +116,45 @@ export function toTodayTaskItem(
     recordedBy,
     answers,
   });
+}
+
+export function toTodayEntryItem(row: OnDemandEntryRow): TodayTaskItem {
+  return buildTodayEntryItem({
+    recordId: row.recordId,
+    title: row.title,
+    formVersionId: row.formVersionId,
+    targetId: row.targetId,
+    targetName: row.targetName,
+    targetKind: row.targetKind as TargetKind | null,
+    area: areaOf(row),
+    resolvedLimits: row.resolvedLimits,
+    entryDate: row.entryDate,
+    entryTime: row.entryTime,
+    createdAt: row.createdAt,
+    recordedAt: row.recordedAt,
+    recordedBy: {
+      id: row.recordedByUserId,
+      firstName: row.recordedByFirstName ?? "",
+      lastName: row.recordedByLastName ?? "",
+    },
+    answers: {
+      result: row.result as RecordResult,
+      values: row.values,
+      correctiveAction: row.correctiveAction,
+      corrective: toCorrective(row),
+    },
+  });
+}
+
+export function toTodayOnDemandForm({
+  form,
+  latestVersion,
+}: FormWithLatestVersion): TodayOnDemandForm {
+  return {
+    formId: form.id,
+    name: form.name,
+    formVersionId: latestVersion.id,
+    appliesTo: form.appliesTo as TodayOnDemandForm["appliesTo"],
+    resolvedLimits: resolveLimits(latestVersion.definition, null),
+  };
 }

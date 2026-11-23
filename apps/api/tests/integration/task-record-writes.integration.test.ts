@@ -102,6 +102,19 @@ describe("Task record writes", () => {
     return `/locations/${locationId}/today/occurrences/${occurrenceId}/record`;
   }
 
+  function recordWritePath(locationId: string, recordId: string): string {
+    return `/locations/${locationId}/today/records/${recordId}`;
+  }
+
+  async function submit(occurrenceId: string, body: unknown): Promise<string> {
+    const response = await apiRequest(
+      recordPath(org.locations.main.id, occurrenceId),
+      { method: "POST", actor: asEmployee(org), body: JSON.stringify(body) },
+    );
+    expect(response.status).toBe(201);
+    return taskRecordResponseSchema.parse(await response.json()).id;
+  }
+
   describe("POST — first submission", () => {
     it("submits a record for a form that cannot fail as not evaluated", async () => {
       const occurrenceId = await insertOccurrence({ type: "cleaning" });
@@ -477,11 +490,12 @@ describe("Task record writes", () => {
   });
 
   describe("PUT — edit and reactivate", () => {
-    it("404s when there is no record yet for the occurrence", async () => {
-      const occurrenceId = await insertOccurrence({ type: "cleaning" });
-
+    it("404s a record id that does not exist", async () => {
       const response = await apiRequest(
-        recordPath(org.locations.main.id, occurrenceId),
+        recordWritePath(
+          org.locations.main.id,
+          "00000000-0000-4000-8000-000000000099",
+        ),
         {
           method: "PUT",
           actor: asEmployee(org),
@@ -494,14 +508,10 @@ describe("Task record writes", () => {
 
     it("replaces the answers, readings and attribution on an active record", async () => {
       const occurrenceId = await insertOccurrence({ type: "temperature" });
-      await apiRequest(recordPath(org.locations.main.id, occurrenceId), {
-        method: "POST",
-        actor: asEmployee(org),
-        body: JSON.stringify(reading(3)),
-      });
+      const recordId = await submit(occurrenceId, reading(3));
 
       const response = await apiRequest(
-        recordPath(org.locations.main.id, occurrenceId),
+        recordWritePath(org.locations.main.id, recordId),
         {
           method: "PUT",
           actor: asAdmin(org),
@@ -511,6 +521,7 @@ describe("Task record writes", () => {
 
       expect(response.status).toBe(200);
       const body = taskRecordResponseSchema.parse(await response.json());
+      expect(body.id).toBe(recordId);
       expect(body.result).toBe("fail");
       expect(body.correctiveAction).toBe("Moved stock");
       expect(body.recordedByUserId).toBe(org.admin.userId);
@@ -526,18 +537,14 @@ describe("Task record writes", () => {
 
     it("reactivates a voided record and clears void attribution", async () => {
       const occurrenceId = await insertOccurrence({ type: "cleaning" });
-      await apiRequest(recordPath(org.locations.main.id, occurrenceId), {
-        method: "POST",
-        actor: asEmployee(org),
-        body: JSON.stringify(CLEANED),
-      });
-      await apiRequest(recordPath(org.locations.main.id, occurrenceId), {
+      const recordId = await submit(occurrenceId, CLEANED);
+      await apiRequest(recordWritePath(org.locations.main.id, recordId), {
         method: "DELETE",
         actor: asEmployee(org),
       });
 
       const response = await apiRequest(
-        recordPath(org.locations.main.id, occurrenceId),
+        recordWritePath(org.locations.main.id, recordId),
         {
           method: "PUT",
           actor: asEmployee(org),
@@ -554,18 +561,14 @@ describe("Task record writes", () => {
 
     it("reactivates a voided reading with new answers", async () => {
       const occurrenceId = await insertOccurrence({ type: "temperature" });
-      await apiRequest(recordPath(org.locations.main.id, occurrenceId), {
-        method: "POST",
-        actor: asEmployee(org),
-        body: JSON.stringify(reading(3)),
-      });
-      await apiRequest(recordPath(org.locations.main.id, occurrenceId), {
+      const recordId = await submit(occurrenceId, reading(3));
+      await apiRequest(recordWritePath(org.locations.main.id, recordId), {
         method: "DELETE",
         actor: asEmployee(org),
       });
 
       const response = await apiRequest(
-        recordPath(org.locations.main.id, occurrenceId),
+        recordWritePath(org.locations.main.id, recordId),
         {
           method: "PUT",
           actor: asEmployee(org),
@@ -595,7 +598,7 @@ describe("Task record writes", () => {
       const createdBody = taskRecordResponseSchema.parse(await created.json());
 
       const response = await apiRequest(
-        recordPath(org.locations.main.id, occurrenceId),
+        recordWritePath(org.locations.main.id, createdBody.id),
         { method: "DELETE", actor: asAdmin(org) },
       );
 
@@ -620,14 +623,10 @@ describe("Task record writes", () => {
 
     it("accepts no reason payload", async () => {
       const occurrenceId = await insertOccurrence({ type: "cleaning" });
-      await apiRequest(recordPath(org.locations.main.id, occurrenceId), {
-        method: "POST",
-        actor: asEmployee(org),
-        body: JSON.stringify(CLEANED),
-      });
+      const recordId = await submit(occurrenceId, CLEANED);
 
       const response = await apiRequest(
-        recordPath(org.locations.main.id, occurrenceId),
+        recordWritePath(org.locations.main.id, recordId),
         { method: "DELETE", actor: asEmployee(org) },
       );
 
@@ -636,30 +635,27 @@ describe("Task record writes", () => {
 
     it("404s a repeated void of an already-voided record", async () => {
       const occurrenceId = await insertOccurrence({ type: "cleaning" });
-      await apiRequest(recordPath(org.locations.main.id, occurrenceId), {
-        method: "POST",
-        actor: asEmployee(org),
-        body: JSON.stringify(CLEANED),
-      });
-      await apiRequest(recordPath(org.locations.main.id, occurrenceId), {
+      const recordId = await submit(occurrenceId, CLEANED);
+      await apiRequest(recordWritePath(org.locations.main.id, recordId), {
         method: "DELETE",
         actor: asEmployee(org),
       });
 
       const response = await apiRequest(
-        recordPath(org.locations.main.id, occurrenceId),
+        recordWritePath(org.locations.main.id, recordId),
         { method: "DELETE", actor: asEmployee(org) },
       );
 
       expect(response.status).toBe(404);
     });
 
-    it("404s void of an occurrence with no record", async () => {
+    it("404s a void addressed to another location", async () => {
       const occurrenceId = await insertOccurrence({ type: "cleaning" });
+      const recordId = await submit(occurrenceId, CLEANED);
 
       const response = await apiRequest(
-        recordPath(org.locations.main.id, occurrenceId),
-        { method: "DELETE", actor: asEmployee(org) },
+        recordWritePath(org.locations.annex.id, recordId),
+        { method: "DELETE", actor: asAdmin(org) },
       );
 
       expect(response.status).toBe(404);

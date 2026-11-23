@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { E2E_PREFIX, LOCALE_PREFIX } from "../../support/env.js";
+import { CLEANING_FORM_NAME } from "../../support/forms.js";
+import { LOCALE_PREFIX } from "../../support/env.js";
 import {
   dateRangeTrigger,
   ensureSubmittedRecord,
@@ -9,13 +10,13 @@ import {
   RECORDS_PATH,
 } from "../../support/records.js";
 
-const CLEANING_TASK = `${E2E_PREFIX} Clean prep surface`;
+const CLEANING_TASK = CLEANING_FORM_NAME;
 
 test("Records renders as a card list on a phone, with no horizontal scroll", async ({
   page,
 }) => {
   await page.goto(`${LOCALE_PREFIX}/dashboard`);
-  await ensureSubmittedRecord(page, CLEANING_TASK);
+  await ensureSubmittedRecord(page, { title: CLEANING_TASK });
 
   await page.goto(RECORDS_PATH);
 

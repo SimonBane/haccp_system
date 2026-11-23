@@ -1,5 +1,6 @@
-import { expect, test } from "@playwright/test";
-import { E2E_PREFIX, LOCALE_PREFIX } from "../../support/env.js";
+import { expect, test, type Page } from "@playwright/test";
+import { CLEANING_FORM_NAME } from "../../support/forms.js";
+import { LOCALE_PREFIX } from "../../support/env.js";
 import { ensurePending, row } from "../../support/today.js";
 
 /**
@@ -14,12 +15,26 @@ import { ensurePending, row } from "../../support/today.js";
  * locationId]` and is straightforward to verify by reading it.
  */
 
+/** Picks the day before the shown one from the calendar the header's date opens. */
+async function pickPreviousDay(page: Page) {
+  await page.getByTestId("date-nav-trigger").click();
+  const shown = await page
+    .locator('td[data-selected="true"]')
+    .getAttribute("data-day");
+  const previous = new Date(`${shown}T00:00:00Z`);
+  previous.setUTCDate(previous.getUTCDate() - 1);
+  // Outside days are shown, so the 1st's previous day is still in this grid.
+  await page
+    .locator(`td[data-day="${previous.toISOString().slice(0, 10)}"] button`)
+    .click();
+}
+
 test("date navigation settles on the requested day when the fetch is slow", async ({
   page,
 }) => {
   await page.goto(`${LOCALE_PREFIX}/dashboard`);
 
-  // "Jump to today" renders only when the view is off today, so its presence is the
+  // The calendar's "Today" button renders only when the view is off today, so its presence is the
   // signal. Task rows are not: a fully completed day collapses every group, so what
   // is in the DOM depends on what earlier journeys did.
   const jumpToToday = page.getByTestId("date-nav-today");
@@ -35,10 +50,10 @@ test("date navigation settles on the requested day when the fetch is slow", asyn
     await route.continue();
   });
 
-  await page.getByTestId("date-nav-trigger").click();
-  await page.getByTestId("date-nav-previous").click();
+  await pickPreviousDay(page);
 
   // The date moved while the response was still in flight.
+  await page.getByTestId("date-nav-trigger").click();
   await expect(jumpToToday).toBeVisible();
 
   await page.unroute("**/locations/*/today*");
@@ -54,7 +69,7 @@ test("a tap during a delayed date switch never writes to the stale date", async 
   page,
 }) => {
   await page.goto(`${LOCALE_PREFIX}/dashboard`);
-  const title = `${E2E_PREFIX} Clean prep surface`;
+  const title = CLEANING_FORM_NAME;
   await ensurePending(page, title);
 
   let writeCount = 0;
@@ -68,9 +83,7 @@ test("a tap during a delayed date switch never writes to the stale date", async 
     await route.continue();
   });
 
-  await page.getByTestId("date-nav-trigger").click();
-  await page.getByTestId("date-nav-previous").click();
-  await page.keyboard.press("Escape");
+  await pickPreviousDay(page);
 
   // The previous date's response is still on screen while the new date's fetch is
   // in flight — tapping now must not write against the (now stale) date it renders.

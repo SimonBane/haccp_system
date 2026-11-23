@@ -11,18 +11,24 @@ import {
   type AnswerFormatters,
 } from "@/features/forms/lib/answer-summary";
 import { actorName, formatOccurrenceDate } from "@/features/records/lib/format";
-import { resolvedTiming, showsTiming } from "@/features/records/lib/labels";
+import {
+  isOnDemand,
+  resolvedTiming,
+  showsTiming,
+} from "@/features/records/lib/labels";
 
 export type ReportStatus = "done" | "fail" | "missed" | "open" | "voided";
 
 /** Optional facts are absent keys, not nulls, so a row with nothing to say prints nothing. */
 export type ReportRow = {
-  occurrenceId: string;
+  /** The record id, or the occurrence id for a scheduled check with no record. */
+  id: string;
   scheduledDate: string;
   scheduledTime: string;
   title: string;
   status: ReportStatus;
   late: boolean;
+  onDemand: boolean;
   targetName?: string;
   answers?: string;
   recordedBy?: string | null;
@@ -59,14 +65,15 @@ export function toReportRow(
   const record = item.record;
 
   const row: ReportRow = {
-    occurrenceId: item.occurrenceId,
-    scheduledDate: formatOccurrenceDate(item.occurrenceDate),
-    scheduledTime: item.scheduledTime,
+    id: item.id,
+    scheduledDate: formatOccurrenceDate(item.entryDate),
+    scheduledTime: item.entryTime,
     title: item.title,
     status: reportStatus(item),
     late:
       showsTiming(item.displayState, item.timing) &&
       resolvedTiming(item) === RECORD_TIMING.LATE,
+    onDemand: isOnDemand(item),
   };
 
   if (item.targetName !== null) {
