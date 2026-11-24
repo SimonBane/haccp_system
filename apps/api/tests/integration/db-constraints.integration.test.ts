@@ -122,11 +122,11 @@ describe("database constraints", () => {
     expect(sameNameElsewhere).toBeNull();
   });
 
-  it("refuses a fixture outside an area", async () => {
+  it("refuses a component outside an area", async () => {
     const code = await codeFor(
       db.insert(targets).values({
         locationId: world.alpha.locations.main.id,
-        kind: "fixture",
+        kind: "component",
         name: "Walls",
       }),
     );
@@ -134,7 +134,7 @@ describe("database constraints", () => {
     expect(code).toBe(PG_ERROR.CHECK_VIOLATION);
   });
 
-  it("scopes fixture names to their area and keeps them apart from other names", async () => {
+  it("scopes component names to their area and keeps them apart from other names", async () => {
     const [kitchen, bar] = await db
       .insert(targets)
       .values([
@@ -150,19 +150,19 @@ describe("database constraints", () => {
         },
       ])
       .returning();
-    const fixture = (parentId: string, name = "Walls") =>
+    const component = (parentId: string, name = "Walls") =>
       db.insert(targets).values({
         locationId: world.alpha.locations.main.id,
-        kind: "fixture",
+        kind: "component",
         name,
         parentId,
       });
 
-    expect(await codeFor(fixture(kitchen!.id))).toBeNull();
-    expect(await codeFor(fixture(bar!.id))).toBeNull();
-    expect(await codeFor(fixture(kitchen!.id))).toBe(PG_ERROR.UNIQUE_VIOLATION);
+    expect(await codeFor(component(kitchen!.id))).toBeNull();
+    expect(await codeFor(component(bar!.id))).toBeNull();
+    expect(await codeFor(component(kitchen!.id))).toBe(PG_ERROR.UNIQUE_VIOLATION);
     expect(
-      await codeFor(fixture(kitchen!.id, world.alpha.targets.fridge.name)),
+      await codeFor(component(kitchen!.id, world.alpha.targets.fridge.name)),
     ).toBeNull();
   });
 

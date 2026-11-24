@@ -28,6 +28,7 @@ type Props = {
   count: number;
   issues: FieldIssues | undefined;
   onChange: (next: BuilderField) => void;
+  parameterLocked: boolean;
   onDuplicate: () => void;
   onRemove: () => void;
   formDetails: ReactNode;
@@ -66,6 +67,7 @@ export function BuilderInspector({
   count,
   issues,
   onChange,
+  parameterLocked,
   onDuplicate,
   onRemove,
   formDetails,
@@ -121,6 +123,7 @@ export function BuilderInspector({
         field={field}
         issues={issues}
         onChange={onChange}
+        parameterLocked={parameterLocked}
       />
       <Separator />
       <div className="flex flex-wrap gap-2">

@@ -24,7 +24,6 @@ export function toTaskTemplateResponse(
     targets: targets.map((target) => ({
       targetId: target.targetId,
       targetName: target.targetName,
-      limitOverrides: target.limitOverrides,
     })),
     completionOpensBeforeMinutes: template.completionOpensBeforeMinutes,
     completionDueAfterMinutes: template.completionDueAfterMinutes,

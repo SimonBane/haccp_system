@@ -66,16 +66,11 @@ export function useFormsMutations() {
     mutationFn: async ({
       id,
       definition,
-      confirmDroppedOverrides,
     }: {
       id: string;
       definition: FormDefinition;
-      confirmDroppedOverrides: boolean;
     }) => {
-      const payload = createFormVersionSchema.parse({
-        definition,
-        confirmDroppedOverrides,
-      });
+      const payload = createFormVersionSchema.parse({ definition });
       return fetchJson(`/forms/${id}/versions`, formResponseSchema, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -1,15 +1,12 @@
 import {
   API_ERROR_CODE,
+  changedParameterFieldIds,
   checkTemplateTargets,
-  findUnusableOverrideFieldIds,
   type CreateFormInput,
   type CreateFormVersionInput,
-  type DroppedOverride,
   type FormAppliesTo,
-  type FormDefinition,
   type FormListResponse,
   type FormResponse,
-  type LimitOverrides,
   type UpdateFormInput,
 } from "@haccp/shared";
 import type { Db, DbClient } from "../../core/db/client.js";
@@ -25,7 +22,6 @@ import { toFormListItem, toFormResponse } from "./form.mapper.js";
 import {
   formRepository,
   type FormWithLatestVersion,
-  type TemplateOverrideRow,
 } from "./form.repository.js";
 
 function nameExists(): ConflictError {
@@ -45,57 +41,6 @@ function canonicalJson(value: unknown): string {
         )
       : inner,
   );
-}
-
-function withoutKeys(
-  overrides: LimitOverrides,
-  keys: string[],
-): LimitOverrides {
-  return Object.fromEntries(
-    Object.entries(overrides).filter(([fieldId]) => !keys.includes(fieldId)),
-  );
-}
-
-type OverrideChange = {
-  row: TemplateOverrideRow;
-  droppedFieldIds: string[];
-};
-
-function planOverrideChanges(
-  previous: FormDefinition,
-  next: FormDefinition,
-  rows: TemplateOverrideRow[],
-): { changes: OverrideChange[]; dropped: DroppedOverride[] } {
-  const labels = new Map(
-    previous.fields.map((field) => [field.id, field.label]),
-  );
-  const changes: OverrideChange[] = [];
-  const dropped: DroppedOverride[] = [];
-
-  for (const row of rows) {
-    const droppedFieldIds = findUnusableOverrideFieldIds(
-      previous,
-      next,
-      row.limitOverrides,
-    );
-    if (droppedFieldIds.length === 0) continue;
-
-    changes.push({ row, droppedFieldIds });
-    for (const fieldId of droppedFieldIds) {
-      dropped.push({
-        templateId: row.templateId,
-        locationId: row.locationId,
-        locationName: row.locationName,
-        targetId: row.targetId,
-        targetName: row.targetName,
-        fieldId,
-        fieldLabel: labels.get(fieldId) ?? fieldId,
-        limits: row.limitOverrides[fieldId]!,
-      });
-    }
-  }
-
-  return { changes, dropped };
 }
 
 /** Templates already using the form must still fit after what it applies to changes. */
@@ -251,10 +196,7 @@ export const formService = {
     }
   },
 
-  /**
-   * Publishes the next version. Overrides it can no longer honour are refused with
-   * their list until the admin confirms, then removed; upcoming occurrences move to it.
-   */
+  /** Publishes the next version; upcoming occurrences move to it. */
   async createVersion(
     db: Db,
     organizationId: string,
@@ -282,32 +224,17 @@ export const formService = {
         return toFormResponse(current);
       }
 
-      const overrideRows = await formRepository.findTemplateOverridesByForm(
-        tx,
-        formId,
-      );
-      const { changes, dropped } = planOverrideChanges(
+      const switchedFieldIds = changedParameterFieldIds(
         current.latestVersion.definition,
         input.definition,
-        overrideRows,
       );
-
-      if (dropped.length > 0 && !input.confirmDroppedOverrides) {
+      if (switchedFieldIds.length > 0) {
         throw new ConflictError(
-          "Saving this version would remove limit overrides set on templates",
+          "A published measurement keeps what it measures; add a new field instead",
           {
-            code: API_ERROR_CODE.FORM_VERSION_DROPS_OVERRIDES,
-            details: { droppedOverrides: dropped },
+            code: API_ERROR_CODE.FORM_FIELD_PARAMETER_CHANGED,
+            details: { fieldIds: switchedFieldIds },
           },
-        );
-      }
-
-      for (const { row, droppedFieldIds } of changes) {
-        await formRepository.setLimitOverrides(
-          tx,
-          row.templateId,
-          row.targetId,
-          withoutKeys(row.limitOverrides, droppedFieldIds),
         );
       }
 

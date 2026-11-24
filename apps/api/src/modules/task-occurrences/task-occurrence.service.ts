@@ -97,7 +97,7 @@ function slotsFor(
   return source.targets.map((target) => ({
     targetId: target.targetId,
     targetName: target.targetName,
-    resolvedLimits: resolveLimits(source.definition, target.limitOverrides),
+    resolvedLimits: resolveLimits(source.definition, target.limits),
   }));
 }
 

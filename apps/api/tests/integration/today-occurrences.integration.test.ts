@@ -251,7 +251,7 @@ describe("Today occurrences (GET)", () => {
     const [walls, slicer] = await db
       .insert(targets)
       .values([
-        { locationId: org.locations.main.id, kind: "fixture", name: "Walls", parentId: kitchen!.id },
+        { locationId: org.locations.main.id, kind: "component", name: "Walls", parentId: kitchen!.id },
         { locationId: org.locations.main.id, kind: "equipment", name: "Slicer", parentId: kitchen!.id },
       ])
       .returning();
@@ -269,7 +269,7 @@ describe("Today occurrences (GET)", () => {
     const room = { id: kitchen!.id, name: "Kitchen 2" };
 
     expect(byId(ids.kitchen)).toMatchObject({ targetKind: "area", area: room });
-    expect(byId(ids.walls)).toMatchObject({ targetKind: "fixture", area: room });
+    expect(byId(ids.walls)).toMatchObject({ targetKind: "component", area: room });
     expect(byId(ids.slicer)).toMatchObject({ targetKind: "equipment", area: room });
     expect(byId(ids.fridge)).toMatchObject({ targetKind: "equipment", area: null });
     expect(byId(ids.untargeted)).toMatchObject({ targetKind: null, area: null });

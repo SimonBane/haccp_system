@@ -26,6 +26,7 @@ const FRIDGE_FORM: CreateFormInput = {
         type: "measurement",
         label: "Temperature",
         required: true,
+        parameter: "temperature",
         unit: "celsius",
         limits: { min: 0, max: 4 },
       },
@@ -87,7 +88,6 @@ async function upsertForm(
   });
   await json(api, "post", `/forms/${found.id}/versions`, {
     definition: form.definition,
-    confirmDroppedOverrides: true,
   });
   return found.id;
 }

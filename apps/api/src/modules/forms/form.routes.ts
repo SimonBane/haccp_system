@@ -96,7 +96,7 @@ const createVersionRoute = createRoute({
   tags: [TAG],
   security: bearerSecurity,
   description:
-    "Publishes a new version. Answers 409 FORM_VERSION_DROPS_OVERRIDES with details.droppedOverrides when it would remove template overrides, until confirmDroppedOverrides is true.",
+    "Publishes a new version and moves upcoming checks onto it.",
   request: {
     params: formIdParamSchema,
     body: {

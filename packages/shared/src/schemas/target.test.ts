@@ -3,6 +3,7 @@ import {
   TARGET_NAME_MAX_LENGTH,
   isTargetNameTaken,
   targetDisplayName,
+  targetDuplicateInputSchema,
   targetInputSchema,
 } from "./target.js";
 
@@ -27,14 +28,14 @@ describe("targetInputSchema", () => {
     ).toBe(false);
   });
 
-  it("accepts only equipment, area and fixture", () => {
+  it("accepts only equipment, area and component", () => {
     expect(
       targetInputSchema.safeParse({ name: "Kitchen", kind: "area" }).success,
     ).toBe(true);
     expect(
       targetInputSchema.safeParse({
         name: "Walls",
-        kind: "fixture",
+        kind: "component",
         parentId: AREA_ID,
       }).success,
     ).toBe(true);
@@ -45,26 +46,78 @@ describe("targetInputSchema", () => {
     }
   });
 
-  it("refuses a fixture outside an area", () => {
-    const result = targetInputSchema.safeParse({ name: "Walls", kind: "fixture" });
+  it("refuses a component outside an area", () => {
+    const result = targetInputSchema.safeParse({ name: "Walls", kind: "component" });
     expect(result.success).toBe(false);
     expect(result.error?.issues[0]?.path).toEqual(["parentId"]);
+  });
+});
+
+describe("targetInputSchema limits", () => {
+  const fridge = { name: "Fridge 20", kind: "equipment" };
+
+  it("defaults to no range of its own", () => {
+    expect(targetInputSchema.parse(fridge).limits).toEqual({});
+  });
+
+  it("keys a range by parameter and accepts one-sided bounds", () => {
+    const limits = {
+      temperature: { min: 0, max: 4 },
+      humidity: { min: 80, max: null },
+    };
+
+    expect(targetInputSchema.parse({ ...fridge, limits }).limits).toEqual(limits);
+  });
+
+  it("refuses an empty range, a reversed one and one beyond the parameter's unit", () => {
+    const parse = (limits: unknown) =>
+      targetInputSchema.safeParse({ ...fridge, limits }).success;
+
+    expect(parse({ temperature: { min: null, max: null } })).toBe(false);
+    expect(parse({ temperature: { min: 8, max: 7 } })).toBe(false);
+    expect(parse({ temperature: { min: null, max: 120 } })).toBe(false);
+    expect(parse({ humidity: { min: 80, max: 101 } })).toBe(false);
+    expect(parse({ celsius: { min: null, max: 4 } })).toBe(false);
+  });
+
+  it("refuses a range for a measurement that always uses the form's limits", () => {
+    expect(
+      targetInputSchema.safeParse({ ...fridge, limits: { ph: { min: 4, max: 6 } } })
+        .success,
+    ).toBe(false);
+  });
+
+  it("gives an area a range but never a component", () => {
+    const limits = { temperature: { min: null, max: 16 } };
+
+    expect(
+      targetInputSchema.safeParse({ name: "Cutting room", kind: "area", limits })
+        .success,
+    ).toBe(true);
+    expect(
+      targetInputSchema.safeParse({
+        name: "Walls",
+        kind: "component",
+        parentId: AREA_ID,
+        limits,
+      }).success,
+    ).toBe(false);
   });
 });
 
 describe("isTargetNameTaken", () => {
   const existing = [
     { id: "a", name: "Kitchen", kind: "area", parentId: null },
-    { id: "b", name: "Walls", kind: "fixture", parentId: AREA_ID },
+    { id: "b", name: "Walls", kind: "component", parentId: AREA_ID },
     { id: "c", name: "Fridge", kind: "equipment", parentId: AREA_ID },
   ] as const;
 
-  it("lets a fixture name repeat in another area but not in the same one", () => {
+  it("lets a component name repeat in another area but not in the same one", () => {
     expect(
-      isTargetNameTaken(existing, { name: "Walls", kind: "fixture", parentId: OTHER_AREA_ID }),
+      isTargetNameTaken(existing, { name: "Walls", kind: "component", parentId: OTHER_AREA_ID }),
     ).toBe(false);
     expect(
-      isTargetNameTaken(existing, { name: "Walls", kind: "fixture", parentId: AREA_ID }),
+      isTargetNameTaken(existing, { name: "Walls", kind: "component", parentId: AREA_ID }),
     ).toBe(true);
   });
 
@@ -77,25 +130,25 @@ describe("isTargetNameTaken", () => {
     ).toBe(true);
   });
 
-  it("never clashes a fixture with equipment or an area, nor an item with itself", () => {
+  it("never clashes a component with equipment or an area, nor an item with itself", () => {
     expect(
-      isTargetNameTaken(existing, { name: "Kitchen", kind: "fixture", parentId: AREA_ID }),
+      isTargetNameTaken(existing, { name: "Kitchen", kind: "component", parentId: AREA_ID }),
     ).toBe(false);
     expect(
-      isTargetNameTaken(existing, { id: "b", name: "Walls", kind: "fixture", parentId: AREA_ID }),
+      isTargetNameTaken(existing, { id: "b", name: "Walls", kind: "component", parentId: AREA_ID }),
     ).toBe(false);
   });
 });
 
 describe("targetDisplayName", () => {
-  it("prefixes only fixtures with their area", () => {
-    expect(targetDisplayName({ name: "Walls", kind: "fixture" }, "Kitchen 2")).toBe(
+  it("prefixes only components with their area", () => {
+    expect(targetDisplayName({ name: "Walls", kind: "component" }, "Kitchen 2")).toBe(
       "Kitchen 2 › Walls",
     );
     expect(targetDisplayName({ name: "Fridge", kind: "equipment" }, "Kitchen 2")).toBe(
       "Fridge",
     );
-    expect(targetDisplayName({ name: "Walls", kind: "fixture" }, null)).toBe("Walls");
+    expect(targetDisplayName({ name: "Walls", kind: "component" }, null)).toBe("Walls");
   });
 });
 
@@ -104,5 +157,25 @@ describe("target name limit", () => {
     const name = "a".repeat(TARGET_NAME_MAX_LENGTH);
     expect(targetInputSchema.safeParse({ name, kind: "area" }).success).toBe(true);
     expect(targetInputSchema.safeParse({ name: `${name}a`, kind: "area" }).success).toBe(false);
+  });
+});
+
+describe("targetDuplicateInputSchema", () => {
+  const target = { name: "Kitchen 2", kind: "area" };
+
+  it("copies nothing inside by default", () => {
+    expect(targetDuplicateInputSchema.parse({ target }).contents).toEqual([]);
+  });
+
+  it("refuses the same item twice in the contents", () => {
+    expect(
+      targetDuplicateInputSchema.safeParse({
+        target,
+        contents: [
+          { sourceId: AREA_ID, name: "Cold room 2" },
+          { sourceId: AREA_ID, name: "Cold room 3" },
+        ],
+      }).success,
+    ).toBe(false);
   });
 });

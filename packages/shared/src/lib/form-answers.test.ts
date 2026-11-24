@@ -3,9 +3,9 @@ import type { FormDefinition, FormField } from "../schemas/form.js";
 import {
   asksForCorrectiveAction,
   buildAnswerSchema,
+  changedParameterFieldIds,
   correctiveSettings,
   evaluateAnswers,
-  findUnusableOverrideFieldIds,
   requiresCorrectiveAction,
   resolveCorrective,
   resolveLimits,
@@ -16,9 +16,10 @@ const temperature: FormField = {
   type: "measurement",
   label: "Temperature",
   required: true,
+  parameter: "temperature",
   unit: "celsius",
   limits: { min: 0, max: 5 },
-};
+} as FormField;
 
 const packaging: FormField = {
   id: "packaging",
@@ -75,32 +76,63 @@ function form(
 }
 
 describe("resolveLimits", () => {
-  const definition = form([
-    temperature,
-    { ...temperature, id: "core", limits: { min: 75, max: null } } as FormField,
-    note,
-  ]);
+  const humidity = {
+    ...temperature,
+    id: "humidity",
+    parameter: "humidity",
+    unit: "percent",
+    limits: { min: 75, max: null },
+  } as FormField;
+  const definition = form([temperature, humidity, note]);
 
   it("takes each measurement field's default limits", () => {
     expect(resolveLimits(definition, null)).toEqual({
       temperature: { min: 0, max: 5 },
-      core: { min: 75, max: null },
+      humidity: { min: 75, max: null },
     });
   });
 
-  it("lets a target's override replace one field's limits whole", () => {
+  it("gives each field the item's range for its own parameter", () => {
+    expect(
+      resolveLimits(definition, {
+        temperature: { min: 0, max: 4 },
+        humidity: { min: 80, max: 90 },
+      }),
+    ).toEqual({
+      temperature: { min: 0, max: 4 },
+      humidity: { min: 80, max: 90 },
+    });
+  });
+
+  it("keeps the default for a field whose parameter the item has no range for", () => {
     expect(
       resolveLimits(definition, { temperature: { min: 0, max: 2 } }),
     ).toEqual({
       temperature: { min: 0, max: 2 },
-      core: { min: 75, max: null },
+      humidity: { min: 75, max: null },
     });
   });
+});
 
-  it("ignores overrides for fields the form no longer has", () => {
-    expect(
-      resolveLimits(definition, { gone: { min: 1, max: 2 } }),
-    ).not.toHaveProperty("gone");
+describe("changedParameterFieldIds", () => {
+  const core = { ...temperature, id: "core" } as FormField;
+
+  it("names a kept field that now measures something else", () => {
+    const next = form([
+      { ...temperature, parameter: "humidity", unit: "percent" } as FormField,
+      core,
+    ]);
+
+    expect(changedParameterFieldIds(form([temperature, core]), next)).toEqual([
+      "temperature",
+    ]);
+  });
+
+  it("ignores added, removed and relabelled fields", () => {
+    const previous = form([temperature, note]);
+    const next = form([{ ...temperature, label: "Air" } as FormField, core]);
+
+    expect(changedParameterFieldIds(previous, next)).toEqual([]);
   });
 });
 
@@ -327,44 +359,6 @@ describe("asksForCorrectiveAction", () => {
     expect(asksForCorrectiveAction(form([]))).toBe(true);
     expect(asksForCorrectiveAction(form([], "optional"))).toBe(true);
     expect(asksForCorrectiveAction(form([], "off"))).toBe(false);
-  });
-});
-
-describe("findUnusableOverrideFieldIds", () => {
-  const previous = form([temperature, packaging]);
-  const overrides = { temperature: { min: 0, max: 2 } };
-
-  it("keeps overrides whose measurement field survives unchanged", () => {
-    const next = form([
-      { ...temperature, label: "Air temperature" } as FormField,
-    ]);
-    expect(findUnusableOverrideFieldIds(previous, next, overrides)).toEqual([]);
-  });
-
-  it("drops overrides for removed fields", () => {
-    expect(
-      findUnusableOverrideFieldIds(previous, form([packaging]), overrides),
-    ).toEqual(["temperature"]);
-  });
-
-  it("drops overrides when the field is no longer a measurement", () => {
-    const next = form([{ ...note, id: "temperature" } as FormField]);
-    expect(findUnusableOverrideFieldIds(previous, next, overrides)).toEqual([
-      "temperature",
-    ]);
-  });
-
-  it("drops overrides when the unit changed", () => {
-    const next = form([
-      {
-        ...temperature,
-        unit: "ph",
-        limits: { min: null, max: null },
-      } as FormField,
-    ]);
-    expect(findUnusableOverrideFieldIds(previous, next, overrides)).toEqual([
-      "temperature",
-    ]);
   });
 });
 

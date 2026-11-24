@@ -58,6 +58,7 @@ const FRIDGE: FormDefinition = {
       type: "measurement",
       label: "Temperature",
       required: true,
+      parameter: "temperature",
       unit: "celsius",
       limits: { min: 0, max: 5 },
     },
@@ -652,11 +653,11 @@ describe("reconcileTemplateIds — targets and forms", () => {
       title: "Fridge round",
       definition: FRIDGE,
       targets: [
-        { targetId: TARGET_A, targetName: "Dairy fridge", limitOverrides: {} },
+        { targetId: TARGET_A, targetName: "Dairy fridge", limits: {} },
         {
           targetId: TARGET_B,
           targetName: "Fish fridge",
-          limitOverrides: { temperature: { min: 0, max: 2 } },
+          limits: { temperature: { min: 0, max: 2 } },
         },
       ],
     });
@@ -753,7 +754,7 @@ describe("reconcileTemplateIds — targets and forms", () => {
           {
             targetId: TARGET_A,
             targetName: "Dairy fridge",
-            limitOverrides: {},
+            limits: {},
           },
         ],
       }),
@@ -788,7 +789,7 @@ describe("reconcileTemplateIds — targets and forms", () => {
           {
             targetId: TARGET_A,
             targetName: "Dairy fridge",
-            limitOverrides: { temperature: { min: 1, max: 4 } },
+            limits: { temperature: { min: 1, max: 4 } },
           },
         ],
       }),
@@ -839,7 +840,7 @@ describe("reconcileTemplateIds — targets and forms", () => {
           {
             targetId: TARGET_A,
             targetName: "Dairy fridge",
-            limitOverrides: {},
+            limits: {},
           },
         ],
       }),

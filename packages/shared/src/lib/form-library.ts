@@ -4,11 +4,12 @@ import {
   FIELD_TYPE,
   FORM_APPLIES_TO,
   FORM_CATEGORY,
+  parameterUnit,
   type FormAppliesTo,
   type FormCategory,
   type FormDefinition,
   type FormField,
-  type MeasurementUnit,
+  type MeasurementParameter,
 } from "../schemas/form.js";
 
 export type LibraryLocale = "bg" | "en";
@@ -22,7 +23,7 @@ type LibraryField =
       id: string;
       label: Localized;
       required: boolean;
-      unit: MeasurementUnit;
+      parameter: MeasurementParameter;
       min: number | null;
       max: number | null;
     }
@@ -106,7 +107,7 @@ const LIBRARY: LibraryEntry[] = [
         id: "air_temperature",
         label: { bg: "Температура на въздуха", en: "Air temperature" },
         required: true,
-        unit: "celsius",
+        parameter: "temperature",
         min: 0,
         max: 4,
       },
@@ -172,7 +173,7 @@ const LIBRARY: LibraryEntry[] = [
         id: "air_temperature",
         label: { bg: "Температура на въздуха", en: "Air temperature" },
         required: true,
-        unit: "celsius",
+        parameter: "temperature",
         min: null,
         max: -18,
       },
@@ -355,7 +356,7 @@ const LIBRARY: LibraryEntry[] = [
         id: "product_temperature",
         label: { bg: "Температура на продукта", en: "Product temperature" },
         required: false,
-        unit: "celsius",
+        parameter: "temperature",
         min: null,
         max: 5,
       },
@@ -418,7 +419,8 @@ function toField(field: LibraryField, locale: LibraryLocale): FormField {
       return {
         ...base,
         type: FIELD_TYPE.MEASUREMENT,
-        unit: field.unit,
+        parameter: field.parameter,
+        unit: parameterUnit(field.parameter),
         limits: { min: field.min, max: field.max },
       };
     case "choice":

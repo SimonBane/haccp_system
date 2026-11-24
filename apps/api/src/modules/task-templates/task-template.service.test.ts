@@ -40,6 +40,7 @@ const FRIDGE: FormDefinition = {
       type: "measurement",
       label: "Temperature",
       required: true,
+      parameter: "temperature",
       unit: "celsius",
       limits: { min: 0, max: 5 },
     },
@@ -73,7 +74,7 @@ function input(
     formId: FORM_ID,
     weekdays: ["monday"],
     scheduledTimes: ["08:00"],
-    targets: [{ targetId: TARGET_ID, limitOverrides: {} }],
+    targets: [{ targetId: TARGET_ID }],
     completionOpensBeforeMinutes: 1440,
     completionDueAfterMinutes: 0,
     ...overrides,
@@ -112,7 +113,6 @@ beforeEach(() => {
       taskTemplateId: TEMPLATE_ID,
       targetId: TARGET_ID,
       targetName: "Fish fridge",
-      limitOverrides: {},
     },
   ]);
 });
@@ -134,8 +134,8 @@ describe("taskTemplateService.create", () => {
         LOCATION_ID,
         input({
           targets: [
-            { targetId: TARGET_ID, limitOverrides: {} },
-            { targetId: OTHER_TARGET_ID, limitOverrides: {} },
+            { targetId: TARGET_ID },
+            { targetId: OTHER_TARGET_ID },
           ],
         }),
       ),
@@ -146,47 +146,8 @@ describe("taskTemplateService.create", () => {
     expect(taskTemplateRepository.insert).not.toHaveBeenCalled();
   });
 
-  it("rejects an override for a field that is not a measurement", async () => {
-    await expect(
-      taskTemplateService.create(
-        db,
-        LOCATION_ID,
-        input({
-          targets: [
-            {
-              targetId: TARGET_ID,
-              limitOverrides: { door_closed: { min: 0, max: 1 } },
-            },
-          ],
-        }),
-      ),
-    ).rejects.toBeInstanceOf(ValidationError);
-  });
-
-  it("rejects an override with min above max", async () => {
-    await expect(
-      taskTemplateService.create(
-        db,
-        LOCATION_ID,
-        input({
-          targets: [
-            {
-              targetId: TARGET_ID,
-              limitOverrides: { temperature: { min: 4, max: 2 } },
-            },
-          ],
-        }),
-      ),
-    ).rejects.toBeInstanceOf(ValidationError);
-  });
-
   it("inserts, links its targets and reconciles in one transaction", async () => {
-    const targets = [
-      {
-        targetId: TARGET_ID,
-        limitOverrides: { temperature: { min: 0, max: 2 } },
-      },
-    ];
+    const targets = [{ targetId: TARGET_ID }];
 
     const result = await taskTemplateService.create(
       db,
@@ -207,7 +168,7 @@ describe("taskTemplateService.create", () => {
       db,
       TEMPLATE_ID,
       LOCATION_ID,
-      targets,
+      [TARGET_ID],
     );
     expect(taskOccurrenceService.reconcileTemplate).toHaveBeenCalledWith(
       db,
@@ -254,7 +215,7 @@ describe("taskTemplateService.create", () => {
     expect(taskTemplateRepository.insert).not.toHaveBeenCalled();
   });
 
-  it("lets a per-item form check any mix of equipment, areas and fixtures", async () => {
+  it("lets a per-item form check any mix of equipment, areas and components", async () => {
     taskTemplateRepository.findActiveTargetIdsAtLocation.mockResolvedValue(
       new Set([TARGET_ID, OTHER_TARGET_ID]),
     );
@@ -264,8 +225,8 @@ describe("taskTemplateService.create", () => {
       LOCATION_ID,
       input({
         targets: [
-          { targetId: TARGET_ID, limitOverrides: {} },
-          { targetId: OTHER_TARGET_ID, limitOverrides: {} },
+          { targetId: TARGET_ID },
+          { targetId: OTHER_TARGET_ID },
         ],
       }),
     );

@@ -1,8 +1,10 @@
 "use client";
 
 import {
+  targetDuplicateInputSchema,
   targetInputSchema,
   targetResponseSchema,
+  type TargetDuplicateInput,
   type TargetInput,
 } from "@haccp/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -43,6 +45,29 @@ export function useTargetsMutations() {
     onSuccess: invalidateTargets,
   });
 
+  const duplicate = useMutation({
+    meta: { handlesError: true },
+    mutationFn: async ({
+      sourceId,
+      input,
+    }: {
+      sourceId: string;
+      input: TargetDuplicateInput;
+    }) => {
+      const payload = targetDuplicateInputSchema.parse(input);
+      return fetchJson(
+        `${targetsPath}/${sourceId}/duplicate`,
+        targetResponseSchema,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
+    },
+    onSuccess: invalidateTargets,
+  });
+
   const update = useMutation({
     meta: { handlesError: true },
     mutationFn: async ({ id, input }: { id: string; input: TargetInput }) => {
@@ -64,5 +89,5 @@ export function useTargetsMutations() {
     onSuccess: invalidateTargets,
   });
 
-  return { create, update, remove };
+  return { create, duplicate, update, remove };
 }

@@ -61,6 +61,7 @@ const FRIDGE: FormDefinition = {
       type: "measurement",
       label: "Temperature",
       required: true,
+      parameter: "temperature",
       unit: "celsius",
       limits: { min: 0, max: 5 },
     },

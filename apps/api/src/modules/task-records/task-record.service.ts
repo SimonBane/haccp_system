@@ -27,7 +27,10 @@ import {
 } from "../../core/errors/app-errors.js";
 import { mapDbMutationError } from "../../lib/db-errors.js";
 import { formRepository } from "../forms/form.repository.js";
-import { targetRepository } from "../targets/target.repository.js";
+import {
+  targetRepository,
+  type TargetItemRow,
+} from "../targets/target.repository.js";
 import {
   toDeviationRows,
   toReadingRows,
@@ -234,7 +237,7 @@ export const taskRecordService = {
       });
     }
 
-    let item: { targetId: string; targetName: string } | null = null;
+    let item: TargetItemRow | null = null;
     if (form.appliesTo === FORM_APPLIES_TO.PER_ITEM) {
       item = input.targetId
         ? await targetRepository.findActiveItem(
@@ -252,7 +255,7 @@ export const taskRecordService = {
 
     assertNotInFuture(input, now, scope.timeZone);
 
-    const resolvedLimits = resolveLimits(latestVersion.definition, null);
+    const resolvedLimits = resolveLimits(latestVersion.definition, item?.limits);
     const judged = judgeAnswers(
       { definition: latestVersion.definition, resolvedLimits },
       input,

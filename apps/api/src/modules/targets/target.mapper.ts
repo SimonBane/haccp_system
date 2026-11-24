@@ -11,6 +11,7 @@ export function toTargetResponse({
     name: target.name,
     kind: target.kind as TargetResponse["kind"],
     parentId: target.parentId,
+    limits: target.limits,
     taskCount,
     createdAt: target.createdAt.toISOString(),
     updatedAt: target.updatedAt.toISOString(),

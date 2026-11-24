@@ -1,5 +1,7 @@
-import { CheckIcon, ThermometerIcon, TriangleAlertIcon } from "lucide-react";
+import type { MeasurementUnit } from "@haccp/shared";
+import { CheckIcon, TriangleAlertIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { UnitIcon } from "./unit-option";
 import type { MeasurementVerdict } from "../lib/measurement";
 
 export type LimitChipTone = "default" | "own" | "invalid" | "pass";
@@ -28,6 +30,7 @@ export function limitChipClass(
 type LimitChipProps = {
   /** "0 to 4 °C" */
   limits: string;
+  unit: MeasurementUnit;
   /** What a screen reader hears instead, e.g. "Allowed 0 to 4 °C". */
   label: string;
   /** Colours the chip once a reading is in; null while nothing is filled. */
@@ -42,11 +45,12 @@ const VERDICT_ICON = {
 
 export function LimitChip({
   limits,
+  unit,
   label,
   verdict = null,
   className,
 }: LimitChipProps) {
-  const Icon = verdict ? VERDICT_ICON[verdict] : ThermometerIcon;
+  const VerdictIcon = verdict ? VERDICT_ICON[verdict] : null;
   const tone: LimitChipTone =
     verdict === "pass" ? "pass" : verdict === "fail" ? "invalid" : "default";
 
@@ -56,7 +60,11 @@ export function LimitChip({
       title={label}
       data-verdict={verdict ?? undefined}
     >
-      <Icon className="size-3.5 shrink-0" aria-hidden />
+      {VerdictIcon ? (
+        <VerdictIcon className="size-3.5 shrink-0" aria-hidden />
+      ) : (
+        <UnitIcon unit={unit} className="size-3.5 shrink-0" />
+      )}
       <span className="truncate" aria-hidden>
         {limits}
       </span>

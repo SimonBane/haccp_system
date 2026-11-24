@@ -38,15 +38,12 @@ export function emptyDraft(): TaskDraft {
 }
 
 /** Loads a saved task, or the source of a duplicate. */
-export function draftFromTask(
-  task: TaskTemplateResponse,
-  separator: string,
-): TaskDraft {
+export function draftFromTask(task: TaskTemplateResponse): TaskDraft {
   const window = windowOf(task);
 
   return {
     formId: task.formId,
-    targets: buildDefaultTargets(task, null, separator),
+    targets: buildDefaultTargets(task, null),
     weekdays: sortWeekdays(task.weekdays),
     times: sortScheduledTimes([...task.scheduledTimes]),
     windowOn: window !== null,

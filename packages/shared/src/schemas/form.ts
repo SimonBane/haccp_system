@@ -27,6 +27,48 @@ export const measurementUnitSchema = z.enum(MEASUREMENT_UNIT_VALUES);
 
 export type MeasurementUnit = z.infer<typeof measurementUnitSchema>;
 
+/** What a measurement field measures; ids are never renamed or removed and a parameter's unit never changes. */
+export const MEASUREMENT_PARAMETERS = {
+  temperature: { unit: "celsius", itemRange: true },
+  humidity: { unit: "percent", itemRange: true },
+  ph: { unit: "ph", itemRange: false },
+  concentration: { unit: "ppm", itemRange: false },
+  water_activity: { unit: "water_activity", itemRange: false },
+  weight_g: { unit: "grams", itemRange: false },
+  weight_kg: { unit: "kilograms", itemRange: false },
+  duration: { unit: "minutes", itemRange: false },
+} as const satisfies Record<
+  string,
+  { unit: MeasurementUnit; itemRange: boolean }
+>;
+
+export const MEASUREMENT_PARAMETER_VALUES = [
+  "temperature",
+  "humidity",
+  "ph",
+  "concentration",
+  "water_activity",
+  "weight_g",
+  "weight_kg",
+  "duration",
+] as const satisfies readonly (keyof typeof MEASUREMENT_PARAMETERS)[];
+
+export const measurementParameterSchema = z.enum(MEASUREMENT_PARAMETER_VALUES);
+
+export type MeasurementParameter = z.infer<typeof measurementParameterSchema>;
+
+export const DEFAULT_MEASUREMENT_PARAMETER: MeasurementParameter = "temperature";
+
+export function parameterUnit(parameter: MeasurementParameter): MeasurementUnit {
+  return MEASUREMENT_PARAMETERS[parameter].unit;
+}
+
+/** The parameters an equipment or area may hold its own range for; the rest are judged by the form's default. */
+export const ITEM_RANGE_PARAMETERS: readonly MeasurementParameter[] =
+  MEASUREMENT_PARAMETER_VALUES.filter(
+    (parameter) => MEASUREMENT_PARAMETERS[parameter].itemRange,
+  );
+
 export const FORM_CATEGORY = {
   TEMPERATURE: "temperature",
   CLEANING: "cleaning",
@@ -48,7 +90,7 @@ export const formCategorySchema = z.enum(FORM_CATEGORY_VALUES);
 export type FormCategory = z.infer<typeof formCategorySchema>;
 
 export const FORM_APPLIES_TO = {
-  /** One check per item a task picks: equipment, areas and fixtures in any mix. */
+  /** One check per item a task picks: equipment, areas and components in any mix. */
   PER_ITEM: "per_item",
   /** One check per time slot, for no item. */
   LOCATION: "location",
@@ -136,7 +178,7 @@ export const FORM_FIELD_LABEL_MAX_LENGTH = 200;
 export const FORM_FIELD_HELP_MAX_LENGTH = 500;
 export const CHOICE_OPTION_LABEL_MAX_LENGTH = 200;
 
-/** Builders mint these once and keep them across versions; answers and overrides are keyed by them. */
+/** Builders mint these once and keep them across versions; answers are keyed by them. */
 export const formElementIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,40}$/, {
   error: "Ids may contain letters, digits, _ and - (at most 40)",
 });
@@ -151,14 +193,6 @@ export const measurementLimitsSchema = z.object({
 export type MeasurementLimits = z.infer<typeof measurementLimitsSchema>;
 
 export const NO_LIMITS: MeasurementLimits = { min: null, max: null };
-
-/** Field ids map to that target's limits, replacing the form field's defaults whole. */
-export const limitOverridesSchema = z.record(
-  formElementIdSchema,
-  measurementLimitsSchema,
-);
-
-export type LimitOverrides = z.infer<typeof limitOverridesSchema>;
 
 /** One entry per measurement field: the limits an occurrence was created with. */
 export const resolvedLimitsSchema = z.record(
@@ -217,6 +251,39 @@ export function limitsIssueMessage(issue: LimitsIssue): string {
   return LIMITS_ISSUE_MESSAGE[issue];
 }
 
+/** An item's own allowed range per parameter; a measurement field of that parameter is judged by it instead of its default. */
+export const itemLimitsSchema = z
+  .partialRecord(measurementParameterSchema, measurementLimitsSchema)
+  .superRefine((limits, ctx) => {
+    for (const parameter of MEASUREMENT_PARAMETER_VALUES) {
+      const range = limits[parameter];
+      if (!range) continue;
+      if (!MEASUREMENT_PARAMETERS[parameter].itemRange) {
+        ctx.addIssue({
+          code: "custom",
+          message: "This measurement always uses the form's own limits",
+          path: [parameter],
+        });
+      }
+      if (range.min === null && range.max === null) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Set a minimum, a maximum or both",
+          path: [parameter],
+        });
+      }
+      for (const issue of checkMeasurementLimits(range, parameterUnit(parameter))) {
+        ctx.addIssue({
+          code: "custom",
+          message: limitsIssueMessage(issue),
+          path: [parameter, issue === "max_out_of_range" ? "max" : "min"],
+        });
+      }
+    }
+  });
+
+export type ItemLimits = z.infer<typeof itemLimitsSchema>;
+
 const fieldBaseShape = {
   id: formElementIdSchema,
   label: fieldLabelSchema,
@@ -232,6 +299,7 @@ export const checkboxFieldSchema = z.object({
 export const measurementFieldSchema = z.object({
   ...fieldBaseShape,
   type: z.literal(FIELD_TYPE.MEASUREMENT),
+  parameter: measurementParameterSchema,
   unit: measurementUnitSchema,
   limits: measurementLimitsSchema,
 });
@@ -345,6 +413,13 @@ export const formDefinitionSchema = z
       seenFieldIds.add(field.id);
 
       if (field.type === FIELD_TYPE.MEASUREMENT) {
+        if (field.unit !== parameterUnit(field.parameter)) {
+          ctx.addIssue({
+            code: "custom",
+            message: "The unit must be the measurement's own unit",
+            path: ["fields", index, "unit"],
+          });
+        }
         for (const issue of checkMeasurementLimits(field.limits, field.unit)) {
           ctx.addIssue({
             code: "custom",
@@ -406,8 +481,6 @@ export type UpdateFormInput = z.infer<typeof updateFormSchema>;
 
 export const createFormVersionSchema = z.object({
   definition: formDefinitionSchema,
-  /** Without it, a version that would drop template overrides is refused with their list. */
-  confirmDroppedOverrides: z.boolean().default(false),
 });
 
 export type CreateFormVersionInput = z.infer<typeof createFormVersionSchema>;
@@ -470,24 +543,3 @@ export const formVersionSummaryMapSchema = z.record(
 );
 
 export type FormVersionSummaryMap = z.infer<typeof formVersionSummaryMapSchema>;
-
-export const droppedOverrideSchema = z.object({
-  templateId: z.uuid(),
-  locationId: z.uuid(),
-  locationName: z.string(),
-  targetId: z.uuid(),
-  targetName: z.string(),
-  fieldId: formElementIdSchema,
-  fieldLabel: z.string(),
-  limits: measurementLimitsSchema,
-});
-
-export type DroppedOverride = z.infer<typeof droppedOverrideSchema>;
-
-export const droppedOverridesDetailsSchema = z.object({
-  droppedOverrides: z.array(droppedOverrideSchema),
-});
-
-export type DroppedOverridesDetails = z.infer<
-  typeof droppedOverridesDetailsSchema
->;

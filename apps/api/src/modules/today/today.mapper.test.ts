@@ -47,7 +47,7 @@ describe("sortItemsByScheduledTime", () => {
     ]);
   });
 
-  it("keeps a room's fixtures together across tasks at the same time", () => {
+  it("keeps a room's components together across tasks at the same time", () => {
     const sorted = sortItemsByScheduledTime([
       item("22:00", OCCURRENCE_A, "Kitchen 2 › Walls", "Weekly walls"),
       item("22:00", OCCURRENCE_A, "Bar › Floor", "Daily floors"),
@@ -150,7 +150,7 @@ describe("toTodayTaskItem", () => {
     expect(
       toTodayTaskItem(
         occurrenceRow({
-          targetKind: "fixture",
+          targetKind: "component",
           targetName: "Kitchen › Walls",
           targetLiveName: "Walls",
           targetParentId: KITCHEN,
@@ -159,7 +159,7 @@ describe("toTodayTaskItem", () => {
         NOW,
       ),
     ).toMatchObject({
-      targetKind: "fixture",
+      targetKind: "component",
       area: { id: KITCHEN, name: "Kitchen" },
     });
     expect(
@@ -341,6 +341,7 @@ describe("toTodayOnDemandForm", () => {
               type: "measurement",
               label: "Core temperature",
               required: true,
+              parameter: "temperature",
               unit: "celsius",
               limits: { min: null, max: 5 },
             },

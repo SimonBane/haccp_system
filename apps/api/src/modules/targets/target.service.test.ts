@@ -42,7 +42,7 @@ const db = dbHandle as never;
 function targetRow(
   id: string,
   name: string,
-  kind: "equipment" | "area" | "fixture",
+  kind: "equipment" | "area" | "component",
   parentId: string | null = null,
 ) {
   return {
@@ -52,6 +52,7 @@ function targetRow(
       kind,
       name,
       parentId,
+      limits: {},
       archivedAt: null,
       createdAt: new Date("2026-10-01T00:00:00Z"),
       updatedAt: new Date("2026-10-01T00:00:00Z"),
@@ -60,12 +61,12 @@ function targetRow(
   };
 }
 
-// Kitchen (area) ⟵ Cold room (area) ⟵ Fish fridge (equipment); Kitchen ⟵ Walls (fixture)
+// Kitchen (area) ⟵ Cold room (area) ⟵ Fish fridge (equipment); Kitchen ⟵ Walls (component)
 const hierarchy = [
   { id: KITCHEN_ID, parentId: null, kind: "area", name: "Kitchen" },
   { id: COLD_ROOM_ID, parentId: KITCHEN_ID, kind: "area", name: "Cold room" },
   { id: FRIDGE_ID, parentId: COLD_ROOM_ID, kind: "equipment", name: "Fish fridge" },
-  { id: WALLS_ID, parentId: KITCHEN_ID, kind: "fixture", name: "Walls" },
+  { id: WALLS_ID, parentId: KITCHEN_ID, kind: "component", name: "Walls" },
 ];
 
 beforeEach(() => {
@@ -81,6 +82,7 @@ describe("targetService.create", () => {
         name: "Freezer room",
         kind: "area",
         parentId: "00000000-0000-4000-8000-0000000000ff",
+        limits: {},
       }),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
@@ -91,34 +93,37 @@ describe("targetService.create", () => {
         name: "Top shelf",
         kind: "equipment",
         parentId: FRIDGE_ID,
+        limits: {},
       }),
     ).rejects.toMatchObject({ code: API_ERROR_CODE.TARGET_PARENT_NOT_AREA });
     expect(targetRepository.insert).not.toHaveBeenCalled();
   });
 
-  it("refuses to place a fixture in equipment, or anything in a fixture", async () => {
+  it("refuses to place a component in equipment, or anything in a component", async () => {
     await expect(
       targetService.create(db, LOCATION_ID, {
         name: "Door",
-        kind: "fixture",
+        kind: "component",
         parentId: FRIDGE_ID,
+        limits: {},
       }),
     ).rejects.toMatchObject({ code: API_ERROR_CODE.TARGET_PARENT_NOT_AREA });
     await expect(
       targetService.create(db, LOCATION_ID, {
         name: "Tile row",
-        kind: "fixture",
+        kind: "component",
         parentId: WALLS_ID,
+        limits: {},
       }),
     ).rejects.toMatchObject({ code: API_ERROR_CODE.TARGET_PARENT_NOT_AREA });
     expect(targetRepository.insert).not.toHaveBeenCalled();
   });
 
-  it("creates a fixture inside an area", async () => {
+  it("creates a component inside an area", async () => {
     const created = targetRow(
       "00000000-0000-4000-8000-0000000000c6",
       "Ceiling",
-      "fixture",
+      "component",
       KITCHEN_ID,
     );
     targetRepository.insert.mockResolvedValue(created.target);
@@ -126,11 +131,12 @@ describe("targetService.create", () => {
 
     const result = await targetService.create(db, LOCATION_ID, {
       name: "Ceiling",
-      kind: "fixture",
+      kind: "component",
       parentId: KITCHEN_ID,
+      limits: {},
     });
 
-    expect(result).toMatchObject({ kind: "fixture", parentId: KITCHEN_ID });
+    expect(result).toMatchObject({ kind: "component", parentId: KITCHEN_ID });
   });
 
   it("creates equipment inside an area and returns its task count", async () => {
@@ -147,6 +153,7 @@ describe("targetService.create", () => {
       name: "Dairy fridge",
       kind: "equipment",
       parentId: COLD_ROOM_ID,
+      limits: {},
     });
 
     expect(targetRepository.insert).toHaveBeenCalledWith(
@@ -156,6 +163,7 @@ describe("targetService.create", () => {
     expect(result).toMatchObject({
       name: "Dairy fridge",
       parentId: COLD_ROOM_ID,
+      limits: {},
       kind: "equipment",
       taskCount: 2,
     });
@@ -169,6 +177,7 @@ describe("targetService.create", () => {
         name: "Kitchen",
         kind: "area",
         parentId: null,
+        limits: {},
       }),
     ).rejects.toMatchObject({ code: API_ERROR_CODE.TARGET_NAME_EXISTS });
   });
@@ -181,6 +190,7 @@ describe("targetService.update", () => {
         name: "Cold room",
         kind: "area",
         parentId: COLD_ROOM_ID,
+        limits: {},
       }),
     ).rejects.toBeInstanceOf(ValidationError);
   });
@@ -191,6 +201,7 @@ describe("targetService.update", () => {
         name: "Kitchen",
         kind: "area",
         parentId: COLD_ROOM_ID,
+        limits: {},
       }),
     ).rejects.toBeInstanceOf(ValidationError);
     expect(targetRepository.updateActive).not.toHaveBeenCalled();
@@ -202,6 +213,7 @@ describe("targetService.update", () => {
         name: "Cold room",
         kind: "equipment",
         parentId: KITCHEN_ID,
+        limits: {},
       }),
     ).rejects.toMatchObject({ code: API_ERROR_CODE.TARGET_KIND_IN_USE });
     expect(targetRepository.updateActive).not.toHaveBeenCalled();
@@ -218,9 +230,36 @@ describe("targetService.update", () => {
       name: "Fish fridge",
       kind: "area",
       parentId: COLD_ROOM_ID,
+      limits: {},
     });
 
     expect(result.kind).toBe("area");
+    expect(
+      taskOccurrenceService.reconcileTemplatesAtLocation,
+    ).toHaveBeenCalledWith(db, LOCATION_ID, ["t1"]);
+  });
+
+  it("stores an item's own range and rebuilds the checks that judge against it", async () => {
+    targetRepository.updateActive.mockResolvedValue({ id: FRIDGE_ID });
+    targetRepository.findActiveTemplateIdsByTargets.mockResolvedValue(["t1"]);
+    targetRepository.findActiveById.mockResolvedValue(
+      targetRow(FRIDGE_ID, "Fish fridge", "equipment", COLD_ROOM_ID),
+    );
+    const limits = { temperature: { min: null, max: 2 } };
+
+    await targetService.update(db, LOCATION_ID, FRIDGE_ID, {
+      name: "Fish fridge",
+      kind: "equipment",
+      parentId: COLD_ROOM_ID,
+      limits,
+    });
+
+    expect(targetRepository.updateActive).toHaveBeenCalledWith(
+      db,
+      LOCATION_ID,
+      FRIDGE_ID,
+      expect.objectContaining({ limits }),
+    );
     expect(
       taskOccurrenceService.reconcileTemplatesAtLocation,
     ).toHaveBeenCalledWith(db, LOCATION_ID, ["t1"]);
@@ -240,6 +279,7 @@ describe("targetService.update", () => {
       name: "Dairy fridge",
       kind: "equipment",
       parentId: KITCHEN_ID,
+      limits: {},
     });
 
     expect(result.name).toBe("Dairy fridge");
@@ -248,7 +288,7 @@ describe("targetService.update", () => {
     ).toHaveBeenCalledWith(db, LOCATION_ID, ["t1", "t2"]);
   });
 
-  it("renaming an area also rebuilds occurrences of tasks that check its fixtures", async () => {
+  it("renaming an area also rebuilds occurrences of tasks that check its components", async () => {
     targetRepository.updateActive.mockResolvedValue({ id: KITCHEN_ID });
     targetRepository.findActiveTemplateIdsByTargets.mockResolvedValue([
       "t1",
@@ -262,6 +302,7 @@ describe("targetService.update", () => {
       name: "Main kitchen",
       kind: "area",
       parentId: null,
+      limits: {},
     });
 
     expect(
@@ -272,7 +313,7 @@ describe("targetService.update", () => {
     ).toHaveBeenCalledWith(db, LOCATION_ID, ["t1", "t3"]);
   });
 
-  it("leaves fixture tasks alone when the area keeps its name", async () => {
+  it("leaves component tasks alone when the area keeps its name", async () => {
     targetRepository.updateActive.mockResolvedValue({ id: KITCHEN_ID });
     targetRepository.findActiveById.mockResolvedValue(
       targetRow(KITCHEN_ID, "Kitchen", "area"),
@@ -282,6 +323,7 @@ describe("targetService.update", () => {
       name: "Kitchen",
       kind: "area",
       parentId: null,
+      limits: {},
     });
 
     expect(
@@ -295,7 +337,7 @@ describe("targetService.update", () => {
         db,
         LOCATION_ID,
         "00000000-0000-4000-8000-0000000000ff",
-        { name: "Fish fridge", kind: "equipment", parentId: null },
+        { name: "Fish fridge", kind: "equipment", parentId: null, limits: {} },
       ),
     ).rejects.toBeInstanceOf(NotFoundError);
     expect(targetRepository.updateActive).not.toHaveBeenCalled();

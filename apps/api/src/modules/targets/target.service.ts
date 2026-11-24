@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import type {
+  TargetDuplicateInput,
   TargetInput,
   TargetListResponse,
   TargetResponse,
@@ -62,6 +64,40 @@ function assertParentValid(
   }
 }
 
+/** The named contents in parent-first order; each must sit in the source or in another copied item. */
+function orderContents(
+  hierarchy: TargetHierarchyRow[],
+  sourceId: string,
+  contents: TargetDuplicateInput["contents"],
+): { source: TargetHierarchyRow; name: string }[] {
+  const byId = new Map(hierarchy.map((row) => [row.id, row]));
+  const named = new Map(contents.map((item) => [item.sourceId, item.name]));
+  const ordered: { source: TargetHierarchyRow; name: string }[] = [];
+  let level = [sourceId];
+
+  while (level.length > 0) {
+    const parents = new Set(level);
+    const next = hierarchy.filter(
+      (row) =>
+        row.parentId !== null && parents.has(row.parentId) && named.has(row.id),
+    );
+    for (const row of next) {
+      ordered.push({ source: row, name: named.get(row.id)! });
+    }
+    level = next.map((row) => row.id);
+  }
+
+  if (
+    ordered.length !== contents.length ||
+    contents.some((item) => !byId.has(item.sourceId))
+  ) {
+    throw new ValidationError(
+      "Only items inside the copied area, together with the area holding each, can be copied along",
+    );
+  }
+  return ordered;
+}
+
 async function loadResponse(
   db: DbClient,
   locationId: string,
@@ -110,6 +146,7 @@ export const targetService = {
         name: input.name,
         kind: input.kind,
         parentId: input.parentId,
+        limits: input.limits,
       });
 
       if (!created) {
@@ -160,6 +197,7 @@ export const targetService = {
             name: input.name,
             kind: input.kind,
             parentId: input.parentId,
+            limits: input.limits,
             updatedAt: new Date(),
           },
         );
@@ -168,21 +206,22 @@ export const targetService = {
           throw new NotFoundError("Target not found");
         }
 
-        // Occurrences copy the target's name, and a fixture's copies its area's too, so upcoming ones are rebuilt.
-        const fixtureIds =
+        // Occurrences copy the target's name and limits, and a component's copies its area's name, so upcoming ones are rebuilt.
+        const componentIds =
           current.name === input.name
             ? []
             : hierarchy
                 .filter(
                   (row) =>
                     row.parentId === targetId &&
-                    row.kind === TARGET_KIND.FIXTURE,
+                    row.kind === TARGET_KIND.COMPONENT,
                 )
                 .map((row) => row.id);
-        const templateIds = await targetRepository.findActiveTemplateIdsByTargets(
-          tx,
-          [targetId, ...fixtureIds],
-        );
+        const templateIds =
+          await targetRepository.findActiveTemplateIdsByTargets(tx, [
+            targetId,
+            ...componentIds,
+          ]);
         await taskOccurrenceService.reconcileTemplatesAtLocation(
           tx,
           locationId,
@@ -190,6 +229,59 @@ export const targetService = {
         );
 
         return loadResponse(tx, locationId, targetId);
+      });
+    } catch (error) {
+      mapWriteError(error);
+    }
+  },
+
+  /** Copies an item, and the named items inside it with their nesting and ranges, in one transaction. */
+  async duplicate(
+    db: Db,
+    locationId: string,
+    sourceId: string,
+    input: TargetDuplicateInput,
+  ): Promise<TargetResponse> {
+    try {
+      return await db.transaction(async (tx) => {
+        const hierarchy = await targetRepository.findActiveHierarchyByLocation(
+          tx,
+          locationId,
+        );
+
+        if (!hierarchy.some((row) => row.id === sourceId)) {
+          throw new NotFoundError("Target not found");
+        }
+
+        assertParentValid(hierarchy, input.target.parentId, null);
+
+        if (
+          input.contents.length > 0 &&
+          input.target.kind !== TARGET_KIND.AREA
+        ) {
+          throw new ValidationError("Only an area can contain other items", {
+            code: API_ERROR_CODE.TARGET_PARENT_NOT_AREA,
+          });
+        }
+
+        const contents = orderContents(hierarchy, sourceId, input.contents);
+        const copyIds = new Map<string, string>([[sourceId, randomUUID()]]);
+        for (const { source } of contents) copyIds.set(source.id, randomUUID());
+        const copyId = copyIds.get(sourceId)!;
+
+        await targetRepository.insertMany(tx, [
+          { id: copyId, locationId, ...input.target },
+          ...contents.map(({ source, name }) => ({
+            id: copyIds.get(source.id)!,
+            locationId,
+            name,
+            kind: source.kind,
+            parentId: copyIds.get(source.parentId!)!,
+            limits: source.limits,
+          })),
+        ]);
+
+        return loadResponse(tx, locationId, copyId);
       });
     } catch (error) {
       mapWriteError(error);

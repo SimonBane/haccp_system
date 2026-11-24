@@ -23,7 +23,7 @@ function todayItemKey(item: TodayTaskItem): string {
   return item.occurrenceId ?? item.recordId ?? "";
 }
 
-/** Within a time, by what is checked: fixture labels lead with their room, so one walk covers "Kitchen 2 › Floor" then "› Walls". */
+/** Within a time, by what is checked: component labels lead with their room, so one walk covers "Kitchen 2 › Floor" then "› Walls". */
 export function sortItemsByScheduledTime(
   items: TodayTaskItem[],
 ): TodayTaskItem[] {

@@ -146,7 +146,11 @@ describe("on-demand records", () => {
         },
       ]);
       expect(body.onDemand.items).toEqual([
-        { targetId: org.targets.fridge.id, targetName: org.targets.fridge.name },
+        {
+          targetId: org.targets.fridge.id,
+          targetName: org.targets.fridge.name,
+          limits: {},
+        },
       ]);
       expect(body.formVersions[org.forms.fridgeCheck.versionId]).toBeDefined();
     });
@@ -224,6 +228,42 @@ describe("on-demand records", () => {
           result: "fail",
         },
       ]);
+    });
+
+    it("judges an entry against the item's range for the field's parameter, not the form's default", async () => {
+      await setOnDemand(org.forms.fridgeCheck.id, true);
+      const updated = await apiRequest(
+        `/locations/${org.locations.main.id}/targets/${org.targets.fridge.id}`,
+        {
+          method: "PATCH",
+          actor: asAdmin(org),
+          body: JSON.stringify({
+            name: org.targets.fridge.name,
+            kind: "equipment",
+            parentId: null,
+            limits: {
+              temperature: { min: null, max: 7 },
+              humidity: { min: 80, max: 90 },
+            },
+          }),
+        },
+      );
+      expect(updated.status).toBe(200);
+
+      const response = await logEntry(org.forms.fridgeCheck.id, {
+        values: { [FRIDGE_FIELD_ID]: 6 },
+      });
+
+      expect(response.status).toBe(201);
+      const record = taskRecordResponseSchema.parse(await response.json());
+      expect(record.result).toBe("pass");
+      const [row] = await db
+        .select()
+        .from(taskRecords)
+        .where(eq(taskRecords.id, record.id));
+      expect(row?.resolvedLimits).toEqual({
+        [FRIDGE_FIELD_ID]: { min: null, max: 7 },
+      });
     });
 
     it("logs a whole-location form without an item, and refuses one with an item", async () => {

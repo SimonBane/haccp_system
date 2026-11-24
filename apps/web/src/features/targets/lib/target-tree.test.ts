@@ -24,6 +24,7 @@ function target(
     name,
     kind,
     parentId,
+    limits: {},
     taskCount: 0,
     createdAt: "2026-10-01T00:00:00.000Z",
     updatedAt: "2026-10-01T00:00:00.000Z",
@@ -64,52 +65,53 @@ describe("buildTargetTree", () => {
   });
 });
 
-describe("fixtures", () => {
-  const withFixtures = [
+describe("components", () => {
+  const withComponents = [
     target("kitchen", "Kitchen", "area"),
     target("mincer", "Mincer", "equipment", "kitchen"),
-    target("walls", "Walls", "fixture", "kitchen"),
-    target("ceiling", "Ceiling", "fixture", "kitchen"),
+    target("walls", "Walls", "component", "kitchen"),
+    target("ceiling", "Ceiling", "component", "kitchen"),
     target("bar", "Bar", "area"),
-    target("bar-walls", "Walls", "fixture", "bar"),
+    target("bar-walls", "Walls", "component", "bar"),
   ];
 
-  it("keeps fixtures with their own area, apart from its equipment", () => {
-    const kitchen = buildTargetTree(withFixtures).areas.find(
+  it("keeps components with their own area, apart from its equipment", () => {
+    const kitchen = buildTargetTree(withComponents).areas.find(
       (node) => node.area.id === "kitchen",
     )!;
 
-    expect(kitchen.fixtures.map((item) => item.id)).toEqual(["ceiling", "walls"]);
+    expect(kitchen.components.map((item) => item.id)).toEqual(["ceiling", "walls"]);
     expect(kitchen.equipment.map((item) => item.id)).toEqual(["mincer"]);
   });
 
-  it("lists an area's fixtures before what stands in it", () => {
-    const rows = buildTargetRows(withFixtures, {
-      scope: { type: "area", areaId: "kitchen" },
+  it("lists an area's components before what stands in it", () => {
+    const rows = buildTargetRows(withComponents, {
+      scope: "rooms",
       query: "",
-      isOpen: () => true,
+      isOpen: (areaId) => areaId === "kitchen",
     });
 
     expect(describeRows(rows)).toEqual([
-      "ceiling:0",
-      "walls:0",
-      "mincer:0",
-      "+kitchen:0",
+      "bar:0",
+      "kitchen:0",
+      "ceiling:1",
+      "walls:1",
+      "mincer:1",
     ]);
   });
 
-  it("finds a fixture by name in every area that has one", () => {
-    const result = filterTargetTree(buildTargetTree(withFixtures), "walls");
+  it("finds a component by name in every area that has one", () => {
+    const result = filterTargetTree(buildTargetTree(withComponents), "walls");
 
     expect(
-      result.areas.map((node) => node.fixtures.map((item) => item.id)),
+      result.areas.map((node) => node.components.map((item) => item.id)),
     ).toEqual([["bar-walls"], ["walls"]]);
   });
 
-  it("counts fixtures apart from equipment", () => {
-    expect(countAreaContents(withFixtures).get("kitchen")).toEqual({
+  it("counts components apart from equipment", () => {
+    expect(countAreaContents(withComponents).get("kitchen")).toEqual({
       equipment: 1,
-      fixtures: 2,
+      components: 2,
       areas: 0,
     });
   });
@@ -146,50 +148,44 @@ function describeRows(rows: TargetListRow[]) {
   return rows.map((row) =>
     row.type === "item"
       ? `${row.target.id}:${row.depth}`
-      : `+${row.area.id}:${row.depth}`,
+      : `standalone(${row.count})`,
   );
 }
 
 describe("buildTargetRows", () => {
   const allOpen = () => true;
 
-  it("nests everything and closes each open area with an add row", () => {
+  it("groups by room, then lists standalone equipment", () => {
     const rows = buildTargetRows(items, {
-      scope: { type: "all" },
+      scope: "all",
       query: "",
       isOpen: allOpen,
     });
 
     expect(describeRows(rows)).toEqual([
       "corridor:0",
-      "+corridor:1",
       "kitchen:0",
       "cold:1",
       "fridge:2",
-      "+cold:2",
       "mincer:1",
-      "+kitchen:1",
+      "standalone(1)",
       "probe:0",
     ]);
   });
 
-  it("puts standalone equipment among areas in name order, not after them", () => {
-    const rows = buildTargetRows(
-      [...items, target("chiller", "Blast chiller", "equipment")],
-      { scope: { type: "all" }, query: "", isOpen: () => false },
-    );
-
-    expect(describeRows(rows)).toEqual([
-      "chiller:0",
-      "corridor:0",
-      "kitchen:0",
-      "probe:0",
-    ]);
-  });
-
-  it("opens every matching branch while searching and drops add rows", () => {
+  it("leaves standalone equipment out of the rooms view", () => {
     const rows = buildTargetRows(items, {
-      scope: { type: "all" },
+      scope: "rooms",
+      query: "",
+      isOpen: () => false,
+    });
+
+    expect(describeRows(rows)).toEqual(["corridor:0", "kitchen:0"]);
+  });
+
+  it("opens every matching branch while searching", () => {
+    const rows = buildTargetRows(items, {
+      scope: "all",
       query: "fish",
       isOpen: () => false,
     });
@@ -199,38 +195,12 @@ describe("buildTargetRows", () => {
 
   it("lists all equipment flat, wherever it stands", () => {
     const rows = buildTargetRows(items, {
-      scope: { type: "equipment" },
+      scope: "equipment",
       query: "",
       isOpen: allOpen,
     });
 
     expect(describeRows(rows)).toEqual(["fridge:0", "mincer:0", "probe:0"]);
-  });
-
-  it("shows an area's contents from the top, ending with its add row", () => {
-    const rows = buildTargetRows(items, {
-      scope: { type: "area", areaId: "kitchen" },
-      query: "",
-      isOpen: allOpen,
-    });
-
-    expect(describeRows(rows)).toEqual([
-      "cold:0",
-      "fridge:1",
-      "+cold:1",
-      "mincer:0",
-      "+kitchen:0",
-    ]);
-  });
-
-  it("shows nothing for an area that is gone", () => {
-    expect(
-      buildTargetRows(items, {
-        scope: { type: "area", areaId: "missing" },
-        query: "",
-        isOpen: allOpen,
-      }),
-    ).toEqual([]);
   });
 });
 
@@ -298,8 +268,8 @@ describe("countAreaContents", () => {
   it("counts each area's direct equipment and sub-areas", () => {
     const counts = countAreaContents(items);
 
-    expect(counts.get("kitchen")).toEqual({ equipment: 1, fixtures: 0, areas: 1 });
-    expect(counts.get("cold")).toEqual({ equipment: 1, fixtures: 0, areas: 0 });
+    expect(counts.get("kitchen")).toEqual({ equipment: 1, components: 0, areas: 1 });
+    expect(counts.get("cold")).toEqual({ equipment: 1, components: 0, areas: 0 });
     expect(counts.has("corridor")).toBe(false);
   });
 });

@@ -8,7 +8,6 @@ import {
   createFormSchema,
   updateFormSchema,
   checkTemplateTargets,
-  createFormVersionSchema,
   formCategorySchema,
   formDefinitionSchema,
   formListItemSchema,
@@ -63,6 +62,7 @@ const fridge: FormField = {
   type: "measurement",
   label: "Temperature",
   required: true,
+  parameter: "temperature",
   unit: "celsius",
   limits: { min: 0, max: 5 },
 };
@@ -215,6 +215,33 @@ describe("formDefinitionSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("rejects an unknown parameter", () => {
+    const result = formDefinitionSchema.safeParse(
+      definition([
+        { ...fridge, parameter: "fridge_temperature" } as unknown as FormField,
+      ]),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a unit other than the parameter's own", () => {
+    const result = formDefinitionSchema.safeParse(
+      definition([{ ...fridge, parameter: "humidity" } as FormField]),
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path).toEqual(["fields", 0, "unit"]);
+  });
+
+  it("accepts two fields measuring the same thing", () => {
+    const result = formDefinitionSchema.safeParse(
+      definition([fridge, { ...fridge, id: "core" } as FormField]),
+    );
+
+    expect(result.success).toBe(true);
+  });
+
   it("rejects ids with spaces", () => {
     const result = formDefinitionSchema.safeParse(
       definition([{ ...fridge, id: "core temp" }]),
@@ -297,16 +324,6 @@ describe("formDefinitionSchema corrective settings", () => {
         })),
       ),
     ).toBe(false);
-  });
-});
-
-describe("createFormVersionSchema", () => {
-  it("does not confirm dropped overrides unless asked", () => {
-    const parsed = createFormVersionSchema.parse({
-      definition: definition([fridge]),
-    });
-
-    expect(parsed.confirmDroppedOverrides).toBe(false);
   });
 });
 

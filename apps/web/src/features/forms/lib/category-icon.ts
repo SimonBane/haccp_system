@@ -2,19 +2,25 @@ import {
   FORM_CATEGORY,
   type FieldType,
   type FormCategory,
+  type MeasurementUnit,
 } from "@haccp/shared";
 import {
   BugIcon,
   CalendarIcon,
   CheckSquareIcon,
   ClipboardCheckIcon,
+  DropletIcon,
+  FlaskConicalIcon,
   GaugeIcon,
   HandIcon,
   ListChecksIcon,
+  PercentIcon,
   SparklesIcon,
   ThermometerIcon,
+  TimerIcon,
   TruckIcon,
   TypeIcon,
+  WeightIcon,
   type LucideIcon,
 } from "lucide-react";
 
@@ -35,4 +41,16 @@ export const FIELD_TYPE_ICONS: Record<FieldType, LucideIcon> = {
   choice: ListChecksIcon,
   text: TypeIcon,
   date: CalendarIcon,
+};
+
+/** Ppm has no fitting glyph, so it keeps the generic measurement gauge. */
+export const MEASUREMENT_UNIT_ICONS: Record<MeasurementUnit, LucideIcon> = {
+  celsius: ThermometerIcon,
+  ph: FlaskConicalIcon,
+  percent: PercentIcon,
+  ppm: FIELD_TYPE_ICONS.measurement,
+  water_activity: DropletIcon,
+  grams: WeightIcon,
+  kilograms: WeightIcon,
+  minutes: TimerIcon,
 };

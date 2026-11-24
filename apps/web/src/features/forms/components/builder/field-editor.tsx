@@ -5,8 +5,9 @@ import {
   FORM_FIELD_HELP_MAX_LENGTH,
   FORM_FIELD_LABEL_MAX_LENGTH,
   FIELD_TYPE,
-  MEASUREMENT_UNIT_VALUES,
-  type MeasurementUnit,
+  MEASUREMENT_PARAMETER_VALUES,
+  parameterUnit,
+  type MeasurementParameter,
 } from "@haccp/shared";
 import { PlusIcon, XIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
@@ -16,6 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   REQUIRED_LABEL_CLASS,
   Field,
+  FieldDescription,
   FieldError,
   FieldLabel,
   FieldLegend,
@@ -51,6 +53,7 @@ import {
   parseMeasurementDraft,
   sanitizeMeasurementDraft,
 } from "../../lib/measurement";
+import { ParameterOption } from "../unit-option";
 import { SwitchCard } from "./switch-card";
 
 type Props = {
@@ -58,10 +61,18 @@ type Props = {
   field: BuilderField;
   issues: FieldIssues | undefined;
   onChange: (next: BuilderField) => void;
+  /** A published measurement keeps what it measures; the API refuses a version that changes it. */
+  parameterLocked?: boolean;
 };
 
 /** Everything about one field except its position, which the canvas owns. */
-export function FieldSettings({ idPrefix, field, issues, onChange }: Props) {
+export function FieldSettings({
+  idPrefix,
+  field,
+  issues,
+  onChange,
+  parameterLocked = false,
+}: Props) {
   const t = useTranslations("FormsPage.builder");
   const id = `${idPrefix}-${field.id}`;
 
@@ -119,6 +130,7 @@ export function FieldSettings({ idPrefix, field, issues, onChange }: Props) {
           field={field}
           issues={issues}
           onChange={onChange}
+          parameterLocked={parameterLocked}
         />
       ) : null}
 
@@ -210,19 +222,21 @@ function MeasurementSettings({
   field,
   issues,
   onChange,
+  parameterLocked,
 }: {
   id: string;
   field: Extract<BuilderField, { type: "measurement" }>;
   issues: FieldIssues | undefined;
   onChange: (next: BuilderField) => void;
+  parameterLocked: boolean;
 }) {
   const t = useTranslations("FormsPage.builder");
   const tForms = useTranslations("Forms");
   const separator = decimalSeparator(useLocale());
   const symbol = tForms(`units.${field.unit}.symbol`);
-  const unitItems = MEASUREMENT_UNIT_VALUES.map((unit) => ({
-    value: unit,
-    label: tForms(`units.${unit}.name`),
+  const parameterItems = MEASUREMENT_PARAMETER_VALUES.map((parameter) => ({
+    value: parameter,
+    label: tForms(`parameters.${parameter}`),
   }));
   const limitsError = issues?.limits
     ? t(`errors.limits.${issues.limits}`)
@@ -270,15 +284,20 @@ function MeasurementSettings({
   return (
     <>
       <Field>
-        <FieldLabel htmlFor={`${id}-unit`}>{t("unitLabel")}</FieldLabel>
+        <FieldLabel htmlFor={`${id}-parameter`}>
+          {t("parameterLabel")}
+        </FieldLabel>
         <Select
-          items={unitItems}
-          value={field.unit}
+          items={parameterItems}
+          value={field.parameter}
+          disabled={parameterLocked}
           onValueChange={(value: unknown) => {
-            const unit = value as MeasurementUnit;
+            const parameter = value as MeasurementParameter;
+            const unit = parameterUnit(parameter);
             // Limits typed for the old unit are trimmed to the new one's digits and decimals.
             onChange({
               ...field,
+              parameter,
               unit,
               limits: {
                 min: sanitizeMeasurementDraft(
@@ -295,19 +314,26 @@ function MeasurementSettings({
             });
           }}
         >
-          <SelectTrigger id={`${id}-unit`} className="w-full">
-            <SelectValue />
+          <SelectTrigger id={`${id}-parameter`} className="w-full">
+            <SelectValue>
+              {(value: MeasurementParameter) => (
+                <ParameterOption parameter={value} />
+              )}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent alignItemWithTrigger={false}>
             <SelectGroup>
-              {unitItems.map((item) => (
+              {parameterItems.map((item) => (
                 <SelectItem key={item.value} value={item.value}>
-                  {item.label}
+                  <ParameterOption parameter={item.value} />
                 </SelectItem>
               ))}
             </SelectGroup>
           </SelectContent>
         </Select>
+        {parameterLocked ? (
+          <FieldDescription>{t("parameterLocked")}</FieldDescription>
+        ) : null}
       </Field>
 
       <FieldSet className="gap-2.5" data-invalid={Boolean(limitsError)}>

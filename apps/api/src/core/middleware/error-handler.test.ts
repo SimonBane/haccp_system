@@ -157,14 +157,14 @@ describe("errorHandler", () => {
   it("serializes details a conflict supplies, for the client to act on", async () => {
     const app = testApp();
     app.get("/conflict", () => {
-      throw new ConflictError("Saving would drop overrides", {
-        code: API_ERROR_CODE.FORM_VERSION_DROPS_OVERRIDES,
-        details: { droppedOverrides: [] },
+      throw new ConflictError("This form is still in use", {
+        code: API_ERROR_CODE.FORM_IN_USE,
+        details: { templateIds: [] },
       });
     });
 
     const body = await errorBody(await app.request("/conflict"));
-    expect(body.error).toBe(API_ERROR_CODE.FORM_VERSION_DROPS_OVERRIDES);
-    expect(body.details).toEqual({ droppedOverrides: [] });
+    expect(body.error).toBe(API_ERROR_CODE.FORM_IN_USE);
+    expect(body.details).toEqual({ templateIds: [] });
   });
 });

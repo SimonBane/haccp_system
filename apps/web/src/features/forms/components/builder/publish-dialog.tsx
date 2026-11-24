@@ -1,13 +1,11 @@
 "use client";
 
-import type { DroppedOverride, MeasurementUnit } from "@haccp/shared";
 import {
   CalendarPlusIcon,
   CheckIcon,
   CircleCheckIcon,
   LockIcon,
   SendIcon,
-  TriangleAlertIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import {
@@ -23,13 +21,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
-import { useAnswerFormat } from "../../hooks/use-answer-format";
 import type { FailRule } from "../../lib/form-builder";
 import { FailRulesSummary } from "./field-palette";
 
 export type PublishStep =
   | { kind: "confirm"; nextVersion: number }
-  | { kind: "drops"; nextVersion: number; dropped: DroppedOverride[] }
   | { kind: "done"; version: number };
 
 export type PublishSummary = {
@@ -43,17 +39,14 @@ export type PublishSummary = {
 type Props = {
   step: PublishStep | null;
   summary: PublishSummary;
-  /** Units the dropped overrides were set in, by field id, so their limits read correctly. */
-  unitsByField: Record<string, MeasurementUnit>;
   isPublishing: boolean;
   onCancel: () => void;
-  onConfirm: (step: Exclude<PublishStep, { kind: "done" }>) => void;
+  onConfirm: () => void;
 };
 
 export function PublishDialog({
   step,
   summary,
-  unitsByField,
   isPublishing,
   onCancel,
   onConfirm,
@@ -98,13 +91,6 @@ export function PublishDialog({
               </Button>
             </AlertDialogFooter>
           </>
-        ) : step?.kind === "drops" ? (
-          <DropsContent
-            step={step}
-            unitsByField={unitsByField}
-            isPublishing={isPublishing}
-            onConfirm={onConfirm}
-          />
         ) : step?.kind === "confirm" ? (
           <>
             <AlertDialogHeader>
@@ -151,7 +137,7 @@ export function PublishDialog({
               </AlertDialogCancel>
               <AlertDialogAction
                 isLoading={isPublishing}
-                onClick={() => onConfirm(step)}
+                onClick={onConfirm}
               >
                 <SendIcon data-icon="inline-start" />
                 {t("confirm")}
@@ -161,63 +147,5 @@ export function PublishDialog({
         ) : null}
       </AlertDialogContent>
     </AlertDialog>
-  );
-}
-
-function DropsContent({
-  step,
-  unitsByField,
-  isPublishing,
-  onConfirm,
-}: {
-  step: Extract<PublishStep, { kind: "drops" }>;
-  unitsByField: Record<string, MeasurementUnit>;
-  isPublishing: boolean;
-  onConfirm: Props["onConfirm"];
-}) {
-  const t = useTranslations("FormsPage.publish");
-  const format = useAnswerFormat();
-
-  return (
-    <>
-      <AlertDialogHeader>
-        <AlertDialogTitle>{t("dropsTitle")}</AlertDialogTitle>
-        <AlertDialogDescription>{t("dropsDescription")}</AlertDialogDescription>
-      </AlertDialogHeader>
-
-      <ul className="flex max-h-64 flex-col divide-y overflow-y-auto rounded-lg border text-sm">
-        {step.dropped.map((drop) => {
-          const unit = unitsByField[drop.fieldId];
-          const limits = unit ? format.limits(drop.limits, unit) : null;
-          return (
-            <li
-              key={`${drop.templateId}:${drop.targetId}:${drop.fieldId}`}
-              className="flex flex-col gap-0.5 px-3 py-2"
-            >
-              <span className="font-medium">{drop.targetName}</span>
-              <span className="text-muted-foreground">
-                {t("dropLine", {
-                  field: drop.fieldLabel,
-                  location: drop.locationName,
-                  limits: limits ?? t("noLimits"),
-                })}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-
-      <AlertDialogFooter>
-        <AlertDialogCancel disabled={isPublishing}>{t("cancel")}</AlertDialogCancel>
-        <AlertDialogAction
-          variant="destructive"
-          isLoading={isPublishing}
-          onClick={() => onConfirm(step)}
-        >
-          <TriangleAlertIcon data-icon="inline-start" />
-          {t("confirmDrops")}
-        </AlertDialogAction>
-      </AlertDialogFooter>
-    </>
   );
 }
