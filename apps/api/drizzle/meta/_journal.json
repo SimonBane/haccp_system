@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1795436430765,
+      "when": 1795521369299,
       "tag": "0000_baseline",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1795448611628,
-      "tag": "0001_move_limits_to_targets",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1795451455228,
-      "tag": "0002_rename_fixture_to_component",
       "breakpoints": true
     }
   ]

@@ -68,13 +68,15 @@ CREATE TABLE "targets" (
 	"kind" text NOT NULL,
 	"name" text NOT NULL,
 	"parent_id" uuid,
+	"limits" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"archived_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "targets_id_location_id_unique" UNIQUE("id","location_id"),
 	CONSTRAINT "targets_name_length" CHECK (char_length("targets"."name") BETWEEN 1 AND 100),
-	CONSTRAINT "targets_kind_valid" CHECK ("targets"."kind" IN ('equipment', 'area', 'fixture')),
-	CONSTRAINT "targets_fixture_has_parent" CHECK ("targets"."kind" <> 'fixture' OR "targets"."parent_id" IS NOT NULL),
+	CONSTRAINT "targets_kind_valid" CHECK ("targets"."kind" IN ('equipment', 'area', 'component')),
+	CONSTRAINT "targets_component_has_parent" CHECK ("targets"."kind" <> 'component' OR "targets"."parent_id" IS NOT NULL),
+	CONSTRAINT "targets_component_no_limits" CHECK ("targets"."kind" <> 'component' OR "targets"."limits" = '{}'::jsonb),
 	CONSTRAINT "targets_parent_not_self" CHECK ("targets"."parent_id" IS NULL OR "targets"."parent_id" <> "targets"."id")
 );
 --> statement-breakpoint
@@ -126,7 +128,6 @@ CREATE TABLE "task_template_targets" (
 	"task_template_id" uuid NOT NULL,
 	"target_id" uuid NOT NULL,
 	"location_id" uuid NOT NULL,
-	"limit_overrides" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	CONSTRAINT "task_template_targets_task_template_id_target_id_pk" PRIMARY KEY("task_template_id","target_id")
 );
 --> statement-breakpoint
@@ -260,7 +261,7 @@ CREATE INDEX "organization_member_locations_location_id_organization_id_idx" ON 
 CREATE INDEX "organization_member_locations_organization_id_idx" ON "organization_member_locations" USING btree ("organization_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "locations_organization_id_name_unique" ON "locations" USING btree ("organization_id","name");--> statement-breakpoint
 CREATE UNIQUE INDEX "locations_organization_id_is_default_unique" ON "locations" USING btree ("organization_id") WHERE "locations"."is_default" = true;--> statement-breakpoint
-CREATE UNIQUE INDEX "targets_location_id_name_scope_active_unique" ON "targets" USING btree ("location_id","name",(CASE WHEN "kind" = 'fixture' THEN "parent_id" ELSE "location_id" END)) WHERE "targets"."archived_at" IS NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "targets_location_id_name_scope_active_unique" ON "targets" USING btree ("location_id","name",(CASE WHEN "kind" = 'component' THEN "parent_id" ELSE "location_id" END)) WHERE "targets"."archived_at" IS NULL;--> statement-breakpoint
 CREATE UNIQUE INDEX "forms_organization_id_name_active_unique" ON "forms" USING btree ("organization_id","name") WHERE "forms"."archived_at" IS NULL;--> statement-breakpoint
 CREATE INDEX "task_templates_location_id_idx" ON "task_templates" USING btree ("location_id");--> statement-breakpoint
 CREATE INDEX "task_templates_form_id_idx" ON "task_templates" USING btree ("form_id");--> statement-breakpoint

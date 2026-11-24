@@ -57,6 +57,11 @@ On 2026-11-23 it was regenerated again to enable row-level security on every
 table, so Supabase's Data API roles see nothing; the API connects as the owner
 and bypasses it. No data was kept: every database is recreated empty.
 
+On 2026-11-24 that baseline and its follow-ups `0001`–`0002` (item limits on
+targets, fixture kind renamed to component) were squashed into a regenerated
+`0000_baseline.sql`, verified identical on scratch databases as above. The
+hosted database was recreated empty.
+
 CI enforces the rule: `validate-migrations` runs `db:check` and fails if it
 produces a migration, which catches both a schema change with no migration and a
 migration the snapshots never saw.
