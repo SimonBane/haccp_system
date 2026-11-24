@@ -3,10 +3,12 @@ import {
   CHOICE_MIN_OPTIONS,
   CORRECTIVE_ACTION_MODE,
   CORRECTIVE_MAX_ANSWERS,
+  DEFAULT_MEASUREMENT_PARAMETER,
   correctiveSettings,
   FIELD_TYPE,
   FORM_MAX_FIELDS,
   isValidMeasurementValue,
+  parameterUnit,
   type CorrectiveActionMode,
   type CorrectiveSettings,
   type FieldType,
@@ -187,7 +189,8 @@ export function createBuilderField(
       return {
         ...base,
         type,
-        unit: "celsius",
+        parameter: DEFAULT_MEASUREMENT_PARAMETER,
+        unit: parameterUnit(DEFAULT_MEASUREMENT_PARAMETER),
         limits: { min: "", max: "" },
       };
     case FIELD_TYPE.CHOICE: {

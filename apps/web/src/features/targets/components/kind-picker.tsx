@@ -1,12 +1,14 @@
 "use client";
 
-import { TARGET_KIND_VALUES, type TargetKind } from "@haccp/shared";
+import type { TargetKind } from "@haccp/shared";
 import { useTranslations } from "next-intl";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { TARGET_KIND_ICONS } from "@/features/targets/lib/target-kinds";
+import { cn } from "@/lib/utils";
 
 type KindPickerProps = {
   labelledBy: string;
+  kinds: readonly TargetKind[];
   value: TargetKind;
   onChange: (kind: TargetKind) => void;
   disabled?: boolean;
@@ -14,6 +16,7 @@ type KindPickerProps = {
 
 export function KindPicker({
   labelledBy,
+  kinds,
   value,
   onChange,
   disabled,
@@ -32,23 +35,21 @@ export function KindPicker({
       variant="outline"
       spacing={2}
       disabled={disabled}
-      className="grid w-full grid-cols-1 sm:grid-cols-3"
+      className={cn(
+        "grid w-full",
+        kinds.length === 3 ? "grid-cols-3" : "grid-cols-2",
+      )}
     >
-      {TARGET_KIND_VALUES.map((kind) => {
+      {kinds.map((kind) => {
         const KindIcon = TARGET_KIND_ICONS[kind];
         return (
           <ToggleGroupItem
             key={kind}
             value={kind}
-            className="h-auto flex-col items-start gap-1 rounded-lg p-3 text-left whitespace-normal aria-pressed:border-primary aria-pressed:bg-primary/10 aria-pressed:text-foreground aria-pressed:hover:bg-primary/10"
+            className="h-auto min-h-11 gap-1.5 rounded-lg px-2 py-2 text-center leading-tight whitespace-normal aria-pressed:border-primary aria-pressed:bg-primary/10 aria-pressed:text-foreground aria-pressed:hover:bg-primary/10 md:min-h-9"
           >
-            <span className="flex items-center gap-2 font-medium">
-              <KindIcon />
-              {t(`kinds.${kind}`)}
-            </span>
-            <span className="text-xs font-normal text-muted-foreground">
-              {t(`kindHints.${kind}`)}
-            </span>
+            <KindIcon className="shrink-0" aria-hidden />
+            {t(`kinds.${kind}`)}
           </ToggleGroupItem>
         );
       })}

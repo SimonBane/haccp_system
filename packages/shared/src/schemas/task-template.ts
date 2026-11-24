@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { formCategorySchema, limitOverridesSchema } from "./form.js";
+import { formCategorySchema } from "./form.js";
 
 export const taskTemplateWeekdaySchema = z.enum([
   "monday",
@@ -158,7 +158,6 @@ export const TASK_TEMPLATE_MAX_TARGETS = 50;
 
 export const taskTemplateTargetInputSchema = z.object({
   targetId: z.uuid(),
-  limitOverrides: limitOverridesSchema.default({}),
 });
 
 export type TaskTemplateTargetInput = z.infer<
@@ -228,7 +227,6 @@ export type UpdateTaskTemplateInput = CreateTaskTemplateInput;
 export const taskTemplateTargetResponseSchema = z.object({
   targetId: z.uuid(),
   targetName: z.string(),
-  limitOverrides: limitOverridesSchema,
 });
 
 export type TaskTemplateTargetResponse = z.infer<

@@ -1,32 +1,17 @@
 "use client";
 
-import {
-  type LimitsIssue,
-  type MeasurementField,
-  type TargetResponse,
-} from "@haccp/shared";
-import { ChevronRightIcon, ThermometerIcon, Trash2Icon } from "lucide-react";
+import { type MeasurementField, type TargetResponse } from "@haccp/shared";
+import { ChevronRightIcon, Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { limitChipClass } from "@/features/forms/components/limit-chip";
+import { UnitIcon } from "@/features/forms/components/unit-option";
 import { useAnswerFormat } from "@/features/forms/hooks/use-answer-format";
-import {
-  formatMeasurementNumber,
-  parseMeasurementDraft,
-  sanitizeMeasurementDraft,
-} from "@/features/forms/lib/measurement";
 import { TARGET_KIND_ICONS } from "@/features/targets/lib/target-kinds";
 import { groupByRoom } from "@/features/task-templates/lib/group-targets";
-import {
-  overrideIssueKey,
-  patchOwnLimit,
-  setOwnLimits,
-  type TargetSelection,
-} from "@/features/task-templates/lib/form-helpers";
+import type { TargetSelection } from "@/features/task-templates/lib/form-helpers";
 import { cn } from "@/lib/utils";
 
 /** Past this many rows the list shows a filter and collapses behind "Show all", instead of a scroll box inside the page. */
@@ -37,9 +22,6 @@ type SelectedTargetsProps = {
   targets: TargetResponse[];
   selections: TargetSelection[];
   fields: MeasurementField[];
-  issues: Record<string, LimitsIssue>;
-  separator: string;
-  onChange: (next: TargetSelection[]) => void;
   onRemove: (targetId: string) => void;
   layout: "desktop" | "mobile";
 };
@@ -55,15 +37,12 @@ function useGroups(targets: TargetResponse[], chosen: TargetResponse[]): Group[]
   }));
 }
 
-/** What the task checks: one row per chosen item, grouped by area, each with its limits and a remove button. */
+/** What the task checks: one row per chosen item, grouped by area, each with the range it is judged by. */
 export function SelectedTargets({
   idPrefix,
   targets,
   selections,
   fields,
-  issues,
-  separator,
-  onChange,
   onRemove,
   layout,
 }: SelectedTargetsProps) {
@@ -73,10 +52,8 @@ export function SelectedTargets({
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState("");
   const [showAll, setShowAll] = useState(false);
-  const [editing, setEditing] = useState<string | null>(null);
 
   const byId = new Map(targets.map((target) => [target.id, target]));
-  const selectionById = new Map(selections.map((selection) => [selection.targetId, selection]));
   const chosen = selections
     .map((selection) => byId.get(selection.targetId))
     .filter((target): target is TargetResponse => Boolean(target));
@@ -85,32 +62,27 @@ export function SelectedTargets({
   const groups = useGroups(targets, visible);
   const isMobile = layout === "mobile";
   const hasLimits = fields.length > 0;
+  const rangeUnit = fields.every((field) => field.unit === fields[0]?.unit)
+    ? (fields[0]?.unit ?? null)
+    : null;
   const many = chosen.length > SELECTED_VISIBLE_ROWS;
   const limit = many && !showAll && !query ? SELECTED_VISIBLE_ROWS : Infinity;
 
-  const formLimits = fields
-    .map((field) => {
-      const limits = format.limits(field.limits, field.unit) ?? tl("noLimits");
-      return fields.length > 1 ? `${field.label} ${limits}` : limits;
-    })
-    .join(" · ");
-  const isOwn = (selection: TargetSelection) =>
-    fields.some((field) => selection.overrides[field.id]?.enabled);
-  /** "1 to 4 °C", "≤ 4 °C" or "No limits" — an empty box means no limit on that side, as in the form builder. */
-  const ownText = (selection: TargetSelection) =>
-    fields
+  /** The item's own range for each field's measurement, else the form's default: what its checks are judged by. */
+  const rangeOf = (target: TargetResponse) => {
+    const own = fields.some((field) => target.limits[field.parameter]);
+    const text = fields
       .map((field) => {
-        const draft = selection.overrides[field.id];
-        const min = draft?.min.trim() ? parseMeasurementDraft(draft.min) : null;
-        const max = draft?.max.trim() ? parseMeasurementDraft(draft.max) : null;
-        const unit = format.symbol(field.unit);
-        const number = (value: number) => formatMeasurementNumber(value, field.unit, format.locale);
-        if (min !== null && max !== null) {
-          return tl("ownChip", { min: number(min), max: number(max), unit });
-        }
-        return format.limits({ min, max }, field.unit) ?? tl("noLimits");
+        const limits =
+          format.limits(
+            target.limits[field.parameter] ?? field.limits,
+            field.unit,
+          ) ?? tl("noLimits");
+        return fields.length > 1 ? `${field.label} ${limits}` : limits;
       })
       .join(" · ");
+    return { own, text };
+  };
 
   if (chosen.length === 0) {
     return (
@@ -120,94 +92,13 @@ export function SelectedTargets({
     );
   }
 
-  function limitsEditor(target: TargetResponse, selection: TargetSelection) {
-    const own = isOwn(selection);
-    return (
-      <div className="flex flex-col gap-3">
-        <ToggleGroup
-          aria-label={tl("editorTitle", { name: target.name })}
-          variant="outline"
-          size={isMobile ? "default" : "sm"}
-          spacing={2}
-          className={cn(isMobile && "w-full")}
-          value={[own ? "own" : "form"]}
-          onValueChange={(next) => {
-            const mode = next.at(-1);
-            if (!mode) return;
-            onChange(setOwnLimits(selections, target.id, fields, mode === "own", separator));
-          }}
-        >
-          <ToggleGroupItem value="form" className={cn(isMobile && "flex-1")}>
-            {formLimits}
-          </ToggleGroupItem>
-          <ToggleGroupItem value="own" className={cn(isMobile && "flex-1")}>
-            {tl("useOwn")}
-          </ToggleGroupItem>
-        </ToggleGroup>
-        {own
-          ? fields.map((field) => {
-              const draft = selection.overrides[field.id];
-              if (!draft) return null;
-              const issue = issues[overrideIssueKey(target.id, field.id)];
-              const patch = (key: "min" | "max", value: string) =>
-                onChange(
-                  patchOwnLimit(selections, target.id, field.id, {
-                    [key]: sanitizeMeasurementDraft(value, separator, field.unit),
-                  }),
-                );
-              return (
-                <div key={field.id} className="flex flex-col gap-1.5">
-                  {fields.length > 1 ? (
-                    <span className="text-xs text-muted-foreground">{field.label}</span>
-                  ) : null}
-                  <div className="flex items-center gap-2">
-                    <Input
-                      inputMode="decimal"
-                      className="min-w-0 flex-1"
-                      placeholder={tl("noMin")}
-                      aria-label={tl("minFor", { field: field.label, target: target.name })}
-                      aria-invalid={Boolean(issue)}
-                      value={draft.min}
-                      onChange={(event) => patch("min", event.target.value)}
-                    />
-                    <span className="text-sm text-muted-foreground">{tl("to")}</span>
-                    <Input
-                      inputMode="decimal"
-                      className="min-w-0 flex-1"
-                      placeholder={tl("noMax")}
-                      aria-label={tl("maxFor", { field: field.label, target: target.name })}
-                      aria-invalid={Boolean(issue)}
-                      value={draft.max}
-                      onChange={(event) => patch("max", event.target.value)}
-                    />
-                    <span className="text-sm text-muted-foreground">{format.symbol(field.unit)}</span>
-                  </div>
-                  {issue ? (
-                    <p role="alert" className="text-xs text-destructive">
-                      {tl(`issues.${issue}`)}
-                    </p>
-                  ) : null}
-                </div>
-              );
-            })
-          : null}
-      </div>
-    );
-  }
-
   function row(target: TargetResponse, last: boolean) {
-    const selection = selectionById.get(target.id);
-    if (!selection) return null;
-    const own = isOwn(selection);
-    const hasIssue = fields.some((field) => issues[overrideIssueKey(target.id, field.id)]);
     const sub = t(`kinds.${target.kind}`);
     const Icon = TARGET_KIND_ICONS[target.kind];
-    const chipText = own ? ownText(selection) : formLimits;
-    const chipClass = limitChipClass(
-      hasIssue ? "invalid" : own ? "own" : "default",
-      { interactive: true },
-    );
-    const isEditing = editing === target.id;
+    const range = rangeOf(target);
+    const rangeLabel = range.own
+      ? tl("own", { limits: range.text })
+      : tl("formDefault", { limits: range.text });
 
     return (
       <li key={target.id} className={cn(isMobile ? "py-1.5 pr-0.5 pl-3" : "py-2 pr-2 pl-3", !last && "border-b")}>
@@ -223,31 +114,14 @@ export function SelectedTargets({
             </span>
             <span className="truncate text-xs text-muted-foreground">{sub}</span>
           </div>
-          {hasLimits && !isMobile ? (
-            <Popover open={isEditing} onOpenChange={(open) => setEditing(open ? target.id : null)}>
-              <PopoverTrigger className={chipClass} aria-label={tl("editorTitle", { name: target.name })}>
-                <ThermometerIcon className="size-3.5 shrink-0" aria-hidden />
-                <span className="truncate">{chipText}</span>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-80 gap-3">
-                <span className="text-[13px] font-semibold">{tl("editorTitle", { name: target.name })}</span>
-                {limitsEditor(target, selection)}
-                <Button type="button" size="sm" className="w-full" onClick={() => setEditing(null)}>
-                  {tl("done")}
-                </Button>
-              </PopoverContent>
-            </Popover>
-          ) : null}
-          {hasLimits && isMobile ? (
-            <button
-              type="button"
-              aria-expanded={isEditing}
-              aria-label={tl("editorTitle", { name: target.name })}
-              onClick={() => setEditing(isEditing ? null : target.id)}
-              className={chipClass}
-            >
-              <span className="truncate">{chipText}</span>
-            </button>
+          {hasLimits ? (
+            <span className={limitChipClass(range.own ? "own" : "default")} title={rangeLabel}>
+              {isMobile ? null : <UnitIcon unit={rangeUnit} className="size-3.5 shrink-0" />}
+              <span className="truncate" aria-hidden>
+                {range.text}
+              </span>
+              <span className="sr-only">{rangeLabel}</span>
+            </span>
           ) : null}
           <Button
             type="button"
@@ -260,18 +134,6 @@ export function SelectedTargets({
             <Trash2Icon />
           </Button>
         </div>
-        {isMobile && isEditing ? (
-          <div className="mt-2 mr-2 mb-1 rounded-xl bg-muted/60 p-3">{limitsEditor(target, selection)}</div>
-        ) : null}
-        {!isEditing && hasIssue ? (
-          <p role="alert" className="pt-1 pl-11 text-xs text-destructive">
-            {fields
-              .map((field) => issues[overrideIssueKey(target.id, field.id)])
-              .filter((issue): issue is LimitsIssue => Boolean(issue))
-              .map((issue) => tl(`issues.${issue}`))
-              .join(" ")}
-          </p>
-        ) : null}
       </li>
     );
   }

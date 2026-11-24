@@ -2,6 +2,7 @@
 
 import {
   FORM_APPLIES_TO,
+  resolveLimits,
   type AnswersInput,
   type CorrectiveInput,
   type FormVersionSummaryMap,
@@ -143,7 +144,7 @@ export function LogEntryPanel({
         <CheckForm
           entryKey={`log-${chosen.formId}-${target?.targetId ?? "none"}`}
           definition={version.definition}
-          limits={chosen.resolvedLimits}
+          limits={resolveLimits(version.definition, target?.limits)}
           initialValues={null}
           initialCorrective={null}
           saveLabel={t("save")}

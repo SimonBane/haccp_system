@@ -53,6 +53,7 @@ export function TargetsOnboarding({
         name,
         kind: TARGET_KIND.AREA,
         parentId: null,
+        limits: {},
       });
       toast.success(t("added", { name }));
     } catch (error) {

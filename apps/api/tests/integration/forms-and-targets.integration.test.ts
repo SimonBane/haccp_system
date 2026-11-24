@@ -1,6 +1,5 @@
 import {
   API_ERROR_CODE,
-  droppedOverridesDetailsSchema,
   formListResponseSchema,
   formResponseSchema,
   targetListResponseSchema,
@@ -11,6 +10,7 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../../src/core/db/client.js";
 import {
+  taskOccurrences,
   taskTemplates,
   taskTemplateTargets,
 } from "../../src/core/db/schema/index.js";
@@ -66,6 +66,31 @@ describe("Equipment & areas and forms (HTTP)", () => {
           taskCount: 1,
         }),
       ]);
+    });
+
+    it("stores an item's own range and refuses one on a component", async () => {
+      const kitchen = await createArea("Kitchen", null);
+      const range = { temperature: { min: null, max: 16 } };
+
+      const room = await apiRequest(
+        targetsPath(world.alpha.locations.main.id),
+        asAlpha("POST", { name: "Cutting room", kind: "area", limits: range }),
+      );
+      const walls = await apiRequest(
+        targetsPath(world.alpha.locations.main.id),
+        asAlpha("POST", {
+          name: "Walls",
+          kind: "component",
+          parentId: kitchen.id,
+          limits: range,
+        }),
+      );
+
+      expect(room.status).toBe(201);
+      expect(targetResponseSchema.parse(await room.json()).limits).toEqual(
+        range,
+      );
+      expect(walls.status).toBe(400);
     });
 
     it("creates equipment inside an area", async () => {
@@ -215,37 +240,37 @@ describe("Equipment & areas and forms (HTTP)", () => {
       });
     });
 
-    it("creates fixtures inside areas, repeating a name only across areas", async () => {
+    it("creates components inside areas, repeating a name only across areas", async () => {
       const kitchen = await createArea("Kitchen");
       const bar = await createArea("Bar");
-      const createFixture = (parentId: string | null) =>
+      const createComponent = (parentId: string | null) =>
         apiRequest(
           targetsPath(world.alpha.locations.main.id),
-          asAlpha("POST", { name: "Walls", kind: "fixture", parentId }),
+          asAlpha("POST", { name: "Walls", kind: "component", parentId }),
         );
 
-      const kitchenWalls = await createFixture(kitchen.id);
+      const kitchenWalls = await createComponent(kitchen.id);
       expect(kitchenWalls.status).toBe(201);
       expect(targetResponseSchema.parse(await kitchenWalls.json())).toMatchObject({
-        kind: "fixture",
+        kind: "component",
         parentId: kitchen.id,
       });
-      expect((await createFixture(bar.id)).status).toBe(201);
+      expect((await createComponent(bar.id)).status).toBe(201);
 
-      const duplicate = await createFixture(kitchen.id);
+      const duplicate = await createComponent(kitchen.id);
       expect(duplicate.status).toBe(409);
       expect(await duplicate.json()).toMatchObject({
         error: API_ERROR_CODE.TARGET_NAME_EXISTS,
       });
-      expect((await createFixture(null)).status).toBe(400);
+      expect((await createComponent(null)).status).toBe(400);
     });
 
-    it("refuses to place a fixture inside equipment", async () => {
+    it("refuses to place a component inside equipment", async () => {
       const response = await apiRequest(
         targetsPath(world.alpha.locations.main.id),
         asAlpha("POST", {
           name: "Door",
-          kind: "fixture",
+          kind: "component",
           parentId: world.alpha.targets.fridge.id,
         }),
       );
@@ -253,6 +278,161 @@ describe("Equipment & areas and forms (HTTP)", () => {
       expect(response.status).toBe(400);
       expect(await response.json()).toMatchObject({
         error: API_ERROR_CODE.TARGET_PARENT_NOT_AREA,
+      });
+    });
+
+    describe("duplicate", () => {
+      const mainId = () => world.alpha.locations.main.id;
+
+      async function createIn(
+        name: string,
+        kind: "equipment" | "area" | "component",
+        parentId: string | null,
+        limits: Record<string, unknown> = {},
+      ) {
+        const response = await apiRequest(
+          targetsPath(mainId()),
+          asAlpha("POST", { name, kind, parentId, limits }),
+        );
+        expect(response.status).toBe(201);
+        return targetResponseSchema.parse(await response.json());
+      }
+
+      async function listAll() {
+        const response = await apiRequest(targetsPath(mainId()), asAlpha("GET"));
+        return targetListResponseSchema.parse(await response.json()).items;
+      }
+
+      const duplicate = (sourceId: string, body: unknown) =>
+        apiRequest(
+          `${targetsPath(mainId())}/${sourceId}/duplicate`,
+          asAlpha("POST", body),
+        );
+
+      // Kitchen ⟵ Cold room ⟵ Fish fridge; Kitchen ⟵ Walls
+      async function seedKitchen() {
+        const kitchen = await createIn("Kitchen", "area", null, {
+          temperature: { min: 10, max: 25 },
+        });
+        const cold = await createIn("Cold room", "area", kitchen.id);
+        const fridge = await createIn("Fish fridge", "equipment", cold.id, {
+          temperature: { min: 0, max: 4 },
+        });
+        const walls = await createIn("Walls", "component", kitchen.id);
+        return { kitchen, cold, fridge, walls };
+      }
+
+      it("copies an area with everything inside it, keeping ranges and nesting", async () => {
+        const { kitchen, cold, fridge, walls } = await seedKitchen();
+
+        const response = await duplicate(kitchen.id, {
+          target: {
+            name: "Kitchen 2",
+            kind: "area",
+            parentId: null,
+            limits: { temperature: { min: 10, max: 25 } },
+          },
+          contents: [
+            { sourceId: cold.id, name: "Cold room 2" },
+            { sourceId: fridge.id, name: "Fish fridge 2" },
+            { sourceId: walls.id, name: "Walls" },
+          ],
+        });
+
+        expect(response.status).toBe(201);
+        const copy = targetResponseSchema.parse(await response.json());
+        expect(copy).toMatchObject({ name: "Kitchen 2", kind: "area", parentId: null });
+
+        const items = await listAll();
+        const byName = (name: string, parentId: string) =>
+          items.find((item) => item.name === name && item.parentId === parentId);
+        const coldCopy = byName("Cold room 2", copy.id);
+        expect(coldCopy).toMatchObject({ kind: "area", limits: {} });
+        expect(byName("Fish fridge 2", coldCopy!.id)).toMatchObject({
+          kind: "equipment",
+          limits: { temperature: { min: 0, max: 4 } },
+          taskCount: 0,
+        });
+        expect(byName("Walls", copy.id)).toMatchObject({ kind: "component" });
+        expect(items.filter((item) => item.parentId === kitchen.id)).toHaveLength(2);
+      });
+
+      it("copies only the area when no contents are named", async () => {
+        const { kitchen } = await seedKitchen();
+        const before = (await listAll()).length;
+
+        const response = await duplicate(kitchen.id, {
+          target: { name: "Kitchen 2", kind: "area", parentId: null },
+        });
+
+        expect(response.status).toBe(201);
+        expect(await listAll()).toHaveLength(before + 1);
+      });
+
+      it("refuses contents from outside the copied area and writes nothing", async () => {
+        const { kitchen, cold } = await seedKitchen();
+        const before = (await listAll()).length;
+
+        const response = await duplicate(kitchen.id, {
+          target: { name: "Kitchen 2", kind: "area", parentId: null },
+          contents: [
+            { sourceId: cold.id, name: "Cold room 2" },
+            { sourceId: world.alpha.targets.fridge.id, name: "Fridge 2" },
+          ],
+        });
+
+        expect(response.status).toBe(400);
+        expect(await listAll()).toHaveLength(before);
+      });
+
+      it("refuses an item whose own area is left out of the copy", async () => {
+        const { kitchen, fridge } = await seedKitchen();
+
+        const response = await duplicate(kitchen.id, {
+          target: { name: "Kitchen 2", kind: "area", parentId: null },
+          contents: [{ sourceId: fridge.id, name: "Fish fridge 2" }],
+        });
+
+        expect(response.status).toBe(400);
+      });
+
+      it("rolls the whole copy back when one name is taken", async () => {
+        const { kitchen, cold } = await seedKitchen();
+        const before = (await listAll()).length;
+
+        const response = await duplicate(kitchen.id, {
+          target: { name: "Kitchen 2", kind: "area", parentId: null },
+          contents: [{ sourceId: cold.id, name: world.alpha.targets.fridge.name }],
+        });
+
+        expect(response.status).toBe(409);
+        expect(await response.json()).toMatchObject({
+          error: API_ERROR_CODE.TARGET_NAME_EXISTS,
+        });
+        expect(await listAll()).toHaveLength(before);
+      });
+
+      it("cannot copy another organisation's item", async () => {
+        const response = await duplicate(world.beta.targets.fridge.id, {
+          target: { name: "Stolen fridge", kind: "equipment", parentId: null },
+        });
+
+        expect(response.status).toBe(404);
+      });
+
+      it("is admin-only", async () => {
+        const response = await apiRequest(
+          `${targetsPath(mainId())}/${world.alpha.targets.fridge.id}/duplicate`,
+          {
+            method: "POST",
+            actor: asEmployee(world.alpha),
+            body: JSON.stringify({
+              target: { name: "Fridge 2", kind: "equipment", parentId: null },
+            }),
+          },
+        );
+
+        expect(response.status).toBe(403);
       });
     });
 
@@ -283,13 +463,6 @@ describe("Equipment & areas and forms (HTTP)", () => {
         },
       ],
     };
-
-    async function overrideFishFridge(): Promise<void> {
-      await db
-        .update(taskTemplateTargets)
-        .set({ limitOverrides: { [FRIDGE_FIELD_ID]: { min: 0, max: 2 } } })
-        .where(eq(taskTemplateTargets.targetId, world.alpha.targets.fridge.id));
-    }
 
     it("lists the organisation's forms with their latest version", async () => {
       const response = await apiRequest("/forms", asAlpha("GET"));
@@ -437,68 +610,125 @@ describe("Equipment & areas and forms (HTTP)", () => {
       ).toBe(2);
     });
 
-    it("warns with every override a version would drop, then drops them once confirmed", async () => {
-      await overrideFishFridge();
-      const withoutTemperature: FormDefinition = {
-        ...FRIDGE_CHECK_DEFINITION,
-        fields: [
-          {
-            id: "door_closed",
-            type: "checkbox",
-            label: "Door closed",
-            required: true,
-          },
-        ],
-      };
-
-      const refused = await apiRequest(
-        `/forms/${world.alpha.forms.fridgeCheck.id}/versions`,
-        asAlpha("POST", { definition: withoutTemperature }),
-      );
-
-      expect(refused.status).toBe(409);
-      const error = (await refused.json()) as {
-        error: string;
-        details: unknown;
-      };
-      expect(error.error).toBe(API_ERROR_CODE.FORM_VERSION_DROPS_OVERRIDES);
-      expect(droppedOverridesDetailsSchema.parse(error.details)).toEqual({
-        droppedOverrides: [
-          {
-            templateId: world.alpha.templates.temperature.id,
-            locationId: world.alpha.locations.main.id,
-            locationName: world.alpha.locations.main.name,
-            targetId: world.alpha.targets.fridge.id,
-            targetName: world.alpha.targets.fridge.name,
-            fieldId: FRIDGE_FIELD_ID,
-            fieldLabel: "Temperature",
-            limits: { min: 0, max: 2 },
-          },
-        ],
-      });
-
-      const unchanged = await apiRequest(
-        `/forms/${world.alpha.forms.fridgeCheck.id}`,
-        asAlpha("GET"),
-      );
-      expect(
-        formResponseSchema.parse(await unchanged.json()).latestVersion.version,
-      ).toBe(1);
-
-      const confirmed = await apiRequest(
-        `/forms/${world.alpha.forms.fridgeCheck.id}/versions`,
-        asAlpha("POST", {
-          definition: withoutTemperature,
-          confirmDroppedOverrides: true,
+    it("keeps judging an item by its own range after a new version", async () => {
+      const fridge = world.alpha.targets.fridge;
+      const updated = await apiRequest(
+        `/locations/${world.alpha.locations.main.id}/targets/${fridge.id}`,
+        asAlpha("PATCH", {
+          name: fridge.name,
+          kind: "equipment",
+          limits: { temperature: { min: null, max: 2 } },
         }),
       );
-      expect(confirmed.status).toBe(201);
+      expect(updated.status).toBe(200);
 
-      const [link] = await db
+      const published = await apiRequest(
+        `/forms/${world.alpha.forms.fridgeCheck.id}/versions`,
+        asAlpha("POST", { definition: withDoorCheck }),
+      );
+      expect(published.status).toBe(201);
+      const versionId = formResponseSchema.parse(await published.json())
+        .latestVersion.id;
+
+      const upcoming = await db
         .select()
-        .from(taskTemplateTargets)
-        .where(eq(taskTemplateTargets.targetId, world.alpha.targets.fridge.id));
-      expect(link?.limitOverrides).toEqual({});
+        .from(taskOccurrences)
+        .where(eq(taskOccurrences.formVersionId, versionId));
+      expect(upcoming.length).toBeGreaterThan(0);
+      expect(
+        upcoming.every(
+          (row) =>
+            row.resolvedLimits[FRIDGE_FIELD_ID]?.max === 2 &&
+            row.resolvedLimits[FRIDGE_FIELD_ID]?.min === null,
+        ),
+      ).toBe(true);
+    });
+
+    it("judges each field of one item by the item's range for what it measures", async () => {
+      const fridge = world.alpha.targets.fridge;
+      const updated = await apiRequest(
+        `/locations/${world.alpha.locations.main.id}/targets/${fridge.id}`,
+        asAlpha("PATCH", {
+          name: fridge.name,
+          kind: "equipment",
+          limits: {
+            temperature: { min: 0, max: 4 },
+            humidity: { min: 80, max: 90 },
+          },
+        }),
+      );
+      expect(updated.status).toBe(200);
+
+      const withHumidity: FormDefinition = {
+        ...FRIDGE_CHECK_DEFINITION,
+        fields: [
+          ...FRIDGE_CHECK_DEFINITION.fields,
+          {
+            id: "humidity",
+            type: "measurement",
+            label: "Humidity",
+            required: true,
+            parameter: "humidity",
+            unit: "percent",
+            limits: { min: null, max: 95 },
+          },
+        ],
+      };
+      const published = await apiRequest(
+        `/forms/${world.alpha.forms.fridgeCheck.id}/versions`,
+        asAlpha("POST", { definition: withHumidity }),
+      );
+      expect(published.status).toBe(201);
+      const versionId = formResponseSchema.parse(await published.json())
+        .latestVersion.id;
+
+      const upcoming = await db
+        .select()
+        .from(taskOccurrences)
+        .where(eq(taskOccurrences.formVersionId, versionId));
+      expect(upcoming.length).toBeGreaterThan(0);
+      for (const row of upcoming) {
+        expect(row.resolvedLimits).toEqual({
+          [FRIDGE_FIELD_ID]: { min: 0, max: 4 },
+          humidity: { min: 80, max: 90 },
+        });
+      }
+    });
+
+    it("refuses a version that switches a published field to another parameter", async () => {
+      const switched: FormDefinition = {
+        ...FRIDGE_CHECK_DEFINITION,
+        fields: FRIDGE_CHECK_DEFINITION.fields.map((field) =>
+          field.type === "measurement"
+            ? { ...field, parameter: "humidity", unit: "percent" }
+            : field,
+        ),
+      };
+
+      const response = await apiRequest(
+        `/forms/${world.alpha.forms.fridgeCheck.id}/versions`,
+        asAlpha("POST", { definition: switched }),
+      );
+
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({
+        error: API_ERROR_CODE.FORM_FIELD_PARAMETER_CHANGED,
+        details: { fieldIds: [FRIDGE_FIELD_ID] },
+      });
+    });
+
+    it("refuses an item range for a measurement that always uses the form's limits", async () => {
+      const fridge = world.alpha.targets.fridge;
+      const response = await apiRequest(
+        `/locations/${world.alpha.locations.main.id}/targets/${fridge.id}`,
+        asAlpha("PATCH", {
+          name: fridge.name,
+          kind: "equipment",
+          limits: { ph: { min: 4, max: 6 } },
+        }),
+      );
+
+      expect(response.status).toBe(400);
     });
 
     it("refuses to archive a form a template uses, and archives it once unused", async () => {

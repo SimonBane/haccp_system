@@ -60,7 +60,7 @@ function shapeKey(definition: FormDefinition): string {
   return definition.fields
     .map((field) =>
       field.type === "measurement"
-        ? `${field.id}:${field.unit}`
+        ? `${field.id}:${field.parameter}`
         : `${field.id}:${field.type}`,
     )
     .join("|");

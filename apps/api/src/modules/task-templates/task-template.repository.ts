@@ -1,4 +1,4 @@
-import type { FormDefinition, LimitOverrides } from "@haccp/shared";
+import type { FormDefinition, ItemLimits } from "@haccp/shared";
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import type { DbClient } from "../../core/db/client.js";
 import { formVersions } from "../../core/db/schema/form-versions.js";
@@ -25,7 +25,6 @@ export type TemplateTargetRow = {
   taskTemplateId: string;
   targetId: string;
   targetName: string;
-  limitOverrides: LimitOverrides;
 };
 
 export type FormForTemplateRow = {
@@ -51,7 +50,7 @@ export type TaskTemplateSourceRow = {
   targets: {
     targetId: string;
     targetName: string;
-    limitOverrides: LimitOverrides;
+    limits: ItemLimits;
   }[];
 };
 
@@ -111,7 +110,6 @@ export const taskTemplateRepository = {
         taskTemplateId: taskTemplateTargets.taskTemplateId,
         targetId: targets.id,
         ...targetLabelColumns,
-        limitOverrides: taskTemplateTargets.limitOverrides,
       })
       .from(taskTemplateTargets)
       .innerJoin(targets, eq(targets.id, taskTemplateTargets.targetId))
@@ -210,21 +208,16 @@ export const taskTemplateRepository = {
     db: DbClient,
     taskTemplateId: string,
     locationId: string,
-    links: { targetId: string; limitOverrides: LimitOverrides }[],
+    targetIds: string[],
   ): Promise<void> {
     await db
       .delete(taskTemplateTargets)
       .where(eq(taskTemplateTargets.taskTemplateId, taskTemplateId));
 
-    if (links.length === 0) return;
+    if (targetIds.length === 0) return;
 
     await db.insert(taskTemplateTargets).values(
-      links.map((link) => ({
-        taskTemplateId,
-        locationId,
-        targetId: link.targetId,
-        limitOverrides: link.limitOverrides,
-      })),
+      targetIds.map((targetId) => ({ taskTemplateId, locationId, targetId })),
     );
   },
 
@@ -288,7 +281,7 @@ export const taskTemplateRepository = {
           taskTemplateId: taskTemplateTargets.taskTemplateId,
           targetId: targets.id,
           ...targetLabelColumns,
-          limitOverrides: taskTemplateTargets.limitOverrides,
+          limits: targets.limits,
         })
         .from(taskTemplateTargets)
         .innerJoin(targets, eq(targets.id, taskTemplateTargets.targetId))
@@ -313,7 +306,7 @@ export const taskTemplateRepository = {
       list.push({
         targetId: link.targetId,
         targetName: link.targetName,
-        limitOverrides: link.limitOverrides,
+        limits: link.limits,
       });
       linksByTemplate.set(link.taskTemplateId, list);
     }

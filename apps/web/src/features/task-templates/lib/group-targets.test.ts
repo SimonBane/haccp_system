@@ -14,6 +14,7 @@ function target(
     name,
     kind,
     parentId,
+    limits: {},
     taskCount: 0,
     createdAt: "2026-10-01T00:00:00.000Z",
     updatedAt: "2026-10-01T00:00:00.000Z",
@@ -29,16 +30,16 @@ const probe = target("probe", "Probe", "equipment");
 const all = [kitchen, cold, slicer, mincer, fridge, probe];
 
 describe("groupByRoom", () => {
-  const walls = target("k-walls", "Walls", "fixture", "kitchen");
-  const floor = target("k-floor", "Floor", "fixture", "kitchen");
-  const coldWalls = target("c-walls", "Walls", "fixture", "cold");
+  const walls = target("k-walls", "Walls", "component", "kitchen");
+  const floor = target("k-floor", "Floor", "component", "kitchen");
+  const coldWalls = target("c-walls", "Walls", "component", "cold");
   const everything = [...all, walls, floor, coldWalls];
 
   function describeGroups(groups: ReturnType<typeof groupByRoom>) {
     return groups.map((group) => [group.label, group.items.map((item) => item.id)]);
   }
 
-  it("lists each room itself, then its fixtures, then its equipment, with items in no room last", () => {
+  it("lists each room itself, then its components, then its equipment, with items in no room last", () => {
     const groups = groupByRoom(
       [slicer, probe, walls, kitchen, mincer, floor, fridge],
       everything,
@@ -53,7 +54,7 @@ describe("groupByRoom", () => {
     expect(groups.at(-1)!.key).toBe(STANDALONE_GROUP_KEY);
   });
 
-  it("keeps same-named fixtures under each of their rooms", () => {
+  it("keeps same-named components under each of their rooms", () => {
     expect(describeGroups(groupByRoom([walls, coldWalls], everything, "Not in a room"))).toEqual([
       ["Cold room", ["c-walls"]],
       ["Kitchen", ["k-walls"]],

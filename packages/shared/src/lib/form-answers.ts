@@ -15,7 +15,7 @@ import {
   type CorrectiveSettings,
   type FormDefinition,
   type FormField,
-  type LimitOverrides,
+  type ItemLimits,
   type MeasurementField,
   type MeasurementLimits,
   type RecordResult,
@@ -100,17 +100,35 @@ export function getMeasurementFields(
   );
 }
 
+/** Scheduled and on-demand entries alike: the item's range for the field's parameter, else the field's default. */
 export function resolveLimits(
   definition: FormDefinition,
-  overrides: LimitOverrides | null | undefined,
+  itemLimits: ItemLimits | null | undefined,
 ): ResolvedLimits {
   const resolved: ResolvedLimits = {};
 
   for (const field of getMeasurementFields(definition)) {
-    resolved[field.id] = overrides?.[field.id] ?? field.limits;
+    resolved[field.id] = itemLimits?.[field.parameter] ?? field.limits;
   }
 
   return resolved;
+}
+
+/** Measurement fields kept by the next version but switched to another parameter; readings keyed by field id would mix quantities. */
+export function changedParameterFieldIds(
+  previous: FormDefinition,
+  next: FormDefinition,
+): string[] {
+  const previousParameters = new Map(
+    getMeasurementFields(previous).map((field) => [field.id, field.parameter]),
+  );
+
+  return getMeasurementFields(next)
+    .filter((field) => {
+      const parameter = previousParameters.get(field.id);
+      return parameter !== undefined && parameter !== field.parameter;
+    })
+    .map((field) => field.id);
 }
 
 function measurementAnswerSchema(field: MeasurementField) {
@@ -358,28 +376,4 @@ export function resolveCorrective(
     text: parts.length > 0 ? parts.join(CORRECTIVE_TEXT_DELIMITER) : null,
     issue,
   };
-}
-
-/**
- * Override keys a new version can no longer honour: the field is gone, is no longer a
- * measurement, or changed unit (a limit in the old unit means nothing in the new one).
- */
-export function findUnusableOverrideFieldIds(
-  previous: FormDefinition,
-  next: FormDefinition,
-  overrides: LimitOverrides,
-): string[] {
-  const previousUnits = new Map(
-    getMeasurementFields(previous).map((field) => [field.id, field.unit]),
-  );
-  const nextUnits = new Map(
-    getMeasurementFields(next).map((field) => [field.id, field.unit]),
-  );
-
-  return Object.keys(overrides).filter((fieldId) => {
-    const nextUnit = nextUnits.get(fieldId);
-    if (nextUnit === undefined) return true;
-    const previousUnit = previousUnits.get(fieldId);
-    return previousUnit !== undefined && previousUnit !== nextUnit;
-  });
 }

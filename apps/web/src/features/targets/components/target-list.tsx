@@ -1,38 +1,24 @@
 "use client";
 
-import {
-  TARGET_NAME_MAX_LENGTH,
-  TARGET_KIND,
-  type TargetResponse,
-} from "@haccp/shared";
-import { BrickWallIcon, ChevronRightIcon, PlusIcon } from "lucide-react";
+import { TARGET_KIND, type TargetResponse } from "@haccp/shared";
+import { ChevronDownIcon, ChevronRightIcon, PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useId, useState, type FormEvent } from "react";
+import { useId } from "react";
 import { Badge } from "@/components/ui/badge";
-import { CharacterCount } from "@/components/character-count";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Field, FieldError } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import {
   TargetActionsMenu,
   type TargetActions,
 } from "@/features/targets/components/target-actions-menu";
+import { ItemRange } from "@/features/targets/components/item-range";
 import { TARGET_KIND_ICONS } from "@/features/targets/lib/target-kinds";
 import type { TargetListRow } from "@/features/targets/lib/target-tree";
 import { useLongPress } from "@/hooks/use-long-press";
 import { cn } from "@/lib/utils";
 
-const CHECKBOX_REM = 2.5;
-const DEPTH_REM = 1.75;
-
-export type InlineAddResult = "added" | "nameTaken" | "failed";
-
-export type InlineAddKind =
-  | typeof TARGET_KIND.EQUIPMENT
-  | typeof TARGET_KIND.FIXTURE;
-
-export type InlineAdding = { areaId: string; kind: InlineAddKind };
+// One nesting step puts a child's expand slot under its parent's icon.
+const DEPTH_REM = { desktop: 2, mobile: 1.5 };
 
 type TargetListProps = {
   rows: TargetListRow[];
@@ -48,14 +34,7 @@ type TargetListProps = {
   onLongPress: (id: string) => void;
   isOpen: (areaId: string) => boolean;
   onOpenChange: (areaId: string, open: boolean) => void;
-  adding: InlineAdding | null;
-  onStartAdd: (area: TargetResponse, kind: InlineAddKind) => void;
-  onCancelAdd: () => void;
-  onAdd: (
-    area: TargetResponse,
-    name: string,
-    kind: InlineAddKind,
-  ) => Promise<InlineAddResult>;
+  onAddToArea: (area: TargetResponse) => void;
   actions: TargetActions;
 };
 
@@ -72,10 +51,7 @@ export function TargetList({
   onLongPress,
   isOpen,
   onOpenChange,
-  adding,
-  onStartAdd,
-  onCancelAdd,
-  onAdd,
+  onAddToArea,
   actions,
 }: TargetListProps) {
   const t = useTranslations("TargetsPage");
@@ -97,14 +73,25 @@ export function TargetList({
             />
           </span>
           <span className="min-w-0 flex-1">{t("columns.name")}</span>
-          {flat ? <span className="w-48">{t("columns.area")}</span> : null}
-          <span className="w-32">{t("columns.tasks")}</span>
+          {flat ? <span className="w-44">{t("columns.area")}</span> : null}
+          <span className="w-48">{t("columns.range")}</span>
+          <span className="w-28">{t("columns.tasks")}</span>
           <span className="w-20" />
         </div>
       )}
       <ul aria-label={t("title")} className="divide-y border-t md:border-t-0">
         {rows.map((row) =>
-          row.type === "item" ? (
+          row.type === "standalone" ? (
+            <li
+              key="standalone"
+              className="flex h-10 items-center gap-2 bg-muted/40 px-4 text-xs font-medium text-muted-foreground"
+            >
+              <span>{t("standaloneGroup")}</span>
+              <span className="font-normal tabular-nums">
+                {t("summary.equipment", { count: row.count })}
+              </span>
+            </li>
+          ) : (
             <TargetListItem
               key={row.target.id}
               target={row.target}
@@ -123,23 +110,8 @@ export function TargetList({
               onLongPress={onLongPress}
               open={isOpen(row.target.id)}
               onOpenChange={onOpenChange}
-              onStartAdd={onStartAdd}
+              onAddToArea={onAddToArea}
               actions={actions}
-            />
-          ) : (
-            <InlineAddRow
-              key={`add-${row.area.id}`}
-              area={row.area}
-              isEmpty={(childCounts.get(row.area.id) ?? 0) === 0}
-              indentRem={
-                (showCheckboxes ? CHECKBOX_REM : 0) + row.depth * DEPTH_REM
-              }
-              editingKind={
-                adding?.areaId === row.area.id ? adding.kind : null
-              }
-              onStart={(kind) => onStartAdd(row.area, kind)}
-              onCancel={onCancelAdd}
-              onAdd={onAdd}
             />
           ),
         )}
@@ -161,7 +133,7 @@ type TargetListItemProps = {
   onLongPress: (id: string) => void;
   open: boolean;
   onOpenChange: (areaId: string, open: boolean) => void;
-  onStartAdd: (area: TargetResponse, kind: InlineAddKind) => void;
+  onAddToArea: (area: TargetResponse) => void;
   actions: TargetActions;
 };
 
@@ -178,7 +150,7 @@ function TargetListItem({
   onLongPress,
   open,
   onOpenChange,
-  onStartAdd,
+  onAddToArea,
   actions,
 }: TargetListItemProps) {
   const t = useTranslations("TargetsPage");
@@ -202,8 +174,9 @@ function TargetListItem({
     );
 
   const meta = isArea ? (
-    <span className="truncate text-xs text-muted-foreground">
-      {t("itemsInside", { count: childCount })}
+    <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+      <span className="truncate">{t("itemsInside", { count: childCount })}</span>
+      {isMobile ? <ItemRange target={target} variant="inline" /> : null}
     </span>
   ) : isMobile ? (
     <span className="flex min-w-0 items-center gap-1.5 text-xs">
@@ -211,6 +184,9 @@ function TargetListItem({
         <span className="truncate text-muted-foreground">{location} ·</span>
       ) : null}
       {tasks}
+      <span className="text-muted-foreground">
+        <ItemRange target={target} variant="inline" />
+      </span>
     </span>
   ) : null;
 
@@ -240,11 +216,25 @@ function TargetListItem({
       className={cn(
         "flex items-center gap-2 px-2 text-sm",
         isMobile ? "min-h-15 ps-4" : "min-h-13",
+        depth > 0 && "bg-muted/30",
+        !selecting && "cursor-pointer hover:bg-muted/50",
         selected && "bg-primary/5",
       )}
+      // Pointer-only: the name button stays the keyboard path to edit.
+      onClick={(event) => {
+        if (selecting) return;
+        const clicked = event.target as HTMLElement;
+        if (
+          clicked.closest("button, [data-row-ignore]") ||
+          clicked.closest('[role="menu"]')
+        ) {
+          return;
+        }
+        actions.onEdit(target);
+      }}
     >
       {showCheckbox ? (
-        <span className="flex w-8 shrink-0 justify-center">
+        <span data-row-ignore className="flex w-8 shrink-0 justify-center self-stretch items-center">
           <Checkbox
             id={checkboxId}
             checked={selected}
@@ -256,25 +246,30 @@ function TargetListItem({
       <span
         aria-hidden
         className="shrink-0"
-        style={{ width: `${depth * DEPTH_REM}rem` }}
+        style={{
+          width: `${depth * (isMobile ? DEPTH_REM.mobile : DEPTH_REM.desktop)}rem`,
+        }}
       />
-      {isArea && !selecting ? (
+      {flat || selecting ? null : !isArea || childCount === 0 ? (
+        <span
+          aria-hidden
+          className={cn("shrink-0", isMobile ? "size-9" : "size-6")}
+        />
+      ) : (
         <Button
           type="button"
           variant="ghost"
           size={isMobile ? "icon" : "icon-xs"}
-          className="text-muted-foreground"
+          className="text-muted-foreground aria-expanded:bg-transparent aria-expanded:text-muted-foreground aria-expanded:hover:bg-muted"
           aria-expanded={open}
           aria-label={t(open ? "collapseArea" : "expandArea", {
             name: target.name,
           })}
           onClick={() => onOpenChange(target.id, !open)}
         >
-          <ChevronRightIcon
-            className={cn("transition-transform", open && "rotate-90")}
-          />
+          {open ? <ChevronDownIcon /> : <ChevronRightIcon />}
         </Button>
-      ) : null}
+      )}
       {selecting ? (
         <label
           htmlFor={checkboxId}
@@ -283,12 +278,16 @@ function TargetListItem({
           {nameBlock}
         </label>
       ) : (
-        <span className="flex min-w-0 flex-1 items-center gap-3 py-2">
+        <button
+          type="button"
+          onClick={() => actions.onEdit(target)}
+          className="-my-px flex min-w-0 flex-1 cursor-pointer items-center gap-3 self-stretch rounded-md py-2 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
           {nameBlock}
-        </span>
+        </button>
       )}
       {flat && !isMobile ? (
-        <span className="flex w-48 min-w-0">
+        <span className="flex w-44 min-w-0">
           {parent ? (
             <Badge variant="secondary" className="max-w-full">
               <span className="truncate">{parent.name}</span>
@@ -298,175 +297,28 @@ function TargetListItem({
           )}
         </span>
       ) : null}
-      {isMobile ? null : <span className="flex w-32">{tasks}</span>}
+      {isMobile ? null : (
+        <span className="flex w-48 min-w-0">
+          <ItemRange target={target} variant="chip" />
+        </span>
+      )}
+      {isMobile ? null : <span className="flex w-28">{tasks}</span>}
       {selecting ? null : (
-        <span className="flex w-20 shrink-0 items-center justify-end gap-1">
+        <span data-row-ignore className="flex w-20 shrink-0 items-center justify-end gap-1 self-stretch">
           {isArea ? (
             <Button
               type="button"
               variant="ghost"
               size={isMobile ? "icon-lg" : "icon-sm"}
               className="text-muted-foreground"
-              aria-label={t("addEquipmentTo", { name: target.name })}
-              onClick={() => onStartAdd(target, TARGET_KIND.EQUIPMENT)}
+              aria-label={t("addTo", { name: target.name })}
+              onClick={() => onAddToArea(target)}
             >
               <PlusIcon />
             </Button>
           ) : null}
           <TargetActionsMenu target={target} actions={actions} />
         </span>
-      )}
-    </li>
-  );
-}
-
-type InlineAddRowProps = {
-  area: TargetResponse;
-  isEmpty: boolean;
-  indentRem: number;
-  editingKind: InlineAddKind | null;
-  onStart: (kind: InlineAddKind) => void;
-  onCancel: () => void;
-  onAdd: (
-    area: TargetResponse,
-    name: string,
-    kind: InlineAddKind,
-  ) => Promise<InlineAddResult>;
-};
-
-function InlineAddRow({
-  area,
-  isEmpty,
-  indentRem,
-  editingKind,
-  onStart,
-  onCancel,
-  onAdd,
-}: InlineAddRowProps) {
-  const t = useTranslations("TargetsPage");
-  const errorId = useId();
-  const [name, setName] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const editing = editingKind !== null;
-  const isFixture = editingKind === TARGET_KIND.FIXTURE;
-
-  const cancel = () => {
-    setName("");
-    setError(null);
-    onCancel();
-  };
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const trimmed = name.trim();
-    if (!trimmed) {
-      setError(t("validation.nameRequired"));
-      return;
-    }
-    if (!editingKind) return;
-    setIsSubmitting(true);
-    const result = await onAdd(area, trimmed, editingKind);
-    setIsSubmitting(false);
-    if (result === "nameTaken") {
-      setError(
-        t(isFixture ? "nameTakenFixture" : "nameTaken"),
-      );
-    }
-    if (result === "added") {
-      setName("");
-      setError(null);
-    }
-  }
-
-  return (
-    <li
-      className={cn(
-        "flex min-h-12 items-center gap-2 py-1.5 ps-4 pe-2 text-sm md:ps-2",
-        editing && "bg-primary/5",
-      )}
-    >
-      <span
-        aria-hidden
-        className="shrink-0"
-        style={{ width: `${indentRem}rem` }}
-      />
-      {editing ? (
-        <form
-          onSubmit={(event) => void submit(event)}
-          className="flex min-w-0 flex-1 flex-col gap-2 py-1 md:max-w-xl md:flex-row md:items-start"
-        >
-          <Field data-invalid={Boolean(error)} className="min-w-0 flex-1">
-            <Input
-              autoFocus
-              value={name}
-              onChange={(event) => {
-                setName(event.target.value);
-                if (error) setError(null);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") cancel();
-              }}
-              placeholder={t(
-                isFixture ? "inlineAdd.placeholderFixture" : "inlineAdd.placeholder",
-              )}
-              aria-label={t(isFixture ? "inlineAdd.labelFixture" : "inlineAdd.label", {
-                name: area.name,
-              })}
-              aria-invalid={Boolean(error)}
-              aria-describedby={error ? errorId : undefined}
-              maxLength={TARGET_NAME_MAX_LENGTH}
-            />
-            <div className="flex items-start justify-between gap-3">
-              {error ? <FieldError id={errorId}>{error}</FieldError> : <span />}
-              <CharacterCount value={name} max={TARGET_NAME_MAX_LENGTH} showFrom={0.8} />
-            </div>
-          </Field>
-          <div className="flex gap-2">
-            <Button
-              type="submit"
-              className="flex-1 md:flex-none"
-              isLoading={isSubmitting}
-            >
-              {t("inlineAdd.submit")}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              disabled={isSubmitting}
-              onClick={cancel}
-            >
-              {t("cancel")}
-            </Button>
-          </div>
-        </form>
-      ) : (
-        <>
-          {isEmpty ? (
-            <span className="text-muted-foreground">{t("emptyArea")}</span>
-          ) : null}
-          <Button
-            type="button"
-            variant="ghost"
-            className="text-muted-foreground"
-            aria-label={t("addEquipmentTo", { name: area.name })}
-            onClick={() => onStart(TARGET_KIND.EQUIPMENT)}
-          >
-            <PlusIcon data-icon="inline-start" />
-            {t("addEquipment")}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            className="text-muted-foreground"
-            aria-label={t("inlineAdd.labelFixture", { name: area.name })}
-            onClick={() => onStart(TARGET_KIND.FIXTURE)}
-          >
-            <BrickWallIcon data-icon="inline-start" />
-            {t("addFixture")}
-          </Button>
-        </>
       )}
     </li>
   );

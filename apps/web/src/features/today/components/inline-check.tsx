@@ -286,6 +286,7 @@ export function InlineCheck({
           {limitsText ? (
             <LimitChip
               limits={limitsText}
+              unit={field.unit}
               label={tForms("measurement.allowed", { limits: limitsText })}
               verdict={verdict}
             />

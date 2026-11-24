@@ -1,9 +1,7 @@
 "use client";
 
 import {
-  API_ERROR_CODE,
   TARGET_KIND,
-  isTargetNameTaken,
   type TargetInput,
   type TargetResponse,
 } from "@haccp/shared";
@@ -20,21 +18,14 @@ import { Button } from "@/components/ui/button";
 import { ResponsiveAlertDialog } from "@/components/ui/responsive-alert-dialog";
 import { SearchInput } from "@/components/ui/search-input";
 import { Spinner } from "@/components/ui/spinner";
+import { ScopeFilter } from "@/features/targets/components/scope-filter";
 import { SelectionActions } from "@/features/targets/components/selection-actions";
 import type { TargetActions } from "@/features/targets/components/target-actions-menu";
-import {
-  TargetList,
-  type InlineAddKind,
-  type InlineAdding,
-  type InlineAddResult,
-} from "@/features/targets/components/target-list";
-import {
-  TargetScopeChips,
-  TargetScopeRail,
-} from "@/features/targets/components/target-scope-nav";
+import { TargetList } from "@/features/targets/components/target-list";
 import { TargetsOnboarding } from "@/features/targets/components/targets-onboarding";
 import { useTargetsMutations } from "@/features/targets/hooks/use-targets-mutations";
 import { useTargetsQuery } from "@/features/targets/hooks/use-targets-query";
+import { planContentsCopy } from "@/features/targets/lib/duplicate-contents";
 import {
   buildTargetRows,
   moveDestinations,
@@ -46,10 +37,7 @@ import {
   type TargetsFormDefaults,
 } from "@/features/targets/targets-form";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { ApiRequestError } from "@/lib/api-utils";
 import { useApiErrorToast } from "@/lib/api/use-api-error-toast";
-
-const ALL: TargetScope = { type: "all" };
 
 type TargetsManagerProps = {
   initialItems: TargetResponse[];
@@ -70,13 +58,12 @@ export function TargetsManager({
     error,
     refetch,
   } = useTargetsQuery({ initialData: initialItems, initialLocationId });
-  const { create, update, remove } = useTargetsMutations();
+  const { create, duplicate, update, remove } = useTargetsMutations();
 
-  const [scope, setScope] = useState<TargetScope>(ALL);
+  const [scope, setScope] = useState<TargetScope>("all");
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
-  const [adding, setAdding] = useState<InlineAdding | null>(null);
   const [isBulkPending, setIsBulkPending] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
@@ -84,6 +71,7 @@ export function TargetsManager({
   const [formDefaults, setFormDefaults] = useState<TargetsFormDefaults>({
     kind: TARGET_KIND.EQUIPMENT,
     parentId: null,
+    inArea: false,
   });
   const [editingTarget, setEditingTarget] = useState<TargetResponse | null>(
     null,
@@ -112,13 +100,8 @@ export function TargetsManager({
   ).length;
   const hasAreas = areaCount > 0;
 
-  // Without areas there is nothing to browse, and a deleted area falls back to everything.
-  const scopeArea =
-    scope.type === "area" ? (itemsById.get(scope.areaId) ?? null) : null;
-  const activeScope: TargetScope =
-    !hasAreas || (scope.type === "area" && scopeArea?.kind !== TARGET_KIND.AREA)
-      ? ALL
-      : scope;
+  // Without rooms there is nothing to filter by.
+  const activeScope: TargetScope = hasAreas ? scope : "all";
 
   const isOpen = useCallback(
     (areaId: string) => !collapsed.has(areaId),
@@ -148,7 +131,6 @@ export function TargetsManager({
   const changeScope = (next: TargetScope) => {
     setScope(next);
     setSelected(new Set());
-    setAdding(null);
   };
 
   const setAreaOpen = useCallback((areaId: string, open: boolean) => {
@@ -190,7 +172,8 @@ export function TargetsManager({
   const openAdd = () =>
     openCreateForm({
       kind: TARGET_KIND.EQUIPMENT,
-      parentId: activeScope.type === "area" ? activeScope.areaId : null,
+      parentId: null,
+      inArea: false,
     });
 
   const actions = useMemo<TargetActions>(
@@ -213,49 +196,37 @@ export function TargetsManager({
     [],
   );
 
-  const startAdd = (area: TargetResponse, kind: InlineAddKind) => {
-    setAreaOpen(area.id, true);
-    setAdding({ areaId: area.id, kind });
-  };
-
-  const addToArea = async (
-    area: TargetResponse,
-    name: string,
-    kind: InlineAddKind,
-  ): Promise<InlineAddResult> => {
-    const input = { name, kind, parentId: area.id };
-    if (isTargetNameTaken(items, input)) return "nameTaken";
-    try {
-      await create.mutateAsync(input);
-      toast.success(t("toast.createSuccess", { name }));
-      setAdding(null);
-      return "added";
-    } catch (error) {
-      if (
-        error instanceof ApiRequestError &&
-        error.code === API_ERROR_CODE.TARGET_NAME_EXISTS
-      ) {
-        return "nameTaken";
-      }
-      showApiError(error);
-      return "failed";
-    }
-  };
+  const addToArea = useCallback(
+    (area: TargetResponse) => {
+      setAreaOpen(area.id, true);
+      openCreateForm({
+        kind: TARGET_KIND.EQUIPMENT,
+        parentId: area.id,
+        inArea: true,
+      });
+    },
+    [openCreateForm, setAreaOpen],
+  );
 
   const reparentSelected = async (parentId: string | null) => {
-    // A fixture cannot leave its room, so "Make standalone" passes over it.
+    // A component cannot leave its room, so "Make standalone" passes over it.
     const changes = selectedItems.filter(
       (item) =>
         item.parentId !== parentId &&
         item.id !== parentId &&
-        !(parentId === null && item.kind === TARGET_KIND.FIXTURE),
+        !(parentId === null && item.kind === TARGET_KIND.COMPONENT),
     );
     setIsBulkPending(true);
     const results = await Promise.allSettled(
       changes.map((item) =>
         update.mutateAsync({
           id: item.id,
-          input: { name: item.name, kind: item.kind, parentId },
+          input: {
+            name: item.name,
+            kind: item.kind,
+            parentId,
+            limits: item.limits,
+          },
         }),
       ),
     );
@@ -319,53 +290,44 @@ export function TargetsManager({
   }, []);
 
   const handleSubmit = useCallback(
-    async (values: TargetInput) => {
+    async (values: TargetInput, copyContents: boolean) => {
       if (editingTarget) {
         await update.mutateAsync({ id: editingTarget.id, input: values });
         toast.success(t("toast.updateSuccess"));
         return;
       }
 
-      await create.mutateAsync(values);
+      if (duplicateSource && copyContents) {
+        const contents = planContentsCopy(
+          items,
+          duplicateSource.id,
+          values,
+          (name, attempt) =>
+            attempt === 1
+              ? t("duplicateSuggestedName", { name })
+              : t("duplicateSuggestedNameNumbered", { name, number: attempt }),
+        );
+        await duplicate.mutateAsync({
+          sourceId: duplicateSource.id,
+          input: { target: values, contents },
+        });
+      } else {
+        await create.mutateAsync(values);
+      }
       toast.success(
         duplicateSource
           ? t("toast.duplicateSuccess")
           : t("toast.createSuccess", { name: values.name }),
       );
     },
-    [create, duplicateSource, editingTarget, t, update],
+    [create, duplicate, duplicateSource, editingTarget, items, t, update],
   );
-
-  const equipmentCount = items.filter(
-    (item) => item.kind === TARGET_KIND.EQUIPMENT,
-  ).length;
-  const fixtureCount = items.filter(
-    (item) => item.kind === TARGET_KIND.FIXTURE,
-  ).length;
-  const scopeTitle =
-    activeScope.type === "area" && scopeArea
-      ? scopeArea.name
-      : t(`scope.${activeScope.type === "equipment" ? "equipment" : "all"}`);
-  const scopeSubtitle =
-    activeScope.type === "area" && scopeArea
-      ? `${t("itemsInside", { count: childCounts.get(scopeArea.id) ?? 0 })} · ${t("taskCount", { count: scopeArea.taskCount })}`
-      : activeScope.type === "equipment"
-        ? t("scope.equipmentHint")
-        : [
-            t("summary.equipment", { count: equipmentCount }),
-            t("summary.areas", { count: areaCount }),
-            fixtureCount > 0
-              ? t("summary.fixtures", { count: fixtureCount })
-              : null,
-          ]
-            .filter(Boolean)
-            .join(" · ");
 
   const selectionActionsProps = {
     count: selectedIds.size,
     destinations,
     canMakeStandalone: selectedItems.some(
-      (item) => item.parentId !== null && item.kind !== TARGET_KIND.FIXTURE,
+      (item) => item.parentId !== null && item.kind !== TARGET_KIND.COMPONENT,
     ),
     canDelete: deletableCount > 0,
     isPending: isBulkPending,
@@ -399,11 +361,6 @@ export function TargetsManager({
             >
               <XIcon className="size-5" />
             </Button>
-          ) : items.length > 0 && !isMobile ? (
-            <Button type="button" onClick={openAdd}>
-              <PlusIcon data-icon="inline-start" />
-              {t("add")}
-            </Button>
           ) : null
         }
       />
@@ -417,95 +374,84 @@ export function TargetsManager({
       ) : items.length === 0 ? (
         <TargetsOnboarding
           onAddArea={() =>
-            openCreateForm({ kind: TARGET_KIND.AREA, parentId: null })
+            openCreateForm({
+              kind: TARGET_KIND.AREA,
+              parentId: null,
+              inArea: false,
+            })
           }
           onAddLooseEquipment={() =>
-            openCreateForm({ kind: TARGET_KIND.EQUIPMENT, parentId: null })
+            openCreateForm({
+              kind: TARGET_KIND.EQUIPMENT,
+              parentId: null,
+              inArea: false,
+            })
           }
         />
       ) : (
-        <div className="flex flex-1 flex-col gap-4 md:flex-row md:items-start md:gap-8">
-          {hasAreas && !isMobile ? (
-            <TargetScopeRail
-              items={items}
-              active={activeScope}
-              onSelect={changeScope}
+        <section
+          aria-label={t("title")}
+          className="flex min-w-0 flex-1 flex-col gap-3"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <SearchInput
+              value={query}
+              onSearch={setQuery}
+              placeholder={t("searchPlaceholder")}
+              aria-label={t("searchPlaceholder")}
+              className="h-(--control-h) w-full bg-card sm:w-[250px]"
             />
-          ) : null}
-
-          <section
-            aria-label={scopeTitle}
-            className="flex min-w-0 flex-1 flex-col gap-3"
-          >
-            {hasAreas && isMobile ? (
-              <TargetScopeChips
-                items={items}
-                active={activeScope}
-                onSelect={changeScope}
-              />
+            {hasAreas ? (
+              <ScopeFilter value={activeScope} onChange={changeScope} />
             ) : null}
-            {hasAreas && !isMobile ? (
-              <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-                <h2 className="text-base font-medium">{scopeTitle}</h2>
-                <span className="text-sm text-muted-foreground">
-                  {scopeSubtitle}
-                </span>
-              </div>
-            ) : null}
-
-            <div className="flex flex-wrap items-center gap-2">
-              <SearchInput
-                value={query}
-                onSearch={setQuery}
-                placeholder={t("searchPlaceholder")}
-                aria-label={t("searchPlaceholder")}
-                className="h-(--control-h) w-full bg-card sm:w-[250px]"
-              />
-              {!isMobile && selectedIds.size > 0 ? (
-                <div className="ms-auto">
+            {isMobile ? null : (
+              <div className="ms-auto flex min-w-0 items-center gap-2">
+                {selectedIds.size > 0 ? (
                   <SelectionActions
                     variant="inline"
                     {...selectionActionsProps}
                   />
-                </div>
-              ) : null}
-            </div>
-
-            {rows.length === 0 ? (
-              <p className="py-12 text-center text-sm text-muted-foreground">
-                {query.trim() ? t("noResults") : t("emptyEquipment")}
-              </p>
-            ) : (
-              <TargetList
-                rows={
-                  mobileSelecting
-                    ? rows.filter((row) => row.type === "item")
-                    : rows
-                }
-                itemsById={itemsById}
-                childCounts={childCounts}
-                flat={activeScope.type === "equipment"}
-                isMobile={isMobile}
-                showCheckboxes={!isMobile || mobileSelecting}
-                selected={selectedIds}
-                onToggleSelected={toggleSelected}
-                onToggleAll={toggleAll}
-                onLongPress={(id) => setSelected(new Set([id]))}
-                isOpen={isOpen}
-                onOpenChange={setAreaOpen}
-                adding={adding}
-                onStartAdd={startAdd}
-                onCancelAdd={() => setAdding(null)}
-                onAdd={addToArea}
-                actions={actions}
-              />
+                ) : (
+                  <Button type="button" onClick={openAdd}>
+                    <PlusIcon data-icon="inline-start" />
+                    {t("add")}
+                  </Button>
+                )}
+              </div>
             )}
+          </div>
 
-            {mobileSelecting ? (
-              <SelectionActions variant="bar" {...selectionActionsProps} />
-            ) : null}
-          </section>
-        </div>
+          {rows.length === 0 ? (
+            <p className="py-12 text-center text-sm text-muted-foreground">
+              {query.trim() ? t("noResults") : t("emptyEquipment")}
+            </p>
+          ) : (
+            <TargetList
+              rows={
+                mobileSelecting
+                  ? rows.filter((row) => row.type === "item")
+                  : rows
+              }
+              itemsById={itemsById}
+              childCounts={childCounts}
+              flat={activeScope === "equipment"}
+              isMobile={isMobile}
+              showCheckboxes={!isMobile || mobileSelecting}
+              selected={selectedIds}
+              onToggleSelected={toggleSelected}
+              onToggleAll={toggleAll}
+              onLongPress={(id) => setSelected(new Set([id]))}
+              isOpen={isOpen}
+              onOpenChange={setAreaOpen}
+              onAddToArea={addToArea}
+              actions={actions}
+            />
+          )}
+
+          {mobileSelecting ? (
+            <SelectionActions variant="bar" {...selectionActionsProps} />
+          ) : null}
+        </section>
       )}
 
       <ResponsiveAlertDialog
@@ -516,8 +462,8 @@ export function TargetsManager({
         title={t(
           deleteTarget?.kind === TARGET_KIND.AREA
             ? "deleteDialog.areaTitle"
-            : deleteTarget?.kind === TARGET_KIND.FIXTURE
-              ? "deleteDialog.fixtureTitle"
+            : deleteTarget?.kind === TARGET_KIND.COMPONENT
+              ? "deleteDialog.componentTitle"
               : "deleteDialog.equipmentTitle",
         )}
         description={

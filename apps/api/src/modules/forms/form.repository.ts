@@ -1,17 +1,9 @@
-import type { LimitOverrides } from "@haccp/shared";
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { DbClient } from "../../core/db/client.js";
 import { formVersions } from "../../core/db/schema/form-versions.js";
 import { forms } from "../../core/db/schema/forms.js";
-import { locations } from "../../core/db/schema/locations.js";
-import { targets } from "../../core/db/schema/targets.js";
 import { taskTemplateTargets } from "../../core/db/schema/task-template-targets.js";
 import { taskTemplates } from "../../core/db/schema/task-templates.js";
-import {
-  parentTargets,
-  targetLabelColumns,
-  withTargetLabel,
-} from "../targets/target-label.js";
 
 export type FormRow = typeof forms.$inferSelect;
 export type FormVersionRow = typeof formVersions.$inferSelect;
@@ -19,15 +11,6 @@ export type FormVersionRow = typeof formVersions.$inferSelect;
 export type FormWithLatestVersion = {
   form: FormRow;
   latestVersion: FormVersionRow;
-};
-
-export type TemplateOverrideRow = {
-  templateId: string;
-  locationId: string;
-  locationName: string;
-  targetId: string;
-  targetName: string;
-  limitOverrides: LimitOverrides;
 };
 
 async function findLatestVersions(
@@ -280,56 +263,5 @@ export const formRepository = {
         and(eq(taskTemplates.formId, formId), isNull(taskTemplates.archivedAt)),
       )
       .groupBy(taskTemplates.id);
-  },
-
-  /** Every active template's per-target overrides for this form, across all locations. */
-  async findTemplateOverridesByForm(
-    db: DbClient,
-    formId: string,
-  ): Promise<TemplateOverrideRow[]> {
-    const rows = await db
-      .select({
-        templateId: taskTemplates.id,
-        locationId: locations.id,
-        locationName: locations.name,
-        targetId: targets.id,
-        ...targetLabelColumns,
-        limitOverrides: taskTemplateTargets.limitOverrides,
-      })
-      .from(taskTemplateTargets)
-      .innerJoin(
-        taskTemplates,
-        eq(taskTemplates.id, taskTemplateTargets.taskTemplateId),
-      )
-      .innerJoin(locations, eq(locations.id, taskTemplateTargets.locationId))
-      .innerJoin(targets, eq(targets.id, taskTemplateTargets.targetId))
-      .leftJoin(parentTargets, eq(parentTargets.id, targets.parentId))
-      .where(
-        and(eq(taskTemplates.formId, formId), isNull(taskTemplates.archivedAt)),
-      )
-      .orderBy(
-        asc(locations.name),
-        asc(targets.name),
-        asc(taskTemplates.createdAt),
-      );
-
-    return rows.map(withTargetLabel);
-  },
-
-  async setLimitOverrides(
-    db: DbClient,
-    templateId: string,
-    targetId: string,
-    limitOverrides: LimitOverrides,
-  ): Promise<void> {
-    await db
-      .update(taskTemplateTargets)
-      .set({ limitOverrides })
-      .where(
-        and(
-          eq(taskTemplateTargets.taskTemplateId, templateId),
-          eq(taskTemplateTargets.targetId, targetId),
-        ),
-      );
   },
 };

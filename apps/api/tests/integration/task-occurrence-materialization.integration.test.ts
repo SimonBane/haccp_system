@@ -331,7 +331,7 @@ describe("Task occurrence materialization — configuration writes", () => {
     expect(after.map((row) => row.id)).toEqual([protectedRow.id]);
   });
 
-  it("a target rename or override change replaces only future unrecorded occurrences", async () => {
+  it("a target rename or range change replaces only future unrecorded occurrences", async () => {
     await materialize();
 
     const protectedRow = await findOccurrence(
@@ -366,28 +366,14 @@ describe("Task occurrence materialization — configuration writes", () => {
     expect(renamed.status).toBe(200);
 
     const overridden = await apiRequest(
-      `/locations/${world.locations.main.id}/task-templates/${world.templates.temperature.id}`,
+      `/locations/${world.locations.main.id}/targets/${world.targets.fridge.id}`,
       {
         method: "PATCH",
         actor: asAdmin(world),
         body: JSON.stringify({
-          formId: world.forms.fridgeCheck.id,
-          weekdays: [
-            "monday",
-            "tuesday",
-            "wednesday",
-            "thursday",
-            "friday",
-            "saturday",
-            "sunday",
-          ],
-          scheduledTimes: ["08:00"],
-          targets: [
-            {
-              targetId: world.targets.fridge.id,
-              limitOverrides: { [FRIDGE_FIELD_ID]: { min: -2, max: 6 } },
-            },
-          ],
+          name: "Fridge 1 (relabeled)",
+          kind: "equipment",
+          limits: { temperature: { min: -2, max: 6 } },
         }),
       },
     );
@@ -417,7 +403,7 @@ describe("Task occurrence materialization — configuration writes", () => {
     });
   });
 
-  it("lets one task check a room, its fixtures and equipment, labelling fixtures with the room", async () => {
+  it("lets one task check a room, its components and equipment, labelling components with the room", async () => {
     const actor = asAdmin(world);
     const targetsPath = `/locations/${world.locations.main.id}/targets`;
     const post = async (path: string, body: unknown) => {
@@ -434,12 +420,12 @@ describe("Task occurrence materialization — configuration writes", () => {
     const bar = await post(targetsPath, { name: "Bar", kind: "area" });
     const kitchenWalls = await post(targetsPath, {
       name: "Walls",
-      kind: "fixture",
+      kind: "component",
       parentId: kitchen.id,
     });
     const barWalls = await post(targetsPath, {
       name: "Walls",
-      kind: "fixture",
+      kind: "component",
       parentId: bar.id,
     });
     const form = await post("/forms", {
@@ -455,10 +441,10 @@ describe("Task occurrence materialization — configuration writes", () => {
         weekdays: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
         scheduledTimes: ["22:00"],
         targets: [
-          { targetId: kitchen.id, limitOverrides: {} },
-          { targetId: kitchenWalls.id, limitOverrides: {} },
-          { targetId: barWalls.id, limitOverrides: {} },
-          { targetId: world.targets.fridge.id, limitOverrides: {} },
+          { targetId: kitchen.id },
+          { targetId: kitchenWalls.id },
+          { targetId: barWalls.id },
+          { targetId: world.targets.fridge.id },
         ],
       },
     );
@@ -501,6 +487,7 @@ describe("Task occurrence materialization — configuration writes", () => {
         body: JSON.stringify({
           name: "Fish fridge",
           kind: "equipment",
+          limits: { temperature: { min: 0, max: 2 } },
         }),
       },
     );
@@ -525,10 +512,7 @@ describe("Task occurrence materialization — configuration writes", () => {
           scheduledTimes: ["08:00"],
           targets: [
             { targetId: world.targets.fridge.id },
-            {
-              targetId: fishFridge.id,
-              limitOverrides: { [FRIDGE_FIELD_ID]: { min: 0, max: 2 } },
-            },
+            { targetId: fishFridge.id },
           ],
         }),
       },

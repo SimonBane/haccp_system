@@ -393,38 +393,31 @@
   },
   "TargetsPage": {
     "title": "Equipment & areas",
-    "description": "Everything your team checks at this location.",
+    "description": "Everything your team checks at this location, with the range each item must stay within.",
     "add": "Add",
     "scope": {
-      "label": "Browse",
-      "all": "Everything",
+      "label": "Show",
+      "all": "All",
       "equipment": "Equipment",
-      "equipmentHint": "In an area or standalone",
-      "areas": "Areas"
+      "rooms": "Rooms"
     },
     "columns": {
       "name": "Name",
       "area": "Area",
-      "tasks": "Tasks"
+      "tasks": "Tasks",
+      "range": "Allowed range"
     },
     "standalone": "Standalone",
     "noTasks": "No tasks",
     "itemsInside": "{count, plural, =0 {Empty} one {# item inside} other {# items inside}}",
     "emptyEquipment": "No equipment yet.",
-    "inlineAdd": {
-      "label": "New equipment in {name}",
-      "placeholder": "Equipment name",
-      "submit": "Add",
-      "labelFixture": "New fixture in {name}",
-      "placeholderFixture": "Fixture name, e.g. Walls"
-    },
     "selection": {
       "toolbar": "Selected items",
       "count": "{count, plural, one {# selected} other {# selected}}",
       "selectAll": "Select all",
       "select": "Select {name}",
       "clear": "Clear selection",
-      "moveTo": "Move to area",
+      "moveTo": "Move",
       "moveToLabel": "{count, plural, one {Move # item to} other {Move # items to}}",
       "makeStandalone": "Make standalone",
       "delete": "Delete",
@@ -439,73 +432,38 @@
     "searchPlaceholder": "Search",
     "expandArea": "Show what is in {name}",
     "collapseArea": "Hide what is in {name}",
-    "addEquipment": "Add equipment",
-    "addEquipmentTo": "Add equipment to {name}",
     "summary": {
       "equipment": "{count, plural, =0 {No equipment} one {# equipment} other {# equipment}}",
       "areas": "{count, plural, one {# area} other {# areas}}",
-      "fixtures": "{count, plural, one {# fixture} other {# fixtures}}"
+      "components": "{count, plural, one {# component} other {# components}}"
     },
     "taskCount": "{count, plural, =0 {Not used in any task} one {In # task} other {In # tasks}}",
-    "emptyArea": "Nothing here yet.",
     "noResults": "Nothing matches your search.",
     "kinds": {
       "equipment": "Equipment",
       "area": "Area",
-      "fixture": "Fixture"
-    },
-    "kindHints": {
-      "equipment": "A thing you check: fridges, tables, slicers, sinks, scales",
-      "area": "A room or zone: kitchen, cold store, changing room",
-      "fixture": "Part of a room: walls, floor, ceiling, door"
+      "component": "Component"
     },
     "form": {
       "kindLabel": "What are you adding?",
-      "addTitle": {
-        "equipment": "Add equipment",
-        "area": "Add area",
-        "fixture": "Add fixture"
-      },
-      "addDescription": {
-        "equipment": "It can be picked in any task that checks equipment.",
-        "area": "It can be picked in any task that checks areas.",
-        "fixture": "It can be picked in any task that checks fixtures."
-      },
-      "editTitle": {
-        "equipment": "Edit equipment",
-        "area": "Edit area",
-        "fixture": "Edit fixture"
-      },
-      "editDescription": {
-        "equipment": "Rename it or move it to another room.",
-        "area": "Rename it or place it inside a larger area.",
-        "fixture": "Rename it or move it to another room."
-      },
-      "duplicateTitle": {
-        "equipment": "Duplicate equipment",
-        "area": "Duplicate area",
-        "fixture": "Duplicate fixture"
-      },
-      "duplicateDescription": {
-        "equipment": "Create a copy with a new name.",
-        "area": "Create a copy with a new name. What is inside is not copied.",
-        "fixture": "Create a copy with a new name."
-      },
+      "addTitle": "Add item",
+      "addDescription": "Tasks can then check it on a schedule.",
+      "editTitle": "Edit item",
+      "editDescription": "Rename it, move it or change its allowed range.",
+      "duplicateTitle": "Duplicate item",
+      "duplicateDescription": "Create a copy with a new name.",
       "namePlaceholder": {
         "equipment": "Mincer",
         "area": "Cold store",
-        "fixture": "Walls"
+        "component": "Walls"
       },
       "parentLabel": "Located in",
       "parentNone": "No area",
-      "submit": {
-        "equipment": "Add equipment",
-        "area": "Add area",
-        "fixture": "Add fixture"
-      },
-      "parentRequired": "Choose the room this fixture is part of."
+      "parentRequired": "Choose the room this component is part of.",
+      "copyContents": "Also copy everything inside ({count})"
     },
     "duplicateSuggestedName": "{name} (Copy)",
+    "duplicateSuggestedNameNumbered": "{name} (Copy {number})",
     "nameLabel": "Name",
     "nameTaken": "Equipment or an area with this name already exists at this location.",
     "save": "Save",
@@ -521,7 +479,7 @@
       "fallback": "This removes the item from future tasks.",
       "cancel": "Cancel",
       "confirm": "Delete",
-      "fixtureTitle": "Delete fixture"
+      "componentTitle": "Delete component"
     },
     "toast": {
       "createSuccess": "{name} was added.",
@@ -564,8 +522,28 @@
       "addArea": "Add area",
       "addLooseEquipment": "Add equipment without an area"
     },
-    "nameTakenFixture": "This room already has a fixture with this name.",
-    "addFixture": "Add fixture"
+    "nameTakenComponent": "This room already has a component with this name.",
+    "addTo": "Add to {name}",
+    "standaloneGroup": "Standalone equipment",
+    "range": {
+      "label": "Allowed range",
+      "unit": "Measurement",
+      "min": "Minimum",
+      "max": "Maximum",
+      "noMin": "No min",
+      "noMax": "No max",
+      "to": "to",
+      "remove": "Remove {measurement}",
+      "addMeasurement": "Add another measurement",
+      "impact": "Upcoming checks use the new range. Recorded checks keep the range they were judged against.",
+      "chipLabel": "Allowed {limits}",
+      "more": "{count, plural, one {and # more range} other {and # more ranges}}",
+      "issues": {
+        "min_out_of_range": "The minimum is outside this unit's range or precision.",
+        "max_out_of_range": "The maximum is outside this unit's range or precision.",
+        "order": "The minimum must be below the maximum."
+      }
+    }
   },
   "FormsPage": {
     "title": "Forms",
@@ -628,7 +606,8 @@
       "helpPlaceholder": "Optional hint shown under the question",
       "requiredLabel": "Answer required",
       "multiline": "Allow several lines",
-      "unitLabel": "Unit",
+      "parameterLabel": "What's measured",
+      "parameterLocked": "Published fields keep what they measure. Add a new field to measure something else.",
       "limitsLabel": "Limits",
       "limitMin": "Minimum",
       "limitMax": "Maximum",
@@ -784,13 +763,8 @@
     "publish": {
       "title": "Publish version {version}?",
       "description": "Upcoming tasks switch to the new version. Records already saved keep the version they were recorded with.",
-      "dropsTitle": "Some custom limits will be removed",
-      "dropsDescription": "These tasks set their own limits for a measurement that this version removes or changes to another unit. Publishing removes those limits.",
-      "dropLine": "{field} at {location}: {limits}",
-      "noLimits": "no limits",
       "cancel": "Cancel",
       "confirm": "Publish",
-      "confirmDrops": "Publish and remove",
       "createDescription": "Staff can use {name} as soon as a task schedules it.",
       "summaryFields": "Fields",
       "summaryAppliesTo": "Filled in for",
@@ -821,37 +795,39 @@
   "Forms": {
     "units": {
       "celsius": {
-        "name": "Degrees Celsius (°C)",
         "symbol": "°C"
       },
       "ph": {
-        "name": "pH",
         "symbol": "pH"
       },
       "percent": {
-        "name": "Percent (%)",
         "symbol": "%"
       },
       "ppm": {
-        "name": "Parts per million (ppm)",
         "symbol": "ppm"
       },
       "water_activity": {
-        "name": "Water activity (aw)",
         "symbol": "aw"
       },
       "grams": {
-        "name": "Grams (g)",
         "symbol": "g"
       },
       "kilograms": {
-        "name": "Kilograms (kg)",
         "symbol": "kg"
       },
       "minutes": {
-        "name": "Minutes (min)",
         "symbol": "min"
       }
+    },
+    "parameters": {
+      "temperature": "Temperature",
+      "humidity": "Humidity",
+      "ph": "pH",
+      "concentration": "Concentration",
+      "water_activity": "Water activity",
+      "weight_g": "Weight",
+      "weight_kg": "Weight",
+      "duration": "Duration"
     },
     "categories": {
       "temperature": "Temperature",
@@ -1197,7 +1173,7 @@
         "descriptionNone": "Choose a form first. It decides what can be checked.",
         "descriptionPick": "Each one you pick gets its own check at every time.",
         "chooseFormFirst": "Choose a form above to see what it can check.",
-        "search": "Search equipment, rooms and fixtures",
+        "search": "Search equipment, rooms and components",
         "new": "Add new",
         "required": "Choose at least one item to check.",
         "standalone": "Standalone",
@@ -1219,7 +1195,7 @@
         "kinds": {
           "area": "Whole room",
           "equipment": "Equipment",
-          "fixture": "Fixture"
+          "component": "Component"
         },
         "filterSelected": "Filter {count} selected",
         "itemsCount": "{count, plural, one {# item} other {# items}}",
@@ -1233,7 +1209,7 @@
         "kinds": {
           "equipment": "Equipment",
           "area": "Area",
-          "fixture": "Fixture"
+          "component": "Component"
         },
         "name": "Name",
         "placeholderEquipment": "e.g. Blast chiller",
@@ -1248,27 +1224,15 @@
         "nameTaken": "{name} already exists here. Pick it from the list.",
         "addedTo": "{name} was added to {area} and selected.",
         "added": "{name} was added and selected.",
-        "titleFixture": "New fixture",
-        "placeholderFixture": "e.g. Walls",
-        "whereFixture": "Which room is it part of?",
-        "needsArea": "Add a room on the Equipment & areas page first, since fixtures belong to one."
+        "titleComponent": "New component",
+        "placeholderComponent": "e.g. Walls",
+        "whereComponent": "Which room is it part of?",
+        "needsArea": "Add a room on the Equipment & areas page first, since components belong to one."
       },
       "limits": {
         "noLimits": "no limits",
-        "to": "to",
-        "minFor": "Minimum {field} for {target}",
-        "maxFor": "Maximum {field} for {target}",
-        "issues": {
-          "min_out_of_range": "The minimum is outside this unit's range or precision.",
-          "max_out_of_range": "The maximum is outside this unit's range or precision.",
-          "order": "The minimum must be below the maximum."
-        },
-        "ownChip": "{min} to {max} {unit}",
-        "editorTitle": "Limits for {name}",
-        "useOwn": "Own limits",
-        "done": "Done",
-        "noMin": "No min",
-        "noMax": "No max"
+        "own": "Own range: {limits}",
+        "formDefault": "Form default: {limits}"
       },
       "when": {
         "title": "When is it done?",

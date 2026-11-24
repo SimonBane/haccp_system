@@ -4,8 +4,6 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../../src/core/db/client.js";
 import { forms } from "../../src/core/db/schema/index.js";
 import {
-  CLEANING_FIELD_ID,
-  FRIDGE_FIELD_ID,
   seedTwoTenants,
   type SeededOrg,
   type TwoTenantWorld,
@@ -14,7 +12,7 @@ import { apiRequest, asAdmin } from "./harness/request.js";
 
 /**
  * A template may only use its organisation's active forms and its own location's
- * equipment & areas, and may only override limits the form's measurements have.
+ * equipment & areas.
  */
 describe("Task template form and target ownership", () => {
   let world: TwoTenantWorld;
@@ -44,16 +42,11 @@ describe("Task template form and target ownership", () => {
     });
   }
 
-  it("creates a template with its targets and per-target overrides", async () => {
+  it("creates a template with its targets", async () => {
     const response = await create(
       world.alpha.locations.main.id,
       templateBody(world.alpha, {
-        targets: [
-          {
-            targetId: world.alpha.targets.fridge.id,
-            limitOverrides: { [FRIDGE_FIELD_ID]: { min: 0, max: 2 } },
-          },
-        ],
+        targets: [{ targetId: world.alpha.targets.fridge.id }],
       }),
     );
 
@@ -67,7 +60,6 @@ describe("Task template form and target ownership", () => {
         {
           targetId: world.alpha.targets.fridge.id,
           targetName: "Fridge 1",
-          limitOverrides: { [FRIDGE_FIELD_ID]: { min: 0, max: 2 } },
         },
       ],
     });
@@ -142,39 +134,6 @@ describe("Task template form and target ownership", () => {
     );
 
     expect(response.status).toBe(404);
-  });
-
-  it("rejects an override for a field that is not a measurement on the form", async () => {
-    const response = await create(
-      world.alpha.locations.main.id,
-      templateBody(world.alpha, {
-        formId: world.alpha.forms.cleaning.id,
-        targets: [
-          {
-            targetId: world.alpha.targets.fridge.id,
-            limitOverrides: { [CLEANING_FIELD_ID]: { min: 0, max: 1 } },
-          },
-        ],
-      }),
-    );
-
-    expect(response.status).toBe(400);
-  });
-
-  it("rejects an override outside the unit's range", async () => {
-    const response = await create(
-      world.alpha.locations.main.id,
-      templateBody(world.alpha, {
-        targets: [
-          {
-            targetId: world.alpha.targets.fridge.id,
-            limitOverrides: { [FRIDGE_FIELD_ID]: { min: 0, max: 150 } },
-          },
-        ],
-      }),
-    );
-
-    expect(response.status).toBe(400);
   });
 
   it("rejects updating a template to use a target from another organization", async () => {

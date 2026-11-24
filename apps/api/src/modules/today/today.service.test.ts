@@ -163,6 +163,7 @@ describe("todayService.getToday — grouping", () => {
                 type: "measurement",
                 label: "Core temperature",
                 required: true,
+                parameter: "temperature",
                 unit: "celsius",
                 limits: { min: null, max: 5 },
               },

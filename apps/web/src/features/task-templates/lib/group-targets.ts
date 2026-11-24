@@ -7,7 +7,7 @@ export const STANDALONE_GROUP_KEY = "standalone";
 
 const KIND_ORDER: Record<TargetKind, number> = {
   [TARGET_KIND.AREA]: 0,
-  [TARGET_KIND.FIXTURE]: 1,
+  [TARGET_KIND.COMPONENT]: 1,
   [TARGET_KIND.EQUIPMENT]: 2,
 };
 
@@ -15,7 +15,7 @@ function byKindThenName(a: TargetResponse, b: TargetResponse): number {
   return KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.name.localeCompare(b.name);
 }
 
-/** One group per room in tree order — the room itself, its fixtures, then its equipment — with items in no room last. */
+/** One group per room in tree order — the room itself, its components, then its equipment — with items in no room last. */
 export function groupByRoom(
   targets: readonly TargetResponse[],
   allTargets: readonly TargetResponse[],

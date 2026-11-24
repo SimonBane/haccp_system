@@ -17,16 +17,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 
-// Prefixed with the side variant so they outrank the stock `data-[side=right]:sm:max-w-sm`.
-const SIZE_CLASS = {
-  md: "data-[side=right]:sm:max-w-md",
-  lg: "data-[side=right]:sm:max-w-lg",
-  xl: "data-[side=right]:sm:max-w-xl",
-} as const;
-
-type ResponsiveFormSheetProps = ResponsiveFormSurfaceProps & {
-  size?: keyof typeof SIZE_CLASS;
-};
+type ResponsiveFormSheetProps = ResponsiveFormSurfaceProps;
 
 /** Drop-in for `ResponsiveFormDialog` when a form is too long for a centred modal. */
 export function ResponsiveFormSheet({
@@ -39,7 +30,6 @@ export function ResponsiveFormSheet({
   closeLabel,
   className,
   initialFocus,
-  size = "lg",
 }: ResponsiveFormSheetProps) {
   const isMobile = useIsMobile();
 
@@ -68,7 +58,8 @@ export function ResponsiveFormSheet({
           "gap-0 overflow-hidden rounded-xl p-0 ring-1 ring-foreground/10",
           // Floats with the same gap as the app's inset content panel instead of touching the edges.
           "data-[side=right]:inset-y-2 data-[side=right]:right-2 data-[side=right]:h-auto data-[side=right]:w-[calc(100%-1rem)] data-[side=right]:border-l-0",
-          SIZE_CLASS[size],
+          // Prefixed with the side variant so it outranks the stock `data-[side=right]:sm:max-w-sm`.
+          "data-[side=right]:sm:max-w-xl",
           className,
         )}
       >

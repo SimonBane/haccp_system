@@ -269,6 +269,7 @@ function MeasurementAnswer({
         {limitsText ? (
           <LimitChip
             limits={limitsText}
+            unit={field.unit}
             label={t("measurement.allowed", { limits: limitsText })}
             verdict={verdict}
           />

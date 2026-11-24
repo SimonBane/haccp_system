@@ -1,17 +1,13 @@
 import type {
   CreateTaskTemplateInput,
   FormAppliesTo,
-  FormDefinition,
   TaskTemplateListResponse,
   TaskTemplateResponse,
   TemplateTargetsIssue,
   UpdateTaskTemplateInput,
 } from "@haccp/shared";
 import {
-  checkMeasurementLimits,
   checkTemplateTargets,
-  getMeasurementFields,
-  limitsIssueMessage,
   sortScheduledTimes,
   sortWeekdays,
 } from "@haccp/shared";
@@ -31,34 +27,6 @@ import {
 } from "./task-template.repository.js";
 
 type TemplateInput = CreateTaskTemplateInput | UpdateTaskTemplateInput;
-
-/** Overrides may only name the form's measurement fields, with limits valid for that field's unit. */
-export function assertOverridesFitForm(
-  definition: FormDefinition,
-  targets: TemplateInput["targets"],
-): void {
-  const units = new Map(
-    getMeasurementFields(definition).map((field) => [field.id, field.unit]),
-  );
-
-  for (const target of targets) {
-    for (const [fieldId, limits] of Object.entries(target.limitOverrides)) {
-      const unit = units.get(fieldId);
-      if (!unit) {
-        throw new ValidationError(
-          `Override for "${fieldId}" does not match a measurement field on this form`,
-        );
-      }
-
-      const [issue] = checkMeasurementLimits(limits, unit);
-      if (issue) {
-        throw new ValidationError(
-          `Override for "${fieldId}": ${limitsIssueMessage(issue)}`,
-        );
-      }
-    }
-  }
-}
 
 const TARGETS_ISSUE_MESSAGES: Record<TemplateTargetsIssue, string> = {
   targets_required: "Choose at least one item for this form to check",
@@ -98,8 +66,6 @@ async function assertInputUsable(
   if (issue) {
     throw new ValidationError(TARGETS_ISSUE_MESSAGES[issue]);
   }
-
-  assertOverridesFitForm(form.definition, input.targets);
 }
 
 function templateColumns(input: TemplateInput) {
@@ -191,7 +157,7 @@ export const taskTemplateService = {
           tx,
           created.id,
           locationId,
-          input.targets,
+          input.targets.map((target) => target.targetId),
         );
         await taskOccurrenceService.reconcileTemplate(
           tx,
@@ -232,7 +198,7 @@ export const taskTemplateService = {
           tx,
           taskTemplateId,
           locationId,
-          input.targets,
+          input.targets.map((target) => target.targetId),
         );
         await taskOccurrenceService.reconcileTemplate(
           tx,

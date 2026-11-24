@@ -20,7 +20,7 @@ function makeTask(overrides: Partial<TaskTemplateResponse> = {}): TaskTemplateRe
     formCategory: "temperature",
     weekdays: ["wednesday", "monday"],
     scheduledTimes: ["13:00", "11:00", "15:00"],
-    targets: [{ targetId: TARGET_ID, targetName: "Bain-marie", limitOverrides: {} }],
+    targets: [{ targetId: TARGET_ID, targetName: "Bain-marie" }],
     completionOpensBeforeMinutes: 15,
     completionDueAfterMinutes: 30,
     createdAt: "2026-01-01T00:00:00.000Z",
@@ -43,7 +43,7 @@ describe("emptyDraft", () => {
 
 describe("draftFromTask", () => {
   it("reopens the times in order and keeps the window", () => {
-    const draft = draftFromTask(makeTask(), ".");
+    const draft = draftFromTask(makeTask());
     expect(draftTimes(draft)).toEqual(["11:00", "13:00", "15:00"]);
     expect(draft.weekdays).toEqual(["monday", "wednesday"]);
     expect(draftWindowFields(draft)).toEqual({
@@ -59,7 +59,6 @@ describe("draftFromTask", () => {
         completionOpensBeforeMinutes: 1440,
         completionDueAfterMinutes: null,
       }),
-      ".",
     );
     expect(draft.times).toEqual(["08:00", "09:30"]);
     expect(draft.windowOn).toBe(false);
@@ -83,18 +82,18 @@ describe("missingSteps", () => {
   });
 
   it("needs a selected target that still exists", () => {
-    const draft = { ...draftFromTask(makeTask(), "."), formId: "f" };
+    const draft = { ...draftFromTask(makeTask()), formId: "f" };
     expect(missingSteps(draft, "per_item", new Set([TARGET_ID]))).toEqual([]);
     expect(missingSteps(draft, "per_item", new Set())).toEqual(["targets"]);
   });
 
   it("does not ask for targets on a whole-location form", () => {
-    const draft = { ...draftFromTask(makeTask({ targets: [] }), "."), formId: "f" };
+    const draft = { ...draftFromTask(makeTask({ targets: [] })), formId: "f" };
     expect(missingSteps(draft, "location", new Set())).toEqual([]);
   });
 
   it("flags a task with no times", () => {
-    const draft = { ...draftFromTask(makeTask(), "."), times: [] };
+    const draft = { ...draftFromTask(makeTask()), times: [] };
     expect(missingSteps(draft, "per_item", new Set([TARGET_ID]))).toEqual(["times"]);
   });
 });

@@ -219,6 +219,7 @@ function FieldGhost({ field }: { field: BuilderField }) {
           {limits ? (
             <LimitChip
               limits={limits}
+              unit={field.unit}
               label={tForms("measurement.allowed", { limits })}
             />
           ) : null}

@@ -92,11 +92,11 @@ export function TargetPicker({
 
   function setCreateKind(kind: TargetKind) {
     if (!create) return;
-    // A fixture always belongs to a room, so it starts in the first one.
+    // A component always belongs to a room, so it starts in the first one.
     const parentId =
       kind === TARGET_KIND.AREA
         ? null
-        : kind === TARGET_KIND.FIXTURE
+        : kind === TARGET_KIND.COMPONENT
           ? (create.parentId ?? areas[0]?.id ?? null)
           : create.parentId;
     setCreate({ ...create, kind, parentId });
@@ -109,12 +109,13 @@ export function TargetPicker({
       setCreate({ ...create, error: tCreate("nameRequired") });
       return;
     }
-    if (create.kind === TARGET_KIND.FIXTURE && !create.parentId) return;
+    if (create.kind === TARGET_KIND.COMPONENT && !create.parentId) return;
     setIsCreating(true);
     const result = await onCreate({
       name,
       kind: create.kind,
       parentId: create.kind === TARGET_KIND.AREA ? null : create.parentId,
+      limits: {},
     });
     setIsCreating(false);
     if (result.kind === "taken") {
@@ -142,8 +143,8 @@ export function TargetPicker({
         <p className="font-semibold">
           {create.kind === TARGET_KIND.AREA
             ? tCreate("titleArea")
-            : create.kind === TARGET_KIND.FIXTURE
-              ? tCreate("titleFixture")
+            : create.kind === TARGET_KIND.COMPONENT
+              ? tCreate("titleComponent")
               : tCreate("titleEquipment")}
         </p>
         <div className="flex flex-col gap-2">
@@ -181,8 +182,8 @@ export function TargetPicker({
             placeholder={
               create.kind === TARGET_KIND.AREA
                 ? tCreate("placeholderArea")
-                : create.kind === TARGET_KIND.FIXTURE
-                  ? tCreate("placeholderFixture")
+                : create.kind === TARGET_KIND.COMPONENT
+                  ? tCreate("placeholderComponent")
                   : tCreate("placeholderEquipment")
             }
             value={create.name}
@@ -201,15 +202,15 @@ export function TargetPicker({
             <CharacterCount value={create.name} max={TARGET_NAME_MAX_LENGTH} showFrom={0.8} />
           </div>
         </div>
-        {create.kind === TARGET_KIND.FIXTURE && areas.length === 0 ? (
+        {create.kind === TARGET_KIND.COMPONENT && areas.length === 0 ? (
           <p role="alert" className="text-sm text-muted-foreground">
             {tCreate("needsArea")}
           </p>
         ) : create.kind !== TARGET_KIND.AREA ? (
           <div className="flex flex-col gap-2">
             <span id={`${idPrefix}-new-area`} className="text-sm leading-none font-medium">
-              {create.kind === TARGET_KIND.FIXTURE
-                ? tCreate("whereFixture")
+              {create.kind === TARGET_KIND.COMPONENT
+                ? tCreate("whereComponent")
                 : tCreate("where")}
             </span>
             <ToggleGroup
@@ -224,7 +225,7 @@ export function TargetPicker({
                 if (value) setCreate({ ...create, parentId: value === NO_PARENT ? null : value });
               }}
             >
-              {create.kind === TARGET_KIND.FIXTURE ? null : (
+              {create.kind === TARGET_KIND.COMPONENT ? null : (
                 <ToggleGroupItem value={NO_PARENT}>{tCreate("standalone")}</ToggleGroupItem>
               )}
               {areas.map((area) => (
@@ -249,7 +250,7 @@ export function TargetPicker({
             type="button"
             className={cn(isSheet ? "h-11 flex-1" : "ml-auto")}
             isLoading={isCreating}
-            disabled={create.kind === TARGET_KIND.FIXTURE && !create.parentId}
+            disabled={create.kind === TARGET_KIND.COMPONENT && !create.parentId}
             onClick={() => void submitCreate()}
           >
             <PlusIcon data-icon="inline-start" />

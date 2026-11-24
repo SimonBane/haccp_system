@@ -4,7 +4,10 @@ import {
   type FormField,
 } from "@haccp/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ConflictError, NotFoundError } from "../../core/errors/app-errors.js";
+import {
+  ConflictError,
+  NotFoundError,
+} from "../../core/errors/app-errors.js";
 
 const formRepository = vi.hoisted(() => ({
   findManyActiveWithLatestVersion: vi.fn(),
@@ -15,9 +18,7 @@ const formRepository = vi.hoisted(() => ({
   archiveIfUnused: vi.fn(),
   countActiveTemplatesByForm: vi.fn(),
   findActiveTemplateIdsByForm: vi.fn(),
-  findTemplateOverridesByForm: vi.fn(),
   findTemplateTargetCountsByForm: vi.fn(),
-  setLimitOverrides: vi.fn(),
 }));
 const taskOccurrenceService = vi.hoisted(() => ({
   reconcileTemplateIds: vi.fn(),
@@ -35,8 +36,6 @@ const FORM_ID = "00000000-0000-4000-8000-0000000000d1";
 const VERSION_1_ID = "00000000-0000-4000-8000-0000000000e1";
 const VERSION_2_ID = "00000000-0000-4000-8000-0000000000e2";
 const TEMPLATE_ID = "00000000-0000-4000-8000-0000000000f1";
-const TARGET_ID = "00000000-0000-4000-8000-0000000000c1";
-const LOCATION_ID = "00000000-0000-4000-8000-0000000000b1";
 const TIME_ZONE = "Europe/Sofia";
 
 const dbHandle: { transaction: (fn: (tx: unknown) => unknown) => unknown } = {
@@ -49,6 +48,7 @@ const temperature: FormField = {
   type: "measurement",
   label: "Temperature",
   required: true,
+  parameter: "temperature",
   unit: "celsius",
   limits: { min: 0, max: 5 },
 };
@@ -86,22 +86,12 @@ function versionRow(id: string, version: number, definition: FormDefinition) {
   };
 }
 
-const overrideRow = {
-  templateId: TEMPLATE_ID,
-  locationId: LOCATION_ID,
-  locationName: "Main kitchen",
-  targetId: TARGET_ID,
-  targetName: "Fish fridge",
-  limitOverrides: { temperature: { min: 0, max: 2 } },
-};
-
 beforeEach(() => {
   vi.clearAllMocks();
   formRepository.findActiveWithLatestVersion.mockResolvedValue({
     form: formRow,
     latestVersion: versionRow(VERSION_1_ID, 1, v1),
   });
-  formRepository.findTemplateOverridesByForm.mockResolvedValue([]);
   formRepository.findActiveTemplateIdsByForm.mockResolvedValue([TEMPLATE_ID]);
   formRepository.insertVersion.mockImplementation(async (_db, data) =>
     versionRow(VERSION_2_ID, data.version, data.definition),
@@ -295,7 +285,6 @@ describe("formService.createVersion", () => {
 
     await formService.createVersion(db, ORG_ID, TIME_ZONE, FORM_ID, {
       definition: v2,
-      confirmDroppedOverrides: false,
     });
 
     expect(formRepository.findActiveWithLatestVersion).toHaveBeenCalledWith(
@@ -333,7 +322,6 @@ describe("formService.createVersion", () => {
       FORM_ID,
       {
         definition: reordered,
-        confirmDroppedOverrides: false,
       },
     );
 
@@ -342,104 +330,42 @@ describe("formService.createVersion", () => {
     expect(taskOccurrenceService.reconcileTemplateIds).not.toHaveBeenCalled();
   });
 
-  it("keeps overrides whose measurement field survives", async () => {
-    formRepository.findTemplateOverridesByForm.mockResolvedValue([overrideRow]);
-    const relabelled: FormDefinition = {
+  it("refuses a version that switches a kept field to another parameter", async () => {
+    const switched: FormDefinition = {
       ...v1,
-      fields: [{ ...temperature, label: "Air temperature" } as FormField],
+      fields: [{ ...temperature, parameter: "humidity", unit: "percent" }],
+    };
+
+    const attempt = formService.createVersion(db, ORG_ID, TIME_ZONE, FORM_ID, {
+      definition: switched,
+    });
+
+    await expect(attempt).rejects.toBeInstanceOf(ConflictError);
+    await expect(attempt).rejects.toMatchObject({
+      code: "FORM_FIELD_PARAMETER_CHANGED",
+      details: { fieldIds: ["temperature"] },
+    });
+    expect(formRepository.insertVersion).not.toHaveBeenCalled();
+  });
+
+  it("publishes a new field for the other parameter beside the kept one", async () => {
+    const v2: FormDefinition = {
+      ...v1,
+      fields: [
+        temperature,
+        { ...temperature, id: "humidity", parameter: "humidity", unit: "percent" },
+      ],
     };
 
     await formService.createVersion(db, ORG_ID, TIME_ZONE, FORM_ID, {
-      definition: relabelled,
-      confirmDroppedOverrides: false,
+      definition: v2,
     });
 
-    expect(formRepository.setLimitOverrides).not.toHaveBeenCalled();
-    expect(formRepository.insertVersion).toHaveBeenCalled();
-  });
-
-  it("refuses, listing each override it would drop, until confirmed", async () => {
-    formRepository.findTemplateOverridesByForm.mockResolvedValue([overrideRow]);
-    const withoutTemperature: FormDefinition = { ...v1, fields: [doorClosed] };
-
-    const error = await formService
-      .createVersion(db, ORG_ID, TIME_ZONE, FORM_ID, {
-        definition: withoutTemperature,
-        confirmDroppedOverrides: false,
-      })
-      .catch((e) => e);
-
-    expect(error).toBeInstanceOf(ConflictError);
-    expect(error.code).toBe(API_ERROR_CODE.FORM_VERSION_DROPS_OVERRIDES);
-    expect(error.details).toEqual({
-      droppedOverrides: [
-        {
-          templateId: TEMPLATE_ID,
-          locationId: LOCATION_ID,
-          locationName: "Main kitchen",
-          targetId: TARGET_ID,
-          targetName: "Fish fridge",
-          fieldId: "temperature",
-          fieldLabel: "Temperature",
-          limits: { min: 0, max: 2 },
-        },
-      ],
-    });
-    expect(formRepository.insertVersion).not.toHaveBeenCalled();
-    expect(formRepository.setLimitOverrides).not.toHaveBeenCalled();
-  });
-
-  it("removes the dropped overrides and publishes once confirmed", async () => {
-    formRepository.findTemplateOverridesByForm.mockResolvedValue([
-      {
-        ...overrideRow,
-        limitOverrides: {
-          temperature: { min: 0, max: 2 },
-          core: { min: 75, max: null },
-        },
-      },
-    ]);
-    const core = {
-      ...temperature,
-      id: "core",
-      limits: { min: 70, max: null },
-    } as FormField;
-    const next: FormDefinition = { ...v1, fields: [core] };
-
-    await formService.createVersion(db, ORG_ID, TIME_ZONE, FORM_ID, {
-      definition: next,
-      confirmDroppedOverrides: true,
-    });
-
-    expect(formRepository.setLimitOverrides).toHaveBeenCalledWith(
-      db,
-      TEMPLATE_ID,
-      TARGET_ID,
-      { core: { min: 75, max: null } },
-    );
     expect(formRepository.insertVersion).toHaveBeenCalledWith(db, {
       formId: FORM_ID,
       version: 2,
-      definition: next,
+      definition: v2,
     });
-  });
-
-  it("drops an override whose field changed unit", async () => {
-    formRepository.findTemplateOverridesByForm.mockResolvedValue([overrideRow]);
-    const ph = {
-      ...temperature,
-      unit: "ph",
-      limits: { min: null, max: 4.6 },
-    } as FormField;
-
-    const error = await formService
-      .createVersion(db, ORG_ID, TIME_ZONE, FORM_ID, {
-        definition: { ...v1, fields: [ph] },
-        confirmDroppedOverrides: false,
-      })
-      .catch((e) => e);
-
-    expect(error.code).toBe(API_ERROR_CODE.FORM_VERSION_DROPS_OVERRIDES);
   });
 
   it("is not found for an archived or foreign form", async () => {
@@ -448,7 +374,6 @@ describe("formService.createVersion", () => {
     await expect(
       formService.createVersion(db, ORG_ID, TIME_ZONE, FORM_ID, {
         definition: v1,
-        confirmDroppedOverrides: false,
       }),
     ).rejects.toBeInstanceOf(NotFoundError);
   });

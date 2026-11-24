@@ -91,7 +91,7 @@ process won't start.
   `src/core/openapi/route-factory.ts` — pass schemas + a service with `list/create/update/delete`
   and it generates all four documented routes. `targets` is the smallest end-to-end example.
 - **Multi-tenancy**: Clerk org → `organizations` row (`clerkOrgId`), which owns `locations`
-  and `forms`; locations own `targets` (equipment, areas & fixtures) and `task_templates`. `assignedLocationIds` is `null` for admins ("all locations"), or an explicit
+  and `forms`; locations own `targets` (equipment, areas & components) and `task_templates`. `assignedLocationIds` is `null` for admins ("all locations"), or an explicit
   list for members. Tenant/membership blobs are cached in Redis (2-day TTL, `tenant:clerk:*` /
   `membership:clerk:*`) — **invalidate on every write that changes org, locations, memberships
   or roles**; cache failures log and fall through to Postgres, never throw.
@@ -138,7 +138,7 @@ UI hooks (`use-mobile`, `use-now`).
   pair every input with a label and inline validation.
 - **i18n**: `next-intl`, locales `bg` (default) and `en`, `localePrefix: "as-needed"`, routes
   under `src/app/[locale]/`. **Any user-facing string must be added to both `messages/en.json`
-  and `messages/bg.json`** — currently at exact key parity (1169 each). Pages call
+  and `messages/bg.json`** — currently at exact key parity (1147 each). Pages call
   `setRequestLocale(locale)` before rendering; middleware is `src/proxy.ts` (Clerk + intl), not
   `middleware.ts`.
 
@@ -211,21 +211,23 @@ once the work is done.
   in UTC on Vercel, so never default a date to the local zone.
 - **Forms**: field types are code (`packages/shared/src/schemas/form.ts`), forms are data. A
   published `form_versions` row is never edited; saving new fields publishes the next version,
-  and field/option ids stay stable across versions because answers and per-target
-  `limitOverrides` are keyed by them. Records describe themselves (location, template, form
-  version, target snapshot, `resolvedLimits`, entry date/time); a scheduled check sets its template
-  and occurrence, while a form flagged `onDemand` is logged from Today at any location with its own
-  limits and sets neither. Tasks have no name of their own: they show their form's, and renaming a
+  and field/option ids stay stable across versions because answers are keyed by them. A
+  measurement field picks a `parameter` from the code catalog `MEASUREMENT_PARAMETERS` (fixed
+  unit; ids never change) and keeps it across versions (`FORM_FIELD_PARAMETER_CHANGED`). Its
+  limits are its default; an item's own `limits` (per parameter, equipment and areas only) win,
+  resolved by the shared `resolveLimits` for scheduled and on-demand checks alike. Records describe themselves (location, template, form version, target snapshot,
+  `resolvedLimits`, entry date/time); a scheduled check sets its template and occurrence, while a
+  form flagged `onDemand` is logged from Today at any location and sets neither. Tasks have no name of their own: they show their form's, and renaming a
   form reconciles upcoming checks. Judge with the shared `evaluateAnswers`, never on the web or in
   SQL. `task_record_readings`: one typed row per measurement.
   A form's `corrective` settings (its own answers, one or several, note or not) drive the fail
   prompt — check input with the shared `resolveCorrective`. Every failed record gets a
   `task_record_deviations` row plus one `task_record_deviation_answers` row per answer, rewritten
   with the record like readings.
-- **Targets** have a fixed `kind` (`equipment` | `area` | `fixture`); only areas contain others
-  (`parentId`), and a fixture (walls, floor) must sit in one. Fixture names are unique per area,
-  everything else per location (`isTargetNameTaken`); occurrences snapshot a fixture as
-  "Area › Fixture" (`targetDisplayName`). A form's `appliesTo` is `per_item` (a task picks any mix
+- **Targets** have a fixed `kind` (`equipment` | `area` | `component`); only areas contain others
+  (`parentId`), and a component (walls, floor) must sit in one. Component names are unique per area,
+  everything else per location (`isTargetNameTaken`); occurrences snapshot a component as
+  "Area › Component" (`targetDisplayName`). A form's `appliesTo` is `per_item` (a task picks any mix
   of kinds) or `location` (no items) — validate with the shared `checkTemplateTargets`, web and API
   alike. Today folds a time slot's checks that share a room into one card (`today-rooms.ts`).
 - Readings are Postgres `numeric` — mappers convert with `Number(...)`, services write

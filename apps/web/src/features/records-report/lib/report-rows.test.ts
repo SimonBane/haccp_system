@@ -25,6 +25,7 @@ const FORM_VERSIONS: FormVersionSummaryMap = {
           type: "measurement",
           label: "Температура",
           required: true,
+          parameter: "temperature",
           unit: "celsius",
           limits: { min: 0, max: 5 },
         },

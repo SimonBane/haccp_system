@@ -54,6 +54,13 @@ describe("toBuilderState and toDefinition", () => {
     }
   });
 
+  it("starts a new measurement as a temperature in °C", () => {
+    expect(measurementField()).toMatchObject({
+      parameter: "temperature",
+      unit: "celsius",
+    });
+  });
+
   it("parses limits typed with a decimal comma and leaves blanks open-ended", () => {
     const field = measurementField();
     const state: BuilderState = {

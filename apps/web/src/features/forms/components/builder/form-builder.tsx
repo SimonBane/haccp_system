@@ -3,11 +3,9 @@
 import {
   API_ERROR_CODE,
   CORRECTIVE_ACTION_MODE,
-  droppedOverridesDetailsSchema,
   getMeasurementFields,
   type FieldType,
   type FormResponse,
-  type MeasurementUnit,
 } from "@haccp/shared";
 import {
   ArrowDownIcon,
@@ -155,18 +153,18 @@ export function FormBuilder({ mode }: { mode: FormBuilderMode }) {
       ? builder.fields.findIndex((f) => f.id === selection.id)
       : -1;
   const selected = selectedIndex === -1 ? null : builder.fields[selectedIndex]!;
-
-  const previousUnits = useMemo<Record<string, MeasurementUnit>>(
+  const publishedMeasurementIds = useMemo(
     () =>
-      mode.kind === "edit"
-        ? Object.fromEntries(
-            getMeasurementFields(mode.form.latestVersion.definition).map(
-              (field) => [field.id, field.unit],
-            ),
-          )
-        : {},
-    [mode],
+      new Set(
+        publishedVersion === null
+          ? []
+          : getMeasurementFields(savedDefinition).map((field) => field.id),
+      ),
+    [publishedVersion, savedDefinition],
   );
+  const selectedParameterLocked = selected
+    ? publishedMeasurementIds.has(selected.id)
+    : false;
 
   useEffect(() => {
     if (!isDirty) return;
@@ -344,22 +342,6 @@ export function FormBuilder({ mode }: { mode: FormBuilderMode }) {
         return;
       }
 
-      if (
-        error instanceof ApiRequestError &&
-        error.code === API_ERROR_CODE.FORM_VERSION_DROPS_OVERRIDES &&
-        publishedVersion !== null
-      ) {
-        const details = droppedOverridesDetailsSchema.safeParse(error.details);
-        if (details.success) {
-          setPublishStep({
-            kind: "drops",
-            nextVersion: publishedVersion + 1,
-            dropped: details.data.droppedOverrides,
-          });
-          return;
-        }
-      }
-
       setPublishStep(null);
       showApiError(error);
     } finally {
@@ -394,7 +376,7 @@ export function FormBuilder({ mode }: { mode: FormBuilderMode }) {
     }
   }
 
-  function confirmPublish(step: Exclude<PublishStep, { kind: "done" }>) {
+  function confirmPublish() {
     const { category, appliesTo } = builder;
     if (category === "" || appliesTo === "") return;
     const input = { ...meta(), category, appliesTo };
@@ -419,7 +401,6 @@ export function FormBuilder({ mode }: { mode: FormBuilderMode }) {
       const published = await publishVersion.mutateAsync({
         id: formId,
         definition,
-        confirmDroppedOverrides: step.kind === "drops",
       });
       if (metaChanged) await update.mutateAsync({ id: formId, input });
       return published.latestVersion.version;
@@ -563,7 +544,6 @@ export function FormBuilder({ mode }: { mode: FormBuilderMode }) {
           rules,
           hasCorrective,
         }}
-        unitsByField={previousUnits}
         isPublishing={isSaving}
         onCancel={() => {
           if (publishStep?.kind === "done") router.push(FORMS_PATH);
@@ -740,6 +720,7 @@ export function FormBuilder({ mode }: { mode: FormBuilderMode }) {
                 field={selected}
                 issues={shownIssues?.byField[selected.id]}
                 onChange={updateField}
+                parameterLocked={selectedParameterLocked}
               />
             ) : null}
           </ResponsiveFormSheet>
@@ -857,6 +838,7 @@ export function FormBuilder({ mode }: { mode: FormBuilderMode }) {
                 count={count}
                 issues={shownIssues?.byField[selected?.id ?? ""]}
                 onChange={updateField}
+                parameterLocked={selectedParameterLocked}
                 onDuplicate={() => selected && duplicate(selected)}
                 onRemove={() => selected && remove(selected.id)}
                 formDetails={formDetails}

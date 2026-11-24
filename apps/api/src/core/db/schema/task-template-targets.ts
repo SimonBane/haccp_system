@@ -1,8 +1,6 @@
-import type { LimitOverrides } from "@haccp/shared";
 import {
   foreignKey,
   index,
-  jsonb,
   pgTable,
   primaryKey,
   uuid,
@@ -16,10 +14,6 @@ export const taskTemplateTargets = pgTable(
     taskTemplateId: uuid("task_template_id").notNull(),
     targetId: uuid("target_id").notNull(),
     locationId: uuid("location_id").notNull(),
-    limitOverrides: jsonb("limit_overrides")
-      .$type<LimitOverrides>()
-      .notNull()
-      .default({}),
   },
   (table) => [
     primaryKey({ columns: [table.taskTemplateId, table.targetId] }),

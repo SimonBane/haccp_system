@@ -1,3 +1,4 @@
+import type { ItemLimits } from "@haccp/shared";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { DbClient } from "../../core/db/client.js";
 import { targets } from "../../core/db/schema/targets.js";
@@ -18,7 +19,7 @@ export type TargetWithTaskCountRow = {
 
 export type TargetHierarchyRow = Pick<
   TargetRow,
-  "id" | "parentId" | "kind" | "name"
+  "id" | "parentId" | "kind" | "name" | "limits"
 >;
 
 function activeTaskCounts(db: DbClient, locationId: string) {
@@ -42,16 +43,24 @@ function activeTaskCounts(db: DbClient, locationId: string) {
     .as("task_counts");
 }
 
-export type TargetItemRow = { targetId: string; targetName: string };
+export type TargetItemRow = {
+  targetId: string;
+  targetName: string;
+  limits: ItemLimits;
+};
 
 export const targetRepository = {
-  /** Every active item at the location, fixtures labelled with their area. */
+  /** Every active item at the location, components labelled with their area. */
   async findActiveItemsByLocation(
     db: DbClient,
     locationId: string,
   ): Promise<TargetItemRow[]> {
     const rows = await db
-      .select({ targetId: targets.id, ...targetLabelColumns })
+      .select({
+        targetId: targets.id,
+        ...targetLabelColumns,
+        limits: targets.limits,
+      })
       .from(targets)
       .leftJoin(parentTargets, eq(parentTargets.id, targets.parentId))
       .where(
@@ -69,7 +78,11 @@ export const targetRepository = {
     targetId: string,
   ): Promise<TargetItemRow | null> {
     const [row] = await db
-      .select({ targetId: targets.id, ...targetLabelColumns })
+      .select({
+        targetId: targets.id,
+        ...targetLabelColumns,
+        limits: targets.limits,
+      })
       .from(targets)
       .leftJoin(parentTargets, eq(parentTargets.id, targets.parentId))
       .where(
@@ -139,6 +152,7 @@ export const targetRepository = {
         parentId: targets.parentId,
         kind: targets.kind,
         name: targets.name,
+        limits: targets.limits,
       })
       .from(targets)
       .where(
@@ -159,6 +173,11 @@ export const targetRepository = {
   async insert(db: DbClient, data: typeof targets.$inferInsert) {
     const [created] = await db.insert(targets).values(data).returning();
     return created ?? null;
+  },
+
+  async insertMany(db: DbClient, rows: (typeof targets.$inferInsert)[]) {
+    if (rows.length === 0) return;
+    await db.insert(targets).values(rows);
   },
 
   async updateActive(

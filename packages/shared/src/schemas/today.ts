@@ -3,6 +3,7 @@ import { recordValuesSchema } from "../lib/form-answers.js";
 import {
   formAppliesToSchema,
   formVersionSummaryMapSchema,
+  itemLimitsSchema,
   recordResultSchema,
   resolvedLimitsSchema,
 } from "./form.js";
@@ -71,7 +72,7 @@ export const todayTaskItemSchema = z.object({
   targetId: z.uuid().nullable(),
   targetName: z.string().nullable(),
   targetKind: targetKindSchema.nullable(),
-  /** The room the check belongs to: the area itself, or the one holding the fixture or equipment; null when standalone. */
+  /** The room the check belongs to: the area itself, or the one holding the component or equipment; null when standalone. */
   area: todayAreaSchema.nullable(),
   resolvedLimits: resolvedLimitsSchema,
   scheduledTime: scheduledTimeSchema,
@@ -93,7 +94,7 @@ export const todayTaskItemSchema = z.object({
 
 export type TodayTaskItem = z.infer<typeof todayTaskItemSchema>;
 
-/** A form staff can log whenever it happens, judged by the form's own limits. */
+/** A form staff can log whenever it happens; `resolvedLimits` are its defaults, before an item's own range. */
 export const todayOnDemandFormSchema = z.object({
   formId: z.uuid(),
   name: z.string(),
@@ -108,6 +109,7 @@ export type TodayOnDemandForm = z.infer<typeof todayOnDemandFormSchema>;
 export const todayOnDemandItemSchema = z.object({
   targetId: z.uuid(),
   targetName: z.string(),
+  limits: itemLimitsSchema,
 });
 
 export type TodayOnDemandItem = z.infer<typeof todayOnDemandItemSchema>;

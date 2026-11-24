@@ -293,6 +293,7 @@ describe("checkShape", () => {
     label: "Temperature",
     required: true,
     type: "measurement",
+    parameter: "temperature",
     unit: "celsius",
     limits: { min: 0, max: 4 },
   } as const;

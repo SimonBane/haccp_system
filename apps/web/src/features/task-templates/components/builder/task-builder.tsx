@@ -7,14 +7,13 @@ import {
   targetDisplayName,
   sortWeekdays,
   type FormListItem,
-  type LimitsIssue,
   type TargetInput,
   type TargetResponse,
   type TaskTemplateFieldsInput,
   type TaskTemplateResponse,
 } from "@haccp/shared";
 import { ArrowLeftIcon, PlusIcon, SaveIcon, Trash2Icon, XIcon } from "lucide-react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -28,7 +27,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ResponsiveFormSheet } from "@/components/ui/responsive-form-sheet";
 import { Switch } from "@/components/ui/switch";
 import { useFormsQuery } from "@/features/forms/hooks/use-forms-query";
-import { decimalSeparator } from "@/features/forms/lib/measurement";
 import { useTargetsMutations } from "@/features/targets/hooks/use-targets-mutations";
 import { useTargetsQuery } from "@/features/targets/hooks/use-targets-query";
 import {
@@ -57,7 +55,6 @@ import { useTaskTemplatesMutations } from "@/features/task-templates/hooks/use-t
 import {
   applyTargetSelection,
   hasTaskChanges,
-  toTargetInputs,
 } from "@/features/task-templates/lib/form-helpers";
 import {
   SECTION_OF,
@@ -91,10 +88,10 @@ type TaskBuilderProps = {
   initialLocationId: string;
 };
 
-function initialDraft(mode: TaskBuilderMode, separator: string): TaskDraft {
-  if (mode.kind === "edit") return draftFromTask(mode.task, separator);
+function initialDraft(mode: TaskBuilderMode): TaskDraft {
+  if (mode.kind === "edit") return draftFromTask(mode.task);
   if (mode.duplicateOf) {
-    return draftFromTask(mode.duplicateOf, separator);
+    return draftFromTask(mode.duplicateOf);
   }
   return emptyDraft();
 }
@@ -107,13 +104,11 @@ export function TaskBuilder({
 }: TaskBuilderProps) {
   const t = useTranslations("TasksPage");
   const tb = useTranslations("TasksPage.builder");
-  const locale = useLocale();
   const router = useRouter();
   const isMobile = useIsMobile();
   const showApiError = useApiErrorToast();
   const labels = useScheduleLabels();
   const { location } = useLocation();
-  const separator = useMemo(() => decimalSeparator(locale), [locale]);
 
   const { data: forms = [] } = useFormsQuery({ initialData: initialForms });
   const { data: queriedTargets = [] } = useTargetsQuery({
@@ -123,10 +118,9 @@ export function TaskBuilder({
   const targetMutations = useTargetsMutations();
   const { create, update } = useTaskTemplatesMutations();
 
-  const [saved] = useState(() => initialDraft(mode, separator));
+  const [saved] = useState(() => initialDraft(mode));
   const [draft, setDraft] = useState(saved);
   const [showErrors, setShowErrors] = useState(false);
-  const [issues, setIssues] = useState<Record<string, LimitsIssue>>({});
   const [pickerOpen, setPickerOpen] = useState(false);
   const [openSection, setOpenSection] = useState<Section | null>(
     mode.kind === "edit" ? null : "form",
@@ -191,7 +185,6 @@ export function TaskBuilder({
 
   function patch(next: Partial<TaskDraft>) {
     setDraft((current) => ({ ...current, ...next }));
-    if (next.targets) setIssues({});
   }
 
   function pickForm(next: FormListItem) {
@@ -200,11 +193,10 @@ export function TaskBuilder({
       formId: next.id,
       targets: next.appliesTo === FORM_APPLIES_TO.LOCATION ? [] : current.targets,
     }));
-    setIssues({});
   }
 
   function setSelected(ids: string[]) {
-    patch({ targets: applyTargetSelection(draft.targets, ids) });
+    patch({ targets: applyTargetSelection(ids) });
   }
 
   async function createTarget(input: TargetInput): Promise<CreateTargetResult> {
@@ -213,7 +205,7 @@ export function TaskBuilder({
       setCreated((current) => [...current, target]);
       setDraft((current) => ({
         ...current,
-        targets: [...current.targets, { targetId: target.id, overrides: {} }],
+        targets: [...current.targets, { targetId: target.id }],
       }));
       return { kind: "created", target };
     } catch (error) {
@@ -237,21 +229,13 @@ export function TaskBuilder({
       if (first) setOpenSection(SECTION_OF[first]);
       return;
     }
-    const { targets: targetInputs, issues: limitIssues } = toTargetInputs(
-      isLocationForm ? [] : selections,
-      form.latestVersion.definition,
-    );
-    if (Object.keys(limitIssues).length > 0) {
-      setIssues(limitIssues);
-      setOpenSection("targets");
-      return;
-    }
-
     const payload: TaskTemplateFieldsInput = {
       formId: form.id,
       weekdays: sortWeekdays(draft.weekdays),
       scheduledTimes: times,
-      targets: targetInputs,
+      targets: isLocationForm
+        ? []
+        : selections.map(({ targetId }) => ({ targetId })),
       ...draftWindowFields(draft),
     };
 
@@ -336,15 +320,6 @@ export function TaskBuilder({
         targets={targets}
         selections={selections}
         fields={measurementFields}
-        issues={issues}
-        separator={separator}
-        onChange={(next) =>
-          patch({
-            targets: draft.targets.map(
-              (selection) => next.find((item) => item.targetId === selection.targetId) ?? selection,
-            ),
-          })
-        }
         onRemove={(id) => setSelected(selectedIds.filter((value) => value !== id))}
         layout={isMobile ? "mobile" : "desktop"}
       />

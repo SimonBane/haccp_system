@@ -10,7 +10,6 @@ import {
 
 const FORM_ID = "11111111-1111-4111-8111-111111111111";
 const TARGET_A = "22222222-2222-4222-8222-222222222222";
-const TARGET_B = "33333333-3333-4333-8333-333333333333";
 
 function baseInput(overrides: Record<string, unknown> = {}) {
   return {
@@ -127,18 +126,11 @@ describe("completion window bounds", () => {
 });
 
 describe("targets", () => {
-  it("defaults to no targets and an empty override map per target", () => {
-    const parsed = createTaskTemplateSchema.parse(
-      baseInput({ targets: [{ targetId: TARGET_A }] }),
-    );
-
-    expect(parsed.targets).toEqual([
-      { targetId: TARGET_A, limitOverrides: {} },
-    ]);
+  it("defaults to no targets", () => {
     expect(createTaskTemplateSchema.parse(baseInput()).targets).toEqual([]);
   });
 
-  it("accepts per-target limit overrides keyed by field id", () => {
+  it("drops anything but the target id from a link", () => {
     const parsed = createTaskTemplateSchema.parse(
       baseInput({
         targets: [
@@ -146,14 +138,11 @@ describe("targets", () => {
             targetId: TARGET_A,
             limitOverrides: { temperature: { min: 0, max: 2 } },
           },
-          { targetId: TARGET_B },
         ],
       }),
     );
 
-    expect(parsed.targets[0]?.limitOverrides).toEqual({
-      temperature: { min: 0, max: 2 },
-    });
+    expect(parsed.targets).toEqual([{ targetId: TARGET_A }]);
   });
 
   it("rejects the same target twice", () => {
