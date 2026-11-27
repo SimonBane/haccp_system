@@ -16,13 +16,13 @@ export function ReportBody({ rows }: { rows: ReportRow[] }) {
           <th scope="col" className="py-1 pr-2 font-semibold">
             {t("columns.task")}
           </th>
-          <th scope="col" className="w-40 py-1 pr-2 font-semibold">
+          <th scope="col" className="w-[34%] py-1 pr-2 font-semibold">
             {t("columns.answers")}
           </th>
-          <th scope="col" className="w-32 py-1 pr-2 font-semibold">
+          <th scope="col" className="w-24 py-1 pr-2 font-semibold">
             {t("columns.status")}
           </th>
-          <th scope="col" className="w-32 py-1 font-semibold">
+          <th scope="col" className="w-28 py-1 font-semibold">
             {t("columns.by")}
           </th>
         </tr>
@@ -57,7 +57,9 @@ export function ReportBody({ rows }: { rows: ReportRow[] }) {
                   : `${row.title} · ${row.targetName}`}
               </td>
               <td className="py-0.5 pr-2 tabular-nums [overflow-wrap:anywhere]">
-                {row.answers ?? ""}
+                {row.answers?.map((answer, index) => (
+                  <p key={index}>{answer}</p>
+                ))}
               </td>
               <td
                 className={

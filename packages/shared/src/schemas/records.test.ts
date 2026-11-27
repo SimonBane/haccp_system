@@ -9,7 +9,9 @@ import {
   isRecordEligible,
   RECORDS_DEFAULT_RANGE_DAYS,
   RECORDS_DEFAULT_SORT,
+  RECORDS_ID_FILTER_MAX,
   RECORDS_PRINT_MAX_ROWS,
+  RECORDS_REPORT_LAYOUT,
   RECORDS_REPORT_STATUS,
   RECORDS_RESULT_FILTER_VALUES,
   RECORDS_SORT_FIELDS,
@@ -21,6 +23,8 @@ import {
   recordsReportQuerySchema,
   recordsReportResponseSchema,
   recordsReportSearchParamsSchema,
+  recordsJournalsResponseSchema,
+  serializeRecordsExclude,
   validateRecordsDateRange,
 } from "./records.js";
 
@@ -207,8 +211,8 @@ describe("recordsListQuerySchema grid fields", () => {
     );
   });
 
-  it("rejects search and any unknown parameter", () => {
-    expect(parse({ search: "fridge" }).success).toBe(false);
+  it("accepts search but rejects any unknown parameter", () => {
+    expect(parse({ search: "fridge" }).success).toBe(true);
     expect(parse({ q: "fridge" }).success).toBe(false);
     expect(parse({ locationId: OCCURRENCE_ID }).success).toBe(false);
   });
@@ -238,6 +242,36 @@ describe("recordsListQuerySchema filters", () => {
       state: ["voided"],
       result: ["fail"],
     });
+  });
+
+  it.each(["form", "target", "recordedBy"])(
+    "parses %s as a deduplicated, sorted id list",
+    (key) => {
+      expect(
+        parse({ [key]: `${USER_ID}, ${TARGET_ID},${USER_ID}` }).data?.[
+          key as "form"
+        ],
+      ).toEqual([TARGET_ID, USER_ID].sort());
+      expect(parse({ [key]: "" }).data?.[key as "form"]).toBeUndefined();
+    },
+  );
+
+  it.each(["form", "target", "recordedBy"])(
+    "rejects a %s value that is not a uuid",
+    (key) => {
+      expect(parse({ [key]: "fridge-1" }).success).toBe(false);
+    },
+  );
+
+  it("caps an id filter at the menu's size", () => {
+    const ids = Array.from(
+      { length: RECORDS_ID_FILTER_MAX + 1 },
+      (_, index) =>
+        `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+    );
+
+    expect(parse({ target: ids.slice(0, -1).join(",") }).success).toBe(true);
+    expect(parse({ target: ids.join(",") }).success).toBe(false);
   });
 });
 
@@ -629,6 +663,9 @@ describe("recordsReportQuerySchema", () => {
       category: undefined,
       state: undefined,
       result: undefined,
+      form: undefined,
+      target: undefined,
+      recordedBy: undefined,
     });
   });
 
@@ -706,6 +743,51 @@ describe("recordsReportSearchParamsSchema", () => {
       }).success,
     ).toBe(false);
   });
+
+  it("defaults the layout to the chronological list and accepts the others", () => {
+    const base = {
+      dateFrom: DATE_FROM,
+      dateTo: DATE_TO,
+      locationId: LOCATION_ID,
+    };
+
+    expect(recordsReportSearchParamsSchema.parse(base).layout).toBe(
+      RECORDS_REPORT_LAYOUT.LIST,
+    );
+    for (const layout of Object.values(RECORDS_REPORT_LAYOUT)) {
+      expect(
+        recordsReportSearchParamsSchema.parse({ ...base, layout }).layout,
+      ).toBe(layout);
+    }
+    expect(
+      recordsReportSearchParamsSchema.safeParse({ ...base, layout: "matrix" })
+        .success,
+    ).toBe(false);
+  });
+
+  it("takes an optional deviations section for the journal pack", () => {
+    const base = {
+      dateFrom: DATE_FROM,
+      dateTo: DATE_TO,
+      locationId: LOCATION_ID,
+    };
+
+    expect(recordsReportSearchParamsSchema.parse(base).deviations).toBeUndefined();
+    expect(
+      recordsReportSearchParamsSchema.parse({ ...base, deviations: "include" })
+        .deviations,
+    ).toBe("include");
+    expect(
+      recordsReportSearchParamsSchema.safeParse({ ...base, deviations: "yes" })
+        .success,
+    ).toBe(false);
+  });
+
+  it("is the only schema that takes a layout: the API never sees one", () => {
+    expect(
+      parseReport({ layout: RECORDS_REPORT_LAYOUT.JOURNALS }).success,
+    ).toBe(false);
+  });
 });
 
 describe("recordsReportResponseSchema", () => {
@@ -756,5 +838,101 @@ describe("recordsReportResponseSchema", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe("print scope filters", () => {
+  const FORM_A = "66666666-6666-4666-8666-666666666666";
+  const OTHER_TARGET = "88888888-8888-4888-8888-888888888888";
+
+  it("accepts late as the only timing filter", () => {
+    expect(parse({ timing: "late" }).success).toBe(true);
+    expect(parse({ timing: "on_time" }).success).toBe(false);
+  });
+
+  it("parses excluded items into sorted, de-duplicated pairs", () => {
+    const parsed = recordsReportQuerySchema.parse({
+      dateFrom: DATE_FROM,
+      dateTo: DATE_TO,
+      exclude: `${FORM_A}:${OTHER_TARGET},${FORM_A}:${TARGET_ID},${FORM_A}:${OTHER_TARGET}`,
+    });
+
+    expect(parsed.exclude).toEqual([
+      { formId: FORM_A, targetId: TARGET_ID },
+      { formId: FORM_A, targetId: OTHER_TARGET },
+    ]);
+  });
+
+  it("round-trips through the serializer", () => {
+    const pairs = [
+      { formId: FORM_A, targetId: OTHER_TARGET },
+      { formId: FORM_A, targetId: TARGET_ID },
+    ];
+    const parsed = recordsReportQuerySchema.parse({
+      dateFrom: DATE_FROM,
+      dateTo: DATE_TO,
+      exclude: serializeRecordsExclude(pairs),
+    });
+
+    expect(serializeRecordsExclude(parsed.exclude!)).toBe(
+      serializeRecordsExclude(pairs),
+    );
+  });
+
+  it("rejects a malformed pair and too many pairs", () => {
+    const base = { dateFrom: DATE_FROM, dateTo: DATE_TO };
+    expect(
+      recordsReportQuerySchema.safeParse({ ...base, exclude: FORM_A }).success,
+    ).toBe(false);
+    expect(
+      recordsReportQuerySchema.safeParse({
+        ...base,
+        exclude: `${FORM_A}:not-a-uuid`,
+      }).success,
+    ).toBe(false);
+    const tooMany = Array.from(
+      { length: RECORDS_ID_FILTER_MAX + 1 },
+      (_, index) =>
+        `${FORM_A}:${String(index).padStart(8, "0")}-0000-4000-8000-000000000000`,
+    ).join(",");
+    expect(
+      recordsReportQuerySchema.safeParse({ ...base, exclude: tooMany }).success,
+    ).toBe(false);
+  });
+
+  it("accepts a search and the outcome filter on the list", () => {
+    const parsed = recordsListQuerySchema.parse({
+      dateFrom: DATE_FROM,
+      dateTo: DATE_TO,
+      search: " fridge ",
+      outcome: "missed,attention",
+    });
+    expect(parsed.search).toBe("fridge");
+    expect(parsed.outcome).toEqual(["attention", "missed"]);
+    expect(parse({ outcome: "late" }).success).toBe(false);
+  });
+
+  it("lists a journal's items, empty for a whole-location check", () => {
+    expect(
+      recordsJournalsResponseSchema.safeParse({
+        items: [
+          {
+            formId: FORM_A,
+            name: "Fridge temperature",
+            total: 3,
+            targets: [
+              {
+                targetId: TARGET_ID,
+                name: "Walls",
+                kind: "component",
+                areaName: "Cutting room",
+                total: 3,
+              },
+            ],
+          },
+          { formId: OTHER_TARGET, name: "Opening", total: 1, targets: [] },
+        ],
+      }).success,
+    ).toBe(true);
   });
 });

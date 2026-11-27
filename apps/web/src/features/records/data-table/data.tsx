@@ -1,57 +1,80 @@
 "use client";
 
 import { GRID_PAGE_SIZE_OPTIONS, type RecordItem } from "@haccp/shared";
+import type { Row } from "@tanstack/react-table";
+import { useTranslations } from "next-intl";
 import { useCallback, useMemo, type ReactNode } from "react";
-import { DataTable } from "@/components/ui/data-table/data-table";
+import {
+  DataTable,
+  type DataTableRowGroup,
+} from "@/components/ui/data-table/data-table";
 import type { DataTableFilterDefinition } from "@/components/ui/data-table/data-table-filter";
 import type { DataTableServerConfig } from "@/components/ui/data-table/server-grid/types";
-import {
-  getRecordsColumns,
-  type RecordsColumnCopy,
-  type SummarizeRecord,
-} from "@/features/records/data-table/columns";
-import { RecordsMobileCard } from "@/features/records/data-table/mobile-card";
-import type { RecordsLabels } from "@/features/records/lib/labels";
+import type { RecordFormat } from "@/features/records/hooks/use-record-format";
+import { groupRecordsByDay } from "@/features/records/lib/record-view";
+import { getRecordsColumns } from "./columns";
 
 type RecordsDataProps = {
   items: RecordItem[];
   server: DataTableServerConfig;
   filters: DataTableFilterDefinition[];
-  labels: RecordsLabels;
-  copy: RecordsColumnCopy;
-  summarize: SummarizeRecord;
-  /** Shown when the location has no scheduled work at all in range. */
-  emptyMessage: string;
-  /** Shown when active filters hide every row of an otherwise non-empty page. */
-  noResultsMessage: string;
-  onViewDetails: (item: RecordItem) => void;
-  toolbarStart?: ReactNode;
-  toolbar?: ReactNode;
+  format: RecordFormat;
+  selectedId: string | null;
+  onOpen: (item: RecordItem) => void;
+  toolbar: ReactNode;
 };
 
 export function RecordsData({
   items,
   server,
   filters,
-  labels,
-  copy,
-  summarize,
-  emptyMessage,
-  noResultsMessage,
-  onViewDetails,
-  toolbarStart,
+  format,
+  selectedId,
+  onOpen,
   toolbar,
 }: RecordsDataProps) {
+  const t = useTranslations("RecordsPage");
+
   const columns = useMemo(
-    () => getRecordsColumns({ copy, labels, summarize, onViewDetails }),
-    [copy, labels, summarize, onViewDetails],
+    () =>
+      getRecordsColumns({
+        format,
+        onOpen,
+        copy: {
+          time: t("columns.time"),
+          check: t("columns.check"),
+          answers: t("columns.answers"),
+          recordedBy: t("columns.recordedBy"),
+          result: t("columns.result"),
+          details: t("columns.details"),
+          noReading: t("noReading"),
+          notRecorded: t("notRecorded"),
+          viewRecord: (name, time) => t("viewRecord", { name, time }),
+        },
+      }),
+    [format, onOpen, t],
   );
 
-  const renderMobileRow = useCallback(
-    (row: Parameters<typeof RecordsMobileCard>[0]["row"]) => (
-      <RecordsMobileCard row={row} labels={labels} summarize={summarize} />
-    ),
-    [labels, summarize],
+  const groups = useMemo(() => {
+    const summaries = new Map<string, DataTableRowGroup>();
+    for (const day of groupRecordsByDay(items)) {
+      summaries.set(day.date, {
+        key: day.date,
+        label: format.longDay(day.date),
+        meta: [
+          t("day.checks", { count: day.items.length }),
+          ...(day.attention > 0
+            ? [t("day.attention", { count: day.attention })]
+            : []),
+        ].join(" · "),
+      });
+    }
+    return summaries;
+  }, [format, items, t]);
+
+  const getRowGroup = useCallback(
+    (row: Row<RecordItem>) => groups.get(row.original.entryDate) ?? null,
+    [groups],
   );
 
   return (
@@ -60,20 +83,24 @@ export function RecordsData({
       data={items}
       server={server}
       filters={filters}
-      toolbarStart={toolbarStart}
       toolbar={toolbar}
+      enableSearch
+      searchPlaceholder={t("searchPlaceholder")}
       pageSizeOptions={GRID_PAGE_SIZE_OPTIONS}
       enablePagination
-      enableSearch={false}
       enableRowSelection={false}
       enableColumnVisibility={false}
-      getRowId={(row) => row.id}
-      mobileVariant="card"
-      emptyMessage={emptyMessage}
-      noResultsMessage={noResultsMessage}
-      onRowClick={(row) => onViewDetails(row.original)}
-      renderMobileRow={renderMobileRow}
-      getRowLabel={(row) => row.original.title}
+      truncateCellValue={false}
+      getRowId={(item) => item.id}
+      getRowGroup={getRowGroup}
+      getRowClassName={(row) =>
+        row.original.id === selectedId ? "bg-muted" : undefined
+      }
+      emptyMessage={t("empty.rangeTitle")}
+      emptyDescription={t("empty.rangeDescription")}
+      noResultsMessage={t("empty.filteredTitle")}
+      onRowClick={(row) => onOpen(row.original)}
+      getRowLabel={(row) => format.heading(row.original).primary}
     />
   );
 }

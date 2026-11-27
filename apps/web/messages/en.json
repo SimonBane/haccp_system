@@ -878,46 +878,89 @@
   },
   "RecordsPage": {
     "title": "Records",
-    "description": "Historical checks for the selected location and date range.",
+    "description": "Every check at {location}, as it was recorded.",
     "printReport": "Print report",
-    "locationContext": "Location: {location}",
-    "emptyRange": "No completed, voided or overdue work in this date range.",
-    "emptyFiltered": "No records match the selected filters.",
-    "viewDetails": "View details",
-    "columns": {
-      "dateTime": "Date/time",
-      "task": "Task/monitoring point",
-      "status": "Status",
-      "timing": "Timing",
-      "answers": "Answers",
-      "result": "Result"
+    "empty": {
+      "rangeTitle": "Nothing recorded in this period",
+      "rangeDescription": "Completed, voided and overdue checks show up here.",
+      "filteredTitle": "No records match the selected filters"
     },
+    "searchPlaceholder": "Search checks or equipment",
     "filters": {
-      "category": "Category",
-      "state": "Status",
-      "result": "Result"
+      "form": "Form",
+      "target": "Equipment or area",
+      "recordedBy": "Recorded by",
+      "status": "Status",
+      "archived": "{name} (archived)"
     },
-    "displayState": {
-      "submitted": "Submitted",
+    "columns": {
+      "time": "Time",
+      "check": "Check",
+      "answers": "Answers",
+      "recordedBy": "Recorded by",
+      "result": "Result",
+      "details": "Details"
+    },
+    "outcome": {
+      "passed": "Passed",
+      "attention": "Needs attention",
+      "recorded": "Recorded",
       "missed": "Missed",
       "voided": "Voided",
       "open": "Open"
     },
-    "recordState": {
-      "none": "No record",
-      "submitted": "Record submitted",
-      "voided": "Record voided"
+    "wholeLocation": "Whole location",
+    "notRecorded": "Not recorded",
+    "noReading": "No reading",
+    "checklist": "{done} of {total} done",
+    "viewRecord": "View record: {name}, {time}",
+    "showMore": "Show more",
+    "day": {
+      "today": "Today · {date}",
+      "yesterday": "Yesterday · {date}",
+      "checks": "{count, plural, one {# check} other {# checks}}",
+      "attention": "{count, plural, one {# needs attention} other {# need attention}}",
+      "missed": "{count} missed",
+      "open": "{count} open",
+      "allWithinLimits": "All within limits"
     },
-    "timing": {
-      "notSubmitted": "Not submitted",
+    "caption": {
+      "wasDue": "Was due by {time}",
+      "correctiveAction": "Corrective action recorded",
+      "late": "Late · {minutes} min"
+    },
+    "record": {
+      "close": "Close",
+      "previous": "Previous record",
+      "next": "Next record",
+      "position": "{index} of {total}",
+      "allowed": "Allowed {limits}",
+      "missedNote": "Nobody recorded this check.",
+      "openNote": "Not recorded yet.",
+      "answers": "Answers",
+      "correctiveAction": "Corrective action",
+      "history": "History",
+      "details": "Details",
+      "form": "Form",
+      "formVersion": "{name} · version {version}",
+      "target": "Equipment or area",
+      "category": "Category",
+      "type": "Type",
+      "scheduled": "Scheduled",
+      "onDemand": "On demand",
+      "location": "Location",
       "onTime": "On time",
       "late": "Late",
-      "noDeadline": "No deadline"
-    },
-    "result": {
-      "pass": "Passed",
-      "fail": "Failed",
-      "notEvaluated": "Not evaluated"
+      "someone": "Unknown user",
+      "events": {
+        "scheduled": "Scheduled",
+        "scheduledDue": "Scheduled, due by {time}",
+        "recorded": "Recorded by {name}",
+        "updated": "Updated by {name}",
+        "correctiveAction": "Corrective action added by {name}",
+        "voided": "Voided by {name}",
+        "missed": "Closed as missed"
+      }
     },
     "dateRange": {
       "label": "Date range",
@@ -925,10 +968,6 @@
       "cancel": "Cancel",
       "apply": "Apply",
       "presets": {
-        "last7": "Last 7 days",
-        "last30": "Last 30 days",
-        "last60": "Last 60 days",
-        "last90": "Last 90 days",
         "thisMonth": "This month",
         "previousMonth": "Previous month"
       },
@@ -938,31 +977,41 @@
         "future": "Future dates are not available."
       }
     },
-    "detail": {
+    "print": {
+      "title": "Print report",
+      "mobileTitle": "Print journals",
+      "description": "Choose the period, the journals and what each journal covers. The report opens in a new tab.",
       "close": "Close",
-      "scheduled": "Scheduled",
-      "due": "Due",
-      "displayState": "Status",
-      "recordState": "Record",
-      "timing": "Timing",
-      "result": "Result",
-      "correctiveAction": "Corrective action",
-      "createdBy": "First created",
-      "recordedBy": "Current record",
-      "voidedBy": "Voided",
-      "recordedTime": "Recorded time",
-      "available": "Available from",
-      "noDeadline": "No deadline",
-      "category": "Category",
-      "form": "Form",
-      "formVersion": "{name} · version {version}",
-      "target": "Equipment or area",
-      "answers": "Answers",
-      "happened": "Happened",
-      "kind": "Type"
-    },
-    "kind": {
-      "onDemand": "On demand"
+      "period": "Period",
+      "journals": "Journals",
+      "selectAll": "Select all",
+      "clear": "Clear",
+      "allItems": "All equipment and areas",
+      "itemsSelected": "{selected} of {total} selected",
+      "scopeAll": "All {count, plural, one {# item} other {# items}}",
+      "scopePartial": "{selected} of {total, plural, one {# item} other {# items}}",
+      "scopeAllShort": "All {count}",
+      "scopePartialShort": "{selected} of {total}",
+      "choose": "Choose",
+      "oneItem": "1 item",
+      "wholeLocation": "Whole location",
+      "notIncluded": "Not included",
+      "entries": "{count, plural, one {# entry} other {# entries}}",
+      "entriesOf": "{selected} of {total, plural, one {# entry} other {# entries}}",
+      "itemsHint": "Choose the equipment and areas this journal covers.",
+      "locationHint": "One journal for the whole location.",
+      "wholeLocationTitle": "Covers the whole location",
+      "wholeLocationDescription": "This form is not filled in per equipment or area, so there is nothing to choose.",
+      "summary": "{journals, plural, one {# journal} other {# journals}} · {entries, plural, one {# entry} other {# entries}}",
+      "chooseOne": "Choose at least one journal to print.",
+      "tooManyLeftOut": "Too many items are left out to print in one go. Tick more items, or print fewer journals.",
+      "include": "Include {name}",
+      "itemsIn": "Equipment and areas in {name}",
+      "journalsEmpty": "Nothing was recorded in this period with the current filters.",
+      "journalsError": "The journals could not be loaded.",
+      "retry": "Try again",
+      "cancel": "Cancel",
+      "submit": "Print"
     }
   },
   "RecordsReportPage": {
@@ -981,7 +1030,10 @@
       "task": "Task/monitoring point",
       "status": "Status",
       "by": "Recorded by",
-      "answers": "Answers"
+      "answers": "Answers",
+      "date": "Date",
+      "item": "Equipment or area",
+      "result": "Result"
     },
     "status": {
       "done": "Done",
@@ -1017,13 +1069,38 @@
     },
     "actions": {
       "back": "Back to Records",
-      "print": "Print / Save as PDF"
+      "print": "Print / Save as PDF",
+      "pdf": "Download PDF for printing"
     },
     "footer": {
       "generatedBy": "Generated by SafeCheck",
       "disclaimer": "This report shows the value currently stored for each record at the time it was generated."
     },
-    "onDemandSuffix": "on demand"
+    "onDemandSuffix": "on demand",
+    "journal": {
+      "title": "Inspection journals",
+      "entryCount": "{count, plural, one {# entry} other {# entries}}",
+      "norm": "Norm",
+      "checkedBy": "Checked by (HACCP team lead): name and signature",
+      "signatureDate": "Date",
+      "page": "Page {page} of {total}",
+      "position": "Journal {index} of {total}",
+      "sheetDone": "{done} of {total} done",
+      "sheetFailed": "{count} failed",
+      "sheetMissed": "{count} missed",
+      "voidedAt": "{time} voided"
+    },
+    "deviations": {
+      "title": "Deviations report",
+      "count": "{count, plural, one {# deviation} other {# deviations}}",
+      "whatFailed": "What failed",
+      "limit": "limit {limit}",
+      "noAction": "None recorded",
+      "empty": {
+        "title": "No deviations in this period",
+        "description": "No check failed in the selected period and filters."
+      }
+    }
   },
   "TasksPage": {
     "title": "Tasks",

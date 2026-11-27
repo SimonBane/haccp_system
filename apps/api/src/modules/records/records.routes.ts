@@ -1,5 +1,7 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import {
+  recordsFilterOptionsResponseSchema,
+  recordsJournalsResponseSchema,
   recordsListQuerySchema,
   recordsListResponseSchema,
   recordsReportQuerySchema,
@@ -28,7 +30,7 @@ const listRecordsRoute = createRoute({
   tags: ["Records"],
   security: bearerSecurity,
   description:
-    "Historical records for one location and organization-local date range. Admin only.",
+    "Historical records for one location and organization-local date range, searchable by check or item name. Admin only.",
   request: {
     query: recordsListQuerySchema,
   },
@@ -88,6 +90,71 @@ recordsRoutes.openapi(
       organizationId,
       timeZone: getCurrentOrganization(c).timezone,
       query,
+    });
+
+    return c.json(result, 200);
+  }),
+);
+
+const listJournalsRoute = createRoute({
+  method: "get",
+  path: "/journals",
+  tags: ["Records"],
+  security: bearerSecurity,
+  description:
+    "How many Records rows each check has for one location, date range and set of filters: the journals the print dialog offers. Admin only.",
+  request: {
+    query: recordsReportQuerySchema,
+  },
+  responses: {
+    200: jsonResponse(recordsJournalsResponseSchema),
+    400: errorResponse("Validation error"),
+    401: errorResponse("Unauthorized"),
+    403: errorResponse("Forbidden"),
+  },
+});
+
+recordsRoutes.openapi(
+  listJournalsRoute,
+  defineRouteHandler(listJournalsRoute, async (c) => {
+    const query = c.req.valid("query");
+    const { id: locationId } = getCurrentLocation(c);
+    const { organizationId } = requireOrgContext(c);
+
+    const result = await recordsService.listJournals(getDb(c), {
+      locationId,
+      organizationId,
+      timeZone: getCurrentOrganization(c).timezone,
+      query,
+    });
+
+    return c.json(result, 200);
+  }),
+);
+
+const filterOptionsRoute = createRoute({
+  method: "get",
+  path: "/filters",
+  tags: ["Records"],
+  security: bearerSecurity,
+  description:
+    "The checks, items and people a Records filter can offer for one location, archived ones included. Admin only.",
+  responses: {
+    200: jsonResponse(recordsFilterOptionsResponseSchema),
+    401: errorResponse("Unauthorized"),
+    403: errorResponse("Forbidden"),
+  },
+});
+
+recordsRoutes.openapi(
+  filterOptionsRoute,
+  defineRouteHandler(filterOptionsRoute, async (c) => {
+    const { id: locationId } = getCurrentLocation(c);
+    const { organizationId } = requireOrgContext(c);
+
+    const result = await recordsService.getFilterOptions(getDb(c), {
+      locationId,
+      organizationId,
     });
 
     return c.json(result, 200);

@@ -1,52 +1,11 @@
 import {
-  type FormCategory,
   RECORD_DISPLAY_STATE,
   RECORD_KIND,
-  type RecordKind,
-  RECORD_RESULT,
   RECORD_TIMING,
   type RecordDisplayState,
-  type RecordResult,
+  type RecordKind,
   type RecordTiming,
 } from "@haccp/shared";
-
-export type RecordsBadgeVariant =
-  "default" | "secondary" | "destructive" | "success" | "warning" | "outline";
-
-/** Meaning is carried by the label; the variant is only reinforcement. */
-export const RECORD_DISPLAY_STATE_VARIANT: Record<
-  RecordDisplayState,
-  RecordsBadgeVariant
-> = {
-  [RECORD_DISPLAY_STATE.SUBMITTED]: "success",
-  [RECORD_DISPLAY_STATE.MISSED]: "destructive",
-  [RECORD_DISPLAY_STATE.VOIDED]: "outline",
-  [RECORD_DISPLAY_STATE.OPEN]: "secondary",
-};
-
-export const RECORD_RESULT_VARIANT: Record<RecordResult, RecordsBadgeVariant> =
-  {
-    [RECORD_RESULT.PASS]: "success",
-    [RECORD_RESULT.FAIL]: "destructive",
-    [RECORD_RESULT.NOT_EVALUATED]: "outline",
-  };
-
-export const RECORD_TIMING_VARIANT: Record<RecordTiming, RecordsBadgeVariant> =
-  {
-    [RECORD_TIMING.ON_TIME]: "secondary",
-    [RECORD_TIMING.LATE]: "warning",
-    [RECORD_TIMING.NOT_SUBMITTED]: "outline",
-    [RECORD_TIMING.NO_DEADLINE]: "outline",
-  };
-
-export type RecordsLabels = {
-  displayState: Record<RecordDisplayState, string>;
-  recordState: Record<"none" | "submitted" | "voided", string>;
-  timing: Record<RecordTiming, string>;
-  result: Record<RecordResult, string>;
-  category: Record<FormCategory, string>;
-  onDemand: string;
-};
 
 /** Timing only qualifies an active submission — an Open row's own badge already reads "Open". */
 export function showsTiming(
@@ -72,18 +31,4 @@ export function resolvedTiming(item: {
 /** An on-demand entry has no deadline to be on time for, so it is labelled by kind instead. */
 export function isOnDemand(item: { kind: RecordKind }): boolean {
   return item.kind === RECORD_KIND.ON_DEMAND;
-}
-
-/** Badge value for the compact grid/mobile views — null when nothing should render. */
-export function timingBadgeValue(item: {
-  kind: RecordKind;
-  displayState: RecordDisplayState;
-  timing: RecordTiming;
-}): RecordTiming | null {
-  if (isOnDemand(item) || !showsTiming(item.displayState, item.timing)) {
-    return null;
-  }
-  return item.timing === RECORD_TIMING.NO_DEADLINE
-    ? RECORD_TIMING.ON_TIME
-    : item.timing;
 }

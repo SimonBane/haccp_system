@@ -7,6 +7,10 @@ import {
   isValidTimeZone,
   validateRecordsDateRange,
   zonedDateString,
+  type RecordsFilterOptionsResponse,
+  type RecordsJournalsResponse,
+  type RecordsJournalSummary,
+  type RecordsJournalTarget,
   type RecordsListQuery,
   type RecordsListResponse,
   type RecordsReportQuery,
@@ -25,6 +29,8 @@ import { toRecordItem } from "./records.mapper.js";
 import {
   recordsRepository,
   type RecordRow,
+  type RecordsFilterOptionRow,
+  type RecordsJournalCountRow,
   type RecordsFilters,
   type RecordsScope,
 } from "./records.repository.js";
@@ -39,6 +45,21 @@ export type NormalizedRecordsQuery = {
   filters: RecordsFilters;
 };
 
+/** `exclude` is left out: only the report itself drops items, the journals dialog lists them all. */
+function toRecordsFilters(
+  query: RecordsListQuery | RecordsReportQuery,
+): RecordsFilters {
+  return {
+    category: query.category,
+    state: query.state,
+    result: query.result,
+    timing: query.timing,
+    form: query.form,
+    target: query.target,
+    recordedBy: query.recordedBy,
+  };
+}
+
 export function normalizeRecordsQuery(
   query: RecordsListQuery,
 ): NormalizedRecordsQuery {
@@ -50,9 +71,9 @@ export function normalizeRecordsQuery(
     sortBy: query.sortBy ?? RECORDS_DEFAULT_SORT.sortBy,
     sortOrder: query.sortOrder ?? RECORDS_DEFAULT_SORT.sortOrder,
     filters: {
-      category: query.category,
-      state: query.state,
-      result: query.result,
+      ...toRecordsFilters(query),
+      search: query.search,
+      outcome: query.outcome,
     },
   };
 }
@@ -79,11 +100,7 @@ export function normalizeRecordsReportQuery(
     sortBy: RECORDS_DEFAULT_SORT.sortBy,
     sortOrder: RECORDS_DEFAULT_SORT.sortOrder,
     offset: 0,
-    filters: {
-      category: query.category,
-      state: query.state,
-      result: query.result,
-    },
+    filters: { ...toRecordsFilters(query), exclude: query.exclude },
   };
 }
 
@@ -151,6 +168,76 @@ async function formVersionsFor(db: DbClient, rows: RecordRow[]) {
   );
 }
 
+function compareJournalTargets(
+  a: RecordsJournalTarget,
+  b: RecordsJournalTarget,
+): number {
+  // An area sorts with its own components, ahead of them.
+  return (
+    (a.areaName ?? a.name).localeCompare(b.areaName ?? b.name) ||
+    Number(a.areaName !== null) - Number(b.areaName !== null) ||
+    a.name.localeCompare(b.name) ||
+    a.targetId.localeCompare(b.targetId)
+  );
+}
+
+/** Both branches can count the same form and item; summed here so each is offered once. */
+export function mergeJournalCounts(
+  counts: readonly RecordsJournalCountRow[],
+): RecordsJournalSummary[] {
+  const byForm = new Map<
+    string,
+    {
+      formId: string;
+      name: string;
+      total: number;
+      targets: Map<string, RecordsJournalTarget>;
+    }
+  >();
+
+  for (const count of counts) {
+    if (count.total <= 0) continue;
+
+    let form = byForm.get(count.formId);
+    if (!form) {
+      form = {
+        formId: count.formId,
+        name: count.formName,
+        total: 0,
+        targets: new Map(),
+      };
+      byForm.set(count.formId, form);
+    }
+    form.total += count.total;
+
+    if (count.targetId === null) continue;
+    const target = form.targets.get(count.targetId);
+    if (target) {
+      target.total += count.total;
+    } else {
+      form.targets.set(count.targetId, {
+        targetId: count.targetId,
+        name: count.targetName ?? "",
+        kind: count.targetKind as RecordsJournalTarget["kind"],
+        areaName: count.areaName,
+        total: count.total,
+      });
+    }
+  }
+
+  return [...byForm.values()]
+    .map((form) => ({
+      formId: form.formId,
+      name: form.name,
+      total: form.total,
+      targets: [...form.targets.values()].sort(compareJournalTargets),
+    }))
+    .sort(
+      (a, b) =>
+        a.name.localeCompare(b.name) || a.formId.localeCompare(b.formId),
+    );
+}
+
 export const recordsService = {
   async listRecords(
     db: Db,
@@ -178,6 +265,47 @@ export const recordsService = {
       items: rows.map(toRecordItem),
       total,
       formVersions: await formVersionsFor(db, rows),
+    };
+  },
+
+  /** The checks the print dialog offers for a period, under the same filters as the grid. */
+  async listJournals(
+    db: Db,
+    params: RecordsRequestParams & { query: RecordsReportQuery },
+  ): Promise<RecordsJournalsResponse> {
+    const scope = resolveScope(params, params.query);
+    const counts = await recordsRepository.countByFormAndTarget(db, {
+      ...scope,
+      filters: toRecordsFilters(params.query),
+    });
+
+    return { items: mergeJournalCounts(counts) };
+  },
+
+  async getFilterOptions(
+    db: Db,
+    params: { locationId: string; organizationId: string },
+  ): Promise<RecordsFilterOptionsResponse> {
+    const [formRows, targetRows, people] = await Promise.all([
+      recordsRepository.findFormsUsedAtLocation(db, params),
+      recordsRepository.findTargetsOfLocation(db, params.locationId),
+      recordsRepository.findRecordersAtLocation(db, params.locationId),
+    ]);
+
+    const toOption = (row: RecordsFilterOptionRow) => ({
+      id: row.id,
+      name: row.name,
+      archived: row.archivedAt !== null,
+    });
+
+    return {
+      forms: formRows.map(toOption),
+      targets: targetRows
+        .map(toOption)
+        .sort(
+          (a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id),
+        ),
+      people,
     };
   },
 

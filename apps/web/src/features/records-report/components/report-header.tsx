@@ -16,7 +16,8 @@ export function ReportHeader(props: {
   dateTo: string;
   generatedAt: string;
   generatedBy: string | null;
-  recordCount: number;
+  title: string;
+  countText: string;
 }) {
   const t = useTranslations("RecordsReportPage");
 
@@ -24,10 +25,8 @@ export function ReportHeader(props: {
     <header className="border-b border-black/20 pb-4">
       <p className="text-lg font-semibold">{t("brand")}</p>
 
-      <h1 className="mt-1 text-xl font-semibold">{t("title")}</h1>
-      <p className="text-sm">
-        {t("recordCount", { count: props.recordCount })}
-      </p>
+      <h1 className="mt-1 text-xl font-semibold">{props.title}</h1>
+      <p className="text-sm">{props.countText}</p>
 
       <dl className="mt-3 grid gap-x-8 gap-y-1 text-sm sm:grid-cols-2">
         <HeaderField label={t("organization")} value={props.organizationName} />

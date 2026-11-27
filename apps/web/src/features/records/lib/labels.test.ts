@@ -1,6 +1,9 @@
-import { RECORD_DISPLAY_STATE, RECORD_KIND, RECORD_TIMING } from "@haccp/shared";
+import {
+  RECORD_DISPLAY_STATE,
+  RECORD_TIMING,
+} from "@haccp/shared";
 import { describe, expect, it } from "vitest";
-import { resolvedTiming, showsTiming, timingBadgeValue } from "./labels";
+import { resolvedTiming, showsTiming } from "./labels";
 
 describe("resolvedTiming", () => {
   it("passes an on-time submission through", () => {
@@ -46,68 +49,6 @@ describe("resolvedTiming", () => {
         timing: RECORD_TIMING.NOT_SUBMITTED,
       }),
     ).toBe(RECORD_TIMING.NOT_SUBMITTED);
-  });
-});
-
-describe("timingBadgeValue", () => {
-  it("shows the timing for an on-time submission", () => {
-    expect(
-      timingBadgeValue({
-        kind: RECORD_KIND.SCHEDULED,
-        displayState: RECORD_DISPLAY_STATE.SUBMITTED,
-        timing: RECORD_TIMING.ON_TIME,
-      }),
-    ).toBe(RECORD_TIMING.ON_TIME);
-  });
-
-  it("collapses a submitted no-deadline record to on time", () => {
-    expect(
-      timingBadgeValue({
-        kind: RECORD_KIND.SCHEDULED,
-        displayState: RECORD_DISPLAY_STATE.SUBMITTED,
-        timing: RECORD_TIMING.NO_DEADLINE,
-      }),
-    ).toBe(RECORD_TIMING.ON_TIME);
-  });
-
-  it("renders nothing for an open row", () => {
-    expect(
-      timingBadgeValue({
-        kind: RECORD_KIND.SCHEDULED,
-        displayState: RECORD_DISPLAY_STATE.OPEN,
-        timing: RECORD_TIMING.NOT_SUBMITTED,
-      }),
-    ).toBeNull();
-  });
-
-  it("renders nothing for a missed row", () => {
-    expect(
-      timingBadgeValue({
-        kind: RECORD_KIND.SCHEDULED,
-        displayState: RECORD_DISPLAY_STATE.MISSED,
-        timing: RECORD_TIMING.NOT_SUBMITTED,
-      }),
-    ).toBeNull();
-  });
-
-  it("renders nothing for an on-demand entry, which has no deadline", () => {
-    expect(
-      timingBadgeValue({
-        kind: RECORD_KIND.ON_DEMAND,
-        displayState: RECORD_DISPLAY_STATE.SUBMITTED,
-        timing: RECORD_TIMING.NO_DEADLINE,
-      }),
-    ).toBeNull();
-  });
-
-  it("renders nothing for a voided row", () => {
-    expect(
-      timingBadgeValue({
-        kind: RECORD_KIND.SCHEDULED,
-        displayState: RECORD_DISPLAY_STATE.VOIDED,
-        timing: RECORD_TIMING.NOT_SUBMITTED,
-      }),
-    ).toBeNull();
   });
 });
 

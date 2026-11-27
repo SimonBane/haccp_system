@@ -6,6 +6,7 @@ import {
   GRID_MAX_SEARCH_LENGTH,
   GRID_PAGE_SIZE_OPTIONS,
   createGridFilterSchema,
+  createGridIdFilterSchema,
   createGridPageSchema,
   createGridQuerySchema,
   sortOrderSchema,
@@ -253,5 +254,34 @@ describe("createGridQuerySchema search seam", () => {
         search: true,
       }).safeParse({ search: "fridge" }).success,
     ).toBe(true);
+  });
+});
+
+describe("createGridIdFilterSchema", () => {
+  const schema = createGridIdFilterSchema(2);
+  const a = "11111111-1111-4111-8111-111111111111";
+  const b = "22222222-2222-4222-8222-222222222222";
+  const c = "33333333-3333-4333-8333-333333333333";
+
+  it("splits, trims, deduplicates and sorts uuids", () => {
+    expect(createGridIdFilterSchema(5).parse(` ${b} , ${a},,${b}`)).toEqual([
+      a,
+      b,
+    ]);
+  });
+
+  it("is undefined when absent or empty", () => {
+    expect(schema.parse(undefined)).toBeUndefined();
+    expect(schema.parse("")).toBeUndefined();
+    expect(schema.parse(" , ")).toBeUndefined();
+  });
+
+  it("rejects a part that is not a uuid", () => {
+    expect(schema.safeParse(`${a},nope`).success).toBe(false);
+  });
+
+  it("rejects more parts than the maximum, accepts exactly the maximum", () => {
+    expect(schema.safeParse(`${a},${b}`).success).toBe(true);
+    expect(schema.safeParse(`${a},${b},${c}`).success).toBe(false);
   });
 });

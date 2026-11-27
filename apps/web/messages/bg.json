@@ -878,46 +878,89 @@
   },
   "RecordsPage": {
     "title": "Записи",
-    "description": "Историческите проверки за избрания обект и период.",
+    "description": "Всяка проверка в {location}, както е записана.",
     "printReport": "Печат на отчет",
-    "locationContext": "Обект: {location}",
-    "emptyRange": "Няма изпълнена, анулирана или просрочена работа в този период.",
-    "emptyFiltered": "Няма записи, отговарящи на избраните филтри.",
-    "viewDetails": "Виж детайли",
-    "columns": {
-      "dateTime": "Дата/час",
-      "task": "Задача/точка за контрол",
-      "status": "Статус",
-      "timing": "Навременност",
-      "answers": "Отговори",
-      "result": "Резултат"
+    "empty": {
+      "rangeTitle": "Няма записи за този период",
+      "rangeDescription": "Тук се появяват изпълнените, анулираните и просрочените проверки.",
+      "filteredTitle": "Няма записи, отговарящи на избраните филтри"
     },
+    "searchPlaceholder": "Търсене на проверки или оборудване",
     "filters": {
-      "category": "Категория",
-      "state": "Статус",
-      "result": "Резултат"
+      "form": "Формуляр",
+      "target": "Оборудване или зона",
+      "recordedBy": "Изпълнил",
+      "status": "Статус",
+      "archived": "{name} (архивиран)"
     },
-    "displayState": {
-      "submitted": "Изпълнена",
+    "columns": {
+      "time": "Час",
+      "check": "Проверка",
+      "answers": "Отговори",
+      "recordedBy": "Изпълнил",
+      "result": "Резултат",
+      "details": "Детайли"
+    },
+    "outcome": {
+      "passed": "Успешна",
+      "attention": "Изисква внимание",
+      "recorded": "Записана",
       "missed": "Пропусната",
       "voided": "Анулирана",
       "open": "Отворена"
     },
-    "recordState": {
-      "none": "Няма запис",
-      "submitted": "Подаден запис",
-      "voided": "Анулиран запис"
+    "wholeLocation": "Целият обект",
+    "notRecorded": "Не е записана",
+    "noReading": "Няма измерване",
+    "checklist": "{done} от {total} изпълнени",
+    "viewRecord": "Виж записа: {name}, {time}",
+    "showMore": "Покажи още",
+    "day": {
+      "today": "Днес · {date}",
+      "yesterday": "Вчера · {date}",
+      "checks": "{count, plural, one {# проверка} other {# проверки}}",
+      "attention": "{count, plural, one {# изисква внимание} other {# изискват внимание}}",
+      "missed": "{count} пропуснати",
+      "open": "{count} отворени",
+      "allWithinLimits": "Всички са в норма"
     },
-    "timing": {
-      "notSubmitted": "Няма подаване",
+    "caption": {
+      "wasDue": "Срок до {time}",
+      "correctiveAction": "Записано коригиращо действие",
+      "late": "Закъсняла · {minutes} мин"
+    },
+    "record": {
+      "close": "Затвори",
+      "previous": "Предишен запис",
+      "next": "Следващ запис",
+      "position": "{index} от {total}",
+      "allowed": "Допустимо {limits}",
+      "missedNote": "Никой не е записал тази проверка.",
+      "openNote": "Все още не е записана.",
+      "answers": "Отговори",
+      "correctiveAction": "Коригиращо действие",
+      "history": "История",
+      "details": "Детайли",
+      "form": "Формуляр",
+      "formVersion": "{name} · версия {version}",
+      "target": "Оборудване или зона",
+      "category": "Категория",
+      "type": "Вид",
+      "scheduled": "Планирана",
+      "onDemand": "При нужда",
+      "location": "Обект",
       "onTime": "Навреме",
       "late": "Със закъснение",
-      "noDeadline": "Без краен срок"
-    },
-    "result": {
-      "pass": "Успешна",
-      "fail": "Неуспешна",
-      "notEvaluated": "Без оценка"
+      "someone": "Неизвестен потребител",
+      "events": {
+        "scheduled": "Планирана",
+        "scheduledDue": "Планирана, срок до {time}",
+        "recorded": "Записана от {name}",
+        "updated": "Променена от {name}",
+        "correctiveAction": "Коригиращо действие от {name}",
+        "voided": "Анулирана от {name}",
+        "missed": "Приключена като пропусната"
+      }
     },
     "dateRange": {
       "label": "Период",
@@ -925,10 +968,6 @@
       "cancel": "Отказ",
       "apply": "Приложи",
       "presets": {
-        "last7": "Последните 7 дни",
-        "last30": "Последните 30 дни",
-        "last60": "Последните 60 дни",
-        "last90": "Последните 90 дни",
         "thisMonth": "Този месец",
         "previousMonth": "Предходния месец"
       },
@@ -938,31 +977,41 @@
         "future": "Бъдещи дати не са налични."
       }
     },
-    "detail": {
+    "print": {
+      "title": "Печат на отчет",
+      "mobileTitle": "Печат на дневници",
+      "description": "Изберете периода, дневниците и какво обхваща всеки дневник. Отчетът се отваря в нов раздел.",
       "close": "Затвори",
-      "scheduled": "Планирано",
-      "due": "Краен срок",
-      "displayState": "Статус",
-      "recordState": "Запис",
-      "timing": "Навременност",
-      "result": "Резултат",
-      "correctiveAction": "Коригиращо действие",
-      "createdBy": "Първоначално създаден",
-      "recordedBy": "Текущ запис",
-      "voidedBy": "Анулиран",
-      "recordedTime": "Час на записа",
-      "available": "Достъпна от",
-      "noDeadline": "Без краен срок",
-      "category": "Категория",
-      "form": "Формуляр",
-      "formVersion": "{name} · версия {version}",
-      "target": "Оборудване или зона",
-      "answers": "Отговори",
-      "happened": "Случило се",
-      "kind": "Вид"
-    },
-    "kind": {
-      "onDemand": "При нужда"
+      "period": "Период",
+      "journals": "Дневници",
+      "selectAll": "Избери всички",
+      "clear": "Изчисти",
+      "allItems": "Цялото оборудване и зони",
+      "itemsSelected": "Избрани {selected} от {total}",
+      "scopeAll": "{count, plural, one {# елемент} other {Всички # елемента}}",
+      "scopePartial": "{selected} от {total, plural, one {# елемент} other {# елемента}}",
+      "scopeAllShort": "Всички {count}",
+      "scopePartialShort": "{selected} от {total}",
+      "choose": "Избери",
+      "oneItem": "1 елемент",
+      "wholeLocation": "Целият обект",
+      "notIncluded": "Не е включен",
+      "entries": "{count, plural, one {# запис} other {# записа}}",
+      "entriesOf": "{selected} от {total, plural, one {# запис} other {# записа}}",
+      "itemsHint": "Изберете оборудването и зоните, които обхваща този дневник.",
+      "locationHint": "Един дневник за целия обект.",
+      "wholeLocationTitle": "Обхваща целия обект",
+      "wholeLocationDescription": "Този формуляр не се попълва за отделно оборудване или зона, затова няма какво да изберете.",
+      "summary": "{journals, plural, one {# дневник} other {# дневника}} · {entries, plural, one {# запис} other {# записа}}",
+      "chooseOne": "Изберете поне един дневник за печат.",
+      "tooManyLeftOut": "Изключени са твърде много елементи за един печат. Отметнете повече елементи или печатайте по-малко дневници.",
+      "include": "Включи {name}",
+      "itemsIn": "Оборудване и зони в {name}",
+      "journalsEmpty": "За този период и текущите филтри няма записи.",
+      "journalsError": "Дневниците не могат да бъдат заредени.",
+      "retry": "Опитайте отново",
+      "cancel": "Отказ",
+      "submit": "Печат"
     }
   },
   "RecordsReportPage": {
@@ -981,7 +1030,10 @@
       "task": "Задача/точка за контрол",
       "status": "Статус",
       "by": "Изпълнил",
-      "answers": "Отговори"
+      "answers": "Отговори",
+      "date": "Дата",
+      "item": "Оборудване или зона",
+      "result": "Резултат"
     },
     "status": {
       "done": "Изпълнена",
@@ -1017,13 +1069,38 @@
     },
     "actions": {
       "back": "Обратно към Записи",
-      "print": "Печат / Запис като PDF"
+      "print": "Печат / Запис като PDF",
+      "pdf": "Изтегли PDF за печат"
     },
     "footer": {
       "generatedBy": "Генериран от SafeCheck",
       "disclaimer": "Отчетът показва стойността, съхранена за всеки запис към момента на генериране."
     },
-    "onDemandSuffix": "при нужда"
+    "onDemandSuffix": "при нужда",
+    "journal": {
+      "title": "Дневници за проверка",
+      "entryCount": "{count, plural, one {# запис} other {# записа}}",
+      "norm": "Норма",
+      "checkedBy": "Проверил (ръководител екип HACCP): име и подпис",
+      "signatureDate": "Дата",
+      "page": "Стр. {page} от {total}",
+      "position": "Дневник {index} от {total}",
+      "sheetDone": "{done} от {total} изпълнени",
+      "sheetFailed": "{count, plural, one {# неуспешна} other {# неуспешни}}",
+      "sheetMissed": "{count, plural, one {# пропусната} other {# пропуснати}}",
+      "voidedAt": "{time} анулирана"
+    },
+    "deviations": {
+      "title": "Отчет за отклоненията",
+      "count": "{count, plural, one {# отклонение} other {# отклонения}}",
+      "whatFailed": "Какво не е наред",
+      "limit": "граница {limit}",
+      "noAction": "Няма записано",
+      "empty": {
+        "title": "Няма отклонения за този период",
+        "description": "В избрания период и филтри няма неуспешна проверка."
+      }
+    }
   },
   "TasksPage": {
     "title": "Задачи",

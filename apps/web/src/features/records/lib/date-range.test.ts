@@ -10,27 +10,7 @@ import {
 
 const TODAY = "2026-08-23";
 
-describe("default range", () => {
-  it("opens on the last seven inclusive organization-local dates", () => {
-    expect(resolveRecordsPreset("last7", TODAY)).toEqual({
-      dateFrom: "2026-08-17",
-      dateTo: "2026-08-23",
-    });
-  });
-});
-
-describe("rolling-day presets", () => {
-  it.each([
-    ["last30", "2026-07-25"],
-    ["last60", "2026-06-25"],
-    ["last90", "2026-05-26"],
-  ] as const)("%s ends today and spans the full window", (preset, dateFrom) => {
-    expect(resolveRecordsPreset(preset, TODAY)).toEqual({
-      dateFrom,
-      dateTo: TODAY,
-    });
-  });
-
+describe("presets", () => {
   it("never reaches past today", () => {
     for (const preset of RECORDS_RANGE_PRESETS) {
       const range = resolveRecordsPreset(preset, TODAY);

@@ -72,6 +72,25 @@ export function createGridFilterSchema<const TValues extends readonly [string, .
     );
 }
 
+/** Same comma-separated wire format as `createGridFilterSchema`, for ids the options come from data. */
+export function createGridIdFilterSchema(maxValues: number) {
+  return z
+    .string()
+    .optional()
+    .transform((raw) =>
+      raw === undefined
+        ? []
+        : raw
+            .split(",")
+            .map((part) => part.trim())
+            .filter((part) => part !== ""),
+    )
+    .pipe(z.array(z.uuid()).max(maxValues))
+    .transform((parsed) =>
+      parsed.length === 0 ? undefined : [...new Set(parsed)].sort(),
+    );
+}
+
 export type GridFilterSchemas = Record<string, z.ZodType>;
 
 /** `search: false` removes the key, so a strict grid query rejects it as unknown. */

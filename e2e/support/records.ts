@@ -85,27 +85,51 @@ export async function openDateRange(page: Page): Promise<void> {
   await expect(page.getByRole("dialog").first()).toBeVisible();
 }
 
-/** The header's sort control is named by its aria-label, not by the column title. */
-export function sortHeader(page: Page, column: string) {
-  return page
-    .getByRole("columnheader")
-    .filter({ hasText: column })
-    .getByRole("button");
+/** The shared Filters menu: each filter is a submenu of checkable options. */
+export function filtersMenu(page: Page) {
+  return page.getByRole("button", { name: "Filter" });
 }
 
-export function filterTrigger(page: Page, name: string) {
-  return page.getByRole("button", { name: `Filter by ${name}` });
-}
-
-/** Opens a filter popover, toggles one option by its translated label, and closes it. */
+/** Opens the Filters menu, toggles one option of one filter by its label, and closes it. */
 export async function toggleFilterOption(
   page: Page,
   filter: string,
   option: string,
 ): Promise<void> {
-  await filterTrigger(page, filter).click();
-  await page.getByRole("checkbox", { name: option }).click();
+  await filtersMenu(page).click();
+  await page.getByRole("menuitem", { name: filter }).hover();
+  await page.getByRole("menuitemcheckbox", { name: option }).click();
   await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+}
+
+export function recordsSearch(page: Page) {
+  return page.getByPlaceholder("Search checks or equipment");
+}
+
+export type PrintLayout = "journals" | "list" | "deviations";
+
+/** The print action opens a dialog; its Print control carries the journal pack link. */
+export async function printLink(page: Page) {
+  await page.getByRole("button", { name: "Print report" }).first().click();
+  const dialog = page.getByRole("dialog", { name: "Print report" });
+  // Print stays disabled, with no link, until the journal list has loaded.
+  await expect(dialog.getByRole("checkbox").first()).toBeVisible();
+  // Base UI renders the action as an anchor with role="button", not a link.
+  return dialog.getByRole("button", { name: "Print", exact: true });
+}
+
+/** Reads the link and closes the dialog; the dialog offers only journals, so other layouts are set on the URL. */
+export async function printHref(
+  page: Page,
+  layout: PrintLayout = "list",
+): Promise<string> {
+  const href = (await (await printLink(page)).getAttribute("href"))!;
+  await page.keyboard.press("Escape");
+  const url = new URL(href, "http://localhost");
+  if (layout === "list") url.searchParams.delete("layout");
+  else url.searchParams.set("layout", layout);
+  return `${url.pathname}?${url.searchParams.toString()}`;
 }
 
 type DocumentGlobal = {

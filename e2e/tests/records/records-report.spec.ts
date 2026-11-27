@@ -9,6 +9,8 @@ import { LOCALE_PREFIX } from "../../support/env.js";
 import {
   ensureSubmittedRecord,
   hasHorizontalOverflow,
+  printHref,
+  printLink,
   RECORDS_PATH,
   recordsTable,
 } from "../../support/records.js";
@@ -29,14 +31,9 @@ async function defaultLocationId(page: Page): Promise<string> {
   }
 }
 
-/** Base UI renders the action as an anchor with role="button", not a link. */
-function reportLink(page: Page) {
-  return page.getByRole("button", { name: "Print report" }).first();
-}
-
-/** The link the grid builds is the only supported entry point, so read the range from it. */
-async function reportHref(page: Page): Promise<string> {
-  return (await reportLink(page).getAttribute("href"))!;
+/** The link the print dialog builds is the only supported entry point, so read the range from it. */
+function reportHref(page: Page): Promise<string> {
+  return printHref(page);
 }
 
 function reportTable(page: Page) {
@@ -80,15 +77,52 @@ test("the print action opens the report for the grid's current selection", async
   expect(params.has("sortBy")).toBe(false);
   expect(params.has("sortOrder")).toBe(false);
 
+  const print = await printLink(page);
   const [report] = await Promise.all([
     page.waitForEvent("popup"),
-    reportLink(page).click(),
+    print.click(),
   ]);
 
   await expect(
-    report.getByRole("heading", { name: "Records report" }),
+    report.getByRole("heading", { name: "Inspection journals" }),
   ).toBeVisible();
   await expect(report.getByText(CLEANING_TASK).first()).toBeVisible();
+});
+
+test("the journals print gives each form its own journal", async ({
+  page,
+}) => {
+  await page.goto(RECORDS_PATH);
+  await expect(recordsTable(page)).toBeVisible();
+
+  const href = await printHref(page, "journals");
+  expect(new URL(href, "http://localhost").searchParams.get("layout")).toBe(
+    "journals",
+  );
+
+  await page.goto(href);
+  await expect(
+    page.getByRole("heading", { name: "Inspection journals" }),
+  ).toBeVisible();
+  await expect(
+    page.locator("section[data-report-journal]").filter({
+      has: page.getByRole("heading", { name: CLEANING_TASK }),
+    }),
+  ).toHaveCount(1);
+});
+
+test("the deviations print lists only failed checks", async ({ page }) => {
+  await page.goto(RECORDS_PATH);
+  await expect(recordsTable(page)).toBeVisible();
+
+  await page.goto(await printHref(page, "deviations"));
+
+  await expect(
+    page.getByRole("heading", { name: "Deviations report" }),
+  ).toBeVisible();
+  await expect(page.locator("tr[data-report-entry]")).not.toContainText(
+    "Missed",
+  );
 });
 
 test("the report carries a status filter chosen on Records", async ({

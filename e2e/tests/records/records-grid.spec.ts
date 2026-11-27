@@ -4,29 +4,26 @@ import { E2E_PREFIX, LOCALE_PREFIX } from "../../support/env.js";
 import {
   dateRangeTrigger,
   ensureSubmittedRecord,
-  filterTrigger,
   isRecordsListRequest,
   nextRecordsQuery,
   openDateRange,
+  printHref,
+  recordsSearch,
   RECORDS_PATH,
   recordsTable,
-  sortHeader,
   toggleFilterOption,
 } from "../../support/records.js";
 
 const CLEANING_TASK = CLEANING_FORM_NAME;
 
 /**
- * The server render answers the default request and the controller seeds it, so the
- * first page costs no client fetch. That makes the print link — built from the same
- * local state — the way to read the active range without forcing a request.
+ * The server render answers the default request and the list seeds it, so the first page
+ * costs no client fetch. That makes the print link — built from the same local state —
+ * the way to read the active range without forcing a request.
  */
 async function activeRange(page: Page): Promise<{ from: string; to: string }> {
-  // Base UI renders the action as an anchor with role="button", not a link.
-  const href = await page
-    .getByRole("button", { name: "Print report" })
-    .getAttribute("href");
-  const params = new URL(href!, "http://localhost").searchParams;
+  const params = new URL(await printHref(page), "http://localhost")
+    .searchParams;
 
   return { from: params.get("dateFrom")!, to: params.get("dateTo")! };
 }
@@ -60,101 +57,78 @@ test("an admin reaches Records from the sidebar and lands on the default range",
   // Seven inclusive organization-local dates.
   expect(spanInDays(await activeRange(page))).toBe(6);
 
-  // Records offers no free-text search, selection or column visibility.
-  await expect(page.getByRole("searchbox")).toHaveCount(0);
-  await expect(page.getByRole("checkbox", { name: "Select all" })).toHaveCount(
-    0,
-  );
+  // Records offers search but no selection or column visibility.
+  await expect(recordsSearch(page)).toBeVisible();
   await expect(page.getByRole("button", { name: "Columns" })).toHaveCount(0);
 });
 
-test("rows-per-page is answered by the server and returns to page one", async ({
+test("the Status filter sends canonical outcomes, newest first", async ({
   page,
 }) => {
   await page.goto(RECORDS_PATH);
   await expect(recordsTable(page)).toBeVisible();
 
-  const resized = await nextRecordsQuery(page, async () => {
-    await page.getByRole("combobox").first().click();
-    await page.getByRole("option", { name: "10", exact: true }).click();
-  });
+  const attention = await nextRecordsQuery(page, () =>
+    toggleFilterOption(page, "Status", "Needs attention"),
+  );
+  expect(attention.get("outcome")).toBe("attention");
+  expect(attention.get("sortBy")).toBe("entryAt");
+  expect(attention.get("sortOrder")).toBe("desc");
+  expect(attention.get("page")).toBe("1");
 
-  expect(resized.get("pageSize")).toBe("10");
-  expect(resized.get("page")).toBe("1");
-  expect(resized.get("sortBy")).toBe("entryAt");
-  expect(resized.get("sortOrder")).toBe("asc");
-  expect(resized.get("search")).toBeNull();
-  expect(resized.get("dateFrom")).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-  expect(resized.get("dateTo")).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  const both = await nextRecordsQuery(page, () =>
+    toggleFilterOption(page, "Status", "Missed"),
+  );
+  expect(both.get("outcome")).toBe("attention,missed");
 });
 
-test("sortable headers ask the server for the allowlisted sort keys", async ({
+test("a facet combines with the status and sends ids, never labels", async ({
   page,
 }) => {
   await page.goto(RECORDS_PATH);
   await expect(recordsTable(page)).toBeVisible();
 
-  const byDate = await nextRecordsQuery(page, () =>
-    sortHeader(page, "Date/time").click(),
+  await nextRecordsQuery(page, () =>
+    toggleFilterOption(page, "Status", "Missed"),
   );
-  expect(byDate.get("sortBy")).toBe("entryAt");
-  expect(byDate.get("sortOrder")).toBe("desc");
-
-  const byTitle = await nextRecordsQuery(page, () =>
-    sortHeader(page, "Task/monitoring point").click(),
+  const byForm = await nextRecordsQuery(page, () =>
+    toggleFilterOption(page, "Form", CLEANING_TASK),
   );
-  expect(byTitle.get("sortBy")).toBe("title");
-  expect(byTitle.get("sortOrder")).toBe("asc");
 
-  // Status, Answers and Result are presentation only.
-  for (const column of ["Status", "Answers", "Result"]) {
-    await expect(sortHeader(page, column)).toHaveCount(0);
-  }
+  expect(byForm.get("form")).toMatch(/^[0-9a-f-]{36}$/);
+  expect(byForm.get("outcome")).toBe("missed");
 });
 
-test("Category and Status filters send canonical values, never translated labels", async ({
+test("only time sorts, and the day headings follow either order", async ({
   page,
 }) => {
   await page.goto(RECORDS_PATH);
   await expect(recordsTable(page)).toBeVisible();
+  await expect(page.locator('[data-slot="table-group-row"]').first()).toBeVisible();
+  await expect(
+    page.getByRole("columnheader", { name: "Check" }).getByRole("button"),
+  ).toHaveCount(0);
 
-  const byCategory = await nextRecordsQuery(page, () =>
-    toggleFilterOption(page, "Category", "Cleaning"),
+  const byTime = await nextRecordsQuery(page, () =>
+    page.getByRole("columnheader", { name: "Time" }).getByRole("button").click(),
   );
-  expect(byCategory.get("category")).toBe("cleaning");
-  expect(byCategory.get("page")).toBe("1");
+  expect(byTime.get("sortBy")).toBe("entryAt");
+  await expect(page.locator('[data-slot="table-group-row"]').first()).toBeVisible();
+});
 
-  const byStatus = await nextRecordsQuery(page, () =>
-    toggleFilterOption(page, "Status", "Submitted"),
+test("search asks the server once typing settles", async ({ page }) => {
+  await page.goto(RECORDS_PATH);
+  await expect(recordsTable(page)).toBeVisible();
+
+  const searched = await nextRecordsQuery(page, () =>
+    recordsSearch(page).fill(CLEANING_TASK),
   );
-  expect(byStatus.get("category")).toBe("cleaning");
-  expect(byStatus.get("state")).toBe("submitted");
-
+  expect(searched.get("search")).toBe(CLEANING_TASK);
+  expect(searched.get("page")).toBe("1");
   await expect(page.getByText(CLEANING_TASK).first()).toBeVisible();
 });
 
-test("the Result filter is always offered and sends the canonical outcome", async ({
-  page,
-}) => {
-  await page.goto(RECORDS_PATH);
-  await expect(recordsTable(page)).toBeVisible();
-
-  await expect(filterTrigger(page, "Result")).toBeVisible();
-
-  const withResult = await nextRecordsQuery(page, () =>
-    toggleFilterOption(page, "Result", "Failed"),
-  );
-  expect(withResult.get("result")).toBe("fail");
-
-  // Widening Category keeps the outcome: every form can pass or fail.
-  const widened = await nextRecordsQuery(page, () =>
-    toggleFilterOption(page, "Category", "Cleaning"),
-  );
-  expect(widened.get("category")).toBe("cleaning");
-  expect(widened.get("result")).toBe("fail");
-});
-
-test("the date range blocks the future and accepts a multi-month span", async ({
+test("the date range blocks the future and applies a preset only on Apply", async ({
   page,
 }) => {
   await page.goto(RECORDS_PATH);
@@ -163,52 +137,41 @@ test("the date range blocks the future and accepts a multi-month span", async ({
   await openDateRange(page);
   // Tomorrow is unreachable: the picker disables it and the API rejects it anyway.
   await expect(page.locator("[data-disabled][data-day]").first()).toBeVisible();
-  await page.keyboard.press("Escape");
 
-  const longRange = await nextRecordsQuery(page, async () => {
-    await openDateRange(page);
-    await page.getByRole("button", { name: "Last 60 days" }).click();
-  });
+  let requested = false;
+  const listen = (request: Parameters<typeof isRecordsListRequest>[0]) => {
+    if (isRecordsListRequest(request)) requested = true;
+  };
+  page.on("request", listen);
+  await page.getByRole("button", { name: "Previous month" }).click();
+  await page.waitForTimeout(300);
+  page.off("request", listen);
+  expect(requested).toBe(false);
 
-  expect(longRange.get("page")).toBe("1");
-  expect(
-    spanInDays({
-      from: longRange.get("dateFrom")!,
-      to: longRange.get("dateTo")!,
-    }),
-  ).toBe(59);
-
-  await expect(page.getByTestId("records-metadata")).toBeVisible();
-  expect(spanInDays(await activeRange(page))).toBe(59);
+  const previousMonth = await nextRecordsQuery(page, () =>
+    page.getByRole("button", { name: "Apply" }).click(),
+  );
+  expect(previousMonth.get("dateFrom")).toMatch(/^\d{4}-\d{2}-01$/);
+  expect((await activeRange(page)).from).toBe(previousMonth.get("dateFrom"));
 });
 
-test("the metadata line and empty states distinguish no work from no matches", async ({
+test("an empty filter says why and clears back to every check", async ({
   page,
 }) => {
   await page.goto(RECORDS_PATH);
   await expect(recordsTable(page)).toBeVisible();
-
-  const metadata = page.getByTestId("records-metadata");
-  await expect(metadata).toBeVisible();
-  await expect(metadata).toContainText(/\d+/);
 
   // Nothing seeded is voided, so rows exist in range but none match.
   await nextRecordsQuery(page, () =>
     toggleFilterOption(page, "Status", "Voided"),
   );
 
-  const clearFilters = page.getByRole("button", { name: "Clear filters" });
-  await expect(clearFilters).toBeVisible();
-  await expect(page.getByText(CLEANING_TASK)).toHaveCount(0);
+  await expect(
+    page.getByText("No records match the selected filters"),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Clear filters" }).last().click();
 
-  // No request assertion here: clearing returns to the default query key, which the
-  // query client may still serve from cache within its stale window.
-  await clearFilters.click();
-
-  await expect(clearFilters).toBeHidden();
   await expect(page.getByText(CLEANING_TASK).first()).toBeVisible();
-  // Clearing filters never clears the required date scope.
-  await expect(dateRangeTrigger(page)).toBeVisible();
 });
 
 test("a failed load offers a retry that recovers", async ({ page }) => {
@@ -224,7 +187,7 @@ test("a failed load offers a retry that recovers", async ({ page }) => {
   );
 
   await nextRecordsQuery(page, () =>
-    toggleFilterOption(page, "Type", "Cleaning"),
+    toggleFilterOption(page, "Status", "Missed"),
   );
 
   const error = page.getByTestId("data-table-error");
@@ -234,71 +197,52 @@ test("a failed load offers a retry that recovers", async ({ page }) => {
   await page.getByTestId("data-table-retry").click();
 
   await expect(error).toBeHidden();
-  await expect(recordsTable(page)).toBeVisible();
 });
 
-/**
- * Only the keyboard path and the rendered content are asserted here. Closing on a
- * dataset change is not: on desktop the detail is a modal `Dialog`, so a click aimed
- * at a filter, sort header or pager is consumed dismissing the overlay and never
- * reaches the control — the same limitation `today/date-navigation.spec.ts` records.
- * The rule itself is a derived comparison (`recordsDatasetKey`) covered by
- * `records-composition.test.ts`.
- */
-test("a row detail opens from the keyboard and shows the stored record", async ({
+test("a record opens from the keyboard in a side sheet and steps to the next", async ({
   page,
 }) => {
   await page.goto(RECORDS_PATH);
   await expect(recordsTable(page)).toBeVisible();
 
-  // Scoped to a known row: what else is scheduled today, and how many times the
-  // seed has advanced the template, both vary between runs.
-  const viewDetails = page
+  // Scoped to a known row: what else is scheduled today varies between runs.
+  const open = page
     .locator("tr", { hasText: CLEANING_TASK })
     .first()
-    .getByRole("button", { name: "View details" });
-  await viewDetails.focus();
-  await expect(viewDetails).toBeFocused();
+    .getByRole("button", { name: /^View record:/ });
+  await open.focus();
   await page.keyboard.press("Enter");
 
-  const detail = page.getByRole("dialog");
-  await expect(detail).toBeVisible();
-  await expect(detail.getByText(CLEANING_TASK).first()).toBeVisible();
-  await expect(detail.getByText("Submitted").first()).toBeVisible();
+  const sheet = page.getByRole("dialog");
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByText(CLEANING_TASK).first()).toBeVisible();
+  await expect(sheet.getByRole("heading", { name: "History" })).toBeVisible();
+  await expect(sheet.getByText(/^\d+ of \d+$/)).toBeVisible();
 
   await page.keyboard.press("Escape");
-  await expect(detail).toBeHidden();
+  await expect(sheet).toBeHidden();
 });
 
-test("the print action carries the current filters but no paging or sort", async ({
+test("the print link carries the facets but no status, paging or sort", async ({
   page,
 }) => {
   await page.goto(RECORDS_PATH);
   await expect(recordsTable(page)).toBeVisible();
 
   await nextRecordsQuery(page, () =>
-    toggleFilterOption(page, "Type", "Cleaning"),
+    toggleFilterOption(page, "Form", CLEANING_TASK),
   );
   await nextRecordsQuery(page, () =>
-    toggleFilterOption(page, "Status", "Submitted"),
-  );
-  await nextRecordsQuery(page, () =>
-    sortHeader(page, "Task/monitoring point").click(),
+    toggleFilterOption(page, "Status", "Needs attention"),
   );
 
-  const href = await page
-    .getByRole("button", { name: "Print report" })
-    .getAttribute("href");
+  const href = await printHref(page);
 
   expect(href).toContain("/records/print?");
-  expect(href).toContain("type=cleaning");
-  expect(href).toContain("state=submitted");
-  expect(href).toMatch(/dateFrom=\d{4}-\d{2}-\d{2}/);
-  expect(href).toMatch(/dateTo=\d{4}-\d{2}-\d{2}/);
+  expect(href).toMatch(/form=[0-9a-f-]{36}/);
+  expect(href).not.toContain("outcome=");
   expect(href).not.toContain("page=");
-  expect(href).not.toContain("pageSize=");
   expect(href).not.toContain("sortBy=");
-  expect(href).not.toContain("pending");
 });
 
 test("switching location never shows the previous location's rows", async ({
@@ -318,5 +262,5 @@ test("switching location never shows the previous location's rows", async ({
 
   // The annex has no seeded work, so the main site's rows must be gone.
   await expect(page.getByText(CLEANING_TASK)).toHaveCount(0);
-  await expect(page.getByTestId("records-metadata")).toBeVisible();
+  await expect(page.getByText("Nothing recorded in this period")).toBeVisible();
 });

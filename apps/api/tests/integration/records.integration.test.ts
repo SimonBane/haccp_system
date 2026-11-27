@@ -3,6 +3,8 @@ import {
   compareCalendarDates,
   endOfCalendarMonth,
   getWeekdayFromDate,
+  recordsFilterOptionsResponseSchema,
+  recordsJournalsResponseSchema,
   recordsListResponseSchema,
   recordsReportResponseSchema,
   wallClockToInstant,
@@ -16,6 +18,7 @@ import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "../../src/core/db/client.js";
 import {
+  formVersions,
   forms,
   targets,
   taskOccurrences,
@@ -23,6 +26,7 @@ import {
   taskTemplates,
 } from "../../src/core/db/schema/index.js";
 import {
+  CLEANING_DEFINITION,
   CLEANING_FIELD_ID,
   FRIDGE_FIELD_ID,
   recordContextFor,
@@ -86,11 +90,19 @@ describe("Records list (GET)", () => {
     title?: string;
     locationId?: string;
     templateId?: string;
+    formVersionId?: string;
+    target?: { id: string; name: string } | null;
   }): Promise<string> {
     const locationId = overrides.locationId ?? org.locations.main.id;
     const occurrenceDate = overrides.occurrenceDate ?? daysAgo(1);
     const scheduledTime = overrides.scheduledTime ?? "08:00";
     const isTemperature = overrides.type === "temperature";
+    const target =
+      overrides.target === undefined
+        ? isTemperature
+          ? org.targets.fridge
+          : null
+        : overrides.target;
 
     const [row] = await db
       .insert(taskOccurrences)
@@ -115,11 +127,13 @@ describe("Records list (GET)", () => {
           (isTemperature
             ? org.templates.temperature.title
             : org.templates.cleaning.title),
-        formVersionId: isTemperature
-          ? org.forms.fridgeCheck.versionId
-          : org.forms.cleaning.versionId,
-        targetId: isTemperature ? org.targets.fridge.id : null,
-        targetName: isTemperature ? org.targets.fridge.name : null,
+        formVersionId:
+          overrides.formVersionId ??
+          (isTemperature
+            ? org.forms.fridgeCheck.versionId
+            : org.forms.cleaning.versionId),
+        targetId: target?.id ?? null,
+        targetName: target?.name ?? null,
         resolvedLimits: isTemperature
           ? { [FRIDGE_FIELD_ID]: { min: 0, max: 5 } }
           : {},
@@ -434,6 +448,11 @@ describe("Records list (GET)", () => {
         {
           formName: "Fridge check",
           category: "temperature",
+          // A printed journal is shaped by these and filed under the version's edition date.
+          appliesTo: "per_item",
+          onDemand: false,
+          version: 1,
+          publishedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T.*Z$/),
         },
       );
     });
@@ -781,6 +800,108 @@ describe("Records list (GET)", () => {
       ).toBe(0);
     });
 
+    it("filters by check, across both union branches", async () => {
+      const page = await listRecords({ form: org.forms.fridgeCheck.id });
+
+      expect(page.items.map((item) => item.occurrenceId)).toEqual([
+        temperaturePassId,
+        temperatureFailId,
+        temperatureMissedId,
+      ]);
+      expect(page.total).toBe(3);
+    });
+
+    it("filters by item, keeping missed checks of that item", async () => {
+      const page = await listRecords({ target: org.targets.fridge.id });
+      const ids = page.items.map((item) => item.occurrenceId);
+
+      expect(ids).toContain(temperatureMissedId);
+      expect(ids).not.toContain(cleaningVoidedId);
+      expect(page.total).toBe(3);
+    });
+
+    it("filters by who recorded, which leaves out checks nobody recorded", async () => {
+      const byAdminId = await insertOccurrence({
+        type: "temperature",
+        scheduledTime: "10:00",
+      });
+      await insertRecord(byAdminId, {
+        recordedAt: wallClockToInstant(daysAgo(1), "09:55", org.timeZone),
+        recordedByUserId: org.admin.userId,
+        temperature: { recordedC: "2.0", result: "ok" },
+      });
+
+      const byAdmin = await listRecords({ recordedBy: org.admin.userId });
+      expect(byAdmin.items.map((item) => item.occurrenceId)).toEqual([
+        byAdminId,
+      ]);
+      expect(byAdmin.total).toBe(1);
+
+      const byEmployee = await listRecords({
+        recordedBy: org.employee.userId,
+        form: org.forms.fridgeCheck.id,
+      });
+      expect(byEmployee.items.map((item) => item.occurrenceId)).toEqual([
+        temperaturePassId,
+        temperatureFailId,
+      ]);
+    });
+
+    it("returns nothing, not an error, for another tenant's check, item or person", async () => {
+      const other = await seedOrganization(db, { slug: "records-other" });
+
+      const queries: Record<string, string>[] = [
+        { form: other.forms.fridgeCheck.id },
+        { target: other.targets.fridge.id },
+        { recordedBy: other.employee.userId },
+      ];
+      for (const query of queries) {
+        const page = await listRecords(query);
+        expect(page).toEqual({ items: [], total: 0, formVersions: {} });
+
+        const params = new URLSearchParams({
+          dateFrom: daysAgo(6),
+          dateTo: today(),
+          ...query,
+        }).toString();
+        const base = `/locations/${org.locations.main.id}/records`;
+
+        const journals = await apiRequest(`${base}/journals?${params}`, {
+          actor: asAdmin(org),
+        });
+        expect(journals.status).toBe(200);
+        expect(await journals.json()).toEqual({ items: [] });
+
+        const report = await apiRequest(`${base}/report?${params}`, {
+          actor: asAdmin(org),
+        });
+        expect(report.status).toBe(200);
+        const reportBody = await report.json();
+        expect(reportBody).not.toHaveProperty("error");
+        expect(reportBody).not.toHaveProperty("details");
+        expect(reportBody).toMatchObject({ items: [], total: 0 });
+      }
+    });
+
+    it("applies the new filters to the report exactly as to the grid", async () => {
+      const query = { target: org.targets.fridge.id, state: "submitted" };
+      const grid = await listRecords({ ...query, pageSize: "100", page: "1" });
+
+      const response = await apiRequest(
+        `/locations/${org.locations.main.id}/records/report?${new URLSearchParams(
+          { dateFrom: daysAgo(6), dateTo: today(), ...query },
+        ).toString()}`,
+        { actor: asAdmin(org) },
+      );
+      const report = recordsReportResponseSchema.parse(
+        await response.json(),
+      ) as RecordsReportOk;
+
+      expect(report.items.map((item) => item.id)).toEqual(
+        grid.items.map((item) => item.id),
+      );
+    });
+
     it("accepts voided combined with a failed reading", async () => {
       const voidedFailId = await insertOccurrence({
         type: "temperature",
@@ -798,6 +919,841 @@ describe("Records list (GET)", () => {
           (item) => item.occurrenceId,
         ),
       ).toEqual([voidedFailId]);
+    });
+  });
+
+  describe("journals", () => {
+    function journalsPath(query: Record<string, string> = {}): string {
+      return `/locations/${org.locations.main.id}/records/journals?${new URLSearchParams(
+        { dateFrom: daysAgo(6), dateTo: today(), ...query },
+      ).toString()}`;
+    }
+
+    beforeEach(async () => {
+      const passId = await insertOccurrence({
+        type: "temperature",
+        scheduledTime: "06:00",
+      });
+      await insertRecord(passId, {
+        recordedAt: wallClockToInstant(daysAgo(1), "05:50", org.timeZone),
+        temperature: { recordedC: "3.5", result: "ok" },
+      });
+      await insertOccurrence({ type: "temperature", scheduledTime: "07:00" });
+      await insertOccurrence({ type: "cleaning", scheduledTime: "08:00" });
+    });
+
+    it("counts each check's rows across records and missed checks", async () => {
+      const response = await apiRequest(journalsPath(), {
+        actor: asAdmin(org),
+      });
+
+      expect(response.status).toBe(200);
+      const body = recordsJournalsResponseSchema.parse(await response.json());
+      expect(body.items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            formId: org.forms.fridgeCheck.id,
+            total: 2,
+          }),
+          expect.objectContaining({ formId: org.forms.cleaning.id, total: 1 }),
+        ]),
+      );
+      expect(body.items).toHaveLength(2);
+    });
+
+    it("matches the grid's total for every check it returns", async () => {
+      const filterSets: Record<string, string>[] = [{}, { state: "submitted" }];
+      for (const filters of filterSets) {
+        const body = recordsJournalsResponseSchema.parse(
+          await (
+            await apiRequest(journalsPath(filters), { actor: asAdmin(org) })
+          ).json(),
+        );
+        expect(body.items.length).toBeGreaterThan(0);
+
+        for (const item of body.items) {
+          const list = await listRecords({ ...filters, form: item.formId });
+          expect(list.total).toBe(item.total);
+        }
+      }
+    });
+
+    it("applies the grid's filters, so it only offers checks with rows", async () => {
+      const response = await apiRequest(journalsPath({ state: "submitted" }), {
+        actor: asAdmin(org),
+      });
+      const body = recordsJournalsResponseSchema.parse(await response.json());
+
+      expect(body.items).toEqual([
+        expect.objectContaining({ formId: org.forms.fridgeCheck.id, total: 1 }),
+      ]);
+    });
+
+    it("is admin-only and validates the range like the report", async () => {
+      expect(
+        (await apiRequest(journalsPath(), { actor: asEmployee(org) })).status,
+      ).toBe(403);
+      expect(
+        (
+          await apiRequest(
+            journalsPath({ dateTo: addCalendarDays(today(), 1) }),
+            {
+              actor: asAdmin(org),
+            },
+          )
+        ).status,
+      ).toBe(400);
+    });
+  });
+
+  function yesterdayAt(time: string): Date {
+    return wallClockToInstant(daysAgo(1), time, org.timeZone);
+  }
+
+  async function insertTarget(values: {
+    kind: "equipment" | "area" | "component";
+    name: string;
+    parentId?: string;
+    archivedAt?: Date;
+  }): Promise<{ id: string; name: string }> {
+    const [target] = await db
+      .insert(targets)
+      .values({ locationId: org.locations.main.id, ...values })
+      .returning({ id: targets.id, name: targets.name });
+    return target!;
+  }
+
+  async function insertPerItemForm(
+    name: string,
+  ): Promise<{ id: string; versionId: string }> {
+    const [form] = await db
+      .insert(forms)
+      .values({
+        organizationId: org.organizationId,
+        name,
+        category: "cleaning",
+        appliesTo: "per_item",
+      })
+      .returning({ id: forms.id });
+    const [version] = await db
+      .insert(formVersions)
+      .values({ formId: form!.id, version: 1, definition: CLEANING_DEFINITION })
+      .returning({ id: formVersions.id });
+    return { id: form!.id, versionId: version!.id };
+  }
+
+  function subPath(
+    endpoint: "report" | "journals",
+    query: Record<string, string> = {},
+  ): string {
+    return `/locations/${org.locations.main.id}/records/${endpoint}?${new URLSearchParams(
+      { dateFrom: daysAgo(6), dateTo: today(), ...query },
+    ).toString()}`;
+  }
+
+  async function getOkReport(
+    query: Record<string, string> = {},
+  ): Promise<RecordsReportOk> {
+    const response = await apiRequest(subPath("report", query), {
+      actor: asAdmin(org),
+    });
+    expect(response.status).toBe(200);
+    const report = recordsReportResponseSchema.parse(await response.json());
+    expect(report.status).toBe("ok");
+    return report as RecordsReportOk;
+  }
+
+  async function getJournals(query: Record<string, string> = {}) {
+    const response = await apiRequest(subPath("journals", query), {
+      actor: asAdmin(org),
+    });
+    expect(response.status).toBe(200);
+    return recordsJournalsResponseSchema.parse(await response.json());
+  }
+
+  describe("late timing filter", () => {
+    let lateId: string;
+    let onTimeId: string;
+    let atDeadlineId: string;
+
+    beforeEach(async () => {
+      lateId = await insertOccurrence({
+        type: "cleaning",
+        scheduledTime: "07:00",
+      });
+      await insertRecord(lateId, { recordedAt: yesterdayAt("07:30") });
+
+      onTimeId = await insertOccurrence({
+        type: "cleaning",
+        scheduledTime: "08:00",
+      });
+      await insertRecord(onTimeId, { recordedAt: yesterdayAt("07:55") });
+
+      atDeadlineId = await insertOccurrence({
+        type: "cleaning",
+        scheduledTime: "09:00",
+      });
+      await insertRecord(atDeadlineId, { recordedAt: yesterdayAt("09:00") });
+
+      const voidedLateId = await insertOccurrence({
+        type: "cleaning",
+        scheduledTime: "10:00",
+      });
+      await insertRecord(voidedLateId, {
+        recordedAt: yesterdayAt("10:30"),
+        voidedAt: new Date(),
+        voidedByUserId: org.admin.userId,
+      });
+
+      const noDeadlineId = await insertOccurrence({
+        type: "cleaning",
+        scheduledTime: "11:00",
+        dueAt: null,
+      });
+      await insertRecord(noDeadlineId, { recordedAt: yesterdayAt("23:00") });
+
+      await insertOccurrence({ type: "cleaning", scheduledTime: "12:00" });
+    });
+
+    it("lists only submitted records made after their deadline", async () => {
+      const page = await listRecords({ timing: "late" });
+
+      expect(page.items.map((item) => item.occurrenceId)).toEqual([lateId]);
+      expect(page.items[0]!.timing).toBe("late");
+      expect(page.total).toBe(1);
+    });
+
+    it("selects exactly the rows the list labels late", async () => {
+      const all = await listRecords();
+      expect(all.total).toBe(6);
+
+      expect(
+        (await listRecords({ timing: "late" })).items.map((item) => item.id),
+      ).toEqual(
+        all.items
+          .filter((item) => item.timing === "late")
+          .map((item) => item.id),
+      );
+      expect(find(all, onTimeId).timing).toBe("on_time");
+      expect(find(all, atDeadlineId).timing).toBe("on_time");
+    });
+
+    it("never matches an unrecorded check and composes with the other filters", async () => {
+      expect(
+        (await listRecords({ timing: "late", state: "missed" })).total,
+      ).toBe(0);
+      expect(
+        (
+          await listRecords({ timing: "late", state: "submitted,missed" })
+        ).items.map((item) => item.occurrenceId),
+      ).toEqual([lateId]);
+      expect(
+        (await listRecords({ timing: "late", category: "temperature" })).total,
+      ).toBe(0);
+    });
+
+    it("applies to the report and the journals as to the grid", async () => {
+      const report = await getOkReport({ timing: "late" });
+      expect(report.items.map((item) => item.occurrenceId)).toEqual([lateId]);
+      expect(report.total).toBe(1);
+
+      expect((await getJournals({ timing: "late" })).items).toEqual([
+        expect.objectContaining({ formId: org.forms.cleaning.id, total: 1 }),
+      ]);
+    });
+  });
+
+  describe("excluded items", () => {
+    let freezer: { id: string; name: string };
+    let hygiene: { id: string; versionId: string };
+    let fridgeOnFridgeId: string;
+    let fridgeOnFreezerId: string;
+    let hygieneOnFridgeId: string;
+    let cleaningId: string;
+
+    beforeEach(async () => {
+      freezer = await insertTarget({ kind: "equipment", name: "Freezer" });
+      hygiene = await insertPerItemForm("Fridge hygiene");
+
+      fridgeOnFridgeId = await insertOccurrence({
+        type: "temperature",
+        scheduledTime: "06:00",
+      });
+      fridgeOnFreezerId = await insertOccurrence({
+        type: "temperature",
+        scheduledTime: "07:00",
+        target: freezer,
+      });
+      await insertRecord(fridgeOnFreezerId, {
+        recordedAt: yesterdayAt("06:55"),
+        temperature: { recordedC: "-18", result: "ok" },
+      });
+      hygieneOnFridgeId = await insertOccurrence({
+        type: "cleaning",
+        scheduledTime: "08:00",
+        formVersionId: hygiene.versionId,
+        target: org.targets.fridge,
+      });
+      await insertRecord(hygieneOnFridgeId, {
+        recordedAt: yesterdayAt("07:55"),
+      });
+      cleaningId = await insertOccurrence({
+        type: "cleaning",
+        scheduledTime: "09:00",
+      });
+    });
+
+    it("leaves out one check's item and keeps another check's rows for it", async () => {
+      expect(
+        (await getOkReport()).items.map((item) => item.occurrenceId),
+      ).toContain(fridgeOnFridgeId);
+
+      const report = await getOkReport({
+        exclude: `${org.forms.fridgeCheck.id}:${org.targets.fridge.id}`,
+      });
+
+      expect(report.items.map((item) => item.occurrenceId)).toEqual([
+        fridgeOnFreezerId,
+        hygieneOnFridgeId,
+        cleaningId,
+      ]);
+      expect(report.total).toBe(report.items.length);
+    });
+
+    it("leaves out every listed pair and never a row with no item", async () => {
+      const report = await getOkReport({
+        exclude: [
+          `${org.forms.fridgeCheck.id}:${org.targets.fridge.id}`,
+          `${hygiene.id}:${org.targets.fridge.id}`,
+          `${org.forms.cleaning.id}:${freezer.id}`,
+        ].join(","),
+      });
+
+      expect(report.items.map((item) => item.occurrenceId)).toEqual([
+        fridgeOnFreezerId,
+        cleaningId,
+      ]);
+      expect(report.total).toBe(2);
+    });
+
+    it("is ignored by the journals, which offer every item to choose from", async () => {
+      const exclude = `${org.forms.fridgeCheck.id}:${org.targets.fridge.id}`;
+
+      expect(await getJournals({ exclude })).toEqual(await getJournals());
+      expect(
+        (await getJournals({ exclude })).items.find(
+          (item) => item.formId === org.forms.fridgeCheck.id,
+        )!.total,
+      ).toBe(2);
+    });
+
+    it("rejects a malformed pair", async () => {
+      for (const exclude of [org.forms.fridgeCheck.id, "not-a-uuid:also-not"]) {
+        expect(
+          (
+            await apiRequest(subPath("report", { exclude }), {
+              actor: asAdmin(org),
+            })
+          ).status,
+        ).toBe(400);
+      }
+    });
+  });
+
+  describe("journal items", () => {
+    let area: { id: string; name: string };
+    let walls: { id: string; name: string };
+    let freezer: { id: string; name: string };
+
+    beforeEach(async () => {
+      area = await insertTarget({ kind: "area", name: "Cold room" });
+      walls = await insertTarget({
+        kind: "component",
+        name: "Walls",
+        parentId: area.id,
+      });
+      freezer = await insertTarget({
+        kind: "equipment",
+        name: "Freezer",
+        archivedAt: new Date(),
+      });
+
+      const recordedId = await insertOccurrence({
+        type: "temperature",
+        scheduledTime: "06:00",
+      });
+      await insertRecord(recordedId, {
+        recordedAt: yesterdayAt("05:55"),
+        temperature: { recordedC: "3.0", result: "ok" },
+      });
+      await insertOccurrence({ type: "temperature", scheduledTime: "07:00" });
+      await insertOccurrence({
+        type: "temperature",
+        scheduledTime: "08:00",
+        target: freezer,
+      });
+      await insertOccurrence({
+        type: "temperature",
+        scheduledTime: "09:00",
+        target: { id: walls.id, name: "Cold room › Walls" },
+      });
+      await insertOccurrence({
+        type: "temperature",
+        scheduledTime: "10:00",
+        target: area,
+      });
+      await insertOccurrence({ type: "cleaning", scheduledTime: "11:00" });
+      await insertOccurrence({ type: "cleaning", scheduledTime: "12:00" });
+
+      // The dialog names an item as it is now, not as the rows snapshot it.
+      await db
+        .update(targets)
+        .set({ name: "Display fridge" })
+        .where(eq(targets.id, org.targets.fridge.id));
+    });
+
+    it("counts each item of a check, components under their area", async () => {
+      const { items } = await getJournals();
+
+      expect(items).toEqual([
+        {
+          formId: org.forms.cleaning.id,
+          name: "Cleaning",
+          total: 2,
+          targets: [],
+        },
+        {
+          formId: org.forms.fridgeCheck.id,
+          name: "Fridge check",
+          total: 5,
+          targets: [
+            {
+              targetId: area.id,
+              name: "Cold room",
+              kind: "area",
+              areaName: null,
+              total: 1,
+            },
+            {
+              targetId: walls.id,
+              name: "Walls",
+              kind: "component",
+              areaName: "Cold room",
+              total: 1,
+            },
+            {
+              targetId: org.targets.fridge.id,
+              name: "Display fridge",
+              kind: "equipment",
+              areaName: null,
+              total: 2,
+            },
+            {
+              targetId: freezer.id,
+              name: "Freezer",
+              kind: "equipment",
+              areaName: null,
+              total: 1,
+            },
+          ],
+        },
+      ]);
+    });
+
+    it("matches the grid's total for every item it offers", async () => {
+      const { items } = await getJournals({ state: "missed" });
+      const fridgeJournal = items.find(
+        (item) => item.formId === org.forms.fridgeCheck.id,
+      )!;
+      expect(fridgeJournal.total).toBe(4);
+
+      for (const target of fridgeJournal.targets) {
+        const list = await listRecords({
+          state: "missed",
+          form: fridgeJournal.formId,
+          target: target.targetId,
+        });
+        expect(list.total).toBe(target.total);
+      }
+    });
+  });
+
+  describe("outcome filter", () => {
+    let passId: string;
+    let failId: string;
+    let lateFailId: string;
+    let voidedFailId: string;
+    let missedId: string;
+    let openId: string;
+    let recordedId: string;
+
+    function ids(page: RecordsListResponse): (string | null)[] {
+      return page.items.map((item) => item.occurrenceId);
+    }
+
+    beforeEach(async () => {
+      passId = await insertOccurrence({
+        type: "temperature",
+        scheduledTime: "06:00",
+      });
+      await insertRecord(passId, {
+        recordedAt: yesterdayAt("05:50"),
+        temperature: { recordedC: "3.0", result: "ok" },
+      });
+
+      failId = await insertOccurrence({
+        type: "temperature",
+        scheduledTime: "07:00",
+      });
+      await insertRecord(failId, {
+        recordedAt: yesterdayAt("06:50"),
+        temperature: { recordedC: "9.0", result: "out_of_range" },
+      });
+
+      lateFailId = await insertOccurrence({
+        type: "temperature",
+        scheduledTime: "08:00",
+      });
+      await insertRecord(lateFailId, {
+        recordedAt: yesterdayAt("08:30"),
+        temperature: { recordedC: "9.5", result: "out_of_range" },
+      });
+
+      voidedFailId = await insertOccurrence({
+        type: "temperature",
+        scheduledTime: "09:00",
+      });
+      await insertRecord(voidedFailId, {
+        recordedAt: yesterdayAt("09:30"),
+        voidedAt: new Date(),
+        voidedByUserId: org.admin.userId,
+        temperature: { recordedC: "9.9", result: "out_of_range" },
+      });
+
+      missedId = await insertOccurrence({
+        type: "temperature",
+        scheduledTime: "10:00",
+      });
+      openId = await insertOccurrence({
+        type: "cleaning",
+        scheduledTime: "11:00",
+        dueAt: null,
+      });
+
+      recordedId = await insertOccurrence({
+        type: "cleaning",
+        scheduledTime: "12:00",
+      });
+      await insertRecord(recordedId, {
+        recordedAt: yesterdayAt("12:30"),
+        recordedByUserId: org.admin.userId,
+      });
+    });
+
+    it("returns exactly the rows of each outcome, a voided failure only as voided", async () => {
+      const expected: Record<string, string[]> = {
+        passed: [passId],
+        attention: [failId, lateFailId],
+        recorded: [recordedId],
+        missed: [missedId],
+        voided: [voidedFailId],
+        open: [openId],
+      };
+
+      for (const [outcome, rows] of Object.entries(expected)) {
+        const page = await listRecords({ outcome });
+        expect(ids(page), outcome).toEqual(rows);
+        expect(page.total, outcome).toBe(rows.length);
+      }
+    });
+
+    it("partitions every row: all six outcomes together are the whole list", async () => {
+      const all = await listRecords();
+      const page = await listRecords({
+        outcome: "passed,attention,recorded,missed,voided,open",
+      });
+
+      expect(ids(page)).toEqual(ids(all));
+      expect(page.total).toBe(7);
+    });
+
+    it("ORs the selected outcomes across both branches", async () => {
+      const page = await listRecords({ outcome: "attention,missed" });
+
+      expect(ids(page)).toEqual([failId, lateFailId, missedId]);
+      expect(page.total).toBe(3);
+    });
+
+    it("ANDs with the other filters", async () => {
+      const late = await listRecords({ outcome: "attention", timing: "late" });
+      expect(ids(late)).toEqual([lateFailId]);
+      expect(late.total).toBe(1);
+
+      const cleaning = await listRecords({
+        outcome: "attention,recorded,open",
+        category: "cleaning",
+      });
+      expect(ids(cleaning)).toEqual([openId, recordedId]);
+      expect(cleaning.total).toBe(2);
+
+      const byEmployee = await listRecords({
+        outcome: "passed,missed",
+        recordedBy: org.employee.userId,
+      });
+      expect(ids(byEmployee)).toEqual([passId]);
+      expect(byEmployee.total).toBe(1);
+
+      const voidedPass = await listRecords({
+        outcome: "voided",
+        result: "pass",
+      });
+      expect(voidedPass.total).toBe(0);
+      expect(voidedPass.items).toEqual([]);
+    });
+
+    it("is a grid filter only: the report and the journals reject it", async () => {
+      for (const endpoint of ["report", "journals"] as const) {
+        for (const query of [
+          { outcome: "missed" },
+          { search: "Fridge" },
+        ] as Record<string, string>[]) {
+          expect(
+            (
+              await apiRequest(subPath(endpoint, query), {
+                actor: asAdmin(org),
+              })
+            ).status,
+            `${endpoint} ${JSON.stringify(query)}`,
+          ).toBe(400);
+        }
+      }
+    });
+  });
+
+  describe("search", () => {
+    let coolerId: string;
+    let freezerId: string;
+    let floorId: string;
+    let handWashId: string;
+
+    beforeEach(async () => {
+      coolerId = await insertOccurrence({
+        type: "temperature",
+        scheduledTime: "06:00",
+        title: "Fridge check",
+        target: { id: org.targets.fridge.id, name: "Walk-in Cooler" },
+      });
+      await insertRecord(coolerId, {
+        recordedAt: yesterdayAt("05:50"),
+        temperature: { recordedC: "3.0", result: "ok" },
+      });
+
+      freezerId = await insertOccurrence({
+        type: "temperature",
+        scheduledTime: "07:00",
+        title: "Freezer 100% audit",
+        target: { id: org.targets.fridge.id, name: "Back_room freezer" },
+      });
+
+      floorId = await insertOccurrence({
+        type: "cleaning",
+        scheduledTime: "08:00",
+        title: "Floor cleaning",
+        target: null,
+      });
+      await insertRecord(floorId, { recordedAt: yesterdayAt("07:50") });
+
+      handWashId = await insertOccurrence({
+        type: "cleaning",
+        scheduledTime: "09:00",
+        title: "Hand wash",
+        target: null,
+      });
+    });
+
+    async function search(
+      term: string,
+      query: Record<string, string> = {},
+    ): Promise<(string | null)[]> {
+      const page = await listRecords({ search: term, ...query });
+      expect(page.total, `total for "${term}"`).toBe(page.items.length);
+      return page.items.map((item) => item.occurrenceId);
+    }
+
+    it("matches the check name on both branches, case-insensitively", async () => {
+      expect(await search("FRIDGE")).toEqual([coolerId]);
+      expect(await search("floor")).toEqual([floorId]);
+      expect(await search("hAnD")).toEqual([handWashId]);
+      expect(await search("audit")).toEqual([freezerId]);
+    });
+
+    it("matches the item name on both branches", async () => {
+      expect(await search("cooler")).toEqual([coolerId]);
+      expect(await search("back_room")).toEqual([freezerId]);
+    });
+
+    it("lists a row once when both its names match", async () => {
+      expect(await search("freezer")).toEqual([freezerId]);
+    });
+
+    it("treats % and _ as literal characters, not wildcards", async () => {
+      expect(await search("%")).toEqual([freezerId]);
+      expect(await search("_")).toEqual([freezerId]);
+      expect(await search("100%")).toEqual([freezerId]);
+      expect(await search("k_r")).toEqual([freezerId]);
+      expect(await search("c_")).toEqual([]);
+      expect(await search("\\")).toEqual([]);
+    });
+
+    it("pages and counts under the same predicate", async () => {
+      expect(await search("A")).toHaveLength(4);
+      const page = await listRecords({
+        search: "a",
+        page: "2",
+        pageSize: "25",
+      });
+      expect(page.items).toEqual([]);
+      expect(page.total).toBe(4);
+    });
+
+    it("ANDs with the other filters and ignores a blank term", async () => {
+      expect(await search("fr", { state: "missed" })).toEqual([freezerId]);
+      expect(await search("fr", { outcome: "passed" })).toEqual([coolerId]);
+      expect(await search("   ")).toEqual([
+        coolerId,
+        freezerId,
+        floorId,
+        handWashId,
+      ]);
+    });
+  });
+
+  describe("filter options", () => {
+    const path = () => `/locations/${org.locations.main.id}/records/filters`;
+
+    it("offers the checks used here, every item and everyone who recorded here", async () => {
+      const occurrenceId = await insertOccurrence({ type: "temperature" });
+      await insertRecord(occurrenceId, {
+        recordedAt: wallClockToInstant(daysAgo(1), "07:50", org.timeZone),
+        temperature: { recordedC: "3.0", result: "ok" },
+      });
+
+      const response = await apiRequest(path(), { actor: asAdmin(org) });
+      expect(response.status).toBe(200);
+      const body = recordsFilterOptionsResponseSchema.parse(
+        await response.json(),
+      );
+
+      expect(body.forms).toEqual([
+        {
+          id: org.forms.fridgeCheck.id,
+          name: expect.any(String),
+          archived: false,
+        },
+      ]);
+      expect(body.targets.map((target) => target.id)).toContain(
+        org.targets.fridge.id,
+      );
+      expect(body.people).toEqual([
+        expect.objectContaining({ id: org.employee.userId }),
+      ]);
+    });
+
+    it("labels a component like its snapshot and lists archived items", async () => {
+      const [area] = await db
+        .insert(targets)
+        .values({
+          locationId: org.locations.main.id,
+          kind: "area",
+          name: "Cold room",
+        })
+        .returning();
+      await db.insert(targets).values({
+        locationId: org.locations.main.id,
+        kind: "component",
+        name: "Walls",
+        parentId: area!.id,
+      });
+      await db.insert(targets).values({
+        locationId: org.locations.main.id,
+        kind: "equipment",
+        name: "Old freezer",
+        archivedAt: new Date(),
+      });
+
+      const body = recordsFilterOptionsResponseSchema.parse(
+        await (await apiRequest(path(), { actor: asAdmin(org) })).json(),
+      );
+
+      expect(body.targets).toContainEqual(
+        expect.objectContaining({ name: "Cold room › Walls", archived: false }),
+      );
+      expect(body.targets).toContainEqual(
+        expect.objectContaining({ name: "Old freezer", archived: true }),
+      );
+    });
+
+    it("keeps an archived check and item that old rows still point at", async () => {
+      await insertOccurrence({ type: "temperature" });
+      await db
+        .update(forms)
+        .set({ archivedAt: new Date() })
+        .where(eq(forms.id, org.forms.fridgeCheck.id));
+      await db
+        .update(targets)
+        .set({ archivedAt: new Date() })
+        .where(eq(targets.id, org.targets.fridge.id));
+
+      const body = recordsFilterOptionsResponseSchema.parse(
+        await (await apiRequest(path(), { actor: asAdmin(org) })).json(),
+      );
+
+      expect(body.forms).toEqual([
+        expect.objectContaining({
+          id: org.forms.fridgeCheck.id,
+          archived: true,
+        }),
+      ]);
+      expect(body.targets).toContainEqual(
+        expect.objectContaining({ id: org.targets.fridge.id, archived: true }),
+      );
+    });
+
+    it("never offers another location's rows or another tenant's data", async () => {
+      const occurrenceId = await insertOccurrence({ type: "temperature" });
+      await insertRecord(occurrenceId, {
+        recordedAt: wallClockToInstant(daysAgo(1), "07:50", org.timeZone),
+        temperature: { recordedC: "3.0", result: "ok" },
+      });
+
+      const annex = recordsFilterOptionsResponseSchema.parse(
+        await (
+          await apiRequest(
+            `/locations/${org.locations.annex.id}/records/filters`,
+            { actor: asAdmin(org) },
+          )
+        ).json(),
+      );
+      expect(annex.forms).toEqual([]);
+      expect(annex.people).toEqual([]);
+      expect(annex.targets.map((target) => target.id)).not.toContain(
+        org.targets.fridge.id,
+      );
+
+      const other = await seedOrganization(db, { slug: "records-options" });
+      expect(
+        (
+          await apiRequest(path(), {
+            actor: asAdmin(other),
+          })
+        ).status,
+      ).toBe(403);
+    });
+
+    it("is admin-only", async () => {
+      expect(
+        (await apiRequest(path(), { actor: asEmployee(org) })).status,
+      ).toBe(403);
     });
   });
 
@@ -1019,7 +1975,8 @@ describe("Records list (GET)", () => {
       ["a reversed range", () => ({ dateFrom: today(), dateTo: daysAgo(3) })],
       ["a malformed date", () => ({ dateFrom: "2026-8-1" })],
       ["a non-existent date", () => ({ dateFrom: "2026-02-30" })],
-      ["a search parameter", () => ({ search: "fridge" })],
+      ["a search over 100 characters", () => ({ search: "x".repeat(101) })],
+      ["an unknown outcome value", () => ({ outcome: "late" })],
       ["an unknown parameter", () => ({ limit: "10" })],
       ["an unlisted sort field", () => ({ sortBy: "status" })],
       ["an invalid sort direction", () => ({ sortOrder: "sideways" })],

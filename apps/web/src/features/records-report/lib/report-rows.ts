@@ -7,7 +7,6 @@ import {
 } from "@haccp/shared";
 import {
   describeAnswers,
-  summarizeAnswers,
   type AnswerFormatters,
 } from "@/features/forms/lib/answer-summary";
 import { actorName, formatOccurrenceDate } from "@/features/records/lib/format";
@@ -30,7 +29,8 @@ export type ReportRow = {
   late: boolean;
   onDemand: boolean;
   targetName?: string;
-  answers?: string;
+  /** One line per answer; a single-answer form needs no label. */
+  answers?: string[];
   recordedBy?: string | null;
   correctiveAction?: string;
 };
@@ -40,7 +40,7 @@ export type ReportDateGroup = {
   rows: ReportRow[];
 };
 
-function reportStatus(item: RecordItem): ReportStatus {
+export function reportStatus(item: RecordItem): ReportStatus {
   switch (item.displayState) {
     case RECORD_DISPLAY_STATE.MISSED:
       return "missed";
@@ -86,7 +86,10 @@ export function toReportRow(
       record.values,
       context.format,
     );
-    if (lines.length > 0) row.answers = summarizeAnswers(lines);
+    if (lines.length === 1) row.answers = [lines[0]!.text];
+    else if (lines.length > 1) {
+      row.answers = lines.map((line) => `${line.label}: ${line.text}`);
+    }
     if (record.correctiveAction !== null) {
       row.correctiveAction = record.correctiveAction;
     }

@@ -79,6 +79,19 @@ describe("parseReportSearchParams", () => {
 });
 
 describe("reportApiQuery", () => {
+  it("forwards the late filter and items left out of a journal", () => {
+    const form = "33333333-3333-4333-8333-333333333333";
+    const target = "44444444-4444-4444-8444-444444444444";
+    const result = parse(valid({ timing: "late", exclude: `${form}:${target}` }));
+    expect(result.ok).toBe(true);
+
+    const query = new URLSearchParams(
+      reportApiQuery(result.ok ? result.params : never()),
+    );
+    expect(query.get("timing")).toBe("late");
+    expect(query.get("exclude")).toBe(`${form}:${target}`);
+  });
+
   it("sends the range alone when nothing is filtered", () => {
     const result = parse(valid());
     expect(result.ok).toBe(true);
@@ -99,6 +112,52 @@ describe("reportApiQuery", () => {
     expect(query).toContain("category=temperature");
     expect(query).toContain("state=missed%2Copen");
     expect(query).toContain("result=fail");
+  });
+
+  it("forwards the check, item and person filters, and not the layout", () => {
+    const A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const result = parse(
+      valid({
+        form: `${B},${A}`,
+        target: A,
+        recordedBy: B,
+        layout: "journals",
+      }),
+    );
+    expect(result.ok).toBe(true);
+
+    const query = reportApiQuery(result.ok ? result.params : never());
+
+    expect(query).toContain(`form=${A}%2C${B}`);
+    expect(query).toContain(`target=${A}`);
+    expect(query).toContain(`recordedBy=${B}`);
+    expect(query).not.toContain("layout");
+  });
+
+  it("asks for every failed, non-voided record for the deviations layout", () => {
+    const result = parse(
+      valid({ layout: "deviations", state: "missed", result: "pass" }),
+    );
+    expect(result.ok).toBe(true);
+
+    const query = new URLSearchParams(
+      reportApiQuery(result.ok ? result.params : never()),
+    );
+
+    expect(query.get("state")).toBe("submitted");
+    expect(query.get("result")).toBe("fail");
+  });
+
+  it("keeps the check, item and person filters for the deviations layout", () => {
+    const A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const result = parse(valid({ layout: "deviations", target: A }));
+
+    const query = new URLSearchParams(
+      reportApiQuery(result.ok ? result.params : never()),
+    );
+
+    expect(query.get("target")).toBe(A);
   });
 
   it("never sends paging or sorting", () => {

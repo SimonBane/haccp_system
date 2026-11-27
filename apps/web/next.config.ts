@@ -10,6 +10,15 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@haccp/shared"],
+  serverExternalPackages: ["@react-pdf/renderer"],
+  // The journal PDF reads its fonts from disk, which file tracing cannot see on its own.
+  outputFileTracingIncludes: {
+    // Keys are globs, so the route's [locale] segment is matched with a wildcard.
+    "/*/records/print/pdf": [
+      "./node_modules/@fontsource/noto-sans/files/noto-sans-{latin,cyrillic}-{400,700}-normal.woff",
+      "./node_modules/@fontsource/noto-sans-math/files/noto-sans-math-math-400-normal.woff",
+    ],
+  },
   env: {
     NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV,
   },

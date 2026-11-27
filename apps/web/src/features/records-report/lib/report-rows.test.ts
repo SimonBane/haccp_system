@@ -1,4 +1,8 @@
-import type { FormVersionSummaryMap, RecordItem, RecordValues } from "@haccp/shared";
+import type {
+  FormVersionSummaryMap,
+  RecordItem,
+  RecordValues,
+} from "@haccp/shared";
 import { describe, expect, it } from "vitest";
 import { buildAnswerFormatters } from "@/features/forms/lib/answer-format";
 import {
@@ -16,7 +20,10 @@ const FORM_VERSIONS: FormVersionSummaryMap = {
     formId: "66666666-6666-4666-8666-666666666666",
     formName: "Хладилник",
     category: "temperature",
+    appliesTo: "per_item",
+    onDemand: false,
     version: 1,
+    publishedAt: "2026-01-01T00:00:00.000Z",
     definition: {
       correctiveAction: "required_on_fail",
       fields: [
@@ -118,7 +125,10 @@ describe("toReportRow status", () => {
   });
 
   it("prints a failed submission as failed", () => {
-    const row = toReportRow(item({ result: "fail", record: record() }), CONTEXT);
+    const row = toReportRow(
+      item({ result: "fail", record: record() }),
+      CONTEXT,
+    );
 
     expect(row.status).toBe("fail");
   });
@@ -191,7 +201,7 @@ describe("toReportRow status", () => {
     );
 
     expect(row.status).toBe("voided");
-    expect(row.answers).toBe("8,4 °C");
+    expect(row.answers).toEqual(["8,4 °C"]);
     expect(row.correctiveAction).toBe("Преместени продукти");
   });
 });
@@ -284,7 +294,7 @@ describe("toReportRow minimal facts", () => {
     );
 
     // Without the version in the map, ids stand in for the labels.
-    expect(row.answers).toBe("temperature: 3 °C · door: Да");
+    expect(row.answers).toEqual(["temperature: 3 °C", "door: Да"]);
   });
 
   it("keeps a corrective action off a row that has none", () => {
@@ -295,7 +305,7 @@ describe("toReportRow minimal facts", () => {
       CONTEXT,
     );
 
-    expect(row.answers).toBe("3,5 °C");
+    expect(row.answers).toEqual(["3,5 °C"]);
     expect("correctiveAction" in row).toBe(false);
   });
 });

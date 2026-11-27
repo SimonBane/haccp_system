@@ -33,6 +33,7 @@ code, not after the failure.
 | One test file | `pnpm --filter @haccp/api exec vitest run src/modules/today/today.mapper.test.ts` |
 | Local Postgres 16 + Redis 7 | `pnpm docker:up` (creds `haccp/haccp/haccp`) |
 | Migrations | `pnpm db:migrate`, `pnpm db:generate`, `pnpm db:studio` |
+| Bulgarian demo data | `pnpm --filter @haccp/api db:seed --org <org_…> [--days 60] [--reset]` |
 | Format | `pnpm format` (Prettier defaults, no config file) |
 | Scope any turbo task | `pnpm turbo build --filter=@haccp/web...` |
 
@@ -138,7 +139,7 @@ UI hooks (`use-mobile`, `use-now`).
   pair every input with a label and inline validation.
 - **i18n**: `next-intl`, locales `bg` (default) and `en`, `localePrefix: "as-needed"`, routes
   under `src/app/[locale]/`. **Any user-facing string must be added to both `messages/en.json`
-  and `messages/bg.json`** — currently at exact key parity (1147 each). Pages call
+  and `messages/bg.json`** — currently at exact key parity (1216 each). Pages call
   `setRequestLocale(locale)` before rendering; middleware is `src/proxy.ts` (Clerk + intl), not
   `middleware.ts`.
 

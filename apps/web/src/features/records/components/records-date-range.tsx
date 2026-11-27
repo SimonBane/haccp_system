@@ -19,9 +19,16 @@ import {
   resolveRecordsPreset,
   type RecordsRangePreset,
 } from "@/features/records/lib/date-range";
+import { startOfCalendarMonth } from "@haccp/shared";
+import { cn } from "@/lib/utils";
 import { formatOccurrenceDate } from "@/features/records/lib/format";
 import { calendarDateToLocalDate, localTodayDateFromDate } from "@/lib/date";
 import type { RecordsDateRange } from "@/features/records/lib/records-grid-config";
+
+/** The picker opens on the month the range ends in, so the selection is always in view. */
+function monthOf(dateTo: string): Date {
+  return calendarDateToLocalDate(startOfCalendarMonth(dateTo));
+}
 
 type RecordsDateRangeControlProps = {
   range: RecordsDateRange;
@@ -38,8 +45,8 @@ export function RecordsDateRangeControl({
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<DateRange | undefined>(undefined);
+  const [month, setMonth] = useState(() => monthOf(range.dateTo));
 
-  const activePreset = detectRecordsRangePreset(range, today);
   const selected = useMemo<DateRange>(
     () =>
       draft ?? {
@@ -48,6 +55,17 @@ export function RecordsDateRangeControl({
       },
     [draft, range.dateFrom, range.dateTo],
   );
+
+  const activePreset =
+    selected.from && selected.to
+      ? detectRecordsRangePreset(
+          {
+            dateFrom: localTodayDateFromDate(selected.from),
+            dateTo: localTodayDateFromDate(selected.to),
+          },
+          today,
+        )
+      : "custom";
 
   const selectedError = useMemo(() => {
     if (!selected.from || !selected.to) return draft ? t("incomplete") : null;
@@ -78,9 +96,17 @@ export function RecordsDateRangeControl({
     setDraft(next);
   }, []);
 
+  // A preset only fills the calendar; Apply is what changes the page.
   const handlePreset = useCallback(
-    (preset: RecordsRangePreset) => commit(resolveRecordsPreset(preset, today)),
-    [commit, today],
+    (preset: RecordsRangePreset) => {
+      const next = resolveRecordsPreset(preset, today);
+      setDraft({
+        from: calendarDateToLocalDate(next.dateFrom),
+        to: calendarDateToLocalDate(next.dateTo),
+      });
+      setMonth(monthOf(next.dateTo));
+    },
+    [today],
   );
 
   const handleCancel = useCallback(() => {
@@ -109,6 +135,7 @@ export function RecordsDateRangeControl({
       onOpenChange={(next) => {
         setOpen(next);
         if (!next) setDraft(undefined);
+        else setMonth(monthOf(range.dateTo));
       }}
     >
       <PopoverTrigger
@@ -116,8 +143,11 @@ export function RecordsDateRangeControl({
           <Button
             type="button"
             variant="outline"
-            size="sm"
-            className="h-9 w-full justify-start bg-card sm:w-auto"
+            size={isMobile ? "lg" : "sm"}
+            className={cn(
+              "w-full justify-start bg-card sm:w-auto",
+              isMobile ? "h-11" : "h-9",
+            )}
             aria-label={t("label")}
           />
         }
@@ -125,16 +155,22 @@ export function RecordsDateRangeControl({
         <CalendarIcon />
         <span className="truncate">{label}</span>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-auto max-w-[92vw] p-0">
-        <div className="flex flex-col sm:flex-row">
-          <div className="flex flex-row flex-wrap gap-1 border-b p-2 sm:w-44 sm:flex-col sm:border-r sm:border-b-0">
+      <PopoverContent
+        align="start"
+        className={cn(
+          "gap-0 p-0",
+          isMobile ? "w-(--anchor-width)" : "w-auto",
+        )}
+      >
+        <div className="flex flex-col">
+          <div className="flex gap-1 border-b p-2">
             {RECORDS_RANGE_PRESETS.map((preset) => (
               <Button
                 key={preset}
                 type="button"
                 variant={activePreset === preset ? "secondary" : "ghost"}
-                size="sm"
-                className="h-9 justify-start"
+                size={isMobile ? "lg" : "sm"}
+                className={cn("flex-1", isMobile ? "h-11" : "h-9")}
                 onClick={() => handlePreset(preset)}
               >
                 {t(`presets.${preset}`)}
@@ -142,12 +178,21 @@ export function RecordsDateRangeControl({
             ))}
           </div>
 
-          <div className="flex flex-col">
+          <div className="flex min-w-0 flex-col">
             <Calendar
               mode="range"
               autoFocus
-              numberOfMonths={isMobile ? 1 : 2}
-              endMonth={calendarDateToLocalDate(range.dateTo)}
+              month={month}
+              onMonthChange={setMonth}
+              endMonth={calendarDateToLocalDate(today)}
+              // A phone stretches the month across the card but keeps day cells at a normal height.
+              className={cn(
+                isMobile &&
+                  "w-full [&_td]:aspect-auto [&_td]:h-9 [&_td_button]:aspect-auto [&_td_button]:h-9",
+              )}
+              classNames={
+                isMobile ? { root: "w-full", week: "mt-1 flex w-full" } : undefined
+              }
               selected={selected}
               onSelect={handleSelect}
               // A crafted request is rejected by the API too; this stops the mistake earlier.

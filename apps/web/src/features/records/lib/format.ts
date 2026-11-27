@@ -1,8 +1,4 @@
-import {
-  RECORD_RESULT,
-  type RecordItem,
-  type UserSummary,
-} from "@haccp/shared";
+import type { UserSummary } from "@haccp/shared";
 
 export function actorName(user: UserSummary | null): string | null {
   if (!user) return null;
@@ -58,9 +54,4 @@ export function formatRecordTimeOfDay(
     hourCycle: "h23",
     timeZone,
   }).format(new Date(timestamp));
-}
-
-/** Pass and fail are worth a badge; a record with nothing to judge is not. */
-export function hasJudgedResult(item: RecordItem): boolean {
-  return item.result !== RECORD_RESULT.NOT_EVALUATED;
 }

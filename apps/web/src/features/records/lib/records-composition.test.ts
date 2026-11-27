@@ -1,22 +1,18 @@
-import {
-  GRID_DEFAULT_PAGE_SIZE,
-  recordsReportSearchParamsSchema,
-} from "@haccp/shared";
+import { recordsReportSearchParamsSchema } from "@haccp/shared";
 import { describe, expect, it } from "vitest";
-import { buildGridRequest } from "@/components/ui/data-table/server-grid/grid-request";
 import { queryKeys } from "@/lib/api/query-keys";
-import type { RecordItem } from "@haccp/shared";
-import { hasJudgedResult } from "./format";
 import {
   buildRecordsFilterDefinitions,
   RECORDS_FILTER_KEY,
 } from "./records-filters";
 import {
-  defaultRecordsGridRequest,
   defaultRecordsQueryString,
   RECORDS_GRID_CAPABILITIES,
+  RECORDS_PAGE_SIZE,
   recordsDatasetKey,
-  recordsQueryString,
+  recordsGridQueryString,
+  recordsListBaseQuery,
+  recordsPageQueryString,
   shouldSeedRecordsPage,
 } from "./records-grid-config";
 import { buildRecordsReportUrl } from "./report-url";
@@ -26,284 +22,246 @@ const LOCATION_B = "22222222-2222-4222-8222-222222222222";
 const RANGE = { dateFrom: "2026-08-17", dateTo: "2026-08-23" };
 const OTHER_RANGE = { dateFrom: "2026-06-01", dateTo: "2026-07-31" };
 
+const FORM_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const FORM_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const TARGET_A = "33333333-3333-4333-8333-333333333333";
+const USER_A = "55555555-5555-4555-8555-555555555555";
+
 const LABELS = {
-  category: "Category",
-  state: "Status",
-  result: "Result",
-  categoryOptions: {
-    temperature: "Температура",
-    cleaning: "Почистване",
-    hygiene: "Хигиена",
-    pest_control: "Контрол на вредители",
-    goods_in: "Приемане на стоки",
+  form: "Check",
+  target: "Item",
+  recordedBy: "Recorded by",
+  status: "Status",
+  statusOptions: {
+    passed: "Passed",
+    attention: "Needs attention",
+    recorded: "Recorded",
+    missed: "Missed",
+    voided: "Voided",
+    open: "Open",
   },
-  stateOptions: {
-    submitted: "Изпълнена",
-    missed: "Пропусната",
-    voided: "Анулирана",
-    open: "Отворена",
-  },
-  resultOptions: {
-    pass: "В диапазона",
-    fail: "Извън диапазона",
-    not_evaluated: "Няма измерена температура",
-  },
+  archived: (name: string) => `${name} (archived)`,
+  unknownUser: "Unknown user",
 };
 
-describe("grid capabilities", () => {
-  it("enables server paging, sorting and filtering only", () => {
+const OPTIONS = {
+  forms: [
+    { id: FORM_A, name: "Fridge temperatures", archived: false },
+    { id: FORM_B, name: "Old cleaning card", archived: true },
+  ],
+  targets: [{ id: TARGET_A, name: "Cold room › Floor", archived: false }],
+  people: [{ id: USER_A, firstName: "Maria", lastName: "Ivanova" }],
+};
+
+describe("list query", () => {
+  it("asks for the first page, newest first, with the range and no filters", () => {
+    expect(defaultRecordsQueryString(RANGE)).toBe(
+      `dateFrom=2026-08-17&dateTo=2026-08-23&sortBy=entryAt&sortOrder=desc&page=1&pageSize=${RECORDS_PAGE_SIZE}`,
+    );
+  });
+
+  it("serializes filters canonically, so equal selections share one cache entry", () => {
+    const a = recordsListBaseQuery({
+      range: RANGE,
+      filters: { target: [TARGET_A], form: [FORM_B, FORM_A, FORM_A], state: [] },
+    });
+    const b = recordsListBaseQuery({
+      range: RANGE,
+      filters: { form: [FORM_A, FORM_B], target: [TARGET_A] },
+    });
+
+    expect(a).toBe(b);
+    expect(a).toContain(`form=${FORM_A}%2C${FORM_B}`);
+    expect(a).not.toContain("state=");
+  });
+
+  it("appends the page last, so every page shares the base query", () => {
+    const base = recordsListBaseQuery({ range: RANGE, filters: {} });
+    expect(recordsPageQueryString(base, 3)).toBe(
+      `${base}&page=3&pageSize=${RECORDS_PAGE_SIZE}`,
+    );
+  });
+
+  it("adds a trimmed search and leaves out an empty one", () => {
+    expect(
+      recordsListBaseQuery({ range: RANGE, filters: {}, search: "  fridge " }),
+    ).toContain("search=fridge");
+    expect(
+      recordsListBaseQuery({ range: RANGE, filters: {}, search: "   " }),
+    ).not.toContain("search=");
+  });
+});
+
+describe("desktop grid", () => {
+  it("pages, sorts, filters and searches on the server, without selection", () => {
     expect(RECORDS_GRID_CAPABILITIES).toEqual({
       pagination: true,
       sorting: true,
       filtering: true,
-      search: false,
+      search: true,
       selection: false,
       columnVisibility: false,
     });
   });
-});
 
-describe("default request and query string", () => {
-  it("asks for page 1 at the default size, sorted chronologically", () => {
-    expect(defaultRecordsGridRequest()).toEqual({
-      page: 1,
-      pageSize: GRID_DEFAULT_PAGE_SIZE,
-      sortBy: "entryAt",
-      sortOrder: "asc",
-    });
-  });
-
-  it("carries no search or filter parameters", () => {
-    const request = defaultRecordsGridRequest();
-
-    expect(request).not.toHaveProperty("search");
-    expect(request).not.toHaveProperty("filters");
-  });
-
-  it("prefixes the required range onto the harness query string", () => {
-    expect(defaultRecordsQueryString(RANGE)).toBe(
-      "dateFrom=2026-08-17&dateTo=2026-08-23&page=1&pageSize=25&sortBy=entryAt&sortOrder=asc",
+  it("prefixes the required range onto the grid's query string", () => {
+    expect(recordsGridQueryString(RANGE, "page=2&pageSize=25")).toBe(
+      "dateFrom=2026-08-17&dateTo=2026-08-23&page=2&pageSize=25",
     );
-  });
-
-  it("serializes an unrestricted multi-month range unchanged", () => {
-    expect(
-      defaultRecordsQueryString({
-        dateFrom: "2026-01-01",
-        dateTo: "2026-08-23",
-      }),
-    ).toContain("dateFrom=2026-01-01&dateTo=2026-08-23");
-  });
-
-  it("still sends the range when the grid contributes nothing", () => {
-    expect(recordsQueryString(RANGE, "")).toBe(
+    expect(recordsGridQueryString(RANGE, "")).toBe(
       "dateFrom=2026-08-17&dateTo=2026-08-23",
     );
+  });
+
+  it("changes the dataset key with the location, range and request only", () => {
+    const base = {
+      locationId: LOCATION_A,
+      range: RANGE,
+      request: { page: 1, pageSize: 25 },
+    };
+    expect(recordsDatasetKey(base)).toBe(recordsDatasetKey({ ...base }));
+    for (const changed of [
+      { ...base, locationId: LOCATION_B },
+      { ...base, range: OTHER_RANGE },
+      { ...base, request: { page: 2, pageSize: 25 } },
+      { ...base, request: { page: 1, pageSize: 25, search: "x" } },
+    ]) {
+      expect(recordsDatasetKey(changed)).not.toBe(recordsDatasetKey(base));
+    }
   });
 });
 
 describe("initial-page seeding", () => {
-  it("seeds while the active range is still the server-rendered one", () => {
-    expect(shouldSeedRecordsPage({ range: RANGE, initialRange: RANGE })).toBe(
-      true,
-    );
-  });
+  const initialBaseQuery = recordsListBaseQuery({ range: RANGE, filters: {} });
 
-  it("refuses to seed the old page into a new range", () => {
-    expect(
-      shouldSeedRecordsPage({ range: OTHER_RANGE, initialRange: RANGE }),
-    ).toBe(false);
+  it("seeds the server-rendered location and unfiltered range", () => {
     expect(
       shouldSeedRecordsPage({
-        range: { ...RANGE, dateTo: "2026-08-22" },
-        initialRange: RANGE,
+        locationId: LOCATION_A,
+        initialLocationId: LOCATION_A,
+        baseQuery: initialBaseQuery,
+        initialBaseQuery,
       }),
-    ).toBe(false);
+    ).toBe(true);
+  });
+
+  it("refuses another range, a filter or another location", () => {
+    for (const input of [
+      { locationId: LOCATION_A, baseQuery: recordsListBaseQuery({ range: OTHER_RANGE, filters: {} }) },
+      { locationId: LOCATION_A, baseQuery: recordsListBaseQuery({ range: RANGE, filters: { form: [FORM_A] } }) },
+      { locationId: LOCATION_B, baseQuery: initialBaseQuery },
+    ]) {
+      expect(
+        shouldSeedRecordsPage({
+          ...input,
+          initialLocationId: LOCATION_A,
+          initialBaseQuery,
+        }),
+      ).toBe(false);
+    }
   });
 });
 
 describe("query-key isolation", () => {
-  function listKey(
-    locationId: string,
-    range: { dateFrom: string; dateTo: string },
-    request: Parameters<typeof buildGridRequest>[0],
-  ) {
-    return JSON.stringify([
-      ...queryKeys.recordsRange(locationId, range.dateFrom, range.dateTo),
-      "list",
-      buildGridRequest(request),
-    ]);
-  }
-
-  const base = {
-    pageIndex: 0,
-    pageSize: 25,
-    search: "",
-    sorting: null,
-    filters: {},
-    capabilities: RECORDS_GRID_CAPABILITIES,
-    defaultSort: { sortBy: "entryAt", sortOrder: "asc" as const },
-  };
-
   it("roots every Records key under the location, for one-shot invalidation", () => {
-    expect(queryKeys.records(LOCATION_A)).toEqual(["records", LOCATION_A]);
-    expect(
-      queryKeys
-        .recordsRange(LOCATION_A, RANGE.dateFrom, RANGE.dateTo)
-        .slice(0, 2),
-    ).toEqual(["records", LOCATION_A]);
+    const root = queryKeys.records(LOCATION_A);
+    for (const key of [
+      queryKeys.recordsGrid(LOCATION_A, "2026-08-17", "2026-08-23"),
+      queryKeys.recordsList(LOCATION_A, "q"),
+      queryKeys.recordsJournals(LOCATION_A, "q"),
+      queryKeys.recordsFilterOptions(LOCATION_A),
+    ]) {
+      expect(key.slice(0, root.length)).toEqual(root);
+    }
   });
 
-  it("gives each location, range, page, sort and filter its own cache entry", () => {
-    const reference = listKey(LOCATION_A, RANGE, base);
-
-    expect(listKey(LOCATION_B, RANGE, base)).not.toBe(reference);
-    expect(listKey(LOCATION_A, OTHER_RANGE, base)).not.toBe(reference);
-    expect(listKey(LOCATION_A, RANGE, { ...base, pageIndex: 1 })).not.toBe(
-      reference,
+  it("gives each location and query its own entry", () => {
+    expect(queryKeys.recordsList(LOCATION_A, "q")).not.toEqual(
+      queryKeys.recordsList(LOCATION_B, "q"),
     );
-    expect(listKey(LOCATION_A, RANGE, { ...base, pageSize: 50 })).not.toBe(
-      reference,
-    );
-    expect(
-      listKey(LOCATION_A, RANGE, {
-        ...base,
-        sorting: { id: "title", desc: true },
-      }),
-    ).not.toBe(reference);
-    expect(
-      listKey(LOCATION_A, RANGE, {
-        ...base,
-        filters: { category: ["temperature"] },
-      }),
-    ).not.toBe(reference);
-  });
-
-  it("reuses one entry for logically identical filter selections", () => {
-    expect(
-      listKey(LOCATION_A, RANGE, {
-        ...base,
-        filters: { state: ["voided", "submitted"] },
-      }),
-    ).toBe(
-      listKey(LOCATION_A, RANGE, {
-        ...base,
-        filters: { state: ["submitted", "voided"] },
-      }),
+    expect(queryKeys.recordsList(LOCATION_A, "q")).not.toEqual(
+      queryKeys.recordsList(LOCATION_A, "q&search=x"),
     );
   });
 });
 
-describe("dataset key", () => {
-  const request = defaultRecordsGridRequest();
-  const reference = recordsDatasetKey({
-    locationId: LOCATION_A,
-    range: RANGE,
-    request,
-  });
-
-  it.each([
-    ["a location change", { locationId: LOCATION_B, range: RANGE, request }],
-    [
-      "a date-range change",
-      { locationId: LOCATION_A, range: OTHER_RANGE, request },
-    ],
-    [
-      "a page change",
-      {
-        locationId: LOCATION_A,
-        range: RANGE,
-        request: { ...request, page: 2 },
-      },
-    ],
-    [
-      "a page-size change",
-      {
-        locationId: LOCATION_A,
-        range: RANGE,
-        request: { ...request, pageSize: 50 },
-      },
-    ],
-    [
-      "a sort change",
-      {
-        locationId: LOCATION_A,
-        range: RANGE,
-        request: { ...request, sortBy: "title" },
-      },
-    ],
-    [
-      "a filter change",
-      {
-        locationId: LOCATION_A,
-        range: RANGE,
-        request: { ...request, filters: { state: ["missed"] } },
-      },
-    ],
-  ])("changes on %s, so an open detail closes", (_label, input) => {
-    expect(recordsDatasetKey(input)).not.toBe(reference);
-  });
-
-  it("is stable while nothing about the dataset changed", () => {
+describe("facet definitions", () => {
+  it("offers Check, Item, Recorded by and Status once the options load", () => {
     expect(
-      recordsDatasetKey({
-        locationId: LOCATION_A,
-        range: { ...RANGE },
-        request,
-      }),
-    ).toBe(reference);
-  });
-});
-
-describe("filter definitions", () => {
-  it("offers Category, Status and Result — every form can pass or fail", () => {
-    expect(
-      buildRecordsFilterDefinitions({ labels: LABELS }).map(
+      buildRecordsFilterDefinitions({ labels: LABELS, options: OPTIONS }).map(
         (definition) => definition.key,
       ),
     ).toEqual([
-      RECORDS_FILTER_KEY.CATEGORY,
-      RECORDS_FILTER_KEY.STATE,
-      RECORDS_FILTER_KEY.RESULT,
+      RECORDS_FILTER_KEY.FORM,
+      RECORDS_FILTER_KEY.TARGET,
+      RECORDS_FILTER_KEY.RECORDED_BY,
+      RECORDS_FILTER_KEY.OUTCOME,
     ]);
   });
 
-  it("keeps canonical API values behind translated labels", () => {
-    const definitions = buildRecordsFilterDefinitions({ labels: LABELS });
-
-    expect(definitions[0]!.options.map((option) => option.value)).toEqual([
-      "temperature",
-      "cleaning",
-      "hygiene",
-      "pest_control",
-      "goods_in",
-    ]);
-    expect(definitions[1]!.options.map((option) => option.value)).toEqual([
-      "submitted",
+  it("offers Status alone before the options load, with canonical values", () => {
+    const [status] = buildRecordsFilterDefinitions({
+      labels: LABELS,
+      options: undefined,
+    });
+    expect(status?.key).toBe(RECORDS_FILTER_KEY.OUTCOME);
+    expect(status?.options.map((option) => option.value)).toEqual([
+      "passed",
+      "attention",
+      "recorded",
       "missed",
       "voided",
       "open",
     ]);
-    expect(definitions[2]!.options.map((option) => option.value)).toEqual([
-      "pass",
-      "fail",
-      "not_evaluated",
-    ]);
-    expect(definitions[1]!.options.map((option) => option.label)).toContain(
-      "Анулирана",
-    );
   });
 
-  it("offers no pending status — upcoming work is not a record", () => {
-    const statuses = buildRecordsFilterDefinitions({
-      labels: LABELS,
-    })[1]!.options.map((option) => option.value);
+  it("leaves out a facet with nothing to choose", () => {
+    expect(
+      buildRecordsFilterDefinitions({
+        labels: LABELS,
+        options: { ...OPTIONS, people: [] },
+      }).map((definition) => definition.key),
+    ).toEqual([
+      RECORDS_FILTER_KEY.FORM,
+      RECORDS_FILTER_KEY.TARGET,
+      RECORDS_FILTER_KEY.OUTCOME,
+    ]);
+  });
 
-    expect(statuses).not.toContain("pending");
+  it("sends ids and labels archived checks", () => {
+    const [forms] = buildRecordsFilterDefinitions({
+      labels: LABELS,
+      options: OPTIONS,
+    });
+    expect(forms?.options).toEqual([
+      { value: FORM_A, label: "Fridge temperatures" },
+      { value: FORM_B, label: "Old cleaning card (archived)" },
+    ]);
   });
 });
 
 describe("report URL", () => {
+  it("carries items left out of a journal as sorted pairs", () => {
+    const url = buildRecordsReportUrl({
+      locale: "bg",
+      locationId: LOCATION_A,
+      range: RANGE,
+      filters: {},
+      exclude: [
+        { formId: FORM_B, targetId: TARGET_A },
+        { formId: FORM_A, targetId: TARGET_A },
+      ],
+    });
+    const params = new URLSearchParams(url.split("?")[1]!);
+    expect(params.get("exclude")).toBe(`${FORM_A}:${TARGET_A},${FORM_B}:${TARGET_A}`);
+    expect(
+      recordsReportSearchParamsSchema.parse(Object.fromEntries(params)).exclude,
+    ).toEqual([
+      { formId: FORM_A, targetId: TARGET_A },
+      { formId: FORM_B, targetId: TARGET_A },
+    ]);
+  });
+
   it("carries the location, range and every selected filter", () => {
     const url = buildRecordsReportUrl({
       locale: "bg",
@@ -402,6 +360,48 @@ describe("report URL", () => {
     });
   });
 
+  it("carries the check, item and person filters", () => {
+    const url = buildRecordsReportUrl({
+      locale: "bg",
+      locationId: LOCATION_A,
+      range: RANGE,
+      filters: {
+        form: [FORM_B, FORM_A],
+        target: [TARGET_A],
+        recordedBy: [USER_A],
+      },
+    });
+
+    const parsed = recordsReportSearchParamsSchema.parse(
+      Object.fromEntries(new URLSearchParams(url.split("?")[1]!)),
+    );
+    expect(parsed).toMatchObject({
+      form: [FORM_A, FORM_B],
+      target: [TARGET_A],
+      recordedBy: [USER_A],
+      layout: "list",
+    });
+  });
+
+  it("names the layout only when it is not the default list", () => {
+    const base = {
+      locale: "bg" as const,
+      locationId: LOCATION_A,
+      range: RANGE,
+      filters: {},
+    };
+
+    expect(buildRecordsReportUrl({ ...base, layout: "list" })).not.toContain(
+      "layout",
+    );
+    expect(buildRecordsReportUrl({ ...base, layout: "journals" })).toContain(
+      "layout=journals",
+    );
+    expect(buildRecordsReportUrl({ ...base, layout: "deviations" })).toContain(
+      "layout=deviations",
+    );
+  });
+
   it("stays available for a zero-row result", () => {
     expect(
       buildRecordsReportUrl({
@@ -411,40 +411,5 @@ describe("report URL", () => {
         filters: {},
       }),
     ).toContain("dateFrom=2019-01-01");
-  });
-});
-
-describe("result presentation", () => {
-  const base: RecordItem = {
-    id: "occ",
-    kind: "scheduled",
-    occurrenceId: "occ",
-    taskTemplateId: "tpl",
-    entryDate: "2026-08-23",
-    entryTime: "08:00",
-    availableAt: "2026-08-23T00:00:00.000Z",
-    dueAt: "2026-08-23T05:00:00.000Z",
-    title: "Clean prep surface",
-    formVersionId: "ver",
-    category: "cleaning",
-    targetId: null,
-    targetName: null,
-    resolvedLimits: {},
-    displayState: "submitted",
-    recordState: "submitted",
-    timing: "on_time",
-    result: "not_evaluated",
-    record: null,
-  };
-
-  it("shows no result badge for a record with nothing to judge", () => {
-    expect(hasJudgedResult(base)).toBe(false);
-  });
-
-  it("shows the badge for a pass or a fail of any category", () => {
-    expect(hasJudgedResult({ ...base, result: "pass" })).toBe(true);
-    expect(
-      hasJudgedResult({ ...base, category: "goods_in", result: "fail" }),
-    ).toBe(true);
   });
 });

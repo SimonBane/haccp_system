@@ -1,5 +1,9 @@
 import {
+  RECORD_DISPLAY_STATE,
+  RECORD_RESULT,
+  RECORDS_REPORT_LAYOUT,
   recordsReportSearchParamsSchema,
+  serializeRecordsExclude,
   validateRecordsDateRange,
   type RecordsReportSearchParams,
 } from "@haccp/shared";
@@ -49,18 +53,42 @@ export function parseReportSearchParams(input: {
   return { ok: true, params: parsed.data };
 }
 
-/** Rebuilt from the parsed values so the API sees the same canonical serialization the grid sends. */
+/** Canonical like the grid's query; deviations override status and result to failed, non-voided records. */
 export function reportApiQuery(params: RecordsReportSearchParams): string {
   const query = new URLSearchParams({
     dateFrom: params.dateFrom,
     dateTo: params.dateTo,
   });
 
-  for (const key of ["category", "state", "result"] as const) {
-    const values = params[key];
-    if (values && values.length > 0) {
-      query.set(key, values.join(","));
+  const deviations = params.layout === RECORDS_REPORT_LAYOUT.DEVIATIONS;
+  const values: Pick<
+    RecordsReportSearchParams,
+    "category" | "state" | "result" | "timing" | "form" | "target" | "recordedBy"
+  > = {
+    ...params,
+    ...(deviations && {
+      state: [RECORD_DISPLAY_STATE.SUBMITTED],
+      result: [RECORD_RESULT.FAIL],
+    }),
+  };
+
+  for (const key of [
+    "category",
+    "state",
+    "result",
+    "timing",
+    "form",
+    "target",
+    "recordedBy",
+  ] as const) {
+    const selected = values[key];
+    if (selected && selected.length > 0) {
+      query.set(key, selected.join(","));
     }
+  }
+
+  if (params.exclude && params.exclude.length > 0) {
+    query.set("exclude", serializeRecordsExclude(params.exclude));
   }
 
   return query.toString();

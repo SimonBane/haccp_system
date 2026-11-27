@@ -1,9 +1,14 @@
 import {
   RECORD_DISPLAY_STATE,
+  RECORD_OUTCOME,
   RECORD_RESULT,
+  RECORD_TIMING,
+  type RECORDS_TIMING_FILTER_VALUES,
   type RecordDisplayState,
+  type RecordOutcome,
   type RecordResult,
   type RecordValues,
+  type RecordsExcludedItem,
   type RecordsSortField,
   type ResolvedLimits,
   type SortOrder,
@@ -11,24 +16,37 @@ import {
 import {
   and,
   eq,
+  gt,
   gte,
   inArray,
   isNotNull,
   isNull,
   lte,
+  not,
   notExists,
   or,
   sql,
   type SQL,
 } from "drizzle-orm";
-import { alias, unionAll, type AnyPgColumn } from "drizzle-orm/pg-core";
+import {
+  alias,
+  union,
+  unionAll,
+  type AnyPgColumn,
+} from "drizzle-orm/pg-core";
 import type { DbClient } from "../../core/db/client.js";
 import { formVersions } from "../../core/db/schema/form-versions.js";
 import { forms } from "../../core/db/schema/forms.js";
 import { locations } from "../../core/db/schema/locations.js";
+import { targets } from "../../core/db/schema/targets.js";
 import { taskOccurrences } from "../../core/db/schema/task-occurrences.js";
 import { taskRecords } from "../../core/db/schema/task-records.js";
 import { users } from "../../core/db/schema/users.js";
+import {
+  parentTargets,
+  targetLabelColumns,
+  withTargetLabel,
+} from "../targets/target-label.js";
 
 const createdByUser = alias(users, "records_created_by");
 const recordedByUser = alias(users, "records_recorded_by");
@@ -42,10 +60,19 @@ export type RecordsScope = {
   now: Date;
 };
 
+export type RecordsTimingFilter = (typeof RECORDS_TIMING_FILTER_VALUES)[number];
+
 export type RecordsFilters = {
+  search?: string;
   category?: string[];
   state?: RecordDisplayState[];
   result?: RecordResult[];
+  timing?: RecordsTimingFilter[];
+  outcome?: RecordOutcome[];
+  form?: string[];
+  target?: string[];
+  recordedBy?: string[];
+  exclude?: RecordsExcludedItem[];
 };
 
 export type RecordsPageParams = RecordsScope & {
@@ -171,24 +198,131 @@ function occurrenceResultFilter(results: RecordResult[]): BranchFilter {
   return results.includes(RECORD_RESULT.NOT_EVALUATED) ? undefined : null;
 }
 
-function combineFilters(
-  scope: SQL,
-  filters: RecordsFilters,
-  stateFilter: (states: RecordDisplayState[]) => BranchFilter,
-  resultFilter: (results: RecordResult[]) => BranchFilter,
-): SQL | null {
-  const conditions: SQL[] = [scope];
+/** `dueAt` comes from the left-joined occurrence, so every records query must join it. */
+function recordTimingFilter(timings: RecordsTimingFilter[]): BranchFilter {
+  return timings.includes(RECORD_TIMING.LATE)
+    ? and(
+        isNull(taskRecords.voidedAt),
+        isNotNull(taskOccurrences.dueAt),
+        gt(taskRecords.recordedAt, taskOccurrences.dueAt),
+      )!
+    : null;
+}
 
-  if (filters.category && filters.category.length > 0) {
+/** An unrecorded occurrence has no submission to be late. */
+function occurrenceTimingFilter(): BranchFilter {
+  return null;
+}
+
+const RECORD_OUTCOME_RESULT: Partial<Record<RecordOutcome, RecordResult>> = {
+  [RECORD_OUTCOME.PASSED]: RECORD_RESULT.PASS,
+  [RECORD_OUTCOME.ATTENTION]: RECORD_RESULT.FAIL,
+  [RECORD_OUTCOME.RECORDED]: RECORD_RESULT.NOT_EVALUATED,
+};
+
+/** A voided record's result no longer counts, so only live records pass, fail or stand recorded. */
+function recordOutcomeFilter(outcomes: RecordOutcome[]): BranchFilter {
+  const conditions = outcomes.flatMap((outcome) => {
+    if (outcome === RECORD_OUTCOME.VOIDED) {
+      return [isNotNull(taskRecords.voidedAt)];
+    }
+    const result = RECORD_OUTCOME_RESULT[outcome];
+    return result === undefined
+      ? []
+      : [and(isNull(taskRecords.voidedAt), eq(taskRecords.result, result))!];
+  });
+  return conditions.length === 0 ? null : or(...conditions)!;
+}
+
+function occurrenceOutcomeFilter(outcomes: RecordOutcome[]): BranchFilter {
+  const conditions = outcomes.flatMap((outcome) => {
+    if (outcome === RECORD_OUTCOME.MISSED) {
+      return [isNotNull(taskOccurrences.dueAt)];
+    }
+    if (outcome === RECORD_OUTCOME.OPEN) {
+      return [isNull(taskOccurrences.dueAt)];
+    }
+    return [];
+  });
+  return conditions.length === 0 ? null : or(...conditions)!;
+}
+
+/** Wildcards in the term must match literally, or a search for "100%" would match everything. */
+function searchFilter(
+  term: string,
+  columns: readonly [AnyPgColumn, AnyPgColumn],
+): SQL {
+  const pattern = `%${term.replace(/[\\%_]/g, "\\$&")}%`;
+  return or(
+    ...columns.map((column) => sql`${column} ilike ${pattern} escape '\\'`),
+  )!;
+}
+
+/** The null guard matters: `not (… and target = y)` is NULL, not true, for a row with no item. */
+function excludeFilter(
+  targetColumn: AnyPgColumn,
+  pairs: RecordsExcludedItem[],
+): SQL {
+  return or(
+    isNull(targetColumn),
+    not(
+      or(
+        ...pairs.map((pair) =>
+          and(eq(forms.id, pair.formId), eq(targetColumn, pair.targetId)),
+        ),
+      )!,
+    ),
+  )!;
+}
+
+/** What a filter reads on one side of the union. */
+type Branch = {
+  scope: SQL;
+  stateFilter: (states: RecordDisplayState[]) => BranchFilter;
+  resultFilter: (results: RecordResult[]) => BranchFilter;
+  timingFilter: (timings: RecordsTimingFilter[]) => BranchFilter;
+  outcomeFilter: (outcomes: RecordOutcome[]) => BranchFilter;
+  /** The check's and the item's names as snapshotted on this side. */
+  searchColumns: readonly [AnyPgColumn, AnyPgColumn];
+  targetColumn: AnyPgColumn;
+  /** Null rules the branch out under a person filter: an unrecorded occurrence has nobody who recorded it. */
+  recordedByColumn: AnyPgColumn | null;
+};
+
+function hasValues<T>(values: T[] | undefined): values is T[] {
+  return values !== undefined && values.length > 0;
+}
+
+function combineFilters(branch: Branch, filters: RecordsFilters): SQL | null {
+  const conditions: SQL[] = [branch.scope];
+
+  if (hasValues(filters.category)) {
     conditions.push(inArray(forms.category, filters.category));
   }
+  if (hasValues(filters.form)) {
+    conditions.push(inArray(forms.id, filters.form));
+  }
+  if (hasValues(filters.target)) {
+    conditions.push(inArray(branch.targetColumn, filters.target));
+  }
+  if (hasValues(filters.exclude)) {
+    conditions.push(excludeFilter(branch.targetColumn, filters.exclude));
+  }
+  if (filters.search !== undefined && filters.search !== "") {
+    conditions.push(searchFilter(filters.search, branch.searchColumns));
+  }
 
-  const narrowed = [
-    filters.state && filters.state.length > 0
-      ? stateFilter(filters.state)
+  const narrowed: BranchFilter[] = [
+    hasValues(filters.state) ? branch.stateFilter(filters.state) : undefined,
+    hasValues(filters.result) ? branch.resultFilter(filters.result) : undefined,
+    hasValues(filters.timing) ? branch.timingFilter(filters.timing) : undefined,
+    hasValues(filters.outcome)
+      ? branch.outcomeFilter(filters.outcome)
       : undefined,
-    filters.result && filters.result.length > 0
-      ? resultFilter(filters.result)
+    hasValues(filters.recordedBy)
+      ? branch.recordedByColumn === null
+        ? null
+        : inArray(branch.recordedByColumn, filters.recordedBy)
       : undefined,
   ];
 
@@ -205,10 +339,17 @@ function recordBranchCondition(params: {
   filters: RecordsFilters;
 }): SQL | null {
   return combineFilters(
-    recordScopeCondition(params.scope),
+    {
+      scope: recordScopeCondition(params.scope),
+      stateFilter: recordStateFilter,
+      resultFilter: recordResultFilter,
+      timingFilter: recordTimingFilter,
+      outcomeFilter: recordOutcomeFilter,
+      searchColumns: [taskRecords.title, taskRecords.targetName],
+      targetColumn: taskRecords.targetId,
+      recordedByColumn: taskRecords.recordedByUserId,
+    },
     params.filters,
-    recordStateFilter,
-    recordResultFilter,
   );
 }
 
@@ -217,10 +358,17 @@ function occurrenceBranchCondition(params: {
   filters: RecordsFilters;
 }): SQL | null {
   return combineFilters(
-    occurrenceScopeCondition(params.scope),
+    {
+      scope: occurrenceScopeCondition(params.scope),
+      stateFilter: occurrenceStateFilter,
+      resultFilter: occurrenceResultFilter,
+      timingFilter: occurrenceTimingFilter,
+      outcomeFilter: occurrenceOutcomeFilter,
+      searchColumns: [taskOccurrences.title, taskOccurrences.targetName],
+      targetColumn: taskOccurrences.targetId,
+      recordedByColumn: null,
+    },
     params.filters,
-    occurrenceStateFilter,
-    occurrenceResultFilter,
   );
 }
 
@@ -357,6 +505,7 @@ async function countRecords(db: DbClient, where: SQL): Promise<number> {
     .select({ total: sql<number>`count(*)`.mapWith(Number) })
     .from(taskRecords)
     .innerJoin(locations, eq(locations.id, taskRecords.locationId))
+    .leftJoin(taskOccurrences, eq(taskOccurrences.id, taskRecords.occurrenceId))
     .innerJoin(formVersions, eq(formVersions.id, taskRecords.formVersionId))
     .innerJoin(forms, eq(forms.id, formVersions.formId))
     .where(where);
@@ -381,6 +530,85 @@ async function countUnrecordedOccurrences(
 
   return row?.total ?? 0;
 }
+
+/** One form × item group; the item columns are null for rows with no item. */
+export type RecordsJournalCountRow = {
+  formId: string;
+  formName: string;
+  targetId: string | null;
+  targetName: string | null;
+  targetKind: string | null;
+  areaName: string | null;
+  total: number;
+};
+
+/** The item's current name, not the row snapshot: the dialog names the item as it is today. */
+const journalCountColumns = {
+  formId: forms.id,
+  formName: forms.name,
+  targetId: targets.id,
+  targetName: targets.name,
+  targetKind: targets.kind,
+  areaName: parentTargets.name,
+  total: sql<number>`count(*)`.mapWith(Number),
+};
+
+const journalCountGroupBy = [
+  forms.id,
+  forms.name,
+  targets.id,
+  targets.name,
+  targets.kind,
+  parentTargets.name,
+];
+
+async function countRecordsByFormAndTarget(
+  db: DbClient,
+  where: SQL,
+): Promise<RecordsJournalCountRow[]> {
+  return db
+    .select(journalCountColumns)
+    .from(taskRecords)
+    .innerJoin(locations, eq(locations.id, taskRecords.locationId))
+    .leftJoin(taskOccurrences, eq(taskOccurrences.id, taskRecords.occurrenceId))
+    .innerJoin(formVersions, eq(formVersions.id, taskRecords.formVersionId))
+    .innerJoin(forms, eq(forms.id, formVersions.formId))
+    .leftJoin(targets, eq(targets.id, taskRecords.targetId))
+    .leftJoin(parentTargets, eq(parentTargets.id, targets.parentId))
+    .where(where)
+    .groupBy(...journalCountGroupBy);
+}
+
+async function countUnrecordedOccurrencesByFormAndTarget(
+  db: DbClient,
+  where: SQL,
+): Promise<RecordsJournalCountRow[]> {
+  return db
+    .select(journalCountColumns)
+    .from(taskOccurrences)
+    .innerJoin(locations, eq(locations.id, taskOccurrences.locationId))
+    .innerJoin(
+      formVersions,
+      eq(formVersions.id, taskOccurrences.formVersionId),
+    )
+    .innerJoin(forms, eq(forms.id, formVersions.formId))
+    .leftJoin(targets, eq(targets.id, taskOccurrences.targetId))
+    .leftJoin(parentTargets, eq(parentTargets.id, targets.parentId))
+    .where(where)
+    .groupBy(...journalCountGroupBy);
+}
+
+export type RecordsFilterOptionRow = {
+  id: string;
+  name: string;
+  archivedAt: Date | null;
+};
+
+export type RecordsPersonRow = {
+  id: string;
+  firstName: string;
+  lastName: string;
+};
 
 export const recordsRepository = {
   async findPage(
@@ -438,6 +666,101 @@ export const recordsRepository = {
     ]);
 
     return records + occurrences;
+  },
+
+  /** One entry per form × item under the same predicates as the page; the service merges the two branches. */
+  async countByFormAndTarget(
+    db: DbClient,
+    params: RecordsScope & { filters: RecordsFilters },
+  ): Promise<RecordsJournalCountRow[]> {
+    const recordWhere = recordBranchCondition({ scope: params, ...params });
+    const occurrenceWhere = occurrenceBranchCondition({
+      scope: params,
+      ...params,
+    });
+
+    const [records, occurrences] = await Promise.all([
+      recordWhere ? countRecordsByFormAndTarget(db, recordWhere) : [],
+      occurrenceWhere
+        ? countUnrecordedOccurrencesByFormAndTarget(db, occurrenceWhere)
+        : [],
+    ]);
+
+    return [...records, ...occurrences];
+  },
+
+  /** Forms with a record or an occurrence at the location, archived ones included: old rows still point at them. */
+  async findFormsUsedAtLocation(
+    db: DbClient,
+    params: { locationId: string; organizationId: string },
+  ): Promise<RecordsFilterOptionRow[]> {
+    const usedFormIds = union(
+      db
+        .select({ formId: formVersions.formId })
+        .from(taskRecords)
+        .innerJoin(formVersions, eq(formVersions.id, taskRecords.formVersionId))
+        .where(eq(taskRecords.locationId, params.locationId)),
+      db
+        .select({ formId: formVersions.formId })
+        .from(taskOccurrences)
+        .innerJoin(
+          formVersions,
+          eq(formVersions.id, taskOccurrences.formVersionId),
+        )
+        .where(eq(taskOccurrences.locationId, params.locationId)),
+    );
+
+    return db
+      .select({ id: forms.id, name: forms.name, archivedAt: forms.archivedAt })
+      .from(forms)
+      .where(
+        and(
+          eq(forms.organizationId, params.organizationId),
+          inArray(forms.id, usedFormIds),
+        ),
+      )
+      .orderBy(forms.name, forms.id);
+  },
+
+  /** Every item of the location, archived ones included, labelled "Area › Component" like their snapshots. */
+  async findTargetsOfLocation(
+    db: DbClient,
+    locationId: string,
+  ): Promise<RecordsFilterOptionRow[]> {
+    const rows = await db
+      .select({
+        id: targets.id,
+        archivedAt: targets.archivedAt,
+        ...targetLabelColumns,
+      })
+      .from(targets)
+      .leftJoin(parentTargets, eq(parentTargets.id, targets.parentId))
+      .where(eq(targets.locationId, locationId));
+
+    return rows
+      .map(withTargetLabel)
+      .map((row) => ({
+        id: row.id,
+        name: row.targetName,
+        archivedAt: row.archivedAt,
+      }));
+  },
+
+  /** Everyone who has recorded a check here, members who have since left included. */
+  async findRecordersAtLocation(
+    db: DbClient,
+    locationId: string,
+  ): Promise<RecordsPersonRow[]> {
+    return db
+      .selectDistinct({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+      })
+      .from(taskRecords)
+      .innerJoin(users, eq(users.id, taskRecords.recordedByUserId))
+      .where(eq(taskRecords.locationId, locationId))
+      .orderBy(users.firstName, users.lastName, users.id);
   },
 };
 
