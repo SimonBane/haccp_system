@@ -1,82 +1,41 @@
-import { GRID_DEFAULT_PAGE_SIZE, RECORDS_DEFAULT_SORT } from "@haccp/shared";
-import {
-  buildGridRequest,
-  gridRequestToQueryString,
-  resolveGridCapabilities,
-} from "@/components/ui/data-table/server-grid/grid-request";
+import { GRID_DEFAULT_PAGE_SIZE, SORT_ORDER } from "@haccp/shared";
+import { normalizeGridFilters } from "@/components/ui/data-table/server-grid/grid-request";
 import type {
   GridCapabilities,
+  GridFilterState,
   GridRequest,
 } from "@/components/ui/data-table/server-grid/types";
+
+export type RecordsDateRange = { dateFrom: string; dateTo: string };
+
+export const RECORDS_PAGE_SIZE = GRID_DEFAULT_PAGE_SIZE;
+
+/** Newest first: the latest exceptions are what an admin opens the page for. */
+export const RECORDS_LIST_SORT = {
+  sortBy: "entryAt",
+  sortOrder: SORT_ORDER.DESC,
+} as const;
 
 /** Module-level so `useServerDataGrid` memoises against a stable reference. */
 export const RECORDS_GRID_CAPABILITIES: GridCapabilities = {
   pagination: true,
   sorting: true,
   filtering: true,
-  search: false,
+  search: true,
   selection: false,
   columnVisibility: false,
 };
 
-/**
- * The request the controller builds on its first render. The server render must send
- * exactly this, or `initialData` is discarded and the page refetches on hydration.
- */
-export function defaultRecordsGridRequest(): GridRequest {
-  return buildGridRequest({
-    pageIndex: 0,
-    pageSize: GRID_DEFAULT_PAGE_SIZE,
-    search: "",
-    sorting: null,
-    filters: {},
-    capabilities: resolveGridCapabilities(RECORDS_GRID_CAPABILITIES),
-    defaultSort: RECORDS_DEFAULT_SORT,
-  });
-}
-
-export type RecordsDateRange = { dateFrom: string; dateTo: string };
-
-/** The date range is required scope, so it is prepended to the harness query string. */
-export function recordsQueryString(
+/** The date range is required scope, so it is prepended to the grid's own query string. */
+export function recordsGridQueryString(
   range: RecordsDateRange,
   gridQueryString: string,
 ): string {
-  const params = new URLSearchParams({
-    dateFrom: range.dateFrom,
-    dateTo: range.dateTo,
-  });
-
-  return gridQueryString === ""
-    ? params.toString()
-    : `${params.toString()}&${gridQueryString}`;
+  const params = rangeParams(range).toString();
+  return gridQueryString === "" ? params : `${params}&${gridQueryString}`;
 }
 
-export function defaultRecordsQueryString(range: RecordsDateRange): string {
-  return recordsQueryString(
-    range,
-    gridRequestToQueryString(defaultRecordsGridRequest()),
-  );
-}
-
-/**
- * The SSR payload answers the server-rendered range only. Once the user moves the
- * range, seeding it would show the old range's rows under the new one.
- */
-export function shouldSeedRecordsPage(input: {
-  range: RecordsDateRange;
-  initialRange: RecordsDateRange;
-}): boolean {
-  return (
-    input.range.dateFrom === input.initialRange.dateFrom &&
-    input.range.dateTo === input.initialRange.dateTo
-  );
-}
-
-/**
- * Identifies the dataset currently on screen. Location, range, filter, sort, page and
- * page-size changes all produce a new key, which is what dismisses an open detail.
- */
+/** Location, range, filter, sort and page all change the rows behind an open record. */
 export function recordsDatasetKey(input: {
   locationId: string;
   range: RecordsDateRange;
@@ -88,4 +47,59 @@ export function recordsDatasetKey(input: {
     input.range.dateTo,
     input.request,
   ]);
+}
+
+function rangeParams(range: RecordsDateRange): URLSearchParams {
+  return new URLSearchParams({
+    dateFrom: range.dateFrom,
+    dateTo: range.dateTo,
+  });
+}
+
+function appendFilters(params: URLSearchParams, filters: GridFilterState) {
+  for (const [key, values] of Object.entries(
+    normalizeGridFilters(filters) ?? {},
+  )) {
+    params.set(key, values.join(","));
+  }
+}
+
+/** Everything but the page: the phone's "Show more" appends to one infinite query per value. */
+export function recordsListBaseQuery(input: {
+  range: RecordsDateRange;
+  filters: GridFilterState;
+  search?: string;
+}): string {
+  const params = rangeParams(input.range);
+  params.set("sortBy", RECORDS_LIST_SORT.sortBy);
+  params.set("sortOrder", RECORDS_LIST_SORT.sortOrder);
+  appendFilters(params, input.filters);
+  const search = input.search?.trim() ?? "";
+  if (search !== "") params.set("search", search);
+  return params.toString();
+}
+
+export function recordsPageQueryString(baseQuery: string, page: number): string {
+  return `${baseQuery}&page=${page}&pageSize=${RECORDS_PAGE_SIZE}`;
+}
+
+/** What the server render fetches; the client's first page must ask exactly this to reuse it. */
+export function defaultRecordsQueryString(range: RecordsDateRange): string {
+  return recordsPageQueryString(
+    recordsListBaseQuery({ range, filters: {} }),
+    1,
+  );
+}
+
+/** The SSR page answers only the server-rendered location and the unfiltered initial range. */
+export function shouldSeedRecordsPage(input: {
+  locationId: string;
+  initialLocationId: string;
+  baseQuery: string;
+  initialBaseQuery: string;
+}): boolean {
+  return (
+    input.locationId === input.initialLocationId &&
+    input.baseQuery === input.initialBaseQuery
+  );
 }

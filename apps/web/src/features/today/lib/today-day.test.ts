@@ -85,7 +85,10 @@ function form(fields: FormVersionSummary["definition"]["fields"]) {
     formId: uuid(),
     formName: "Form",
     category: "temperature",
+    appliesTo: "per_item",
+    onDemand: false,
     version: 1,
+    publishedAt: "2026-01-01T00:00:00.000Z",
     definition: { fields, correctiveAction: "required_on_fail" },
   } satisfies FormVersionSummary;
 }

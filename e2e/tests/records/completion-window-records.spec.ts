@@ -38,10 +38,12 @@ test("an opened, unrecorded Never-overdue occurrence shows as Open with No deadl
   const row = rowByKey(page, occurrenceId);
   await expect(row).toBeVisible();
   await expect(row.getByText("Open", { exact: true })).toBeVisible();
-  await expect(row.getByText("No deadline", { exact: true })).toBeVisible();
 
-  await row.getByRole("button", { name: "View details" }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByText("No deadline — never overdue")).toBeVisible();
+  await row.getByRole("button", { name: /^View record:/ }).click();
+  const sheet = page.getByRole("dialog");
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByText("Not recorded yet.")).toBeVisible();
+  // No deadline, so the schedule names none and nothing ever closes it as missed.
+  await expect(sheet.getByText("Scheduled", { exact: true })).toBeVisible();
+  await expect(sheet.getByText("Closed as missed")).toHaveCount(0);
 });

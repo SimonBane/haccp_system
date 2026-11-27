@@ -42,6 +42,8 @@ export type FormVersionSummaryRow = {
   version: FormVersionRow;
   formName: string;
   category: string;
+  appliesTo: string;
+  onDemand: boolean;
 };
 
 export const formRepository = {
@@ -57,6 +59,8 @@ export const formRepository = {
         version: formVersions,
         formName: forms.name,
         category: forms.category,
+        appliesTo: forms.appliesTo,
+        onDemand: forms.onDemand,
       })
       .from(formVersions)
       .innerJoin(forms, eq(forms.id, formVersions.formId))

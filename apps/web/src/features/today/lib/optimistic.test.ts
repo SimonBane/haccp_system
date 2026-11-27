@@ -42,7 +42,10 @@ function summary(id: string, definition: FormDefinition) {
     formId: "00000000-0000-4000-8000-0000000000f0",
     formName: "Form",
     category: "hygiene" as const,
+    appliesTo: "per_item" as const,
+    onDemand: false,
     version: 1,
+    publishedAt: "2026-01-01T00:00:00.000Z",
     definition,
   };
 }

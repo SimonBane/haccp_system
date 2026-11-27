@@ -56,7 +56,10 @@ export function toFormVersionSummaryMap(
       formId: row.version.formId,
       formName: row.formName,
       category: row.category as FormVersionSummaryMap[string]["category"],
+      appliesTo: row.appliesTo as FormVersionSummaryMap[string]["appliesTo"],
+      onDemand: row.onDemand,
       version: row.version.version,
+      publishedAt: row.version.createdAt.toISOString(),
       definition: row.version.definition,
     };
   }

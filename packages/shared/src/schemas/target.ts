@@ -107,12 +107,28 @@ export function isTargetNameTaken(
   );
 }
 
+const AREA_SEPARATOR = " › ";
+
 /** "Kitchen 2 › Walls": a component's own name says nothing once it leaves its area's list. */
 export function targetDisplayName(
   target: { name: string; kind: TargetKind | string },
   parentName: string | null | undefined,
 ): string {
   return target.kind === TARGET_KIND.COMPONENT && parentName
-    ? `${parentName} › ${target.name}`
+    ? `${parentName}${AREA_SEPARATOR}${target.name}`
     : target.name;
+}
+
+/** Records keep only the display name they were snapshotted with, so the area is read back from it. */
+export function splitTargetDisplayName(displayName: string): {
+  area: string | null;
+  name: string;
+} {
+  const at = displayName.indexOf(AREA_SEPARATOR);
+  return at === -1
+    ? { area: null, name: displayName }
+    : {
+        area: displayName.slice(0, at),
+        name: displayName.slice(at + AREA_SEPARATOR.length),
+      };
 }

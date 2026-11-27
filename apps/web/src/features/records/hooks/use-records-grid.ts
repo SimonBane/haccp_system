@@ -1,29 +1,24 @@
 "use client";
 
 import {
-  GRID_DEFAULT_PAGE_SIZE,
-  RECORDS_DEFAULT_SORT,
   recordsListResponseSchema,
   type FormVersionSummaryMap,
   type RecordItem,
   type RecordsListResponse,
 } from "@haccp/shared";
-import { useCallback, useMemo, useState } from "react";
-import type { DataTableServerConfig } from "@/components/ui/data-table/server-grid/types";
+import { useCallback, useMemo } from "react";
 import { useServerDataGrid } from "@/components/ui/data-table/server-grid/use-server-data-grid";
 import { useLocation } from "@/features/tenant/tenant-provider";
 import { useAuthenticatedFetch } from "@/lib/api/client";
 import { locationScopedPath } from "@/lib/api/paths";
 import { queryKeys } from "@/lib/api/query-keys";
-import {
-  isSameRecordsRange,
-  recordsRangeError,
-} from "@/features/records/lib/date-range";
+import { isSameRecordsRange } from "@/features/records/lib/date-range";
 import {
   RECORDS_GRID_CAPABILITIES,
+  RECORDS_LIST_SORT,
+  RECORDS_PAGE_SIZE,
   recordsDatasetKey,
-  recordsQueryString,
-  shouldSeedRecordsPage,
+  recordsGridQueryString,
   type RecordsDateRange,
 } from "@/features/records/lib/records-grid-config";
 
@@ -33,42 +28,26 @@ export type UseRecordsGridOptions = {
   initialPage: RecordsListResponse;
   initialLocationId: string;
   initialRange: RecordsDateRange;
-  /** Organization-local today, resolved on the server; future dates are rejected against it. */
-  today: string;
-};
-
-export type RecordsGrid = {
-  items: RecordItem[];
-  total: number;
   range: RecordsDateRange;
-  setRange: (range: RecordsDateRange) => void;
-  server: DataTableServerConfig;
-  /** The form versions the visible rows were recorded against. */
-  formVersions: FormVersionSummaryMap;
-  isLoading: boolean;
-  isError: boolean;
-  error: unknown;
-  refetch: () => Promise<unknown>;
-  /** Bumps whenever the visible dataset changes, so open detail can be dismissed. */
-  datasetKey: string;
+  enabled: boolean;
 };
 
-export function useRecordsGrid(options: UseRecordsGridOptions): RecordsGrid {
+/** The desktop table: the shared server grid, with the date range as part of its scope. */
+export function useRecordsGrid(options: UseRecordsGridOptions) {
   const { locationId } = useLocation();
   const { fetchJson } = useAuthenticatedFetch();
-  const [range, setRangeState] = useState<RecordsDateRange>(
-    options.initialRange,
-  );
+  const { range } = options;
 
+  // The range belongs to the scope, so a new range starts on page one with no stale rows.
   const queryKeyRoot = useMemo(
-    () => queryKeys.recordsRange(locationId, range.dateFrom, range.dateTo),
+    () => queryKeys.recordsGrid(locationId, range.dateFrom, range.dateTo),
     [locationId, range.dateFrom, range.dateTo],
   );
 
   const fetcher = useCallback(
     ({ queryString, signal }: { queryString: string; signal: AbortSignal }) =>
       fetchJson(
-        `${locationScopedPath(locationId, "records")}?${recordsQueryString(range, queryString)}`,
+        `${locationScopedPath(locationId, "records")}?${recordsGridQueryString(range, queryString)}`,
         recordsListResponseSchema,
         { signal },
       ),
@@ -76,56 +55,26 @@ export function useRecordsGrid(options: UseRecordsGridOptions): RecordsGrid {
   );
 
   const grid = useServerDataGrid<RecordItem, RecordsListResponse>({
-    scopeKey: locationId,
+    scopeKey: `${locationId}|${range.dateFrom}|${range.dateTo}`,
     queryKeyRoot,
-    defaultSort: RECORDS_DEFAULT_SORT,
-    defaultPageSize: GRID_DEFAULT_PAGE_SIZE,
+    defaultSort: RECORDS_LIST_SORT,
+    defaultPageSize: RECORDS_PAGE_SIZE,
     capabilities: RECORDS_GRID_CAPABILITIES,
     getRowId: (item) => item.id,
-    // Seeding is additionally gated on the range: the SSR payload answers the initial range only.
-    initialPage: shouldSeedRecordsPage({
-      range,
-      initialRange: options.initialRange,
-    })
+    // The server render answers the initial range only.
+    initialPage: isSameRecordsRange(range, options.initialRange)
       ? options.initialPage
       : undefined,
-    initialScopeKey: options.initialLocationId,
+    initialScopeKey: `${options.initialLocationId}|${options.initialRange.dateFrom}|${options.initialRange.dateTo}`,
     fetcher,
+    enabled: options.enabled,
   });
 
-  const { onPaginationChange, pagination } = grid.server;
-
-  const setRange = useCallback(
-    (next: RecordsDateRange) => {
-      if (recordsRangeError(next, options.today)) {
-        return;
-      }
-
-      setRangeState((current) =>
-        isSameRecordsRange(current, next) ? current : next,
-      );
-      // Filters and sort survive a range change; the page number cannot.
-      onPaginationChange({ pageIndex: 0, pageSize: pagination.pageSize });
-    },
-    [onPaginationChange, options.today, pagination.pageSize],
-  );
-
-  const datasetKey = useMemo(
-    () => recordsDatasetKey({ locationId, range, request: grid.request }),
-    [locationId, range, grid.request],
-  );
-
   return {
-    items: grid.items,
-    total: grid.total,
-    range,
-    setRange,
-    server: grid.server,
+    ...grid,
     formVersions: grid.page?.formVersions ?? EMPTY_FORM_VERSIONS,
-    isLoading: grid.isLoading,
-    isError: grid.isError,
-    error: grid.error,
-    refetch: grid.refetch,
-    datasetKey,
+    datasetKey: recordsDatasetKey({ locationId, range, request: grid.request }),
   };
 }
+
+export type RecordsGrid = ReturnType<typeof useRecordsGrid>;

@@ -1,8 +1,6 @@
 import {
-  addCalendarDays,
   addCalendarMonths,
   compareCalendarDates,
-  defaultRecordsDateRange,
   endOfCalendarMonth,
   startOfCalendarMonth,
   validateRecordsDateRange,
@@ -10,14 +8,8 @@ import {
 } from "@haccp/shared";
 import type { RecordsDateRange } from "./records-grid-config";
 
-export const RECORDS_RANGE_PRESETS = [
-  "last7",
-  "last30",
-  "last60",
-  "last90",
-  "thisMonth",
-  "previousMonth",
-] as const;
+/** One month at a time: a binder covers a calendar month, so those are the only shortcuts. */
+export const RECORDS_RANGE_PRESETS = ["thisMonth", "previousMonth"] as const;
 
 export type RecordsRangePreset = (typeof RECORDS_RANGE_PRESETS)[number];
 
@@ -29,14 +21,6 @@ export function resolveRecordsPreset(
   today: string,
 ): RecordsDateRange {
   switch (preset) {
-    case "last7":
-      return defaultRecordsDateRange(today);
-    case "last30":
-      return { dateFrom: addCalendarDays(today, -29), dateTo: today };
-    case "last60":
-      return { dateFrom: addCalendarDays(today, -59), dateTo: today };
-    case "last90":
-      return { dateFrom: addCalendarDays(today, -89), dateTo: today };
     case "thisMonth":
       // Clamped to today: the rest of the month has not happened yet.
       return { dateFrom: startOfCalendarMonth(today), dateTo: today };

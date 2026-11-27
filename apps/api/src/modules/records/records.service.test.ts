@@ -12,16 +12,27 @@ import {
   ValidationError,
 } from "../../core/errors/app-errors.js";
 import {
+  mergeJournalCounts,
   normalizeRecordsQuery,
   normalizeRecordsReportQuery,
   recordsService,
 } from "./records.service.js";
 import { formRepository } from "../forms/form.repository.js";
-import { recordsRepository, type RecordRow } from "./records.repository.js";
+import {
+  recordsRepository,
+  type RecordRow,
+  type RecordsJournalCountRow,
+} from "./records.repository.js";
 
 const LOCATION_ID = "11111111-1111-4111-8111-111111111111";
 const ORGANIZATION_ID = "22222222-2222-4222-8222-222222222222";
 const TIME_ZONE = "Europe/Sofia";
+const FORM_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const FORM_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const TARGET_ID = "33333333-3333-4333-8333-333333333333";
+const USER_ID = "55555555-5555-4555-8555-555555555555";
+const AREA_ID = "66666666-6666-4666-8666-666666666666";
+const COMPONENT_ID = "77777777-7777-4777-8777-777777777777";
 const db = {} as Db;
 
 function query(overrides: Record<string, string> = {}): RecordsListQuery {
@@ -110,6 +121,52 @@ describe("normalizeRecordsQuery", () => {
       category: ["temperature"],
       state: ["submitted", "voided"],
       result: ["fail"],
+      timing: undefined,
+      form: undefined,
+      target: undefined,
+      recordedBy: undefined,
+      search: undefined,
+      outcome: undefined,
+    });
+  });
+
+  it("carries the trimmed search and the outcome filter through", () => {
+    expect(
+      normalizeRecordsQuery(
+        query({ search: "  Fridge 1 ", outcome: "missed,attention" }),
+      ).filters,
+    ).toMatchObject({
+      search: "Fridge 1",
+      outcome: ["attention", "missed"],
+    });
+  });
+
+  it("drops a blank search", () => {
+    expect(normalizeRecordsQuery(query({ search: "   " })).filters.search).toBe(
+      undefined,
+    );
+  });
+
+  it("rejects an unknown outcome and a search over 100 characters", () => {
+    expect(() => query({ outcome: "late" })).toThrow();
+    expect(() => query({ search: "x".repeat(101) })).toThrow();
+  });
+
+  it("carries the timing filter through", () => {
+    expect(
+      normalizeRecordsQuery(query({ timing: "late" })).filters,
+    ).toMatchObject({ timing: ["late"] });
+  });
+
+  it("carries the check, item and person filters through", () => {
+    expect(
+      normalizeRecordsQuery(
+        query({ form: FORM_A, target: TARGET_ID, recordedBy: USER_ID }),
+      ).filters,
+    ).toMatchObject({
+      form: [FORM_A],
+      target: [TARGET_ID],
+      recordedBy: [USER_ID],
     });
   });
 });
@@ -340,7 +397,33 @@ describe("normalizeRecordsReportQuery", () => {
       sortBy: "entryAt",
       sortOrder: "asc",
       offset: 0,
-      filters: { category: undefined, state: undefined, result: undefined },
+      filters: {
+        category: undefined,
+        state: undefined,
+        result: undefined,
+        timing: undefined,
+        form: undefined,
+        target: undefined,
+        recordedBy: undefined,
+        exclude: undefined,
+      },
+    });
+  });
+
+  it("carries the timing filter and the excluded items through", () => {
+    expect(
+      normalizeRecordsReportQuery(
+        reportQuery({
+          timing: "late",
+          exclude: `${FORM_B}:${TARGET_ID},${FORM_A}:${TARGET_ID}`,
+        }),
+      ).filters,
+    ).toMatchObject({
+      timing: ["late"],
+      exclude: [
+        { formId: FORM_A, targetId: TARGET_ID },
+        { formId: FORM_B, targetId: TARGET_ID },
+      ],
     });
   });
 
@@ -349,6 +432,11 @@ describe("normalizeRecordsReportQuery", () => {
       normalizeRecordsReportQuery(reportQuery({ state: "open,missed" }))
         .filters,
     ).toMatchObject({ state: ["missed", "open"] });
+  });
+
+  it("rejects the grid's search and outcome filters", () => {
+    expect(() => reportQuery({ search: "Fridge" })).toThrow();
+    expect(() => reportQuery({ outcome: "missed" })).toThrow();
   });
 });
 
@@ -485,5 +573,232 @@ describe("getRecordsReport", () => {
         reportQuery({ dateFrom: "2025-08-23", dateTo: "2026-08-23" }),
       ).result,
     ).resolves.toMatchObject({ status: "ok" });
+  });
+});
+
+function journalRow(
+  overrides: Partial<RecordsJournalCountRow> = {},
+): RecordsJournalCountRow {
+  return {
+    formId: FORM_A,
+    formName: "Fridges",
+    targetId: null,
+    targetName: null,
+    targetKind: null,
+    areaName: null,
+    total: 1,
+    ...overrides,
+  };
+}
+
+describe("mergeJournalCounts", () => {
+  it("sums a form and an item counted by both branches and drops empty groups", () => {
+    expect(
+      mergeJournalCounts([
+        journalRow({
+          formId: FORM_B,
+          formName: "Fridges",
+          targetId: TARGET_ID,
+          targetName: "Fridge 1",
+          targetKind: "equipment",
+          total: 3,
+        }),
+        journalRow({ formId: FORM_A, formName: "Cleaning", total: 0 }),
+        journalRow({
+          formId: FORM_B,
+          formName: "Fridges",
+          targetId: TARGET_ID,
+          targetName: "Fridge 1",
+          targetKind: "equipment",
+          total: 2,
+        }),
+      ]),
+    ).toEqual([
+      {
+        formId: FORM_B,
+        name: "Fridges",
+        total: 5,
+        targets: [
+          {
+            targetId: TARGET_ID,
+            name: "Fridge 1",
+            kind: "equipment",
+            areaName: null,
+            total: 5,
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("counts rows with no item in the form's total but lists no item for them", () => {
+    expect(
+      mergeJournalCounts([
+        journalRow({ total: 4 }),
+        journalRow({
+          targetId: TARGET_ID,
+          targetName: "Fridge 1",
+          targetKind: "equipment",
+          total: 2,
+        }),
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        total: 6,
+        targets: [expect.objectContaining({ targetId: TARGET_ID, total: 2 })],
+      }),
+    ]);
+
+    expect(mergeJournalCounts([journalRow({ total: 3 })])).toEqual([
+      { formId: FORM_A, name: "Fridges", total: 3, targets: [] },
+    ]);
+  });
+
+  it("orders items by area then name, an area ahead of its own components", () => {
+    const [journal] = mergeJournalCounts([
+      journalRow({
+        targetId: COMPONENT_ID,
+        targetName: "Walls",
+        targetKind: "component",
+        areaName: "Cold room",
+      }),
+      journalRow({
+        targetId: TARGET_ID,
+        targetName: "Display fridge",
+        targetKind: "equipment",
+      }),
+      journalRow({
+        targetId: USER_ID,
+        targetName: "Floor",
+        targetKind: "component",
+        areaName: "Cold room",
+      }),
+      journalRow({
+        targetId: AREA_ID,
+        targetName: "Cold room",
+        targetKind: "area",
+      }),
+    ]);
+
+    expect(
+      journal!.targets.map((target) => [target.areaName, target.name]),
+    ).toEqual([
+      [null, "Cold room"],
+      ["Cold room", "Floor"],
+      ["Cold room", "Walls"],
+      [null, "Display fridge"],
+    ]);
+  });
+
+  it("orders forms by name, then id, so equal names stay stable", () => {
+    expect(
+      mergeJournalCounts([
+        journalRow({ formId: FORM_B, formName: "Fridges" }),
+        journalRow({ formId: FORM_A, formName: "Fridges" }),
+        journalRow({ formId: TARGET_ID, formName: "Cleaning" }),
+      ]).map((journal) => [journal.name, journal.formId]),
+    ).toEqual([
+      ["Cleaning", TARGET_ID],
+      ["Fridges", FORM_A],
+      ["Fridges", FORM_B],
+    ]);
+  });
+});
+
+describe("listJournals", () => {
+  it("counts under the same filters and captured scope as the report", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-23T09:00:00.000Z"));
+    const countByFormAndTarget = vi
+      .spyOn(recordsRepository, "countByFormAndTarget")
+      .mockResolvedValue([journalRow({ total: 4 })]);
+
+    const result = await recordsService.listJournals(db, {
+      locationId: LOCATION_ID,
+      organizationId: ORGANIZATION_ID,
+      timeZone: TIME_ZONE,
+      query: reportQuery({
+        state: "missed",
+        recordedBy: USER_ID,
+        timing: "late",
+      }),
+    });
+
+    expect(result).toEqual({
+      items: [{ formId: FORM_A, name: "Fridges", total: 4, targets: [] }],
+    });
+    expect(countByFormAndTarget.mock.calls[0]![1]).toMatchObject({
+      locationId: LOCATION_ID,
+      organizationId: ORGANIZATION_ID,
+      now: new Date("2026-08-23T09:00:00.000Z"),
+      filters: { state: ["missed"], recordedBy: [USER_ID], timing: ["late"] },
+    });
+  });
+
+  it("ignores excluded items, so the print dialog can still offer them", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-23T09:00:00.000Z"));
+    const countByFormAndTarget = vi
+      .spyOn(recordsRepository, "countByFormAndTarget")
+      .mockResolvedValue([]);
+
+    await recordsService.listJournals(db, {
+      locationId: LOCATION_ID,
+      organizationId: ORGANIZATION_ID,
+      timeZone: TIME_ZONE,
+      query: reportQuery({ exclude: `${FORM_A}:${TARGET_ID}` }),
+    });
+
+    expect(countByFormAndTarget.mock.calls[0]![1]!.filters).not.toHaveProperty(
+      "exclude",
+    );
+  });
+
+  it("rejects a range ending after the organization's current date", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-23T09:00:00.000Z"));
+    const countByFormAndTarget = vi.spyOn(
+      recordsRepository,
+      "countByFormAndTarget",
+    );
+
+    await expect(
+      recordsService.listJournals(db, {
+        locationId: LOCATION_ID,
+        organizationId: ORGANIZATION_ID,
+        timeZone: TIME_ZONE,
+        query: reportQuery({ dateTo: "2026-08-25" }),
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(countByFormAndTarget).not.toHaveBeenCalled();
+  });
+});
+
+describe("getFilterOptions", () => {
+  it("flags archived options and sorts items by their label", async () => {
+    vi.spyOn(recordsRepository, "findFormsUsedAtLocation").mockResolvedValue([
+      { id: FORM_A, name: "Fridges", archivedAt: new Date() },
+    ]);
+    vi.spyOn(recordsRepository, "findTargetsOfLocation").mockResolvedValue([
+      { id: TARGET_ID, name: "Kitchen › Walls", archivedAt: null },
+      { id: FORM_B, name: "Fridge 1", archivedAt: null },
+    ]);
+    vi.spyOn(recordsRepository, "findRecordersAtLocation").mockResolvedValue([
+      { id: USER_ID, firstName: "Maria", lastName: "Ivanova" },
+    ]);
+
+    expect(
+      await recordsService.getFilterOptions(db, {
+        locationId: LOCATION_ID,
+        organizationId: ORGANIZATION_ID,
+      }),
+    ).toEqual({
+      forms: [{ id: FORM_A, name: "Fridges", archived: true }],
+      targets: [
+        { id: FORM_B, name: "Fridge 1", archived: false },
+        { id: TARGET_ID, name: "Kitchen › Walls", archived: false },
+      ],
+      people: [{ id: USER_ID, firstName: "Maria", lastName: "Ivanova" }],
+    });
   });
 });

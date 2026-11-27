@@ -51,6 +51,11 @@ interface DataTableProps<TData, TValue> {
   onRowClick?: (row: Row<TData>) => void;
   /** Extra classes for one desktop row, e.g. to highlight the row just saved. */
   getRowClassName?: (row: Row<TData>) => string | undefined;
+  /**
+   * Starts a labelled group row whenever the key changes between consecutive rows, so
+   * rows arriving in group order (e.g. by day) read under one heading each. Desktop only.
+   */
+  getRowGroup?: (row: Row<TData>) => DataTableRowGroup | null;
   renderMobileRow?: (row: Row<TData>) => React.ReactNode;
   getRowActions?: (row: Row<TData>) => RowAction[];
   getRowLabel?: (row: Row<TData>) => string;
@@ -100,6 +105,12 @@ const TABLE_FILTER_FNS = {
   },
 };
 
+export type DataTableRowGroup = {
+  key: string;
+  label: React.ReactNode;
+  meta?: React.ReactNode;
+};
+
 const TABLE_DEFAULT_COLUMN = {
   filterFn: "includesString" as const,
 };
@@ -110,6 +121,7 @@ export function DataTable<TData, TValue>({
   onRowClick,
   renderMobileRow,
   getRowClassName,
+  getRowGroup,
   getRowActions,
   getRowLabel,
   mobileVariant,
@@ -426,12 +438,34 @@ export function DataTable<TData, TValue>({
             </TableHeader>
             <TableBody>
               {visibleRows.length ? (
-                visibleRows.map((row) => {
+                visibleRows.map((row, index) => {
                   const isRowClickable = Boolean(onRowClick);
+                  const group = getRowGroup?.(row) ?? null;
+                  const previousGroup =
+                    index > 0 ? getRowGroup?.(visibleRows[index - 1]!) : null;
+                  const startsGroup =
+                    group !== null && group.key !== previousGroup?.key;
 
                   return (
+                    <React.Fragment key={row.id}>
+                    {startsGroup ? (
+                      <TableRow
+                        data-slot="table-group-row"
+                        className="bg-muted/50 hover:bg-muted/50"
+                      >
+                        <TableCell colSpan={row.getVisibleCells().length}>
+                          <div className="flex items-center justify-between gap-4">
+                            <span className="font-medium">{group.label}</span>
+                            {group.meta ? (
+                              <span className="text-xs text-muted-foreground">
+                                {group.meta}
+                              </span>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : null}
                     <TableRow
-                      key={row.id}
                       data-row-key={row.id}
                       data-state={row.getIsSelected() ? "selected" : undefined}
                       className={cn(
@@ -485,6 +519,7 @@ export function DataTable<TData, TValue>({
                         </TableCell>
                       ))}
                     </TableRow>
+                    </React.Fragment>
                   );
                 })
               ) : (

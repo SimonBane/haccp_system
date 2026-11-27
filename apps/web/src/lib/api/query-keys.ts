@@ -7,12 +7,17 @@ export const queryKeys = {
     ["task-templates", locationId] as const,
   /** Invalidation root: covers every cached range, page, sort and filter variant. */
   records: (locationId: string) => ["records", locationId] as const,
-  /**
-   * The grid controller's key root. The range belongs to the scope, so placeholder
-   * rows from the previous range can never render against a new one.
-   */
-  recordsRange: (locationId: string, dateFrom: string, dateTo: string) =>
-    ["records", locationId, "range", dateFrom, dateTo] as const,
+  /** The desktop grid's key root; the range is part of its scope. */
+  recordsGrid: (locationId: string, dateFrom: string, dateTo: string) =>
+    ["records", locationId, "grid", dateFrom, dateTo] as const,
+  /** The phone list: the list query without the page, in canonical order. */
+  recordsList: (locationId: string, query: string) =>
+    ["records", locationId, "list", query] as const,
+  recordsFilterOptions: (locationId: string) =>
+    ["records", locationId, "filters"] as const,
+  /** `query` is the print dialog's canonical query string: period plus the grid's filters. */
+  recordsJournals: (locationId: string, query: string) =>
+    ["records", locationId, "journals", query] as const,
   // Org-scoped so switching Clerk org cannot serve the previous org's cache.
   locations: (organizationId: string) => ["locations", organizationId] as const,
   employees: (organizationId: string) => ["employees", organizationId] as const,

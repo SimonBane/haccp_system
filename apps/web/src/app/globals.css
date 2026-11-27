@@ -217,6 +217,23 @@
     break-after: avoid;
   }
 
+  @page journal-wide {
+    size: A4 landscape;
+  }
+
+  tr[data-report-entry] {
+    break-inside: avoid;
+  }
+
+  section[data-report-journal] {
+    break-before: page;
+  }
+
+  /* Chromium switches to a named page only at a forced break, which every journal has. */
+  section[data-report-journal][data-wide] {
+    page: journal-wide;
+  }
+
   h1,
   h2,
   h3 {

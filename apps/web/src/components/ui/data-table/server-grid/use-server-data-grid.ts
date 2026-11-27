@@ -51,6 +51,8 @@ export type UseServerDataGridOptions<
   capabilities?: Partial<GridCapabilities>;
   initialPage?: TPage;
   initialScopeKey?: string;
+  /** False keeps the grid idle, e.g. while another layout of the same page is on screen. */
+  enabled?: boolean;
 };
 
 export type ServerDataGrid<
@@ -195,6 +197,7 @@ export function useServerDataGrid<
       previousQuery && sameGridScope(previousQuery.queryKey, queryKey)
         ? previousData
         : undefined,
+    enabled: options.enabled ?? true,
   });
 
   const total = query.data?.total ?? 0;

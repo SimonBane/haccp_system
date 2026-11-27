@@ -6,6 +6,7 @@ import {
 } from "../lib/calendar-date.js";
 import {
   createGridFilterSchema,
+  createGridIdFilterSchema,
   createGridPageSchema,
   createGridQuerySchema,
   SORT_ORDER,
@@ -20,6 +21,7 @@ import {
   resolvedLimitsSchema,
   type RecordResult,
 } from "./form.js";
+import { targetKindSchema } from "./target.js";
 import { scheduledTimeSchema } from "./task-template.js";
 import { userSummarySchema } from "./user.js";
 
@@ -113,6 +115,83 @@ export const RECORDS_RESULT_FILTER_VALUES = [
   RECORD_RESULT.NOT_EVALUATED,
 ] as const;
 
+/** One word per row, the state and the result together: what the Status filter offers. */
+export const RECORD_OUTCOME = {
+  PASSED: "passed",
+  ATTENTION: "attention",
+  RECORDED: "recorded",
+  MISSED: "missed",
+  VOIDED: "voided",
+  OPEN: "open",
+} as const;
+
+export const RECORDS_OUTCOME_FILTER_VALUES = [
+  RECORD_OUTCOME.PASSED,
+  RECORD_OUTCOME.ATTENTION,
+  RECORD_OUTCOME.RECORDED,
+  RECORD_OUTCOME.MISSED,
+  RECORD_OUTCOME.VOIDED,
+  RECORD_OUTCOME.OPEN,
+] as const;
+
+export type RecordOutcome = (typeof RECORDS_OUTCOME_FILTER_VALUES)[number];
+
+/** Only lateness is filterable: the other timings already follow from the state filter. */
+export const RECORDS_TIMING_FILTER_VALUES = [RECORD_TIMING.LATE] as const;
+
+/** A crafted query string can carry any number of ids; a menu never offers this many. */
+export const RECORDS_ID_FILTER_MAX = 100;
+
+/** Check, item and person filters: ids, so their options come from the location's own data. */
+const recordsIdFilters = {
+  form: createGridIdFilterSchema(RECORDS_ID_FILTER_MAX),
+  target: createGridIdFilterSchema(RECORDS_ID_FILTER_MAX),
+  recordedBy: createGridIdFilterSchema(RECORDS_ID_FILTER_MAX),
+};
+
+/** One check's item left out of a printed journal, as `formId:targetId`. */
+export type RecordsExcludedItem = { formId: string; targetId: string };
+
+/** Pairs are what let one journal cover only some items while another covers them all. */
+export const recordsExcludeFilterSchema = z
+  .string()
+  .optional()
+  .transform((raw) =>
+    raw === undefined
+      ? []
+      : raw
+          .split(",")
+          .map((part) => part.trim())
+          .filter((part) => part !== ""),
+  )
+  .pipe(
+    z
+      .array(
+        z
+          .string()
+          .transform((pair) => pair.split(":"))
+          .pipe(z.tuple([z.uuid(), z.uuid()]))
+          .transform(([formId, targetId]) => ({ formId, targetId })),
+      )
+      .max(RECORDS_ID_FILTER_MAX),
+  )
+  .transform((parsed): RecordsExcludedItem[] | undefined => {
+    if (parsed.length === 0) return undefined;
+    const unique = new Map(
+      parsed.map((pair) => [`${pair.formId}:${pair.targetId}`, pair]),
+    );
+    return [...unique.keys()].sort().map((key) => unique.get(key)!);
+  });
+
+/** The wire form `recordsExcludeFilterSchema` parses back to the same canonical list. */
+export function serializeRecordsExclude(
+  pairs: readonly RecordsExcludedItem[],
+): string {
+  return [...new Set(pairs.map((pair) => `${pair.formId}:${pair.targetId}`))]
+    .sort()
+    .join(",");
+}
+
 export const RECORDS_DEFAULT_RANGE_DAYS = 7;
 
 export function defaultRecordsDateRange(today: string): {
@@ -183,13 +262,16 @@ function checkDateRangeOrder(
   }
 }
 
+/** Searches the check's name and the item's name, as recorded. */
 export const recordsListQuerySchema = createGridQuerySchema({
   sortFields: RECORDS_SORT_FIELDS,
-  search: false,
   filters: {
     category: createGridFilterSchema(RECORDS_CATEGORY_FILTER_VALUES),
     state: createGridFilterSchema(RECORDS_STATE_FILTER_VALUES),
     result: createGridFilterSchema(RECORDS_RESULT_FILTER_VALUES),
+    timing: createGridFilterSchema(RECORDS_TIMING_FILTER_VALUES),
+    outcome: createGridFilterSchema(RECORDS_OUTCOME_FILTER_VALUES),
+    ...recordsIdFilters,
   },
 })
   .safeExtend({
@@ -222,6 +304,9 @@ const recordsReportBaseSchema = z.strictObject({
   category: createGridFilterSchema(RECORDS_CATEGORY_FILTER_VALUES),
   state: createGridFilterSchema(RECORDS_STATE_FILTER_VALUES),
   result: createGridFilterSchema(RECORDS_RESULT_FILTER_VALUES),
+  timing: createGridFilterSchema(RECORDS_TIMING_FILTER_VALUES),
+  exclude: recordsExcludeFilterSchema,
+  ...recordsIdFilters,
 });
 
 export const recordsReportQuerySchema =
@@ -229,9 +314,29 @@ export const recordsReportQuerySchema =
 
 export type RecordsReportQuery = z.infer<typeof recordsReportQuerySchema>;
 
-/** The print page carries locationId in the URL; the API takes it as a path segment. */
+/** Journals and deviations are the same snapshot as the list, laid out differently by the print page. */
+export const RECORDS_REPORT_LAYOUT = {
+  LIST: "list",
+  JOURNALS: "journals",
+  DEVIATIONS: "deviations",
+} as const;
+
+export const recordsReportLayoutSchema = z.enum([
+  RECORDS_REPORT_LAYOUT.LIST,
+  RECORDS_REPORT_LAYOUT.JOURNALS,
+  RECORDS_REPORT_LAYOUT.DEVIATIONS,
+]);
+
+export type RecordsReportLayout = z.infer<typeof recordsReportLayoutSchema>;
+
+/** The print page carries locationId and layout in the URL; the API takes neither as a query parameter. */
 export const recordsReportSearchParamsSchema = recordsReportBaseSchema
-  .safeExtend({ locationId: z.uuid() })
+  .safeExtend({
+    locationId: z.uuid(),
+    layout: recordsReportLayoutSchema.default(RECORDS_REPORT_LAYOUT.LIST),
+    /** Ends a journal pack with the deviations report, from the same rows. */
+    deviations: z.literal("include").optional(),
+  })
   .check(checkDateRangeOrder);
 
 export type RecordsReportSearchParams = z.infer<
@@ -391,3 +496,54 @@ export function deriveRecordResult(
 ): RecordResult {
   return record?.result ?? RECORD_RESULT.NOT_EVALUATED;
 }
+
+/** An option a Records filter offers; archived ones stay listed because old records still point at them. */
+export const recordsFilterOptionSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  archived: z.boolean(),
+});
+
+export type RecordsFilterOption = z.infer<typeof recordsFilterOptionSchema>;
+
+/** The checks with rows at this location, its items, and everyone who has recorded there. */
+export const recordsFilterOptionsResponseSchema = z.object({
+  forms: z.array(recordsFilterOptionSchema),
+  targets: z.array(recordsFilterOptionSchema),
+  people: z.array(userSummarySchema),
+});
+
+export type RecordsFilterOptionsResponse = z.infer<
+  typeof recordsFilterOptionsResponseSchema
+>;
+
+/** One item's rows inside a journal; the area is named so a phone can group components under it. */
+export const recordsJournalTargetSchema = z.object({
+  targetId: z.uuid(),
+  name: z.string(),
+  kind: targetKindSchema,
+  areaName: z.string().nullable(),
+  total: z.int().positive(),
+});
+
+export type RecordsJournalTarget = z.infer<typeof recordsJournalTargetSchema>;
+
+/** How many Records rows one check has under a query: what the print dialog offers as a journal. */
+export const recordsJournalSummarySchema = z.object({
+  formId: z.uuid(),
+  name: z.string(),
+  /** Every row, the ones with no item included. */
+  total: z.int().positive(),
+  /** Empty for a check of the whole location: there is nothing to choose. */
+  targets: z.array(recordsJournalTargetSchema),
+});
+
+export type RecordsJournalSummary = z.infer<typeof recordsJournalSummarySchema>;
+
+export const recordsJournalsResponseSchema = z.object({
+  items: z.array(recordsJournalSummarySchema),
+});
+
+export type RecordsJournalsResponse = z.infer<
+  typeof recordsJournalsResponseSchema
+>;

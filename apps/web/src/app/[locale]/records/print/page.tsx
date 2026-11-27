@@ -10,7 +10,7 @@ import {
 } from "@/features/records-report/lib/report-search-params";
 import { RecordsReport } from "@/features/records-report/records-report";
 import { hasMultipleLocations } from "@/features/tenant/lib/multiple-locations";
-import type { Locale } from "@/i18n/routing";
+import { routing, type Locale } from "@/i18n/routing";
 
 const BACK_HREF = "/dashboard/records";
 
@@ -97,8 +97,24 @@ export default async function RecordsPrintReportPage({
       locale={locale}
       timeZone={tenant.organization.timezone}
       backHref={BACK_HREF}
+      pdfHref={pdfHref(locale, query)}
     />
   );
+}
+
+/** The same query, served as the journal PDF next to this page. */
+function pdfHref(
+  locale: string,
+  query: Record<string, string | string[] | undefined>,
+): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    for (const item of [value].flat()) {
+      if (item !== undefined) search.append(key, item);
+    }
+  }
+  const prefix = locale === routing.defaultLocale ? "" : `/${locale}`;
+  return `${prefix}/records/print/pdf?${search}`;
 }
 
 function reportAuthor(

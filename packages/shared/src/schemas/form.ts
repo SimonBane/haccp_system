@@ -531,7 +531,11 @@ export const formVersionSummarySchema = z.object({
   formId: z.uuid(),
   formName: z.string(),
   category: formCategorySchema,
+  appliesTo: formAppliesToSchema,
+  onDemand: z.boolean(),
   version: z.int().positive(),
+  /** When this version was published: the edition date a printed journal shows. */
+  publishedAt: z.iso.datetime(),
   definition: formDefinitionSchema,
 });
 

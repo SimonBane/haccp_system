@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   TARGET_NAME_MAX_LENGTH,
   isTargetNameTaken,
+  splitTargetDisplayName,
   targetDisplayName,
   targetDuplicateInputSchema,
   targetInputSchema,
@@ -149,6 +150,24 @@ describe("targetDisplayName", () => {
       "Fridge",
     );
     expect(targetDisplayName({ name: "Walls", kind: "component" }, null)).toBe("Walls");
+  });
+});
+
+describe("splitTargetDisplayName", () => {
+  it("reads a component's area back out of its display name", () => {
+    expect(splitTargetDisplayName("Kitchen 2 › Walls")).toEqual({
+      area: "Kitchen 2",
+      name: "Walls",
+    });
+  });
+
+  it("leaves a name without an area whole", () => {
+    expect(splitTargetDisplayName("Fridge")).toEqual({ area: null, name: "Fridge" });
+  });
+
+  it("round-trips what targetDisplayName wrote", () => {
+    const shown = targetDisplayName({ name: "Floor", kind: "component" }, "Cold room");
+    expect(splitTargetDisplayName(shown)).toEqual({ area: "Cold room", name: "Floor" });
   });
 });
 

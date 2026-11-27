@@ -18,6 +18,8 @@
     "db:migrate": "node --env-file=.env --env-file=.env.local ./node_modules/drizzle-kit/bin.cjs migrate",
     "db:migrate:deploy": "drizzle-kit migrate",
     "db:check": "drizzle-kit generate",
+    "db:seed": "tsx --env-file=.env --env-file=.env.local src/scripts/seed-demo.ts",
+    "db:seed:supabase": "tsx --env-file=.env --env-file=.env.supabase src/scripts/seed-demo.ts",
     "db:studio": "node --env-file=.env --env-file=.env.local ./node_modules/drizzle-kit/bin.cjs studio"
   },
   "dependencies": {
